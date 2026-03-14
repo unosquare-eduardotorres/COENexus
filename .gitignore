@@ -5,6 +5,8 @@ node_modules
 dist
 dist-ssr
 build
+bin/
+obj/
 
 # Local env files
 .env
@@ -44,3 +46,6 @@ coverage
 
 # Tesseract OCR trained data (large binary files)
 backend/tessdata/*.traineddata
+
+# HAR files (may contain tokens and sensitive data)
+*.har
