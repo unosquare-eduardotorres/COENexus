@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OperationNexus.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+16893d62067fd44cce797b45667c22b95b647d87")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d03e2de61da040583a88e642349b7df2c3068e7e")]
 [assembly: System.Reflection.AssemblyProductAttribute("OperationNexus.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OperationNexus.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

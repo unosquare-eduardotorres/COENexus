@@ -554,10 +554,10 @@ export default function DataSyncPage() {
                 ) : (
                   <button
                     onClick={() => setHasEntered(false)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent-500 hover:text-accent-600 bg-accent-500/5 hover:bg-accent-500/10 border border-accent-500/20 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-accent-500 hover:bg-accent-600 rounded-lg transition-colors shadow-sm shadow-accent-500/25 animate-pulse hover:animate-none"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.9-4.243a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.9-4.243a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
                     </svg>
                     Connect Token
                   </button>

@@ -42,7 +42,13 @@ builder.Services.Configure<VoyageSettings>(builder.Configuration.GetSection("Voy
 builder.Services.AddHttpClient<VoyageEmbeddingService>();
 builder.Services.AddScoped<IVoyageEmbeddingService, VoyageEmbeddingService>();
 builder.Services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
+builder.Services.AddSingleton<MatchSearchCoordinator>();
 builder.Services.AddScoped<IProcessingOrchestrator, ProcessingOrchestrator>();
+
+builder.Services.Configure<ClaudeProxySettings>(builder.Configuration.GetSection("ClaudeProxy"));
+builder.Services.AddHttpClient<ClaudeProxyService>();
+builder.Services.AddScoped<IClaudeProxyService, ClaudeProxyService>();
+builder.Services.AddScoped<IMatchEngineService, MatchEngineService>();
 
 var connectionString = builder.Configuration.GetConnectionString("NexusDb");
 builder.Services.AddDbContext<NexusDbContext>(options =>

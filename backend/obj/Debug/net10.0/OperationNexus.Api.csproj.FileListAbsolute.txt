@@ -132,3 +132,10 @@
 /Users/eduardo.torres/Downloads/COE Operation Nexus/backend/obj/Debug/net10.0/OperationNexus.Api.pdb
 /Users/eduardo.torres/Downloads/COE Operation Nexus/backend/obj/Debug/net10.0/OperationNexus.Api.genruntimeconfig.cache
 /Users/eduardo.torres/Downloads/COE Operation Nexus/backend/obj/Debug/net10.0/ref/OperationNexus.Api.dll
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/tessdata/eng.traineddata
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/tessdata/spa.traineddata
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/x86/leptonica-1.85.0.dll
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/x86/tesseract55.dll
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/x64/leptonica-1.85.0.dll
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/x64/tesseract55.dll
+/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/bin/Debug/net10.0/TesseractOCR.dll

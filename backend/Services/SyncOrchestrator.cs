@@ -14,6 +14,11 @@ public class SyncOrchestrator : ISyncOrchestrator
     private readonly NexusDbContext _dbContext;
     private readonly ILogger<SyncOrchestrator> _logger;
 
+    private static readonly HashSet<string> SupportedResumeExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".docx", ".doc"
+    };
+
     private static readonly HashSet<string> ExcludedJobTitles = new(StringComparer.OrdinalIgnoreCase)
     {
         "Centers Of Excellence",
@@ -552,7 +557,9 @@ public class SyncOrchestrator : ISyncOrchestrator
         var contract = contracts.FirstOrDefault();
         var rate = rates.FirstOrDefault();
         var resumeNote = notes
-            .Where(n => n.NoteTypeName == "Resume")
+            .Where(n => n.NoteTypeName == "Resume"
+                && !string.IsNullOrEmpty(n.Filename)
+                && SupportedResumeExtensions.Contains(Path.GetExtension(n.Filename)))
             .OrderByDescending(n => n.DateCreated)
             .FirstOrDefault();
 
@@ -611,7 +618,9 @@ public class SyncOrchestrator : ISyncOrchestrator
     private SyncedCandidate BuildCandidateEntity(CandidateDetail detail, List<PersonaNote> notes)
     {
         var resumeNote = notes
-            .Where(n => n.NoteTypeName == "Resume")
+            .Where(n => n.NoteTypeName == "Resume"
+                && !string.IsNullOrEmpty(n.Filename)
+                && SupportedResumeExtensions.Contains(Path.GetExtension(n.Filename)))
             .OrderByDescending(n => n.DateCreated)
             .FirstOrDefault();
 

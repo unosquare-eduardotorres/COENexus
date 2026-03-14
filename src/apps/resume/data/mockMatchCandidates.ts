@@ -1,199 +1,65 @@
-import { MatchCandidate, PipelineStats, DataSource } from '../types';
+export const SAMPLE_JOB_DESCRIPTION = `Position Title: Backend Engineer
+Reports To: Director of Software Engineering
 
-export const SAMPLE_JOB_DESCRIPTION = `Senior Full-Stack Developer – Healthcare Platform\n\nWe are looking for a Senior Full-Stack Developer to join our healthcare technology team. The ideal candidate will have strong experience with .NET Core and React/TypeScript, with specific knowledge of healthcare integration standards (HL7, FHIR).\n\nRequirements:\n• 5+ years of experience with C#/.NET Core\n• 3+ years with React and TypeScript\n• Experience with HL7/FHIR healthcare integration standards\n• PostgreSQL or similar relational database experience\n• Azure cloud services (App Service, Functions, Service Bus)\n• Docker and Kubernetes for containerized deployments\n• GraphQL API design experience is a plus\n\nDomain Experience:\n• Healthcare industry experience strongly preferred\n• Understanding of HIPAA compliance requirements\n• Experience with patient data systems, EHR integrations\n\nSoft Skills:\n• Team leadership or mentoring experience\n• Strong communication skills for cross-functional collaboration\n• Ability to work in agile environments`;
+The Position:
+We're seeking a Backend Engineer to design and build interoperability-first services in Azure that securely move, transform, and expose healthcare data. You will work primarily in Python to integrate external systems via REST APIs, implement standards like FHIR and C-CDA, generate compliant HTML-to-PDF documents, and deploy horizontally scalable services on Azure Container Apps or Azure Function Apps. Success in this role leads directly to lower turnaround time, higher data quality, and audit-ready outcomes in a HIPAA/HITRUST environment.
 
-export const mockMatchCandidates: MatchCandidate[] = [
-  {
-    id: 1, name: "Alejandra Reyes", type: "employee", role: "Senior Full-Stack Developer",
-    matchScore: 94, years: 8, location: "Guadalajara, MX", salary: "$65/hr", availability: "Immediately",
-    seniority: "Senior", expectedRate: 65, currency: "USD", country: "Mexico", mainSkill: "C#", isBench: true, centerOfExcellence: "Backend",
-    scores: { technical: 96, domain: 92, leadership: 88, softSkills: 90, availability: 100 },
-    summary: "Senior .NET/React developer with 3+ years of HL7/FHIR integration work and proven team leadership. Built healthcare data pipelines serving 200K+ patients.",
-    skills: [
-      { name: "C# / .NET Core", status: "match", years: 6 },
-      { name: "React / TypeScript", status: "match", years: 4 },
-      { name: "HL7 / FHIR", status: "match", years: 3 },
-      { name: "PostgreSQL", status: "match", years: 5 },
-      { name: "Azure", status: "match", years: 4 },
-      { name: "Docker / K8s", status: "partial", years: 2 },
-      { name: "GraphQL", status: "missing", years: 0 },
-    ],
-    domains: [
-      { name: "Healthcare", confidence: 92, evidence: "HL7 integration layer, FHIR API development, hospital EHR system" },
-      { name: "Finance", confidence: 45, evidence: "Payment processing module for billing system" },
-    ],
-    gaps: [
-      { skill: "GraphQL", severity: "low", note: "JD mentions GraphQL but REST experience is extensive — quick ramp-up expected" },
-      { skill: "Kubernetes", severity: "medium", note: "Docker experience present, Kubernetes exposure limited to dev environments" },
-    ],
-    leadership: ["Led team of 6 engineers", "Mentored 3 junior developers", "Conducted architecture reviews"],
-    softSkills: ["Cross-functional communication", "Stakeholder management", "Agile/Scrum facilitation"],
-  },
-  {
-    id: 2, name: "Marcus Chen", type: "employee", role: "Tech Lead - Backend",
-    matchScore: 89, years: 10, location: "Remote - Austin, TX", salary: "$75/hr", availability: "2 weeks",
-    seniority: "Lead", expectedRate: 75, currency: "USD", country: "United States", mainSkill: "C#", isBench: false, centerOfExcellence: "Architecture",
-    scores: { technical: 91, domain: 85, leadership: 95, softSkills: 87, availability: 85 },
-    summary: "Seasoned backend architect with healthcare platform experience at scale. Strong leadership track record managing cross-functional teams of 10+.",
-    skills: [
-      { name: "C# / .NET Core", status: "match", years: 8 },
-      { name: "React / TypeScript", status: "partial", years: 2 },
-      { name: "HL7 / FHIR", status: "match", years: 4 },
-      { name: "PostgreSQL", status: "match", years: 7 },
-      { name: "Azure", status: "match", years: 5 },
-      { name: "Docker / K8s", status: "match", years: 4 },
-      { name: "GraphQL", status: "match", years: 3 },
-    ],
-    domains: [
-      { name: "Healthcare", confidence: 85, evidence: "Built patient data platform, HIPAA compliance architecture" },
-      { name: "Insurance", confidence: 60, evidence: "Claims processing system integration" },
-    ],
-    gaps: [
-      { skill: "React depth", severity: "medium", note: "Frontend experience is functional but not deep — primarily backend/API focused" },
-    ],
-    leadership: ["Managed team of 12", "Led platform migration", "Defined engineering standards", "Hired 8 engineers"],
-    softSkills: ["Executive communication", "Conflict resolution", "Strategic planning"],
-  },
-  {
-    id: 3, name: "Priya Sharma", type: "candidate", role: "Full-Stack Developer",
-    matchScore: 86, years: 5, location: "Monterrey, MX", salary: "$50/hr", availability: "Immediately",
-    seniority: "Mid", expectedRate: 50, currency: "USD", country: "Mexico", mainSkill: "React", isBench: false,
-    scores: { technical: 90, domain: 78, leadership: 72, softSkills: 88, availability: 100 },
-    summary: "Strong full-stack developer with modern .NET and React skills. Healthcare exposure through clinical trial management system. Rising talent with fast learning curve.",
-    skills: [
-      { name: "C# / .NET Core", status: "match", years: 4 },
-      { name: "React / TypeScript", status: "match", years: 3 },
-      { name: "HL7 / FHIR", status: "partial", years: 1 },
-      { name: "PostgreSQL", status: "match", years: 3 },
-      { name: "Azure", status: "partial", years: 2 },
-      { name: "Docker / K8s", status: "missing", years: 0 },
-      { name: "GraphQL", status: "match", years: 2 },
-    ],
-    domains: [
-      { name: "Healthcare", confidence: 78, evidence: "Clinical trial management system, patient portal" },
-    ],
-    gaps: [
-      { skill: "Docker / Kubernetes", severity: "high", note: "No container orchestration experience — would need training" },
-      { skill: "HL7 depth", severity: "medium", note: "Basic FHIR awareness but no deep HL7 integration work" },
-    ],
-    leadership: ["Led feature team of 3"],
-    softSkills: ["Quick learner", "Strong documentation", "Collaborative"],
-  },
-  {
-    id: 4, name: "David Kowalski", type: "employee", role: "Senior Software Engineer",
-    matchScore: 83, years: 7, location: "CDMX, MX", salary: "$60/hr", availability: "30 days",
-    seniority: "Senior", expectedRate: 60, currency: "USD", country: "Mexico", mainSkill: "C#", isBench: false, centerOfExcellence: "Backend",
-    scores: { technical: 88, domain: 70, leadership: 80, softSkills: 85, availability: 75 },
-    summary: "Versatile .NET developer with strong API design skills. Finance-focused background with some healthcare-adjacent work through insurance platforms.",
-    skills: [
-      { name: "C# / .NET Core", status: "match", years: 7 },
-      { name: "React / TypeScript", status: "match", years: 3 },
-      { name: "HL7 / FHIR", status: "missing", years: 0 },
-      { name: "PostgreSQL", status: "match", years: 5 },
-      { name: "Azure", status: "match", years: 4 },
-      { name: "Docker / K8s", status: "match", years: 3 },
-      { name: "GraphQL", status: "partial", years: 1 },
-    ],
-    domains: [
-      { name: "Healthcare", confidence: 40, evidence: "Insurance claims platform (healthcare-adjacent)" },
-      { name: "Finance", confidence: 82, evidence: "Trading platform, payment gateway, compliance reporting" },
-    ],
-    gaps: [
-      { skill: "HL7 / FHIR", severity: "high", note: "No direct healthcare integration experience — would need significant ramp-up" },
-      { skill: "Healthcare domain", severity: "high", note: "Finance-focused career — healthcare knowledge gap" },
-    ],
-    leadership: ["Led backend team of 4", "Drove microservices adoption"],
-    softSkills: ["Problem solving", "Technical writing", "Mentoring"],
-  },
-  {
-    id: 5, name: "Sofia Morales", type: "candidate", role: "Mid-Level Developer",
-    matchScore: 79, years: 4, location: "Bogotá, CO", salary: "$42/hr", availability: "Immediately",
-    seniority: "Mid", expectedRate: 42, currency: "USD", country: "Colombia", mainSkill: "React", isBench: false,
-    scores: { technical: 82, domain: 74, leadership: 65, softSkills: 90, availability: 100 },
-    summary: "Promising React-focused developer with growing .NET skills. Healthcare startup experience with telemedicine platform. Excellent communication and collaboration.",
-    skills: [
-      { name: "C# / .NET Core", status: "partial", years: 2 },
-      { name: "React / TypeScript", status: "match", years: 4 },
-      { name: "HL7 / FHIR", status: "partial", years: 1 },
-      { name: "PostgreSQL", status: "match", years: 3 },
-      { name: "Azure", status: "missing", years: 0 },
-      { name: "Docker / K8s", status: "missing", years: 0 },
-      { name: "GraphQL", status: "match", years: 3 },
-    ],
-    domains: [
-      { name: "Healthcare", confidence: 74, evidence: "Telemedicine platform, patient scheduling system" },
-    ],
-    gaps: [
-      { skill: "Azure", severity: "high", note: "AWS experience only — would need Azure onboarding" },
-      { skill: "Docker / K8s", severity: "high", note: "No containerization experience" },
-      { skill: ".NET depth", severity: "medium", note: "2 years .NET — junior level, needs mentoring" },
-    ],
-    leadership: [],
-    softSkills: ["Excellent communicator", "Self-motivated", "Quick learner", "Team player"],
-  },
-  {
-    id: 6, name: "James O'Brien", type: "employee", role: "Senior Developer",
-    matchScore: 77, years: 9, location: "Remote - Dublin, IE", salary: "$70/hr", availability: "60 days",
-    seniority: "Senior", expectedRate: 70, currency: "USD", country: "Ireland", mainSkill: "C#", isBench: false, centerOfExcellence: "Backend",
-    scores: { technical: 85, domain: 60, leadership: 82, softSkills: 78, availability: 55 },
-    summary: "Experienced .NET architect with strong backend fundamentals. No direct healthcare experience but deep understanding of regulated industries through fintech work.",
-    skills: [
-      { name: "C# / .NET Core", status: "match", years: 9 },
-      { name: "React / TypeScript", status: "partial", years: 2 },
-      { name: "HL7 / FHIR", status: "missing", years: 0 },
-      { name: "PostgreSQL", status: "match", years: 6 },
-      { name: "Azure", status: "match", years: 5 },
-      { name: "Docker / K8s", status: "match", years: 4 },
-      { name: "GraphQL", status: "match", years: 3 },
-    ],
-    domains: [
-      { name: "Finance", confidence: 90, evidence: "Fintech platforms, regulatory compliance systems" },
-    ],
-    gaps: [
-      { skill: "Healthcare domain", severity: "high", note: "No healthcare experience — significant domain knowledge gap" },
-      { skill: "HL7 / FHIR", severity: "high", note: "No exposure to healthcare integration standards" },
-      { skill: "Availability", severity: "medium", note: "60-day notice period — may delay project start" },
-    ],
-    leadership: ["Led architecture team", "Managed 5 direct reports", "Drove compliance initiatives"],
-    softSkills: ["Strategic thinking", "Technical documentation", "Stakeholder management"],
-  },
-];
+Duties & Responsibilities:
 
-export const mockPipelineStats: Record<DataSource, PipelineStats> = {
-  bench: {
-    profilesScanned: "142",
-    preFiltered: "38",
-    constraintsApplied: "32",
-    haikuTriage: "18",
-    sonnetAnalyzed: "12",
-    searchCost: "$0.18",
-    time: "12s",
-  },
-  'all-employees': {
-    profilesScanned: "1,023",
-    preFiltered: "87",
-    constraintsApplied: "64",
-    haikuTriage: "24",
-    sonnetAnalyzed: "18",
-    searchCost: "$0.32",
-    time: "24s",
-  },
-  candidates: {
-    profilesScanned: "48,512",
-    preFiltered: "412",
-    constraintsApplied: "285",
-    haikuTriage: "52",
-    sonnetAnalyzed: "35",
-    searchCost: "$0.58",
-    time: "68s",
-  },
-  'all-sources': {
-    profilesScanned: "49,677",
-    preFiltered: "499",
-    constraintsApplied: "349",
-    haikuTriage: "62",
-    sonnetAnalyzed: "45",
-    searchCost: "$0.72",
-    time: "82s",
-  },
-};
+Interoperability & Standards
+- Build FHIR integrations (e.g., Patient, DocumentReference, $match) including authentication (OAuth2 / SMART on FHIR) and robust error handling.
+- Parse and transform C-CDA clinical documents; map sections/entries into normalized data structures for downstream use.
+- Contribute to HL7 v2/MDM/ADT flows as needed (e.g., payload parsing, message validation, ack/error handling).
+
+API Engineering (Python)
+- Design and implement internal/external REST APIs using Python (FastAPI/Flask), with clear contracts, validation, and versioning.
+- Define OpenAPI specs, request/response schemas, and secure endpoints (authZ/authN, scopes, roles, and least-privilege).
+
+Document Generation (HTML → PDF)
+- Create accessible and compliant HTML templates for request/authorization letters and correspondence; convert to PDF via server-side renderers.
+- Implement a reusable templating pipeline (variables, partials, localization, testing) and ensure PDFs meet client and regulatory requirements.
+
+Cloud-Native Delivery (Azure)
+- Deploy horizontally scalable services on Azure Container Apps (with autoscale) or Azure Function Apps (Elastic Premium), backed by Application Insights and Log Analytics for observability.
+- Use Azure Service Bus/Event Grid for reliable, event-driven processing; design idempotent workers with poison-queue handling.
+- Manage secrets/config via Key Vault/App Configuration; implement blue/green or slot-based releases.
+
+Data Engineering
+- Build resilient ingestion/transformation pipelines for FHIR/C-CDA and API data across Blob/Data Lake/SQL/Cosmos DB stores.
+- Model data for reporting/analytics while maintaining lineage and auditability; enforce PII/PHI handling rules.
+
+Quality, Observability & Reliability
+- Instrument services with structured logs, metrics, and traces; maintain dashboards and SLOs (latency, error rate, throughput).
+- Write integration tests, contract tests, and data validation checks; automate with CI/CD (Azure DevOps/GitHub Actions).
+
+Compliance & Documentation
+- Ensure HIPAA/HITRUST controls are met across code, infrastructure, and logging.
+- Maintain developer-ready docs: API specs, field mappings, runbooks, and architectural decision records (ADRs).
+
+Experience & Qualifications:
+
+Required
+- 3+ years in data engineering, platform/API development, or similar roles.
+- Strong Python skills (FastAPI/Flask), including packaging, virtual environments, and testing frameworks.
+- Hands on building REST APIs and integrating external APIs; OpenAPI/Swagger proficiency.
+- Practical experience with FHIR (resources, search parameters, auth) and C-CDA parsing/transformation.
+- Knowledge of EPIC, Cerner, Athena, and other EMRs.
+- Proven deployment of horizontally scalable services on Azure (Container Apps or Function Apps), with observability and auto-scale.
+- Solid understanding of cloud data stores (Azure SQL, Blob/Data Lake, Postgres SQL DB) and event systems (Service Bus/Event Grid).
+- Git based workflows and CI/CD; security first mindset; excellent communication and collaboration.
+- Experience working in Healthcare.
+- Experience with FHIR, Epic, Cerner, Athena, eClinicalWorks, or other EMRs.
+
+Preferred
+- Experience with HL7 v2 (MLLP/MDM/ADT) message handling.
+- Familiarity with HTML→PDF engines and template systems.
+- IaC (Bicep/Terraform/ARM), Azure API Management, and private networking patterns.
+- Healthcare background and working knowledge of HIPAA/HITRUST controls.
+
+The Person:
+The successful candidate will be a motivated data engineer who:
+- Interoperability-minded: Enjoys turning healthcare standards (FHIR/C-CDA/HL7) into reliable, developer-friendly services.
+- Python craftsperson: Writes clean, testable code and well-documented APIs.
+- Cloud-native pragmatist: Designs for horizontal scale, resiliency, and observability from day one.
+- Compliance-aware: Bakes auditability and privacy into every pipeline and endpoint.
+- Collaborative: Works smoothly with product, ops, and security—translating requirements into running systems.`;

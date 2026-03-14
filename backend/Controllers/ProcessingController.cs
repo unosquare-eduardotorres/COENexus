@@ -228,4 +228,31 @@ public class ProcessingController : ControllerBase
         _vectorizeCts?.Cancel();
         return Ok();
     }
+
+    [HttpPost("reset-status/{source}/{upstreamId}")]
+    public async Task<IActionResult> ResetStatus(string source, int upstreamId)
+    {
+        if (source == "employees")
+        {
+            var emp = await _dbContext.SyncedEmployees.FirstOrDefaultAsync(e => e.UpstreamId == upstreamId);
+            if (emp == null) return NotFound();
+            emp.Status = "synced";
+            emp.Failed = false;
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { emp.UpstreamId, emp.FullName, emp.Status });
+        }
+        else if (source == "candidates")
+        {
+            var cand = await _dbContext.SyncedCandidates.FirstOrDefaultAsync(c => c.UpstreamId == upstreamId);
+            if (cand == null) return NotFound();
+            cand.Status = "synced";
+            cand.Failed = false;
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { cand.UpstreamId, cand.FullName, cand.Status });
+        }
+        else
+        {
+            return BadRequest("Invalid source. Use 'employees' or 'candidates'.");
+        }
+    }
 }

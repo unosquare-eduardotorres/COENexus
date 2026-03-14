@@ -69,8 +69,8 @@ export default function CandidateCard({
         </div>
 
         <div className="hidden md:block w-32 space-y-1.5">
-          <CategoryBar label="Technical" value={candidate.scores.technical} />
-          <CategoryBar label="Domain" value={candidate.scores.domain} />
+          <CategoryBar label="Technical" value={candidate.scores.technical} tooltip="Hard skills, frameworks, and tools match" />
+          <CategoryBar label="Domain" value={candidate.scores.domain} tooltip="Industry knowledge and vertical experience" />
         </div>
 
         <div className="hidden lg:flex flex-col items-end text-right gap-0.5">

@@ -300,12 +300,22 @@ export type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead' | 'Architect' | 'Tr
 
 export type Currency = 'USD' | 'MXN' | 'COP' | 'PEN' | 'BOB';
 
+export type SalaryOperator = 'lte' | 'gte';
+
 export interface HardConstraints {
-  seniority?: Seniority;
-  maxRate?: number;
-  currency?: Currency;
-  country?: string;
+  seniority?: string;
   mainSkill?: string;
+  salary?: number;
+  salaryOperator?: SalaryOperator;
+  salaryCurrency?: string;
+  country?: string;
+}
+
+export interface FilterOptions {
+  seniorities: string[];
+  mainSkills: string[];
+  countries: string[];
+  currencies: string[];
 }
 
 export type SkillMatchStatus = 'match' | 'partial' | 'missing';
@@ -362,6 +372,15 @@ export interface MatchCandidate {
   mainSkill: string;
   isBench: boolean;
   centerOfExcellence?: string;
+  analysis?: SonnetAnalysis;
+}
+
+export interface CandidateTiming {
+  name: string;
+  phase: 'haiku' | 'sonnet';
+  durationMs: number;
+  fallback: boolean;
+  error?: string;
 }
 
 export interface PipelineStats {
@@ -372,6 +391,8 @@ export interface PipelineStats {
   sonnetAnalyzed: string;
   searchCost: string;
   time: string;
+  timings?: Record<string, number>;
+  candidateTimings?: CandidateTiming[];
 }
 
 export interface SearchProgress {
@@ -379,7 +400,7 @@ export interface SearchProgress {
   stage: string;
 }
 
-export type MatchFlowType = 'find-for-position' | 'match-to-positions';
+export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op';
 
 export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'searching' | 'results' | 'deep-dive';
 
@@ -482,3 +503,95 @@ export type VoyageModel = 'voyage-4-large' | 'voyage-4' | 'voyage-4-lite';
 export interface VectorizationConfig {
   model: VoyageModel;
 }
+
+export type TopN = 1 | 10 | 20 | 30;
+
+export interface SonnetAnalysis {
+  whyRightFit: string;
+  immediateValue: string;
+  rampUpEstimate: string;
+  riskFactors: string;
+  beyondJd: string;
+  leadershipDynamics: string;
+  industryDepth: string;
+  trackRecord: string;
+  culturalFit: string;
+  retentionPotential: string;
+}
+
+export interface PoolCounts {
+  bench: number;
+  employees: number;
+  candidates: number;
+  allSources: number;
+}
+
+export type PipelineStageKey = 'vectorResults' | 'afterConstraints' | 'afterHaikuTriage' | 'sonnetAnalyzed';
+
+export interface PipelineStageCandidateDto {
+  upstreamId: number;
+  name: string;
+  sourceType: string;
+  cosineSimilarity: number;
+  seniority?: string;
+  mainSkill?: string;
+  country?: string;
+  isBench: boolean;
+  eliminationReason?: string | null;
+  haikuScore?: number | null;
+}
+
+export interface PipelineStages {
+  vectorResults: PipelineStageCandidateDto[];
+  afterConstraints: PipelineStageCandidateDto[];
+  afterHaikuTriage: PipelineStageCandidateDto[];
+}
+
+export interface HaikuConfirmPayload {
+  requestedTopN: number;
+  passedCount: number;
+  highestRejectedScore: number;
+  lowestPassedScore: number;
+  bestRejected: HaikuRejectedCandidate[];
+}
+
+export interface HaikuRejectedCandidate {
+  name: string;
+  haikuScore: number;
+  cosineSimilarity: number;
+  seniority?: string;
+  mainSkill?: string;
+}
+
+export interface MatchSessionSummary {
+  id: number;
+  name: string;
+  matchFlowType: MatchFlowType;
+  dataSource: DataSource;
+  topN: TopN;
+  jdSource: JdSource;
+  status: 'running' | 'completed' | 'failed';
+  createdAt: string;
+  completedAt?: string;
+  candidateCount?: number;
+  time?: string;
+}
+
+export interface MatchSessionDetail extends MatchSessionSummary {
+  jobDescription: string;
+  constraints?: HardConstraints;
+  stats?: PipelineStats;
+  pipelineStages?: PipelineStages;
+  candidates: MatchCandidate[];
+}
+
+export interface CreateSessionRequest {
+  name: string;
+  matchFlowType: MatchFlowType;
+  jdSource: JdSource;
+  jobDescription: string;
+  dataSource: DataSource;
+  topN: TopN;
+  constraints?: HardConstraints;
+}
+

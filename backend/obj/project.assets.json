@@ -801,6 +801,22 @@
         "build": {
           "buildTransitive/net6.0/_._": {}
         }
+      },
+      "TesseractOCR/5.5.1": {
+        "type": "package",
+        "compile": {
+          "lib/net9.0/TesseractOCR.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net9.0/TesseractOCR.dll": {
+            "related": ".xml"
+          }
+        },
+        "build": {
+          "build/TesseractOCR.targets": {}
+        }
       }
     }
   },
@@ -2422,6 +2438,41 @@
         "system.io.packaging.nuspec",
         "useSharedDesignerContext.txt"
       ]
+    },
+    "TesseractOCR/5.5.1": {
+      "sha512": "C/o5EAEqHv/77OVOF4BECACrbo0YcZBMR5AsaowYHPdch71p0w+K8qWXmWbJYSeA1jIJFXT/k9jO9ER7/6pYtQ==",
+      "type": "package",
+      "path": "tesseractocr/5.5.1",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "build/TesseractOCR.targets",
+        "lib/leptonica-1.85.0.dll",
+        "lib/net461/TesseractOCR.dll",
+        "lib/net461/TesseractOCR.xml",
+        "lib/net48/TesseractOCR.dll",
+        "lib/net48/TesseractOCR.xml",
+        "lib/net6.0/TesseractOCR.dll",
+        "lib/net6.0/TesseractOCR.xml",
+        "lib/net8.0/TesseractOCR.dll",
+        "lib/net8.0/TesseractOCR.xml",
+        "lib/net9.0/TesseractOCR.dll",
+        "lib/net9.0/TesseractOCR.xml",
+        "lib/netstandard2.1/TesseractOCR.dll",
+        "lib/netstandard2.1/TesseractOCR.xml",
+        "lib/tesseract.exe",
+        "lib/tesseract55.dll",
+        "ocr.png",
+        "tesseractocr.5.5.1.nupkg.sha512",
+        "tesseractocr.nuspec",
+        "x64/leptonica-1.85.0.dll",
+        "x64/tesseract.exe",
+        "x64/tesseract55.dll",
+        "x86/leptonica-1.85.0.dll",
+        "x86/tesseract.exe",
+        "x86/tesseract55.dll"
+      ]
     }
   },
   "projectFileDependencyGroups": {
@@ -2432,7 +2483,8 @@
       "Npgsql.EntityFrameworkCore.PostgreSQL >= 9.0.4",
       "PdfPig >= 0.1.13",
       "Pgvector.EntityFrameworkCore >= 0.3.0",
-      "Scalar.AspNetCore >= 2.0.0"
+      "Scalar.AspNetCore >= 2.0.0",
+      "TesseractOCR >= 5.5.1"
     ]
   },
   "packageFolders": {
@@ -2505,6 +2557,10 @@
           "Scalar.AspNetCore": {
             "target": "Package",
             "version": "[2.0.0, )"
+          },
+          "TesseractOCR": {
+            "target": "Package",
+            "version": "[5.5.1, )"
           }
         },
         "imports": [

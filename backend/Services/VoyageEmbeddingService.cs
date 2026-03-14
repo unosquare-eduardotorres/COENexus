@@ -1,5 +1,5 @@
+using System.Diagnostics;
 using System.Net;
-using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 using OperationNexus.Api.Configuration;
 
@@ -8,14 +8,16 @@ namespace OperationNexus.Api.Services;
 public class VoyageEmbeddingService : IVoyageEmbeddingService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<VoyageEmbeddingService> _logger;
     private readonly string _apiUrl;
     private readonly string _apiKey;
     private const int MaxRetries = 5;
     private static readonly int[] BackoffSeconds = [2, 5, 10, 20, 40];
 
-    public VoyageEmbeddingService(HttpClient httpClient, IOptions<VoyageSettings> settings)
+    public VoyageEmbeddingService(HttpClient httpClient, IOptions<VoyageSettings> settings, ILogger<VoyageEmbeddingService> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
         _apiUrl = settings.Value.ApiUrl.TrimEnd('/');
         _apiKey = settings.Value.ApiKey;
     }
@@ -35,16 +37,22 @@ public class VoyageEmbeddingService : IVoyageEmbeddingService
                 model
             });
 
+            var sw = Stopwatch.StartNew();
             var response = await _httpClient.SendAsync(request, ct);
+            sw.Stop();
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < MaxRetries)
             {
                 var retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds
                     ?? BackoffSeconds[Math.Min(attempt, BackoffSeconds.Length - 1)];
-                Console.Error.WriteLine($"[Voyage] 429 rate-limited, retry {attempt + 1}/{MaxRetries} after {retryAfter:F0}s");
+                _logger.LogWarning("[Voyage] 429 rate-limited, waiting {Delay:F0}s (retry {Attempt}/{Max})",
+                    retryAfter, attempt + 1, MaxRetries);
                 await Task.Delay(TimeSpan.FromSeconds(retryAfter), ct);
                 continue;
             }
+
+            _logger.LogInformation("[Voyage] Embedding generated in {Ms}ms (attempt {Attempt})",
+                sw.ElapsedMilliseconds, attempt + 1);
 
             response.EnsureSuccessStatusCode();
 

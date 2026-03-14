@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "t3NWjoI7flg=",
+  "dgSpecHash": "n98+eNWw/hQ=",
   "success": true,
   "projectFilePath": "/Users/eduardo.torres/Downloads/COE Operation Nexus/backend/OperationNexus.Api.csproj",
   "expectedPackageFiles": [
@@ -38,7 +38,8 @@
     "/Users/eduardo.torres/.nuget/packages/system.composition.hosting/7.0.0/system.composition.hosting.7.0.0.nupkg.sha512",
     "/Users/eduardo.torres/.nuget/packages/system.composition.runtime/7.0.0/system.composition.runtime.7.0.0.nupkg.sha512",
     "/Users/eduardo.torres/.nuget/packages/system.composition.typedparts/7.0.0/system.composition.typedparts.7.0.0.nupkg.sha512",
-    "/Users/eduardo.torres/.nuget/packages/system.io.packaging/8.0.1/system.io.packaging.8.0.1.nupkg.sha512"
+    "/Users/eduardo.torres/.nuget/packages/system.io.packaging/8.0.1/system.io.packaging.8.0.1.nupkg.sha512",
+    "/Users/eduardo.torres/.nuget/packages/tesseractocr/5.5.1/tesseractocr.5.5.1.nupkg.sha512"
   ],
   "logs": []
 }

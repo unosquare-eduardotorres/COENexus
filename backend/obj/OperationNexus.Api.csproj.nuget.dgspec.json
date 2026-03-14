@@ -71,6 +71,10 @@
             "Scalar.AspNetCore": {
               "target": "Package",
               "version": "[2.0.0, )"
+            },
+            "TesseractOCR": {
+              "target": "Package",
+              "version": "[5.5.1, )"
             }
           },
           "imports": [

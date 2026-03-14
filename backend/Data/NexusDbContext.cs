@@ -10,6 +10,7 @@ public class NexusDbContext : DbContext
     public DbSet<SyncedEmployee> SyncedEmployees => Set<SyncedEmployee>();
     public DbSet<SyncedCandidate> SyncedCandidates => Set<SyncedCandidate>();
     public DbSet<ResumeEmbedding> ResumeEmbeddings => Set<ResumeEmbedding>();
+    public DbSet<MatchSession> MatchSessions => Set<MatchSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,6 +35,12 @@ public class NexusDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => new { e.SourceType, e.SourceId }).IsUnique();
             entity.Property(e => e.Embedding).HasColumnType("vector(1024)").IsRequired(false);
+        });
+
+        modelBuilder.Entity<MatchSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.CreatedAt).IsDescending();
         });
     }
 }

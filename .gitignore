@@ -41,3 +41,6 @@ coverage
 
 # Vite
 *.local
+
+# Tesseract OCR trained data (large binary files)
+backend/tessdata/*.traineddata

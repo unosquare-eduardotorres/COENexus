@@ -101,11 +101,11 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
               </div>
 
               <div className="space-y-2">
-                <CategoryBar label="Technical" value={candidate.scores.technical} />
-                <CategoryBar label="Domain" value={candidate.scores.domain} />
-                <CategoryBar label="Leadership" value={candidate.scores.leadership} />
-                <CategoryBar label="Soft Skills" value={candidate.scores.softSkills} />
-                <CategoryBar label="Availability" value={candidate.scores.availability} />
+                <CategoryBar label="Technical" value={candidate.scores.technical} tooltip="Hard skills, frameworks, and tools match" />
+                <CategoryBar label="Domain" value={candidate.scores.domain} tooltip="Industry knowledge and vertical experience" />
+                <CategoryBar label="Leadership" value={candidate.scores.leadership} tooltip="Team management and decision-making ability" />
+                <CategoryBar label="Soft Skills" value={candidate.scores.softSkills} tooltip="Communication and collaboration capabilities" />
+                <CategoryBar label="Availability" value={candidate.scores.availability} tooltip="How quickly the candidate can start" />
               </div>
 
               <div className="space-y-1.5">

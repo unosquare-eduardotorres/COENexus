@@ -603,7 +603,7 @@ export default function SyncDashboard({
             </>
           )}
 
-          {statusFilter === 'extracted' && (
+          {(statusFilter === 'synced' || statusFilter === 'extracted') && (
             <ProcessActionButtons
               progress={extractionProgress}
               hasEligible={records.some((r) => r.pipelineStatus === 'synced' && r.hasResume)}
