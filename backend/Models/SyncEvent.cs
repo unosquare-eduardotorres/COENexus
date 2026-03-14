@@ -37,7 +37,12 @@ public record SyncRecordDto
     public string? SyncDetail { get; init; }
     public string SyncedAt { get; init; } = string.Empty;
     public string? ResumeDateCreated { get; init; }
+    public bool CoeCertified { get; init; }
+    public string? LastStatusUpdate { get; init; }
+    public decimal? SalaryExpectations { get; init; }
+    public string? SalaryExpectationsCurrency { get; init; }
     public string? JobTitle { get; init; }
+    public string? CandidateStatus { get; init; }
 }
 
 public record SyncProgressDto

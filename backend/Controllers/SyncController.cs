@@ -59,7 +59,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpGet("status/{source}")]
-    public async Task<IActionResult> GetStatus(string source)
+    public async Task<IActionResult> GetStatus(string source, [FromQuery] int? year = null)
     {
         if (source == "employees")
         {
@@ -84,13 +84,17 @@ public class SyncController : ControllerBase
 
         if (source == "candidates")
         {
-            var total = await _dbContext.SyncedCandidates.CountAsync();
-            var synced = await _dbContext.SyncedCandidates.CountAsync(e => e.Status == "synced");
-            var incomplete = await _dbContext.SyncedCandidates.CountAsync(e => e.Status == "incomplete");
-            var notProcessed = await _dbContext.SyncedCandidates.CountAsync(e => e.Status == "not-processed");
-            var extracted = await _dbContext.SyncedCandidates.CountAsync(e => e.Status == "extracted");
-            var vectorized = await _dbContext.SyncedCandidates.CountAsync(e => e.Status == "vectorized");
-            var failed = await _dbContext.SyncedCandidates.CountAsync(e => e.Failed);
+            var query = _dbContext.SyncedCandidates.AsQueryable();
+            if (year.HasValue)
+                query = ApplyCandidateYearFilter(query, year.Value);
+
+            var total = await query.CountAsync();
+            var synced = await query.CountAsync(e => e.Status == "synced");
+            var incomplete = await query.CountAsync(e => e.Status == "incomplete");
+            var notProcessed = await query.CountAsync(e => e.Status == "not-processed");
+            var extracted = await query.CountAsync(e => e.Status == "extracted");
+            var vectorized = await query.CountAsync(e => e.Status == "vectorized");
+            var failed = await query.CountAsync(e => e.Failed);
             return Ok(new
             {
                 totalRecords = total,
@@ -106,8 +110,22 @@ public class SyncController : ControllerBase
         return BadRequest();
     }
 
+    private static IQueryable<Models.Entities.SyncedCandidate> ApplyCandidateYearFilter(
+        IQueryable<Models.Entities.SyncedCandidate> query, int year)
+    {
+        if (year >= 2014)
+        {
+            var start = new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var end = new DateTime(year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            return query.Where(c => c.LastStatusUpdate >= start && c.LastStatusUpdate < end);
+        }
+
+        var cutoff = new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        return query.Where(c => c.LastStatusUpdate == null || c.LastStatusUpdate < cutoff);
+    }
+
     [HttpGet("stream/{source}")]
-    public async Task StreamSync(string source, [FromQuery] string token, [FromQuery] int? limit = null, [FromQuery] int? skip = null)
+    public async Task StreamSync(string source, [FromQuery] string token, [FromQuery] int? limit = null, [FromQuery] int? skip = null, [FromQuery] int? year = null)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
@@ -123,7 +141,7 @@ public class SyncController : ControllerBase
 
         try
         {
-            await foreach (var syncEvent in _syncOrchestrator.SyncAsync(source, token, limit, skip, linkedCts.Token))
+            await foreach (var syncEvent in _syncOrchestrator.SyncAsync(source, token, limit, skip, year, linkedCts.Token))
             {
                 var (eventName, data) = syncEvent switch
                 {
@@ -164,7 +182,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpGet("retry-failed/{source}")]
-    public async Task RetryFailed(string source, [FromQuery] string token)
+    public async Task RetryFailed(string source, [FromQuery] string token, [FromQuery] int? year = null)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
@@ -187,8 +205,12 @@ public class SyncController : ControllerBase
             }
             else if (source == "candidates")
             {
-                failedIds = await _dbContext.SyncedCandidates
-                    .Where(e => e.Status == "incomplete" || e.Status == "not-processed")
+                var candidateQuery = _dbContext.SyncedCandidates
+                    .Where(e => e.Status == "incomplete" || e.Status == "not-processed");
+                if (year.HasValue)
+                    candidateQuery = ApplyCandidateYearFilter(candidateQuery, year.Value)
+                        .Where(e => e.Status == "incomplete" || e.Status == "not-processed");
+                failedIds = await candidateQuery
                     .Select(e => e.UpstreamId)
                     .ToListAsync();
             }
@@ -242,7 +264,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpGet("records/{source}")]
-    public async Task<IActionResult> GetRecords(string source)
+    public async Task<IActionResult> GetRecords(string source, [FromQuery] int? year = null)
     {
         if (source == "employees")
         {
@@ -283,7 +305,11 @@ public class SyncController : ControllerBase
 
         if (source == "candidates")
         {
-            var candidates = await _dbContext.SyncedCandidates
+            var query = _dbContext.SyncedCandidates.AsQueryable();
+            if (year.HasValue)
+                query = ApplyCandidateYearFilter(query, year.Value);
+
+            var candidates = await query
                 .OrderBy(e => e.FullName)
                 .ToListAsync();
 
@@ -299,6 +325,11 @@ public class SyncController : ControllerBase
                 Country = e.Country,
                 GrossMonthlySalary = e.CurrentSalary,
                 Currency = e.SalaryCurrency,
+                CoeCertified = e.CoeCertified,
+                CandidateStatus = e.CandidateStatus,
+                LastStatusUpdate = e.LastStatusUpdate?.ToString("o"),
+                SalaryExpectations = e.SalaryExpectations,
+                SalaryExpectationsCurrency = e.SalaryExpectationsCurrency,
                 HasResume = e.HasResume,
                 ResumeNoteId = e.ResumeNoteId,
                 ResumeFilename = e.ResumeFilename,
@@ -317,7 +348,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpDelete("clear/{source}")]
-    public async Task<IActionResult> ClearSyncedData(string source)
+    public async Task<IActionResult> ClearSyncedData(string source, [FromQuery] int? year = null)
     {
         if (source == "employees")
         {
@@ -332,11 +363,25 @@ public class SyncController : ControllerBase
 
         if (source == "candidates")
         {
-            var embeddings = await _dbContext.ResumeEmbeddings
-                .Where(e => e.SourceType == "candidates")
-                .ToListAsync();
-            _dbContext.ResumeEmbeddings.RemoveRange(embeddings);
-            _dbContext.SyncedCandidates.RemoveRange(_dbContext.SyncedCandidates);
+            if (year.HasValue)
+            {
+                var candidatesToDelete = await ApplyCandidateYearFilter(_dbContext.SyncedCandidates.AsQueryable(), year.Value)
+                    .ToListAsync();
+                var candidateIds = candidatesToDelete.Select(c => c.Id).ToList();
+                var embeddings = await _dbContext.ResumeEmbeddings
+                    .Where(e => e.SourceType == "candidates" && candidateIds.Contains(e.SourceId))
+                    .ToListAsync();
+                _dbContext.ResumeEmbeddings.RemoveRange(embeddings);
+                _dbContext.SyncedCandidates.RemoveRange(candidatesToDelete);
+            }
+            else
+            {
+                var embeddings = await _dbContext.ResumeEmbeddings
+                    .Where(e => e.SourceType == "candidates")
+                    .ToListAsync();
+                _dbContext.ResumeEmbeddings.RemoveRange(embeddings);
+                _dbContext.SyncedCandidates.RemoveRange(_dbContext.SyncedCandidates);
+            }
             await _dbContext.SaveChangesAsync();
             return Ok(new { cleared = "candidates" });
         }

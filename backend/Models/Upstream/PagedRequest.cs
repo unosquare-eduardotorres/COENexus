@@ -82,4 +82,8 @@ public class ColumnDefinition
 
     [JsonPropertyName("exportable")]
     public bool Exportable { get; set; } = true;
+
+    [JsonPropertyName("filterArgument")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? FilterArgument { get; set; }
 }

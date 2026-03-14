@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using OperationNexus.Api.Configuration;
 using OperationNexus.Api.Models.Upstream;
@@ -10,11 +11,13 @@ public class UpstreamApiService : IUpstreamApiService
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
+    private readonly ILogger<UpstreamApiService> _logger;
 
-    public UpstreamApiService(HttpClient httpClient, IOptions<UpstreamSettings> settings)
+    public UpstreamApiService(HttpClient httpClient, IOptions<UpstreamSettings> settings, ILogger<UpstreamApiService> logger)
     {
         _httpClient = httpClient;
         _baseUrl = settings.Value.ApiUrl;
+        _logger = logger;
     }
 
     public async Task<(List<EmployeeDetail> Items, int TotalRecords)> GetEmployeesPagedAsync(string token, int skip, int take)
@@ -97,14 +100,14 @@ public class UpstreamApiService : IUpstreamApiService
         return MapNoteRows(paged);
     }
 
-    public async Task<(List<CandidateDetail> Items, int TotalRecords)> GetCandidatesPagedAsync(string token, int skip, int take)
+    public async Task<(List<CandidateDetail> Items, int TotalRecords)> GetCandidatesPagedAsync(string token, int skip, int take, int? year = null)
     {
         var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}Candidate/paged", token);
         request.Content = JsonContent.Create(new PagedRequest
         {
             Skip = skip,
             Take = take,
-            Columns = BuildCandidateColumns()
+            Columns = BuildCandidateColumns(year)
         });
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
@@ -114,10 +117,13 @@ public class UpstreamApiService : IUpstreamApiService
         {
             CandidateId = GetInt(row, 0),
             FullName = GetString(row, 1),
+            CandidateStatusName = GetNullableString(row, 3),
             Email = GetString(row, 11),
             MainSkill = GetString(row, 5),
-            Seniority = GetString(row, 7),
+            SeniorityText = GetString(row, 7),
             Country = GetString(row, 13),
+            CoeCertifiedStatus = GetNullableString(row, 9),
+            StatusUpdate = GetNullableDateTime(row, 14),
         }).ToList();
 
         return (items, paged.FilteredRecordCount);
@@ -128,7 +134,13 @@ public class UpstreamApiService : IUpstreamApiService
         var request = CreateAuthorizedRequest(HttpMethod.Get, $"{_baseUrl}Candidate/{id}", token);
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<CandidateDetail>() ?? new();
+        var json = await response.Content.ReadAsStringAsync();
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+        return JsonSerializer.Deserialize<CandidateDetail>(json, options) ?? new();
     }
 
     public async Task<List<PersonaNote>> GetCandidateNotesAsync(string token, int id)
@@ -187,8 +199,30 @@ public class UpstreamApiService : IUpstreamApiService
         };
     }
 
-    private static List<ColumnDefinition> BuildCandidateColumns()
+    private static List<ColumnDefinition> BuildCandidateColumns(int? year = null)
     {
+        var statusUpdateColumn = new ColumnDefinition
+        {
+            Name = "StatusUpdate",
+            Label = "Status Update",
+            DataType = "datetimeutc"
+        };
+
+        if (year.HasValue)
+        {
+            statusUpdateColumn.FilterOperator = "Between";
+            if (year.Value >= 2014)
+            {
+                statusUpdateColumn.FilterText = $"{year.Value}-01-01T00:00:00.000Z";
+                statusUpdateColumn.FilterArgument = new[] { $"{year.Value}-12-31T23:59:59.999Z" };
+            }
+            else
+            {
+                statusUpdateColumn.FilterText = "2000-01-01T00:00:00.000Z";
+                statusUpdateColumn.FilterArgument = new[] { "2013-12-31T23:59:59.999Z" };
+            }
+        }
+
         return new List<ColumnDefinition>
         {
             new() { Name = "CandidateId", Label = "Actions", DataType = "numeric", IsKey = true, Filterable = false, Exportable = false, FilterOperator = "Equals" },
@@ -205,7 +239,7 @@ public class UpstreamApiService : IUpstreamApiService
             new() { Name = "Email", Label = "Email", Searchable = true },
             new() { Name = "SecondaryEmail", Label = "Secondary Email" },
             new() { Name = "Location", Label = "Location" },
-            new() { Name = "StatusUpdate", Label = "Status Update", DataType = "datetimeutc" },
+            statusUpdateColumn,
         };
     }
 
@@ -273,5 +307,16 @@ public class UpstreamApiService : IUpstreamApiService
                 return dt;
         }
         return DateTime.MinValue;
+    }
+
+    private static DateTime? GetNullableDateTime(JsonElement[] row, int i)
+    {
+        if (i < row.Length && row[i].ValueKind == JsonValueKind.String)
+        {
+            var str = row[i].GetString();
+            if (DateTime.TryParse(str, out var dt))
+                return dt;
+        }
+        return null;
     }
 }

@@ -28,6 +28,7 @@ import CandidateCard from '../components/match/CandidateCard';
 import CandidateProfile from '../components/match/CandidateProfile';
 import CompareView from '../components/match/CompareView';
 import SessionHistory from '../components/match/SessionHistory';
+import SessionHistoryPage from '../components/match/SessionHistoryPage';
 import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
@@ -140,6 +141,7 @@ export default function MatchEnginePage() {
   const [activeStageDrawer, setActiveStageDrawer] = useState<PipelineStageKey | null>(null);
   const [showAiWarningModal, setShowAiWarningModal] = useState(false);
   const [haikuConfirm, setHaikuConfirm] = useState<HaikuConfirmPayload | null>(null);
+  const [showHistoryPage, setShowHistoryPage] = useState(false);
 
   useEffect(() => {
     matchEngineService.getPoolCounts()
@@ -496,8 +498,20 @@ export default function MatchEnginePage() {
           stepSummaries={stepSummaries}
         />
 
-        {currentStepKey === 'intent' && (
-          <IntentSelector onSelect={handleIntentSelect} />
+        {currentStepKey === 'intent' && !showHistoryPage && (
+          <IntentSelector
+            onSelect={handleIntentSelect}
+            onViewHistory={() => setShowHistoryPage(true)}
+            sessionCount={sessions.length}
+          />
+        )}
+
+        {currentStepKey === 'intent' && showHistoryPage && (
+          <SessionHistoryPage
+            sessions={sessions}
+            onLoadSession={(id) => { setShowHistoryPage(false); handleLoadSession(id); }}
+            onBack={() => setShowHistoryPage(false)}
+          />
         )}
 
         {currentStepKey === 'job-description' && (

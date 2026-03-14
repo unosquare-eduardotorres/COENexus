@@ -69,7 +69,7 @@ function RefreshIcon({ spinning }: { spinning?: boolean }) {
   );
 }
 
-type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason';
+type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations';
 type SortDirection = 'asc' | 'desc';
 
 const PIPELINE_ORDER: Record<PipelineStatus, number> = {
@@ -110,7 +110,7 @@ function compareValues(a: string | number | boolean | null | undefined, b: strin
 
 export default function SyncRecordTable({
   records,
-  source: _source,
+  source,
   statusFilter,
   onRefreshRecord,
   refreshingId,
@@ -202,6 +202,22 @@ export default function SyncRecordTable({
           valA = a.hasResume;
           valB = b.hasResume;
           break;
+        case 'coeCertified':
+          valA = a.coeCertified ?? null;
+          valB = b.coeCertified ?? null;
+          break;
+        case 'candidateStatus':
+          valA = a.candidateStatus ?? null;
+          valB = b.candidateStatus ?? null;
+          break;
+        case 'lastStatusUpdate':
+          valA = a.lastStatusUpdate ?? null;
+          valB = b.lastStatusUpdate ?? null;
+          break;
+        case 'salaryExpectations':
+          valA = a.salaryExpectations ?? null;
+          valB = b.salaryExpectations ?? null;
+          break;
         case 'reason':
           valA = a.syncDetail || a.reason || null;
           valB = b.syncDetail || b.reason || null;
@@ -253,7 +269,18 @@ export default function SyncRecordTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-border/30">
-                {([
+                {(source === 'candidates' ? [
+                  { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
+                  { key: 'name' as SortKey, label: 'Candidate', className: '' },
+                  { key: 'coeCertified' as SortKey, label: 'COE Certified', className: 'hidden md:table-cell' },
+                  { key: 'email' as SortKey, label: 'Email', className: 'hidden md:table-cell' },
+                  { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
+                  { key: 'candidateStatus' as SortKey, label: 'Cand. Status', className: 'hidden lg:table-cell' },
+                  { key: 'lastStatusUpdate' as SortKey, label: 'Last Status', className: 'hidden lg:table-cell' },
+                  { key: 'salaryExpectations' as SortKey, label: 'Salary Exp.', className: '' },
+                  { key: 'country' as SortKey, label: 'Country', className: 'hidden lg:table-cell' },
+                  { key: 'hasResume' as SortKey, label: 'Resume', className: '' },
+                ] : [
                   { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
                   { key: 'name' as SortKey, label: 'Name', className: '' },
                   { key: 'jobTitle' as SortKey, label: 'Job Title', className: 'hidden md:table-cell' },
@@ -263,7 +290,7 @@ export default function SyncRecordTable({
                   { key: 'salary' as SortKey, label: 'Salary', className: '' },
                   { key: 'country' as SortKey, label: 'Country', className: 'hidden lg:table-cell' },
                   { key: 'hasResume' as SortKey, label: 'Resume', className: '' },
-                ] as const).map(({ key, label, className }) => (
+                ]).map(({ key, label, className }) => (
                   <th
                     key={key}
                     onClick={() => handleSort(key)}
@@ -287,7 +314,7 @@ export default function SyncRecordTable({
                 </th>
                 {onRefreshRecord && (
                   <th className="sticky right-0 bg-white dark:bg-dark-surface text-center px-3 py-3 text-xs font-semibold text-muted uppercase tracking-wider w-16 border-l border-gray-100 dark:border-dark-border/30">
-                    Re-sync
+                    Sync
                   </th>
                 )}
               </tr>
@@ -315,16 +342,40 @@ export default function SyncRecordTable({
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  <td className="hidden md:table-cell px-4 py-3 text-secondary whitespace-nowrap">{record.jobTitle || '—'}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.email || '—'}</td>
-                  <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniority || '—'}</td>
-                  <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
-                  <td className="px-4 py-3 text-secondary whitespace-nowrap">
-                    {record.grossMonthlySalary != null && record.currency
-                      ? `${record.currency} ${record.grossMonthlySalary.toLocaleString()}`
-                      : '—'}
-                  </td>
-                  <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
+                  {source === 'candidates' ? (
+                    <>
+                      <td className="hidden md:table-cell px-4 py-3">
+                        {record.coeCertified ? <CheckIcon /> : <XIcon />}
+                      </td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.email || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.candidateStatus || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary whitespace-nowrap">
+                        {record.lastStatusUpdate
+                          ? new Date(record.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-secondary whitespace-nowrap">
+                        {record.salaryExpectations != null
+                          ? `${record.salaryExpectationsCurrency ?? 'USD'} ${record.salaryExpectations.toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary whitespace-nowrap">{record.jobTitle || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.email || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniority || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
+                      <td className="px-4 py-3 text-secondary whitespace-nowrap">
+                        {record.grossMonthlySalary != null && record.currency
+                          ? `${record.currency} ${record.grossMonthlySalary.toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
+                    </>
+                  )}
                   <td className="px-4 py-3">
                     {record.hasResume ? (
                       <span className="inline-flex items-center gap-1.5">
@@ -378,7 +429,7 @@ export default function SyncRecordTable({
                         onClick={() => onRefreshRecord(record.upstreamId)}
                         disabled={refreshingId === record.upstreamId}
                         className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-gray-400 hover:text-accent-500 hover:bg-accent-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Re-sync this record"
+                        title="Sync this record"
                       >
                         <RefreshIcon spinning={refreshingId === record.upstreamId} />
                       </button>

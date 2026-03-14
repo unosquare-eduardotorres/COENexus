@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SyncSourceType, SyncProgress, SyncRecord, PipelineStatus, ProcessingProgress } from '../../types';
 import SyncRecordTable from './SyncRecordTable';
 import ConfirmModal from './ConfirmModal';
+import YearSelector from './YearSelector';
 
 interface SyncDashboardProps {
   source: SyncSourceType;
@@ -29,6 +30,8 @@ interface SyncDashboardProps {
   onClearData?: () => void;
   isLoadingRecords?: boolean;
   isClearing?: boolean;
+  selectedYear?: number | null;
+  onYearChange?: (year: number) => void;
 }
 
 function formatLastSynced(isoString?: string): string {
@@ -351,6 +354,8 @@ export default function SyncDashboard({
   onClearData,
   isLoadingRecords,
   isClearing,
+  selectedYear,
+  onYearChange,
 }: SyncDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusCardKey>('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -367,6 +372,7 @@ export default function SyncDashboard({
     (progress.status === 'idle' || progress.status === 'completed' || progress.status === 'paused') && records.length > 0 && !isClearing;
 
   const isSyncInProgress = progress.status === 'syncing';
+  const candidateNeedsYear = source === 'candidates' && selectedYear == null;
 
   const isExtracting = extractionProgress?.status === 'processing' || extractionProgress?.status === 'paused';
   const extractionPercent =
@@ -446,6 +452,14 @@ export default function SyncDashboard({
         </div>
       </div>
 
+      {source === 'candidates' && onYearChange && (
+        <YearSelector
+          selectedYear={selectedYear ?? null}
+          onYearChange={onYearChange}
+          disabled={progress.status === 'syncing'}
+        />
+      )}
+
       {isActiveOrPaused && (
         <div className="glass-panel-subtle rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -516,7 +530,7 @@ export default function SyncDashboard({
         </div>
 
         <div className="flex items-center gap-2">
-          {statusFilter === 'incomplete' && onRetryIncomplete && (progress.incompleteCount > 0 || progress.notProcessedCount > 0) && (
+          {(statusFilter === 'incomplete' || statusFilter === 'not-processed') && onRetryIncomplete && (progress.incompleteCount > 0 || progress.notProcessedCount > 0) && (
             <button
               onClick={onRetryIncomplete}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors duration-200 font-semibold text-sm"
@@ -535,7 +549,8 @@ export default function SyncDashboard({
                   {onStartSyncLimited && (
                     <button
                       onClick={onStartSyncLimited}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-dark-hover border border-emerald-300 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors duration-200 font-semibold text-sm"
+                      disabled={candidateNeedsYear}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-dark-hover border border-emerald-300 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
@@ -545,7 +560,8 @@ export default function SyncDashboard({
                   )}
                   <button
                     onClick={onStartSync}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm"
+                    disabled={candidateNeedsYear}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
@@ -586,7 +602,7 @@ export default function SyncDashboard({
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      Re-sync 10
+                      Sync 10
                     </button>
                   )}
                   <button
@@ -596,7 +612,7 @@ export default function SyncDashboard({
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    Re-sync All
+                    Sync All
                   </button>
                 </>
               )}

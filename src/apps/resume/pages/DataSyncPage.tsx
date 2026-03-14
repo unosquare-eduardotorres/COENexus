@@ -97,7 +97,7 @@ export default function DataSyncPage() {
   });
   const [isValidating, setIsValidating] = useState(false);
   const [tokenError, setTokenError] = useState<string | undefined>();
-  const [activeTab, setActiveTab] = useState<SyncSourceType>('employees');
+  const [activeTab, setActiveTab] = useState<SyncSourceType>('candidates');
   const [showExpirationWarning, setShowExpirationWarning] = useState(false);
   const [employeeProgress, setEmployeeProgress] = useState<SyncProgress>(() =>
     restoreProgress(
@@ -134,6 +134,9 @@ export default function DataSyncPage() {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(() =>
+    safeParseJSON(localStorage.getItem('datasync-candidate-year'), null)
+  );
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const extractionAbortRef = useRef<AbortController | null>(null);
@@ -148,13 +151,14 @@ export default function DataSyncPage() {
     return Math.max(0, (expiresAt.getTime() - Date.now()) / 60_000);
   }, [token, showExpirationWarning]);
 
-  const loadRecordsFromDb = useCallback(async (source: SyncSourceType, reconcileStats = false) => {
+  const loadRecordsFromDb = useCallback(async (source: SyncSourceType, reconcileStats = false, year?: number | null) => {
     const setLoading = source === 'employees' ? setIsLoadingEmployees : setIsLoadingCandidates;
     const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
     const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
     try {
       setLoading(true);
-      const records = await dataSyncService.fetchRecords(source);
+      const yearParam = source === 'candidates' && year != null ? year : undefined;
+      const records = await dataSyncService.fetchRecords(source, yearParam);
       setRecords(records);
 
       if (reconcileStats && records.length > 0) {
@@ -168,7 +172,12 @@ export default function DataSyncPage() {
 
   useEffect(() => {
     loadRecordsFromDb('employees', true);
-    loadRecordsFromDb('candidates', true);
+    loadRecordsFromDb('candidates', true, selectedYear);
+  }, [loadRecordsFromDb]);
+
+  const handleYearChange = useCallback((year: number) => {
+    setSelectedYear(year);
+    loadRecordsFromDb('candidates', true, year);
   }, [loadRecordsFromDb]);
 
   useEffect(() => {
@@ -196,6 +205,14 @@ export default function DataSyncPage() {
   useEffect(() => {
     localStorage.setItem('datasync-candidate-progress', JSON.stringify(candidateProgress));
   }, [candidateProgress]);
+
+  useEffect(() => {
+    if (selectedYear != null) {
+      localStorage.setItem('datasync-candidate-year', JSON.stringify(selectedYear));
+    } else {
+      localStorage.removeItem('datasync-candidate-year');
+    }
+  }, [selectedYear]);
 
   const handleValidate = useCallback(async () => {
     setIsValidating(true);
@@ -262,6 +279,8 @@ export default function DataSyncPage() {
       setProgress((prev) => ({ ...prev, status: 'syncing' }));
     }
 
+    const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+
     const finalProgress = await dataSyncService.startSync(
       source,
       token,
@@ -274,13 +293,14 @@ export default function DataSyncPage() {
       }),
       controller.signal,
       limit,
-      isResume ? skipCount : undefined
+      isResume ? skipCount : undefined,
+      yearParam
     );
 
     setProgress({ ...finalProgress, lastSyncedAt: new Date().toISOString() });
 
-    await loadRecordsFromDb(source);
-  }, [activeTab, token, loadRecordsFromDb]);
+    await loadRecordsFromDb(source, false, yearParam);
+  }, [activeTab, token, loadRecordsFromDb, selectedYear]);
 
   const handleStartSync = useCallback(() => doStartSync(), [doStartSync]);
   const handleStartSyncLimited = useCallback(() => doStartSync(10), [doStartSync]);
@@ -299,6 +319,8 @@ export default function DataSyncPage() {
 
     setProgress((prev) => ({ ...prev, status: 'syncing' }));
 
+    const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+
     await dataSyncService.retryFailed(
       source,
       token,
@@ -306,12 +328,13 @@ export default function DataSyncPage() {
         prev.map((r) => r.upstreamId === record.upstreamId ? record : r)
       ),
       () => {},
-      controller.signal
+      controller.signal,
+      yearParam
     );
 
-    await loadRecordsFromDb(source, true);
+    await loadRecordsFromDb(source, true, yearParam);
     setProgress((prev) => ({ ...prev, status: 'completed', lastSyncedAt: new Date().toISOString() }));
-  }, [activeTab, token, loadRecordsFromDb]);
+  }, [activeTab, token, loadRecordsFromDb, selectedYear]);
 
   const handleResumeSync = useCallback(() => {
     const currentProgress = activeTab === 'employees' ? employeeProgress : candidateProgress;
@@ -431,7 +454,8 @@ export default function DataSyncPage() {
     const source = activeTab;
     setIsClearing(true);
     try {
-      await dataSyncService.clearRecords(source);
+      const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+      await dataSyncService.clearRecords(source, yearParam);
 
       const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
       const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
@@ -451,7 +475,7 @@ export default function DataSyncPage() {
     } finally {
       setIsClearing(false);
     }
-  }, [activeTab]);
+  }, [activeTab, selectedYear]);
 
   const handleRefreshRecord = useCallback(async (upstreamId: number) => {
     setRefreshingId(upstreamId);
@@ -591,6 +615,8 @@ export default function DataSyncPage() {
               onClearData={handleClearData}
               isLoadingRecords={isLoadingRecords}
               isClearing={isClearing}
+              selectedYear={selectedYear}
+              onYearChange={handleYearChange}
             />
           </div>
         )}
