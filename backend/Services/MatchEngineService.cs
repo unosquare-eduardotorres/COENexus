@@ -774,6 +774,7 @@ Return ONLY valid JSON, no markdown or explanation.";
 
     public async Task<List<MatchSessionDto>> ListSessionsAsync(CancellationToken ct = default)
     {
+        var jsonOpts = JsonOptions;
         return await _dbContext.MatchSessions
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => new MatchSessionDto
@@ -788,10 +789,10 @@ Return ONLY valid JSON, no markdown or explanation.";
                 CreatedAt = s.CreatedAt,
                 CompletedAt = s.CompletedAt,
                 CandidateCount = s.ResultsJson != null
-                    ? JsonSerializer.Deserialize<List<MatchCandidateResult>>(s.ResultsJson, JsonOptions)!.Count
+                    ? JsonSerializer.Deserialize<List<MatchCandidateResult>>(s.ResultsJson, jsonOpts)!.Count
                     : null,
                 Time = s.PipelineStatsJson != null
-                    ? JsonSerializer.Deserialize<PipelineStatsDto>(s.PipelineStatsJson, JsonOptions)!.Time
+                    ? JsonSerializer.Deserialize<PipelineStatsDto>(s.PipelineStatsJson, jsonOpts)!.Time
                     : null,
             })
             .ToListAsync(ct);

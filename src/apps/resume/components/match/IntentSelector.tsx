@@ -2,6 +2,8 @@ import { MatchFlowType } from '../../types';
 
 interface IntentSelectorProps {
   onSelect: (flow: MatchFlowType) => void;
+  onViewHistory?: () => void;
+  sessionCount?: number;
 }
 
 interface IntentOption {
@@ -52,6 +54,15 @@ function MicroscopeIcon() {
   );
 }
 
+function ClockHistoryIcon() {
+  return (
+    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
 const INTENTS: IntentOption[] = [
   {
     id: 'find-for-position',
@@ -88,7 +99,7 @@ const INTENTS: IntentOption[] = [
   },
 ];
 
-export default function IntentSelector({ onSelect }: IntentSelectorProps) {
+export default function IntentSelector({ onSelect, onViewHistory, sessionCount = 0 }: IntentSelectorProps) {
   return (
     <div className="space-y-4">
       <div className="text-center mb-2">
@@ -96,7 +107,7 @@ export default function IntentSelector({ onSelect }: IntentSelectorProps) {
         <p className="text-sm text-muted mt-1">Choose your matching workflow to get started</p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
         {INTENTS.map((intent) =>
           intent.enabled ? (
             <button
@@ -145,6 +156,34 @@ export default function IntentSelector({ onSelect }: IntentSelectorProps) {
             </div>
           )
         )}
+
+        <button
+          onClick={onViewHistory}
+          className="text-left p-6 rounded-2xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-amber-500/30 transition-all duration-200 group"
+        >
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white flex-shrink-0">
+              <ClockHistoryIcon />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-semibold text-primary">Search History</h3>
+              <p className="text-sm text-muted mt-1.5 leading-relaxed">
+                Review previous search sessions, compare results, and revisit past candidate matches.
+              </p>
+              <div className="flex flex-wrap justify-center gap-1.5 mt-3">
+                {sessionCount > 0 ? (
+                  <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    {sessionCount} session{sessionCount !== 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    No sessions yet
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </button>
       </div>
     </div>
   );

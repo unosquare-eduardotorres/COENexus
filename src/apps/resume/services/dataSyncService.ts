@@ -15,21 +15,27 @@ export const dataSyncService = {
     return res.json();
   },
 
-  async fetchSyncStatus(source: SyncSourceType): Promise<{ totalRecords: number; fetchedRecords: number }> {
-    const res = await fetch(`${API_BASE}/status/${source}`);
+  async fetchSyncStatus(source: SyncSourceType, year?: number): Promise<{ totalRecords: number; fetchedRecords: number }> {
+    let url = `${API_BASE}/status/${source}`;
+    if (year && source === 'candidates') url += `?year=${year}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch sync status: ${res.status}`);
     return res.json();
   },
 
-  async fetchRecords(source: SyncSourceType): Promise<SyncRecord[]> {
-    const res = await fetch(`${API_BASE}/records/${source}`);
+  async fetchRecords(source: SyncSourceType, year?: number): Promise<SyncRecord[]> {
+    let url = `${API_BASE}/records/${source}`;
+    if (year && source === 'candidates') url += `?year=${year}`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch records: ${res.status}`);
     const raw: unknown[] = await res.json();
     return raw.map((r: any) => ({ ...r, pipelineStatus: r.status, failed: r.failed ?? false }));
   },
 
-  async clearRecords(source: 'employees' | 'candidates' | 'all'): Promise<void> {
-    const res = await fetch(`${API_BASE}/clear/${source}`, { method: 'DELETE' });
+  async clearRecords(source: 'employees' | 'candidates' | 'all', year?: number): Promise<void> {
+    let url = `${API_BASE}/clear/${source}`;
+    if (year && source === 'candidates') url += `?year=${year}`;
+    const res = await fetch(url, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Failed to clear records: ${res.status}`);
   },
 
@@ -52,10 +58,12 @@ export const dataSyncService = {
     token: string,
     onRecordRetried: (record: SyncRecord) => void,
     onProgress: (progress: { total: number; retried: number }) => void,
-    signal: AbortSignal
+    signal: AbortSignal,
+    year?: number
   ): Promise<{ total: number; retried: number }> {
     return new Promise((resolve, reject) => {
-      const url = `${API_BASE}/retry-failed/${source}?token=${encodeURIComponent(token)}`;
+      let url = `${API_BASE}/retry-failed/${source}?token=${encodeURIComponent(token)}`;
+      if (year && source === 'candidates') url += `&year=${year}`;
       const eventSource = new EventSource(url);
 
       let lastResult = { total: 0, retried: 0 };
@@ -95,12 +103,14 @@ export const dataSyncService = {
     onRecordSynced: (record: SyncRecord) => void,
     signal: AbortSignal,
     limit?: number,
-    skip?: number
+    skip?: number,
+    year?: number
   ): Promise<SyncProgress> {
     return new Promise((resolve, reject) => {
       let url = `${API_BASE}/stream/${source}?token=${encodeURIComponent(token)}`;
       if (limit) url += `&limit=${limit}`;
       if (skip) url += `&skip=${skip}`;
+      if (year && source === 'candidates') url += `&year=${year}`;
       const eventSource = new EventSource(url);
 
       let lastProgress: SyncProgress = {

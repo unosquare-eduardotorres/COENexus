@@ -53,7 +53,7 @@ public class SyncOrchestrator : ISyncOrchestrator
         _logger = logger;
     }
 
-    public async IAsyncEnumerable<SyncEvent> SyncAsync(string source, string token, int? limit = null, int? skip = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<SyncEvent> SyncAsync(string source, string token, int? limit = null, int? skip = null, int? year = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (source == "employees")
         {
@@ -62,7 +62,7 @@ public class SyncOrchestrator : ISyncOrchestrator
         }
         else if (source == "candidates")
         {
-            await foreach (var syncEvent in SyncCandidatesAsync(token, limit, skip, cancellationToken))
+            await foreach (var syncEvent in SyncCandidatesAsync(token, limit, skip, year, cancellationToken))
                 yield return syncEvent;
         }
     }
@@ -97,10 +97,15 @@ public class SyncOrchestrator : ISyncOrchestrator
 
     private async Task<SyncRecordDto> SyncSingleCandidateAsync(string token, int upstreamId, CancellationToken ct)
     {
-        var detail = await _upstreamApi.GetCandidateDetailAsync(token, upstreamId);
-        var notes = await _upstreamApi.GetCandidateNotesAsync(token, upstreamId);
+        var seniorities = await _catalogService.GetSenioritiesAsync(token);
+        var mainSkills = await LoadCatalogOrEmpty("MainSkill", () => _catalogService.GetMainSkillsAsync(token));
+        var countries = await LoadCatalogOrEmpty("Country", () => _catalogService.GetCountriesAsync(token));
 
-        var entity = BuildCandidateEntity(detail, notes);
+        var detail = await _upstreamApi.GetCandidateDetailAsync(token, upstreamId);
+        var notes = await LoadOrEmpty("Notes", () => _upstreamApi.GetCandidateNotesAsync(token, upstreamId));
+
+        var pagedFallback = new CandidateDetail { CandidateId = upstreamId };
+        var entity = BuildCandidateEntity(detail, notes, seniorities, mainSkills, countries, pagedFallback);
         var (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, ct);
 
         return MapCandidateToDto(entity, resumeChanged, syncDetail);
@@ -214,10 +219,16 @@ public class SyncOrchestrator : ISyncOrchestrator
             {
                 try
                 {
-                    var detail = await _upstreamApi.GetEmployeeDetailAsync(token, basicEmployee.UserId);
-                    var contracts = await LoadOrEmpty("Contracts", () => _upstreamApi.GetEmployeeContractsAsync(token, basicEmployee.UserId));
-                    var rates = await LoadOrEmpty("Rates", () => _upstreamApi.GetEmployeeRatesAsync(token, basicEmployee.UserId));
-                    var notes = await LoadOrEmpty("Notes", () => _upstreamApi.GetEmployeeNotesAsync(token, basicEmployee.UserId));
+                    var detailTask = _upstreamApi.GetEmployeeDetailAsync(token, basicEmployee.UserId);
+                    var contractsTask = LoadOrEmpty("Contracts", () => _upstreamApi.GetEmployeeContractsAsync(token, basicEmployee.UserId));
+                    var ratesTask = LoadOrEmpty("Rates", () => _upstreamApi.GetEmployeeRatesAsync(token, basicEmployee.UserId));
+                    var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetEmployeeNotesAsync(token, basicEmployee.UserId));
+                    await Task.WhenAll(detailTask, contractsTask, ratesTask, notesTask);
+
+                    var detail = detailTask.Result;
+                    var contracts = contractsTask.Result;
+                    var rates = ratesTask.Result;
+                    var notes = notesTask.Result;
 
                     entity = BuildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicEmployee);
                     (_, resumeChanged, syncDetail) = await UpsertEmployeeAsync(entity, cancellationToken);
@@ -348,44 +359,23 @@ public class SyncOrchestrator : ISyncOrchestrator
         });
     }
 
-    private async IAsyncEnumerable<SyncEvent> SyncCandidatesAsync(string token, int? limit, int? skipRecords, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<SyncEvent> SyncCandidatesAsync(string token, int? limit, int? skipRecords, int? year, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var allCandidates = new List<CandidateDetail>();
-        int pageOffset = 0;
+        var seniorities = await _catalogService.GetSenioritiesAsync(token);
+        var mainSkills = await LoadCatalogOrEmpty("MainSkill", () => _catalogService.GetMainSkillsAsync(token));
+        var countries = await LoadCatalogOrEmpty("Country", () => _catalogService.GetCountriesAsync(token));
+
+        const int batchSize = 20;
+        int pageOffset = skipRecords ?? 0;
         int totalRecords = 0;
-        int pageSize = limit.HasValue ? Math.Min(100, limit.Value) : 100;
-
-        while (true)
-        {
-            var (items, total) = await _upstreamApi.GetCandidatesPagedAsync(token, pageOffset, pageSize);
-            totalRecords = total;
-            allCandidates.AddRange(items);
-            pageOffset += items.Count;
-            if (pageOffset >= totalRecords || items.Count == 0)
-                break;
-            if (limit.HasValue && allCandidates.Count >= limit.Value)
-                break;
-        }
-
-        if (limit.HasValue && allCandidates.Count > limit.Value)
-            allCandidates = allCandidates.Take(limit.Value).ToList();
-
-        if (skipRecords.HasValue && skipRecords.Value > 0)
-        {
-            var toSkip = Math.Min(skipRecords.Value, allCandidates.Count);
-            _logger.LogInformation("Resuming sync — skipping first {SkipCount} of {Total} candidates", toSkip, allCandidates.Count);
-            allCandidates = allCandidates.Skip(toSkip).ToList();
-        }
-
-        var totalAfterSkip = allCandidates.Count + (skipRecords ?? 0);
-        totalRecords = limit.HasValue ? Math.Min(totalRecords, totalAfterSkip) : totalAfterSkip;
-
         int syncedCount = 0;
         int incompleteCount = 0;
         int notProcessedCount = 0;
         int updatedCount = 0;
         int unchangedCount = 0;
         int fetchedRecords = skipRecords ?? 0;
+        int maxToProcess = limit ?? int.MaxValue;
+        int processedInRun = 0;
 
         if (skipRecords.HasValue && skipRecords.Value > 0)
         {
@@ -401,86 +391,152 @@ public class SyncOrchestrator : ISyncOrchestrator
             notProcessedCount = dbCounts.FirstOrDefault(c => c.Status == "not-processed")?.Count ?? 0;
         }
 
-        foreach (var basicCandidate in allCandidates)
+        bool hasMorePages = true;
+
+        while (hasMorePages && processedInRun < maxToProcess)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            fetchedRecords++;
 
-            SyncedCandidate? entity = null;
-            bool resumeChanged = false;
-            string syncDetail = "not-processed";
-            Exception? fatalError = null;
+            var take = Math.Min(batchSize, maxToProcess - processedInRun);
+            var (batch, total) = await _upstreamApi.GetCandidatesPagedAsync(token, pageOffset, take, year);
+            totalRecords = total;
 
-            try
+            if (batch.Count == 0)
+                break;
+
+            _logger.LogInformation("Fetched candidate batch: offset={Offset}, count={Count}, total={Total}", pageOffset, batch.Count, totalRecords);
+
+            if (year.HasValue && year.Value <= 2013)
             {
+                var cutoff = new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                batch = batch
+                    .Where(c => !c.StatusUpdate.HasValue || c.StatusUpdate.Value < cutoff)
+                    .ToList();
+            }
+
+            foreach (var basicCandidate in batch)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                fetchedRecords++;
+                processedInRun++;
+
+                SyncedCandidate? entity = null;
+                bool resumeChanged = false;
+                string syncDetail = "not-processed";
+                Exception? fatalError = null;
+
                 try
                 {
-                    var detail = await _upstreamApi.GetCandidateDetailAsync(token, basicCandidate.CandidateId);
-                    var notes = await _upstreamApi.GetCandidateNotesAsync(token, basicCandidate.CandidateId);
+                    try
+                    {
+                        var detailTask = _upstreamApi.GetCandidateDetailAsync(token, basicCandidate.CandidateId);
+                        var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetCandidateNotesAsync(token, basicCandidate.CandidateId));
+                        await Task.WhenAll(detailTask, notesTask);
 
-                    entity = BuildCandidateEntity(detail, notes);
-                    (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, cancellationToken);
+                        var detail = detailTask.Result;
+                        var notes = notesTask.Result;
+
+                        entity = BuildCandidateEntity(detail, notes, seniorities, mainSkills, countries, basicCandidate);
+                        (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        entity = new SyncedCandidate
+                        {
+                            UpstreamId = basicCandidate.CandidateId,
+                            FullName = basicCandidate.FullName ?? string.Empty,
+                            Email = basicCandidate.Email ?? string.Empty,
+                            MainSkill = basicCandidate.MainSkill ?? string.Empty,
+                            Seniority = basicCandidate.SeniorityText ?? string.Empty,
+                            Country = basicCandidate.Country ?? string.Empty,
+                            CoeCertified = !string.IsNullOrEmpty(basicCandidate.CoeCertifiedStatus),
+                            CandidateStatus = basicCandidate.CandidateStatusName,
+                            LastStatusUpdate = ToUtc(basicCandidate.StatusUpdate),
+                            Status = "not-processed",
+                            StatusReason = ex.Message,
+                            SyncedAt = DateTime.UtcNow
+                        };
+
+                        var existingOnError = await _dbContext.SyncedCandidates
+                            .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, cancellationToken);
+                        if (existingOnError != null)
+                        {
+                            existingOnError.FullName = entity.FullName;
+                            existingOnError.Email = entity.Email;
+                            existingOnError.MainSkill = entity.MainSkill;
+                            existingOnError.Seniority = entity.Seniority;
+                            existingOnError.Country = entity.Country;
+                            existingOnError.CoeCertified = entity.CoeCertified;
+                            existingOnError.CandidateStatus = entity.CandidateStatus;
+                            existingOnError.LastStatusUpdate = entity.LastStatusUpdate;
+                            existingOnError.Status = entity.Status;
+                            existingOnError.StatusReason = entity.StatusReason;
+                            existingOnError.SyncedAt = entity.SyncedAt;
+                        }
+                        else
+                        {
+                            _dbContext.SyncedCandidates.Add(entity);
+                        }
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    entity = new SyncedCandidate
-                    {
-                        UpstreamId = basicCandidate.CandidateId,
-                        FullName = basicCandidate.FullName ?? string.Empty,
-                        Email = basicCandidate.Email ?? string.Empty,
-                        MainSkill = basicCandidate.MainSkill ?? string.Empty,
-                        Seniority = basicCandidate.Seniority ?? string.Empty,
-                        Country = basicCandidate.Country ?? string.Empty,
-                        Status = "not-processed",
-                        StatusReason = ex.Message,
-                        SyncedAt = DateTime.UtcNow
-                    };
-
-                    var existingOnError = await _dbContext.SyncedCandidates
-                        .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, cancellationToken);
-                    if (existingOnError != null)
-                    {
-                        existingOnError.FullName = entity.FullName;
-                        existingOnError.Email = entity.Email;
-                        existingOnError.MainSkill = entity.MainSkill;
-                        existingOnError.Seniority = entity.Seniority;
-                        existingOnError.Country = entity.Country;
-                        existingOnError.Status = entity.Status;
-                        existingOnError.StatusReason = entity.StatusReason;
-                        existingOnError.SyncedAt = entity.SyncedAt;
-                    }
-                    else
-                    {
-                        _dbContext.SyncedCandidates.Add(entity);
-                    }
-                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    _logger.LogError(ex, "Failed to sync candidate {UpstreamId} ({Name}) — skipping",
+                        basicCandidate.CandidateId, basicCandidate.FullName);
+                    fatalError = ex;
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to sync candidate {UpstreamId} ({Name}) — skipping",
-                    basicCandidate.CandidateId, basicCandidate.FullName);
-                fatalError = ex;
-            }
 
-            if (fatalError != null)
-            {
-                notProcessedCount++;
-
-                yield return new SyncRecordEvent(new SyncRecordDto
+                if (fatalError != null)
                 {
-                    Id = $"cand-{basicCandidate.CandidateId}",
-                    Source = "candidates",
-                    Status = "not-processed",
-                    Name = basicCandidate.FullName ?? "Unknown",
-                    Email = basicCandidate.Email ?? string.Empty,
-                    Reason = fatalError.Message,
-                    UpstreamId = basicCandidate.CandidateId,
-                    HasResume = false,
-                    Failed = false,
-                    SyncDetail = "error",
-                    SyncedAt = DateTime.UtcNow.ToString("o"),
-                });
+                    notProcessedCount++;
+
+                    yield return new SyncRecordEvent(new SyncRecordDto
+                    {
+                        Id = $"cand-{basicCandidate.CandidateId}",
+                        Source = "candidates",
+                        Status = "not-processed",
+                        Name = basicCandidate.FullName ?? "Unknown",
+                        Email = basicCandidate.Email ?? string.Empty,
+                        Reason = fatalError.Message,
+                        UpstreamId = basicCandidate.CandidateId,
+                        HasResume = false,
+                        Failed = false,
+                        SyncDetail = "error",
+                        SyncedAt = DateTime.UtcNow.ToString("o"),
+                    });
+
+                    yield return new SyncProgressEvent(new SyncProgressDto
+                    {
+                        TotalRecords = totalRecords,
+                        FetchedRecords = fetchedRecords,
+                        SyncedCount = syncedCount,
+                        IncompleteCount = incompleteCount,
+                        NotProcessedCount = notProcessedCount,
+                        UpdatedCount = updatedCount,
+                        UnchangedCount = unchangedCount,
+                        CurrentRecord = basicCandidate.FullName ?? "Unknown",
+                        Status = "syncing"
+                    });
+
+                    continue;
+                }
+
+                if (entity!.Status == "incomplete")
+                    incompleteCount++;
+                else if (entity.Status == "not-processed")
+                    notProcessedCount++;
+                else
+                {
+                    switch (syncDetail)
+                    {
+                        case "new": syncedCount++; break;
+                        case "updated": updatedCount++; break;
+                        case "unchanged": unchangedCount++; break;
+                    }
+                }
+
+                yield return new SyncRecordEvent(MapCandidateToDto(entity, resumeChanged, syncDetail));
 
                 yield return new SyncProgressEvent(new SyncProgressDto
                 {
@@ -491,41 +547,16 @@ public class SyncOrchestrator : ISyncOrchestrator
                     NotProcessedCount = notProcessedCount,
                     UpdatedCount = updatedCount,
                     UnchangedCount = unchangedCount,
-                    CurrentRecord = basicCandidate.FullName ?? "Unknown",
+                    CurrentRecord = entity.FullName,
                     Status = "syncing"
                 });
 
-                continue;
+                if (processedInRun >= maxToProcess)
+                    break;
             }
 
-            if (entity!.Status == "incomplete")
-                incompleteCount++;
-            else if (entity.Status == "not-processed")
-                notProcessedCount++;
-            else
-            {
-                switch (syncDetail)
-                {
-                    case "new": syncedCount++; break;
-                    case "updated": updatedCount++; break;
-                    case "unchanged": unchangedCount++; break;
-                }
-            }
-
-            yield return new SyncRecordEvent(MapCandidateToDto(entity, resumeChanged, syncDetail));
-
-            yield return new SyncProgressEvent(new SyncProgressDto
-            {
-                TotalRecords = totalRecords,
-                FetchedRecords = fetchedRecords,
-                SyncedCount = syncedCount,
-                IncompleteCount = incompleteCount,
-                NotProcessedCount = notProcessedCount,
-                UpdatedCount = updatedCount,
-                UnchangedCount = unchangedCount,
-                CurrentRecord = entity.FullName,
-                Status = "syncing"
-            });
+            pageOffset += batch.Count;
+            hasMorePages = pageOffset < totalRecords;
         }
 
         yield return new SyncCompleteEvent(new SyncProgressDto
@@ -615,7 +646,13 @@ public class SyncOrchestrator : ISyncOrchestrator
         };
     }
 
-    private SyncedCandidate BuildCandidateEntity(CandidateDetail detail, List<PersonaNote> notes)
+    private SyncedCandidate BuildCandidateEntity(
+        CandidateDetail detail,
+        List<PersonaNote> notes,
+        Dictionary<int, string> seniorities,
+        Dictionary<int, string> mainSkills,
+        Dictionary<int, string> countries,
+        CandidateDetail pagedFallback)
     {
         var resumeNote = notes
             .Where(n => n.NoteTypeName == "Resume"
@@ -624,9 +661,30 @@ public class SyncOrchestrator : ISyncOrchestrator
             .OrderByDescending(n => n.DateCreated)
             .FirstOrDefault();
 
+        var fullName = !string.IsNullOrWhiteSpace(detail.FullName)
+            ? detail.FullName
+            : $"{detail.FirstName} {detail.LastName}".Trim();
+
+        if (string.IsNullOrWhiteSpace(fullName))
+            fullName = pagedFallback.FullName;
+
+        var seniority = detail.Seniority.GetValueOrDefault() > 0
+            ? seniorities.GetValueOrDefault(detail.Seniority!.Value, pagedFallback.SeniorityText ?? "Unknown")
+            : pagedFallback.SeniorityText ?? "Unknown";
+
+        var mainSkill = mainSkills.Count > 0 && detail.MainSkillId.GetValueOrDefault() > 0
+            ? mainSkills.GetValueOrDefault(detail.MainSkillId!.Value, pagedFallback.MainSkill)
+            : pagedFallback.MainSkill;
+
+        var country = countries.Count > 0 && detail.CountryId.GetValueOrDefault() > 0
+            ? countries.GetValueOrDefault(detail.CountryId!.Value, pagedFallback.Country)
+            : pagedFallback.Country;
+
         var missingFields = new List<string>();
-        if (string.IsNullOrEmpty(detail.FullName)) missingFields.Add("FullName");
+        if (string.IsNullOrEmpty(fullName)) missingFields.Add("FullName");
         if (string.IsNullOrEmpty(detail.Email)) missingFields.Add("Email");
+        if (seniority == "Unknown") missingFields.Add("Seniority");
+        if (string.IsNullOrEmpty(mainSkill)) missingFields.Add("MainSkill");
         if (resumeNote == null) missingFields.Add("Resume");
 
         var recordStatus = missingFields.Count == 0 ? "synced" : "incomplete";
@@ -635,13 +693,18 @@ public class SyncOrchestrator : ISyncOrchestrator
         return new SyncedCandidate
         {
             UpstreamId = detail.CandidateId,
-            FullName = detail.FullName,
+            FullName = fullName ?? string.Empty,
             Email = detail.Email,
-            Seniority = detail.Seniority,
-            MainSkill = detail.MainSkill,
-            Country = detail.Country,
+            Seniority = seniority,
+            MainSkill = mainSkill,
+            Country = country,
             CurrentSalary = detail.CurrentSalary,
-            SalaryCurrency = detail.SalaryCurrency,
+            SalaryCurrency = detail.CurrentSalaryCurrency ?? detail.SalaryCurrency,
+            CoeCertified = detail.CoeCertifiedStatusId.GetValueOrDefault() > 0,
+            CandidateStatus = detail.CandidateStatusName ?? pagedFallback.CandidateStatusName,
+            LastStatusUpdate = ToUtc(detail.StatusUpdate),
+            SalaryExpectations = detail.Offer,
+            SalaryExpectationsCurrency = detail.DesiredSalaryCurrency,
             HasResume = resumeNote != null,
             ResumeNoteId = resumeNote?.PersonaNoteId,
             ResumeDateCreated = ToUtc(resumeNote?.DateCreated),
@@ -754,6 +817,11 @@ public class SyncOrchestrator : ISyncOrchestrator
                 existing.Country != entity.Country ||
                 existing.CurrentSalary != entity.CurrentSalary ||
                 existing.SalaryCurrency != entity.SalaryCurrency ||
+                existing.CoeCertified != entity.CoeCertified ||
+                existing.CandidateStatus != entity.CandidateStatus ||
+                existing.LastStatusUpdate != entity.LastStatusUpdate ||
+                existing.SalaryExpectations != entity.SalaryExpectations ||
+                existing.SalaryExpectationsCurrency != entity.SalaryExpectationsCurrency ||
                 existing.HasResume != entity.HasResume;
 
             var resumeChanged = entity.HasResume &&
@@ -783,6 +851,11 @@ public class SyncOrchestrator : ISyncOrchestrator
             existing.Country = entity.Country;
             existing.CurrentSalary = entity.CurrentSalary;
             existing.SalaryCurrency = entity.SalaryCurrency;
+            existing.CoeCertified = entity.CoeCertified;
+            existing.CandidateStatus = entity.CandidateStatus;
+            existing.LastStatusUpdate = entity.LastStatusUpdate;
+            existing.SalaryExpectations = entity.SalaryExpectations;
+            existing.SalaryExpectationsCurrency = entity.SalaryExpectationsCurrency;
             existing.HasResume = entity.HasResume;
             existing.SyncedAt = entity.SyncedAt;
 
@@ -858,6 +931,11 @@ public class SyncOrchestrator : ISyncOrchestrator
         Country = entity.Country,
         GrossMonthlySalary = entity.CurrentSalary,
         Currency = entity.SalaryCurrency,
+        CoeCertified = entity.CoeCertified,
+        CandidateStatus = entity.CandidateStatus,
+        LastStatusUpdate = entity.LastStatusUpdate?.ToString("o"),
+        SalaryExpectations = entity.SalaryExpectations,
+        SalaryExpectationsCurrency = entity.SalaryExpectationsCurrency,
         HasResume = entity.HasResume,
         ResumeNoteId = entity.ResumeNoteId,
         ResumeFilename = entity.ResumeFilename,

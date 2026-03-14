@@ -276,4 +276,208 @@ public class SyncOrchestratorTests : IDisposable
         Assert.Equal("Junior", recordEvent.Record.Seniority);
         Assert.Equal("not-processed", recordEvent.Record.Status);
     }
+
+    private void SetupDefaultCandidateUpstreamResponses(
+        CandidateDetail? detail = null,
+        List<PersonaNote>? notes = null,
+        int upstreamId = 200)
+    {
+        _upstreamApi.GetCandidateDetailAsync(FakeToken, upstreamId)
+            .Returns(detail ?? new CandidateDetail { CandidateId = upstreamId, FirstName = "Test", LastName = "Candidate", Email = "test@example.com" });
+        _upstreamApi.GetCandidateNotesAsync(FakeToken, upstreamId)
+            .Returns(notes ?? new List<PersonaNote>());
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsSeniorityFromCatalog()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 3, "Senior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 3,
+                MainSkillId = 1,
+                CountryId = 1
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.Equal("Senior", result.Seniority);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsMainSkillFromCatalog()
+    {
+        SetupDefaultCatalogs(
+            seniorities: new Dictionary<int, string> { { 1, "Junior" } },
+            mainSkills: new Dictionary<int, string> { { 700, "React" } }
+        );
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 700,
+                CountryId = 1
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.Equal("React", result.MainSkill);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsCountryFromCatalog()
+    {
+        SetupDefaultCatalogs(
+            seniorities: new Dictionary<int, string> { { 1, "Junior" } },
+            countries: new Dictionary<int, string> { { 5, "Mexico" } }
+        );
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 5
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.Equal("Mexico", result.Country);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsCoeCertified()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 1, "Junior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 1,
+                CoeCertifiedStatusId = 1
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.True(result.CoeCertified);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsSalaryExpectations()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 1, "Junior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 1,
+                Offer = 8000m,
+                DesiredSalaryCurrency = "USD"
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.Equal(8000m, result.SalaryExpectations);
+        Assert.Equal("USD", result.SalaryExpectationsCurrency);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsLastStatusUpdate()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 1, "Junior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 1,
+                StatusUpdate = new DateTime(2025, 6, 15)
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.NotNull(result.LastStatusUpdate);
+        Assert.Contains("2025", result.LastStatusUpdate);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_UsesFirstNameLastNameWhenFullNameEmpty()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 1, "Junior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FullName = "",
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 1
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.Equal("John Doe", result.Name);
+    }
+
+    [Fact]
+    public async Task BuildCandidate_MapsResumeFromNotes()
+    {
+        SetupDefaultCatalogs(seniorities: new Dictionary<int, string> { { 1, "Junior" } });
+        SetupDefaultCandidateUpstreamResponses(
+            detail: new CandidateDetail
+            {
+                CandidateId = 200,
+                FirstName = "Test",
+                LastName = "Candidate",
+                Email = "test@example.com",
+                Seniority = 1,
+                MainSkillId = 1,
+                CountryId = 1
+            },
+            notes: new List<PersonaNote>
+            {
+                new() { PersonaNoteId = 99, NoteTypeName = "Resume", Filename = "candidate_cv.pdf", DateCreated = DateTime.UtcNow }
+            }
+        );
+
+        var result = await _orchestrator.SyncSingleAsync("candidates", FakeToken, 200);
+
+        Assert.True(result.HasResume);
+    }
 }

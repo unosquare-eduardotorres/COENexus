@@ -454,6 +454,11 @@ export interface SyncRecord {
   grossMonthlySalary?: number;
   resumeDateCreated?: string;
   jobTitle?: string;
+  coeCertified?: boolean;
+  candidateStatus?: string;
+  lastStatusUpdate?: string;
+  salaryExpectations?: number;
+  salaryExpectationsCurrency?: string;
 }
 
 export interface SyncProgress {

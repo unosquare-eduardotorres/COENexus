@@ -11,6 +11,11 @@ public class SyncedCandidate
     public string? Country { get; set; }
     public decimal? CurrentSalary { get; set; }
     public string? SalaryCurrency { get; set; }
+    public bool CoeCertified { get; set; }
+    public string? CandidateStatus { get; set; }
+    public DateTime? LastStatusUpdate { get; set; }
+    public decimal? SalaryExpectations { get; set; }
+    public string? SalaryExpectationsCurrency { get; set; }
     public bool HasResume { get; set; }
     public int? ResumeNoteId { get; set; }
     public DateTime? ResumeDateCreated { get; set; }
