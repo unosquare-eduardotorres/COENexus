@@ -4,7 +4,7 @@ import {
   MatchFlowType,
   JdSource,
   DataSource,
-  HardConstraints,
+  AdvancedConstraints,
   MatchCandidate,
   PipelineStats as PipelineStatsType,
   PipelineStages,
@@ -15,6 +15,7 @@ import {
   FilterOptions,
   MatchSessionSummary,
   HaikuConfirmPayload,
+  SearchMode,
 } from '../types';
 import { matchEngineService } from '../services/matchEngineService';
 import { SAMPLE_JOB_DESCRIPTION } from '../data/mockMatchCandidates';
@@ -22,6 +23,8 @@ import StepperBar from '../components/shared/StepperBar';
 import IntentSelector from '../components/match/IntentSelector';
 import JobDescriptionStep from '../components/match/JobDescriptionStep';
 import DataSourceStep from '../components/match/DataSourceStep';
+import FilterStep from '../components/match/FilterStep';
+import SearchDepthStep from '../components/match/SearchDepthStep';
 import SearchProgressComponent from '../components/match/SearchProgress';
 import PipelineStatsDisplay from '../components/match/PipelineStats';
 import CandidateCard from '../components/match/CandidateCard';
@@ -32,7 +35,6 @@ import SessionHistoryPage from '../components/match/SessionHistoryPage';
 import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
-  bench: 'Bench',
   'all-employees': 'Employees',
   candidates: 'Candidates',
   'all-sources': 'All Sources',
@@ -62,6 +64,15 @@ const STEP_LABELS: { key: MatchStepKey; title: string; icon: ReactNode }[] = [
     ),
   },
   {
+    key: 'data-source',
+    title: 'Data Source',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
     key: 'job-description',
     title: 'Job Description',
     icon: (
@@ -71,11 +82,20 @@ const STEP_LABELS: { key: MatchStepKey; title: string; icon: ReactNode }[] = [
     ),
   },
   {
-    key: 'data-source',
-    title: 'Data Source',
+    key: 'filters',
+    title: 'Filters',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      </svg>
+    ),
+  },
+  {
+    key: 'search-depth',
+    title: 'Search Depth',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4h18l-7 8v6l-4 2V12L3 4z" />
       </svg>
     ),
   },
@@ -116,9 +136,12 @@ export default function MatchEnginePage() {
 
   const [jobDescription, setJobDescription] = useState(SAMPLE_JOB_DESCRIPTION);
   const [jdSource, setJdSource] = useState<JdSource>('custom');
-  const [constraints, setConstraints] = useState<HardConstraints>({});
-  const [dataSource, setDataSource] = useState<DataSource>('bench');
+  const [advancedConstraints, setAdvancedConstraints] = useState<AdvancedConstraints>({ candidateFilters: [], employeeFilters: [] });
+  const [dataSource, setDataSource] = useState<DataSource>('candidates');
   const [topN, setTopN] = useState<TopN>(10);
+
+  const [searchMode, setSearchMode] = useState<SearchMode>('opus');
+  const [showAnalyzeDeeper, setShowAnalyzeDeeper] = useState(false);
 
   const [poolCounts, setPoolCounts] = useState<PoolCounts | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
@@ -167,31 +190,52 @@ export default function MatchEnginePage() {
     (flow: MatchFlowType) => {
       setMatchFlow(flow);
       completeStep('intent');
-      setCurrentStepKey('job-description');
-    },
-    [completeStep]
-  );
-
-  const handleJdNext = useCallback(
-    (jd: string, source: JdSource, hardConstraints: HardConstraints) => {
-      setJobDescription(jd);
-      setJdSource(source);
-      setConstraints(hardConstraints);
-      completeStep('job-description');
       setCurrentStepKey('data-source');
     },
     [completeStep]
   );
 
-  const handleDataSourceNext = useCallback(
-    (source: DataSource, selectedTopN: TopN) => {
-      setPendingDataSource({ source, topN: selectedTopN });
+  const handleJdNext = useCallback(
+    (jd: string, source: JdSource) => {
+      setJobDescription(jd);
+      setJdSource(source);
+      completeStep('job-description');
+      setCurrentStepKey('filters');
+    },
+    [completeStep]
+  );
+
+  const handleFiltersNext = useCallback(
+    (constraints: AdvancedConstraints) => {
+      setAdvancedConstraints(constraints);
+      completeStep('filters');
+      setCurrentStepKey('search-depth');
+    },
+    [completeStep]
+  );
+
+  const handleSearchDepthNext = useCallback(
+    (mode: SearchMode, selectedTopN: number) => {
+      setSearchMode(mode);
+      setTopN(selectedTopN as TopN);
+      completeStep('search-depth');
+
+      setPendingDataSource({ source: dataSource, topN: selectedTopN as TopN });
       const now = new Date();
       const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
       setSessionName(defaultName);
       setShowSessionNamePrompt(true);
     },
-    []
+    [completeStep, dataSource]
+  );
+
+  const handleDataSourceNext = useCallback(
+    (source: DataSource) => {
+      setDataSource(source);
+      completeStep('data-source');
+      setCurrentStepKey('job-description');
+    },
+    [completeStep]
   );
 
   const executeSearch = useCallback(
@@ -218,7 +262,8 @@ export default function MatchEnginePage() {
             jobDescription,
             dataSource: source,
             topN: selectedTopN,
-            constraints,
+            searchMode,
+            constraints: advancedConstraints,
           },
           (p) => setProgress(p),
           (stages) => setPipelineStages(stages),
@@ -241,7 +286,7 @@ export default function MatchEnginePage() {
         setCurrentStepKey('data-source');
       }
     },
-    [pendingDataSource, sessionName, matchFlow, jdSource, jobDescription, constraints, completeStep]
+    [pendingDataSource, sessionName, matchFlow, jdSource, jobDescription, advancedConstraints, completeStep]
   );
 
   const handleStartSearch = useCallback(
@@ -285,13 +330,14 @@ export default function MatchEnginePage() {
       setMatchFlow(detail.matchFlowType);
       setJobDescription(detail.jobDescription);
       setJdSource(detail.jdSource);
-      setConstraints(detail.constraints || {});
+      setAdvancedConstraints(detail.constraints || { candidateFilters: [], employeeFilters: [] });
       setDataSource(detail.dataSource);
       setTopN(detail.topN);
+      setSearchMode(detail.searchMode || 'opus');
       setCandidates(detail.candidates);
       setStats(detail.stats || null);
       setPipelineStages(detail.pipelineStages || null);
-      setCompletedSteps(new Set<MatchStepKey>(['intent', 'job-description', 'data-source', 'searching']));
+      setCompletedSteps(new Set<MatchStepKey>(['intent', 'job-description', 'data-source', 'filters', 'search-depth', 'searching']));
       setCurrentStepKey('results');
       setShowSessionHistory(false);
       setTimeout(() => setAnimateIn(true), 50);
@@ -346,9 +392,11 @@ export default function MatchEnginePage() {
     setMatchFlow(null);
     setJobDescription(SAMPLE_JOB_DESCRIPTION);
     setJdSource('custom');
-    setConstraints({});
-    setDataSource('bench');
+    setAdvancedConstraints({ candidateFilters: [], employeeFilters: [] });
+    setDataSource('candidates');
     setTopN(10);
+    setSearchMode('opus');
+    setShowAnalyzeDeeper(false);
     setProgress({ percent: 0, stage: '' });
     setCandidates([]);
     setStats(null);
@@ -372,14 +420,8 @@ export default function MatchEnginePage() {
   }, [activeStageDrawer, pipelineStages]);
 
   const activeConstraintCount = useMemo(() => {
-    let count = 0;
-    if (constraints.seniority) count++;
-    if (constraints.mainSkill) count++;
-    if (constraints.salary) count++;
-    if (constraints.salaryCurrency) count++;
-    if (constraints.country) count++;
-    return count;
-  }, [constraints]);
+    return advancedConstraints.candidateFilters.length + advancedConstraints.employeeFilters.length;
+  }, [advancedConstraints]);
 
   const stepSummaries = useMemo<Partial<Record<MatchStepKey, { icon: ReactNode; label: string } | null>>>(() => {
     const summaries: Partial<Record<MatchStepKey, { icon: ReactNode; label: string } | null>> = {};
@@ -396,10 +438,7 @@ export default function MatchEnginePage() {
     }
 
     if (completedSteps.has('job-description')) {
-      const baseLabel = jdSource === 'position' ? 'Position' : 'Custom';
-      const jdLabel = activeConstraintCount > 0
-        ? `${baseLabel} (+${activeConstraintCount})`
-        : baseLabel;
+      const jdLabel = jdSource === 'position' ? 'Position' : 'Custom';
       const icon = jdSource === 'position' ? (
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -412,6 +451,18 @@ export default function MatchEnginePage() {
       summaries['job-description'] = { icon, label: jdLabel };
     }
 
+    if (completedSteps.has('filters')) {
+      const filtersLabel = activeConstraintCount > 0 ? `${activeConstraintCount} filter(s)` : 'No filters';
+      summaries['filters'] = {
+        icon: (
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+          </svg>
+        ),
+        label: filtersLabel,
+      };
+    }
+
     if (completedSteps.has('data-source')) {
       summaries['data-source'] = {
         icon: (
@@ -419,7 +470,19 @@ export default function MatchEnginePage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
         ),
-        label: `${SOURCE_LABELS[dataSource]} · Top ${topN}`,
+        label: SOURCE_LABELS[dataSource],
+      };
+    }
+
+    if (completedSteps.has('search-depth')) {
+      const modeLabels: Record<SearchMode, string> = { vector: 'Vector', haiku: 'Haiku', opus: 'Full Analysis' };
+      summaries['search-depth'] = {
+        icon: (
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4h18l-7 8v6l-4 2V12L3 4z" />
+          </svg>
+        ),
+        label: `${modeLabels[searchMode]} · ${topN}`,
       };
     }
 
@@ -446,7 +509,7 @@ export default function MatchEnginePage() {
     }
 
     return summaries;
-  }, [completedSteps, matchFlow, jdSource, activeConstraintCount, dataSource, topN, stats, candidates.length]);
+  }, [completedSteps, matchFlow, jdSource, activeConstraintCount, dataSource, topN, searchMode, stats, candidates.length]);
 
   return (
     <div className="min-h-screen py-8">
@@ -519,13 +582,24 @@ export default function MatchEnginePage() {
             onNext={handleJdNext}
             initialJobDescription={jobDescription}
             initialSource={jdSource}
-            initialConstraints={constraints}
+          />
+        )}
+
+        {currentStepKey === 'filters' && (
+          <FilterStep
+            dataSource={dataSource}
             filterOptions={filterOptions}
+            initialConstraints={advancedConstraints}
+            onNext={handleFiltersNext}
           />
         )}
 
         {currentStepKey === 'data-source' && (
           <DataSourceStep onNext={handleDataSourceNext} initialSource={dataSource} poolCounts={poolCounts} />
+        )}
+
+        {currentStepKey === 'search-depth' && (
+          <SearchDepthStep onNext={handleSearchDepthNext} initialMode={searchMode} />
         )}
 
         {currentStepKey === 'searching' && (
@@ -573,13 +647,23 @@ export default function MatchEnginePage() {
                   )}
                 </p>
               </div>
-              <button
-                onClick={handleStartCompare}
-                disabled={compareList.length < 2}
-                className="mt-8 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-accent-500 disabled:hover:to-accent-600"
-              >
-                Compare Selected ({compareList.length})
-              </button>
+              <div className="flex items-center gap-3 mt-8">
+                {searchMode !== 'opus' && (
+                  <button
+                    onClick={() => setShowAnalyzeDeeper(true)}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-violet-500/20"
+                  >
+                    🔬 Analyze Deeper
+                  </button>
+                )}
+                <button
+                  onClick={handleStartCompare}
+                  disabled={compareList.length < 2}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-accent-500 disabled:hover:to-accent-600"
+                >
+                  Compare Selected ({compareList.length})
+                </button>
+              </div>
             </div>
 
             {showSessionHistory && (
@@ -712,6 +796,92 @@ export default function MatchEnginePage() {
                 Continue Without AI
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAnalyzeDeeper && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="glass-card max-w-lg mx-4 p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-violet-500/15 flex items-center justify-center">
+                <span className="text-lg">🔬</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-primary">Analyze Deeper</h3>
+                <p className="text-xs text-muted">Upgrade your search with more AI analysis</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {searchMode === 'vector' && (
+                <button
+                  onClick={() => {
+                    setShowAnalyzeDeeper(false);
+                    setSearchMode('haiku');
+                    setTopN(50 as TopN);
+                    setPendingDataSource({ source: dataSource, topN: 50 as TopN });
+                    const now = new Date();
+                    const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                    setSessionName(defaultName);
+                    setShowSessionNamePrompt(true);
+                  }}
+                  className="w-full text-left p-4 rounded-xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-amber-500/30 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 4h18l-7 8v6l-4 2V12L3 4z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-primary">Haiku Pre-filter</h4>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400">🎯 Balanced</span>
+                      </div>
+                      <p className="text-xs text-muted mt-1">AI triage with Haiku to score and filter candidates. Returns top 50.</p>
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setShowAnalyzeDeeper(false);
+                  setSearchMode('opus');
+                  setTopN(10 as TopN);
+                  setPendingDataSource({ source: dataSource, topN: 10 as TopN });
+                  const now = new Date();
+                  const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                  setSessionName(defaultName);
+                  setShowSessionNamePrompt(true);
+                }}
+                className="w-full text-left p-4 rounded-xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-violet-500/30 transition-all"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center text-white flex-shrink-0">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a7 7 0 017 7c0 2.5-1.5 4.5-3 6l-1 3H9l-1-3c-1.5-1.5-3-3.5-3-6a7 7 0 017-7z" />
+                      <path d="M9 18h6M10 21h4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-primary">Full Sonnet Analysis</h4>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400">🔬 Deepest</span>
+                    </div>
+                    <p className="text-xs text-muted mt-1">Complete pipeline with deep Sonnet analysis — fit narratives, skill gaps, leadership assessment. Top 10 candidates.</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowAnalyzeDeeper(false)}
+              className="w-full py-2 text-sm text-muted hover:text-secondary transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

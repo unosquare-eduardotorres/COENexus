@@ -104,6 +104,18 @@ export const resumeProcessingService = {
     );
   },
 
+  async retryFailed(source: SyncSourceType): Promise<{ reset: number }> {
+    const res = await fetch(`${API_BASE}/retry-failed/${source}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Failed to retry: ${res.status}`);
+    return res.json();
+  },
+
+  async retryFailedVectorization(source: SyncSourceType): Promise<{ reset: number }> {
+    const res = await fetch(`${API_BASE}/retry-failed-vectorization/${source}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Failed to retry vectorization: ${res.status}`);
+    return res.json();
+  },
+
   async vectorizeSingle(
     source: SyncSourceType,
     upstreamId: number

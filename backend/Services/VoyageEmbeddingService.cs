@@ -22,15 +22,18 @@ public class VoyageEmbeddingService : IVoyageEmbeddingService
         _apiKey = settings.Value.ApiKey;
     }
 
-    public async Task<float[]> GenerateEmbeddingAsync(string text, string model, CancellationToken ct = default)
+    public Task<float[]> GenerateEmbeddingAsync(string text, string model, CancellationToken ct = default)
+        => GenerateEmbeddingWithKeyAsync(text, model, _apiKey, ct);
+
+    public async Task<float[]> GenerateEmbeddingWithKeyAsync(string text, string model, string apiKey, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("Voyage API key not configured. Set the Voyage__ApiKey environment variable.");
 
         for (int attempt = 0; attempt <= MaxRetries; attempt++)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiUrl}/embeddings");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
             request.Content = JsonContent.Create(new
             {
                 input = new[] { text },
@@ -45,16 +48,16 @@ public class VoyageEmbeddingService : IVoyageEmbeddingService
             {
                 var retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds
                     ?? BackoffSeconds[Math.Min(attempt, BackoffSeconds.Length - 1)];
-                _logger.LogWarning("[Voyage] 429 rate-limited, waiting {Delay:F0}s (retry {Attempt}/{Max})",
-                    retryAfter, attempt + 1, MaxRetries);
+                _logger.LogWarning("[Voyage] 429 rate-limited on key {KeySuffix}, waiting {Delay:F0}s (retry {Attempt}/{Max})",
+                    apiKey.Length > 4 ? apiKey[^4..] : "****", retryAfter, attempt + 1, MaxRetries);
                 await Task.Delay(TimeSpan.FromSeconds(retryAfter), ct);
                 continue;
             }
 
+            response.EnsureSuccessStatusCode();
+
             _logger.LogInformation("[Voyage] Embedding generated in {Ms}ms (attempt {Attempt})",
                 sw.ElapsedMilliseconds, attempt + 1);
-
-            response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<VoyageResponse>(ct);
             return result?.Data?.FirstOrDefault()?.Embedding ?? throw new InvalidOperationException("Empty embedding response");

@@ -294,7 +294,7 @@ export interface RefinementPrompt {
   updatedAt: string;
 }
 
-export type DataSource = 'bench' | 'all-employees' | 'candidates' | 'all-sources';
+export type DataSource = 'all-employees' | 'candidates' | 'all-sources';
 
 export type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead' | 'Architect' | 'Trainee' | 'Not Specified';
 
@@ -316,6 +316,32 @@ export interface FilterOptions {
   mainSkills: string[];
   countries: string[];
   currencies: string[];
+  candidateStatuses: string[];
+}
+
+export type FilterField =
+  | 'mainSkill' | 'country' | 'seniority'
+  | 'currentSalary' | 'salaryExpectation' | 'status';
+
+export type FilterOperator =
+  | 'equals' | 'notEquals'
+  | 'in' | 'notIn'
+  | 'lte' | 'gte';
+
+export type FilterConnector = 'and' | 'or';
+
+export interface FilterRule {
+  id: string;
+  field: FilterField;
+  operator: FilterOperator;
+  value: string | number;
+  currency?: string;
+  connector: FilterConnector;
+}
+
+export interface AdvancedConstraints {
+  candidateFilters: FilterRule[];
+  employeeFilters: FilterRule[];
 }
 
 export type SkillMatchStatus = 'match' | 'partial' | 'missing';
@@ -372,7 +398,11 @@ export interface MatchCandidate {
   mainSkill: string;
   isBench: boolean;
   centerOfExcellence?: string;
+  candidateStatus?: string;
+  upstreamId: number;
   analysis?: SonnetAnalysis;
+  salaryExpectations?: number;
+  salaryExpectationsCurrency?: string;
 }
 
 export interface CandidateTiming {
@@ -402,7 +432,7 @@ export interface SearchProgress {
 
 export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op';
 
-export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'searching' | 'results' | 'deep-dive';
+export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive';
 
 export type JdSource = 'position' | 'custom';
 
@@ -493,7 +523,7 @@ export interface ProcessingRecord {
 
 export interface ProcessingProgress {
   source: SyncSourceType;
-  status: 'idle' | 'processing' | 'paused' | 'completed' | 'error';
+  status: 'idle' | 'processing' | 'paused' | 'completed' | 'error' | 'auth_failed';
   totalRecords: number;
   processedRecords: number;
   successCount: number;
@@ -510,6 +540,8 @@ export interface VectorizationConfig {
 }
 
 export type TopN = 1 | 10 | 20 | 30;
+
+export type SearchMode = 'vector' | 'haiku' | 'opus';
 
 export interface SonnetAnalysis {
   whyRightFit: string;
@@ -574,6 +606,7 @@ export interface MatchSessionSummary {
   matchFlowType: MatchFlowType;
   dataSource: DataSource;
   topN: TopN;
+  searchMode?: SearchMode;
   jdSource: JdSource;
   status: 'running' | 'completed' | 'failed';
   createdAt: string;
@@ -584,7 +617,7 @@ export interface MatchSessionSummary {
 
 export interface MatchSessionDetail extends MatchSessionSummary {
   jobDescription: string;
-  constraints?: HardConstraints;
+  constraints?: AdvancedConstraints;
   stats?: PipelineStats;
   pipelineStages?: PipelineStages;
   candidates: MatchCandidate[];
@@ -596,7 +629,8 @@ export interface CreateSessionRequest {
   jdSource: JdSource;
   jobDescription: string;
   dataSource: DataSource;
-  topN: TopN;
-  constraints?: HardConstraints;
+  topN: number;
+  searchMode: SearchMode;
+  constraints?: AdvancedConstraints;
 }
 

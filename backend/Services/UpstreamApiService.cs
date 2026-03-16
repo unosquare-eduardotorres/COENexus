@@ -167,6 +167,82 @@ public class UpstreamApiService : IUpstreamApiService
         return await response.Content.ReadAsByteArrayAsync();
     }
 
+    public async Task<(List<OpenPositionListItem> Items, int TotalRecords)> GetOpenPositionsPagedAsync(string token, int skip, int take)
+    {
+        var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}op/paged/false", token);
+        request.Content = JsonContent.Create(new PagedRequest
+        {
+            Skip = skip,
+            Take = take,
+            Columns = BuildOpenPositionColumns()
+        });
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var paged = await response.Content.ReadFromJsonAsync<PagedResponse>() ?? new();
+
+        var items = paged.Payload.Select(row => new OpenPositionListItem
+        {
+            Id = GetInt(row, 1),
+            Account = GetString(row, 2),
+            Coe = GetString(row, 4),
+            Practice = GetString(row, 5),
+            Stakeholder = GetString(row, 6),
+            MainSkill = GetString(row, 7),
+            Status = GetString(row, 8),
+            Countries = GetString(row, 9),
+            Aging = row.Length > 13 ? GetInt(row, 13) : 0,
+            Seniorities = row.Length > 14 ? GetString(row, 14) : string.Empty,
+            AvailableRange = row.Length > 15 ? GetString(row, 15) : string.Empty,
+            Created = row.Length > 16 ? GetString(row, 16) : string.Empty,
+            ReadyDate = row.Length > 17 ? GetString(row, 17) : string.Empty,
+            LastModification = row.Length > 18 ? GetString(row, 18) : string.Empty,
+            Sourcing = row.Length > 19 ? GetString(row, 19) : string.Empty,
+            Replacement = row.Length > 20 && GetBool(row, 20),
+        }).ToList();
+
+        return (items, paged.FilteredRecordCount);
+    }
+
+    public async Task<OpenPositionDetail> GetOpenPositionDetailAsync(string token, int id)
+    {
+        var request = CreateAuthorizedRequest(HttpMethod.Get, $"{_baseUrl}op/{id}", token);
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            NumberHandling = JsonNumberHandling.AllowReadingFromString
+        };
+        return JsonSerializer.Deserialize<OpenPositionDetail>(json, options) ?? new();
+    }
+
+    public async Task<List<PresentedCandidateItem>> GetPresentedCandidatesAsync(string token, int positionId)
+    {
+        var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}op/pagedRequisition/{positionId}", token);
+        request.Content = JsonContent.Create(new PagedRequest
+        {
+            Skip = 0,
+            Take = 100,
+            Columns = BuildPresentedCandidateColumns()
+        });
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var paged = await response.Content.ReadFromJsonAsync<PagedResponse>() ?? new();
+
+        return paged.Payload.Select(row => new PresentedCandidateItem
+        {
+            CandidateRequisitionId = GetInt(row, 0),
+            Candidate = GetString(row, 1),
+            CandidateStatusName = GetString(row, 2),
+            StartDate = GetString(row, 3),
+            Skills = GetString(row, 4),
+            Rate = GetDecimal(row, 5),
+            IsEmployee = GetBool(row, 6),
+            CandidateId = row.Length > 8 ? GetInt(row, 8) : 0,
+        }).ToList();
+    }
+
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url, string token)
     {
         var request = new HttpRequestMessage(method, url);
@@ -267,6 +343,52 @@ public class UpstreamApiService : IUpstreamApiService
         };
     }
 
+    private static List<ColumnDefinition> BuildOpenPositionColumns()
+    {
+        return new List<ColumnDefinition>
+        {
+            new() { Name = "RecruitmentRequisitionId", Label = "Actions", Filterable = false, Exportable = false, Sortable = false, FilterOperator = "None" },
+            new() { Name = "Id", Label = "Id", DataType = "numeric", IsKey = true, SortDirection = "Ascending", SortOrder = 2, FilterOperator = "None" },
+            new() { Name = "Account", Label = "Account", Searchable = true, SortDirection = "Ascending", SortOrder = 1, FilterOperator = "None" },
+            new() { Name = "VerticalIndustry", Label = "Vertical Industry", Searchable = true, FilterOperator = "None" },
+            new() { Name = "CoE", Label = "CoE", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Practice", Label = "Practice", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Stakeholder", Label = "Stakeholder", Searchable = true, FilterOperator = "None" },
+            new() { Name = "MainSkill", Label = "Main Skill", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Status", Label = "Status", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Countries", Label = "Countries", Searchable = true, FilterOperator = "None" },
+            new() { Name = "InOffice", Label = "In Office", DataType = "boolean", FilterOperator = "None" },
+            new() { Name = "Csu", Label = "CSU", Searchable = true, FilterOperator = "None" },
+            new() { Name = "PositionStatus", Label = "Count", Filterable = false, FilterOperator = "None" },
+            new() { Name = "Aging", Label = "Aging", DataType = "numeric", Filterable = false, FilterOperator = "None" },
+            new() { Name = "Seniorities", Label = "Seniorities", Searchable = true, FilterOperator = "None" },
+            new() { Name = "RateRange", Label = "Available Range", FilterOperator = "None" },
+            new() { Name = "Created", Label = "Created", DataType = "date", FilterOperator = "None" },
+            new() { Name = "StartDate", Label = "Ready Date", DataType = "date", FilterOperator = "None" },
+            new() { Name = "LastStatus", Label = "Last Modification", DataType = "date", FilterOperator = "None" },
+            new() { Name = "Sourcing", Label = "Sourcing", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Replacement", Label = "Replacement", DataType = "boolean", FilterOperator = "None" },
+            new() { Name = "Closed", Label = "Closed", DataType = "date", FilterOperator = "None" },
+            new() { Name = "IsFromAssignments", Label = "Is From Assignments", DataType = "boolean", Sortable = false, Visible = false, FilterOperator = "None" },
+        };
+    }
+
+    private static List<ColumnDefinition> BuildPresentedCandidateColumns()
+    {
+        return new List<ColumnDefinition>
+        {
+            new() { Name = "CandidateRequisitionId", Label = "Actions", DataType = "numeric", IsKey = true, Filterable = false, Exportable = false, Sortable = false, FilterOperator = "None" },
+            new() { Name = "Candidate", Label = "Candidate", Searchable = true, FilterOperator = "None" },
+            new() { Name = "CandidateStatusName", Label = "Status", Searchable = true, FilterOperator = "None" },
+            new() { Name = "StartDate", Label = "Status Date", DataType = "date", SortDirection = "Descending", SortOrder = 1, FilterOperator = "None" },
+            new() { Name = "Skills", Label = "Main Skill", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Rate", Label = "Rate", DataType = "numeric", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Visa", Label = "Employee", DataType = "boolean", FilterOperator = "None" },
+            new() { Name = "Skype", Label = "Rec Status", Searchable = true, FilterOperator = "None" },
+            new() { Name = "CandidateId", Label = "Candidate Id", DataType = "numeric", Filterable = false, Visible = false, FilterOperator = "None" },
+        };
+    }
+
     private static List<PersonaNote> MapNoteRows(PagedResponse paged)
     {
         return paged.Payload.Select(row => new PersonaNote
@@ -297,6 +419,19 @@ public class UpstreamApiService : IUpstreamApiService
     private static decimal GetDecimal(JsonElement[] row, int i) =>
         i < row.Length && row[i].ValueKind == JsonValueKind.Number
             ? row[i].GetDecimal() : 0m;
+
+    private static bool GetBool(JsonElement[] row, int i)
+    {
+        if (i >= row.Length) return false;
+        if (row[i].ValueKind == JsonValueKind.True) return true;
+        if (row[i].ValueKind == JsonValueKind.False) return false;
+        if (row[i].ValueKind == JsonValueKind.String)
+        {
+            var str = row[i].GetString()?.ToLowerInvariant();
+            return str == "true" || str == "yes" || str == "1";
+        }
+        return false;
+    }
 
     private static DateTime GetDateTime(JsonElement[] row, int i)
     {

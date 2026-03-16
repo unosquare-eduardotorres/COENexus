@@ -65,6 +65,11 @@ public class SyncOrchestrator : ISyncOrchestrator
             await foreach (var syncEvent in SyncCandidatesAsync(token, limit, skip, year, cancellationToken))
                 yield return syncEvent;
         }
+        else if (source == "open-positions")
+        {
+            await foreach (var syncEvent in SyncOpenPositionsAsync(token, limit, skip, cancellationToken))
+                yield return syncEvent;
+        }
     }
 
     public async Task<SyncRecordDto> SyncSingleAsync(string source, string token, int upstreamId, CancellationToken ct = default)
@@ -73,6 +78,8 @@ public class SyncOrchestrator : ISyncOrchestrator
             return await SyncSingleEmployeeAsync(token, upstreamId, ct);
         if (source == "candidates")
             return await SyncSingleCandidateAsync(token, upstreamId, ct);
+        if (source == "open-positions")
+            return await SyncSingleOpenPositionAsync(token, upstreamId, ct);
 
         throw new ArgumentException($"Unknown source: {source}");
     }
@@ -205,97 +212,166 @@ public class SyncOrchestrator : ISyncOrchestrator
             notProcessedCount = dbCounts.FirstOrDefault(c => c.Status == "not-processed")?.Count ?? 0;
         }
 
-        foreach (var basicEmployee in allEmployees)
+        const int employeeBatchSize = 5;
+
+        for (int batchStart = 0; batchStart < allEmployees.Count; batchStart += employeeBatchSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            fetchedRecords++;
 
-            SyncedEmployee? entity = null;
-            bool resumeChanged = false;
-            string syncDetail = "not-processed";
-            Exception? fatalError = null;
+            var currentBatch = allEmployees
+                .Skip(batchStart)
+                .Take(employeeBatchSize)
+                .ToList();
 
-            try
+            var fetchTasks = currentBatch.Select(async basicEmp =>
             {
                 try
                 {
-                    var detailTask = _upstreamApi.GetEmployeeDetailAsync(token, basicEmployee.UserId);
-                    var contractsTask = LoadOrEmpty("Contracts", () => _upstreamApi.GetEmployeeContractsAsync(token, basicEmployee.UserId));
-                    var ratesTask = LoadOrEmpty("Rates", () => _upstreamApi.GetEmployeeRatesAsync(token, basicEmployee.UserId));
-                    var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetEmployeeNotesAsync(token, basicEmployee.UserId));
+                    var detailTask = _upstreamApi.GetEmployeeDetailAsync(token, basicEmp.UserId);
+                    var contractsTask = LoadOrEmpty("Contracts", () => _upstreamApi.GetEmployeeContractsAsync(token, basicEmp.UserId));
+                    var ratesTask = LoadOrEmpty("Rates", () => _upstreamApi.GetEmployeeRatesAsync(token, basicEmp.UserId));
+                    var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetEmployeeNotesAsync(token, basicEmp.UserId));
                     await Task.WhenAll(detailTask, contractsTask, ratesTask, notesTask);
 
-                    var detail = detailTask.Result;
-                    var contracts = contractsTask.Result;
-                    var rates = ratesTask.Result;
-                    var notes = notesTask.Result;
-
-                    entity = BuildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicEmployee);
-                    (_, resumeChanged, syncDetail) = await UpsertEmployeeAsync(entity, cancellationToken);
+                    return (
+                        Employee: basicEmp,
+                        Detail: (EmployeeDetail?)detailTask.Result,
+                        Contracts: (List<EmployeeContract>?)contractsTask.Result,
+                        Rates: (List<EmployeeRate>?)ratesTask.Result,
+                        Notes: (List<PersonaNote>?)notesTask.Result,
+                        FetchError: (Exception?)null
+                    );
                 }
                 catch (Exception ex)
                 {
-                    entity = new SyncedEmployee
-                    {
-                        UpstreamId = basicEmployee.UserId,
-                        FullName = basicEmployee.FullName ?? string.Empty,
-                        Email = basicEmployee.Email ?? string.Empty,
-                        JobTitle = basicEmployee.JobTitle ?? string.Empty,
-                        MainSkill = basicEmployee.MainSkillName ?? string.Empty,
-                        Country = basicEmployee.OfficeName ?? string.Empty,
-                        Seniority = seniorities.GetValueOrDefault(basicEmployee.Seniority, string.Empty),
-                        Status = "not-processed",
-                        StatusReason = ex.Message,
-                        SyncedAt = DateTime.UtcNow
-                    };
-
-                    var existingOnError = await _dbContext.SyncedEmployees
-                        .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, cancellationToken);
-                    if (existingOnError != null)
-                    {
-                        existingOnError.FullName = entity.FullName;
-                        existingOnError.Email = entity.Email;
-                        existingOnError.JobTitle = entity.JobTitle;
-                        existingOnError.MainSkill = entity.MainSkill;
-                        existingOnError.Country = entity.Country;
-                        existingOnError.Seniority = entity.Seniority;
-                        existingOnError.Status = entity.Status;
-                        existingOnError.StatusReason = entity.StatusReason;
-                        existingOnError.SyncedAt = entity.SyncedAt;
-                    }
-                    else
-                    {
-                        _dbContext.SyncedEmployees.Add(entity);
-                    }
-                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    return (
+                        Employee: basicEmp,
+                        Detail: (EmployeeDetail?)null,
+                        Contracts: (List<EmployeeContract>?)null,
+                        Rates: (List<EmployeeRate>?)null,
+                        Notes: (List<PersonaNote>?)null,
+                        FetchError: (Exception?)ex
+                    );
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to sync employee {UpstreamId} ({Name}) — skipping",
-                    basicEmployee.UserId, basicEmployee.FullName);
-                fatalError = ex;
-            }
+            }).ToList();
 
-            if (fatalError != null)
-            {
-                notProcessedCount++;
+            var fetchResults = await Task.WhenAll(fetchTasks);
 
-                yield return new SyncRecordEvent(new SyncRecordDto
+            foreach (var result in fetchResults)
+            {
+                fetchedRecords++;
+
+                SyncedEmployee? entity = null;
+                bool resumeChanged = false;
+                string syncDetail = "not-processed";
+                Exception? fatalError = null;
+
+                try
                 {
-                    Id = $"emp-{basicEmployee.UserId}",
-                    Source = "employees",
-                    Status = "not-processed",
-                    Name = basicEmployee.FullName ?? "Unknown",
-                    Email = basicEmployee.Email ?? string.Empty,
-                    JobTitle = basicEmployee.JobTitle ?? string.Empty,
-                    Reason = fatalError.Message,
-                    UpstreamId = basicEmployee.UserId,
-                    HasResume = false,
-                    Failed = false,
-                    SyncDetail = "error",
-                    SyncedAt = DateTime.UtcNow.ToString("o"),
-                });
+                    try
+                    {
+                        if (result.FetchError != null)
+                            throw result.FetchError;
+
+                        entity = BuildEmployeeEntity(result.Detail!, result.Contracts!, result.Rates!, result.Notes!, seniorities, mainSkills, countries, result.Employee);
+                        (_, resumeChanged, syncDetail) = await UpsertEmployeeAsync(entity, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        entity = new SyncedEmployee
+                        {
+                            UpstreamId = result.Employee.UserId,
+                            FullName = result.Employee.FullName ?? string.Empty,
+                            Email = result.Employee.Email ?? string.Empty,
+                            JobTitle = result.Employee.JobTitle ?? string.Empty,
+                            MainSkill = result.Employee.MainSkillName ?? string.Empty,
+                            Country = result.Employee.OfficeName ?? string.Empty,
+                            Seniority = seniorities.GetValueOrDefault(result.Employee.Seniority, string.Empty),
+                            Status = "not-processed",
+                            StatusReason = ex.Message,
+                            SyncedAt = DateTime.UtcNow
+                        };
+
+                        var existingOnError = await _dbContext.SyncedEmployees
+                            .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, cancellationToken);
+                        if (existingOnError != null)
+                        {
+                            existingOnError.FullName = entity.FullName;
+                            existingOnError.Email = entity.Email;
+                            existingOnError.JobTitle = entity.JobTitle;
+                            existingOnError.MainSkill = entity.MainSkill;
+                            existingOnError.Country = entity.Country;
+                            existingOnError.Seniority = entity.Seniority;
+                            existingOnError.Status = entity.Status;
+                            existingOnError.StatusReason = entity.StatusReason;
+                            existingOnError.SyncedAt = entity.SyncedAt;
+                        }
+                        else
+                        {
+                            _dbContext.SyncedEmployees.Add(entity);
+                        }
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to sync employee {UpstreamId} ({Name}) — skipping",
+                        result.Employee.UserId, result.Employee.FullName);
+                    fatalError = ex;
+                }
+
+                if (fatalError != null)
+                {
+                    notProcessedCount++;
+
+                    yield return new SyncRecordEvent(new SyncRecordDto
+                    {
+                        Id = $"emp-{result.Employee.UserId}",
+                        Source = "employees",
+                        Status = "not-processed",
+                        Name = result.Employee.FullName ?? "Unknown",
+                        Email = result.Employee.Email ?? string.Empty,
+                        JobTitle = result.Employee.JobTitle ?? string.Empty,
+                        Reason = fatalError.Message,
+                        UpstreamId = result.Employee.UserId,
+                        HasResume = false,
+                        Failed = false,
+                        SyncDetail = "error",
+                        SyncedAt = DateTime.UtcNow.ToString("o"),
+                    });
+
+                    yield return new SyncProgressEvent(new SyncProgressDto
+                    {
+                        TotalRecords = totalRecords,
+                        FetchedRecords = fetchedRecords,
+                        SyncedCount = syncedCount,
+                        IncompleteCount = incompleteCount,
+                        NotProcessedCount = notProcessedCount,
+                        UpdatedCount = updatedCount,
+                        UnchangedCount = unchangedCount,
+                        SkippedCount = excludedCount,
+                        CurrentRecord = result.Employee.FullName ?? "Unknown",
+                        Status = "syncing"
+                    });
+
+                    continue;
+                }
+
+                if (entity!.Status == "incomplete")
+                    incompleteCount++;
+                else if (entity.Status == "not-processed")
+                    notProcessedCount++;
+                else
+                {
+                    switch (syncDetail)
+                    {
+                        case "new": syncedCount++; break;
+                        case "updated": updatedCount++; break;
+                        case "unchanged": unchangedCount++; break;
+                    }
+                }
+
+                yield return new SyncRecordEvent(MapEmployeeToDto(entity, resumeChanged, syncDetail));
 
                 yield return new SyncProgressEvent(new SyncProgressDto
                 {
@@ -307,42 +383,10 @@ public class SyncOrchestrator : ISyncOrchestrator
                     UpdatedCount = updatedCount,
                     UnchangedCount = unchangedCount,
                     SkippedCount = excludedCount,
-                    CurrentRecord = basicEmployee.FullName ?? "Unknown",
+                    CurrentRecord = entity.FullName,
                     Status = "syncing"
                 });
-
-                continue;
             }
-
-            if (entity!.Status == "incomplete")
-                incompleteCount++;
-            else if (entity.Status == "not-processed")
-                notProcessedCount++;
-            else
-            {
-                switch (syncDetail)
-                {
-                    case "new": syncedCount++; break;
-                    case "updated": updatedCount++; break;
-                    case "unchanged": unchangedCount++; break;
-                }
-            }
-
-            yield return new SyncRecordEvent(MapEmployeeToDto(entity, resumeChanged, syncDetail));
-
-            yield return new SyncProgressEvent(new SyncProgressDto
-            {
-                TotalRecords = totalRecords,
-                FetchedRecords = fetchedRecords,
-                SyncedCount = syncedCount,
-                IncompleteCount = incompleteCount,
-                NotProcessedCount = notProcessedCount,
-                UpdatedCount = updatedCount,
-                UnchangedCount = unchangedCount,
-                SkippedCount = excludedCount,
-                CurrentRecord = entity.FullName,
-                Status = "syncing"
-            });
         }
 
         yield return new SyncCompleteEvent(new SyncProgressDto
@@ -414,9 +458,36 @@ public class SyncOrchestrator : ISyncOrchestrator
                     .ToList();
             }
 
-            foreach (var basicCandidate in batch)
+            var fetchTasks = batch.Select(async basicCand =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var detailTask = _upstreamApi.GetCandidateDetailAsync(token, basicCand.CandidateId);
+                    var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetCandidateNotesAsync(token, basicCand.CandidateId));
+                    await Task.WhenAll(detailTask, notesTask);
+
+                    return (
+                        Candidate: basicCand,
+                        Detail: (CandidateDetail?)detailTask.Result,
+                        Notes: (List<PersonaNote>?)notesTask.Result,
+                        FetchError: (Exception?)null
+                    );
+                }
+                catch (Exception ex)
+                {
+                    return (
+                        Candidate: basicCand,
+                        Detail: (CandidateDetail?)null,
+                        Notes: (List<PersonaNote>?)null,
+                        FetchError: (Exception?)ex
+                    );
+                }
+            }).ToList();
+
+            var fetchResults = await Task.WhenAll(fetchTasks);
+
+            foreach (var result in fetchResults)
+            {
                 fetchedRecords++;
                 processedInRun++;
 
@@ -429,29 +500,25 @@ public class SyncOrchestrator : ISyncOrchestrator
                 {
                     try
                     {
-                        var detailTask = _upstreamApi.GetCandidateDetailAsync(token, basicCandidate.CandidateId);
-                        var notesTask = LoadOrEmpty("Notes", () => _upstreamApi.GetCandidateNotesAsync(token, basicCandidate.CandidateId));
-                        await Task.WhenAll(detailTask, notesTask);
+                        if (result.FetchError != null)
+                            throw result.FetchError;
 
-                        var detail = detailTask.Result;
-                        var notes = notesTask.Result;
-
-                        entity = BuildCandidateEntity(detail, notes, seniorities, mainSkills, countries, basicCandidate);
+                        entity = BuildCandidateEntity(result.Detail!, result.Notes!, seniorities, mainSkills, countries, result.Candidate);
                         (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, cancellationToken);
                     }
                     catch (Exception ex)
                     {
                         entity = new SyncedCandidate
                         {
-                            UpstreamId = basicCandidate.CandidateId,
-                            FullName = basicCandidate.FullName ?? string.Empty,
-                            Email = basicCandidate.Email ?? string.Empty,
-                            MainSkill = basicCandidate.MainSkill ?? string.Empty,
-                            Seniority = basicCandidate.SeniorityText ?? string.Empty,
-                            Country = basicCandidate.Country ?? string.Empty,
-                            CoeCertified = !string.IsNullOrEmpty(basicCandidate.CoeCertifiedStatus),
-                            CandidateStatus = basicCandidate.CandidateStatusName,
-                            LastStatusUpdate = ToUtc(basicCandidate.StatusUpdate),
+                            UpstreamId = result.Candidate.CandidateId,
+                            FullName = result.Candidate.FullName ?? string.Empty,
+                            Email = result.Candidate.Email ?? string.Empty,
+                            MainSkill = result.Candidate.MainSkill ?? string.Empty,
+                            Seniority = result.Candidate.SeniorityText ?? string.Empty,
+                            Country = result.Candidate.Country ?? string.Empty,
+                            CoeCertified = !string.IsNullOrEmpty(result.Candidate.CoeCertifiedStatus),
+                            CandidateStatus = result.Candidate.CandidateStatusName,
+                            LastStatusUpdate = ToUtc(result.Candidate.StatusUpdate),
                             Status = "not-processed",
                             StatusReason = ex.Message,
                             SyncedAt = DateTime.UtcNow
@@ -483,7 +550,7 @@ public class SyncOrchestrator : ISyncOrchestrator
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to sync candidate {UpstreamId} ({Name}) — skipping",
-                        basicCandidate.CandidateId, basicCandidate.FullName);
+                        result.Candidate.CandidateId, result.Candidate.FullName);
                     fatalError = ex;
                 }
 
@@ -493,13 +560,13 @@ public class SyncOrchestrator : ISyncOrchestrator
 
                     yield return new SyncRecordEvent(new SyncRecordDto
                     {
-                        Id = $"cand-{basicCandidate.CandidateId}",
+                        Id = $"cand-{result.Candidate.CandidateId}",
                         Source = "candidates",
                         Status = "not-processed",
-                        Name = basicCandidate.FullName ?? "Unknown",
-                        Email = basicCandidate.Email ?? string.Empty,
+                        Name = result.Candidate.FullName ?? "Unknown",
+                        Email = result.Candidate.Email ?? string.Empty,
                         Reason = fatalError.Message,
-                        UpstreamId = basicCandidate.CandidateId,
+                        UpstreamId = result.Candidate.CandidateId,
                         HasResume = false,
                         Failed = false,
                         SyncDetail = "error",
@@ -515,7 +582,7 @@ public class SyncOrchestrator : ISyncOrchestrator
                         NotProcessedCount = notProcessedCount,
                         UpdatedCount = updatedCount,
                         UnchangedCount = unchangedCount,
-                        CurrentRecord = basicCandidate.FullName ?? "Unknown",
+                        CurrentRecord = result.Candidate.FullName ?? "Unknown",
                         Status = "syncing"
                     });
 
@@ -946,5 +1013,433 @@ public class SyncOrchestrator : ISyncOrchestrator
         SyncDetail = syncDetail,
         SyncedAt = entity.SyncedAt.ToString("o"),
         ResumeDateCreated = entity.ResumeDateCreated?.ToString("o"),
+    };
+
+    private async Task<SyncRecordDto> SyncSingleOpenPositionAsync(string token, int upstreamId, CancellationToken ct)
+    {
+        var detail = await _upstreamApi.GetOpenPositionDetailAsync(token, upstreamId);
+        var candidates = await LoadOrEmpty("PresentedCandidates", () => _upstreamApi.GetPresentedCandidatesAsync(token, upstreamId));
+
+        var pagedFallback = new OpenPositionListItem { Id = upstreamId };
+        var entity = BuildOpenPositionEntity(pagedFallback, detail, candidates);
+        var (_, syncDetail) = await UpsertOpenPositionAsync(entity, candidates, ct);
+
+        return MapOpenPositionToDto(entity, syncDetail, candidates.Count);
+    }
+
+    private async IAsyncEnumerable<SyncEvent> SyncOpenPositionsAsync(string token, int? limit, int? skipRecords, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        const int batchSize = 20;
+        int pageOffset = skipRecords ?? 0;
+        int totalRecords = 0;
+        int syncedCount = 0;
+        int incompleteCount = 0;
+        int notProcessedCount = 0;
+        int updatedCount = 0;
+        int unchangedCount = 0;
+        int fetchedRecords = skipRecords ?? 0;
+        int maxToProcess = limit ?? int.MaxValue;
+        int processedInRun = 0;
+
+        if (skipRecords.HasValue && skipRecords.Value > 0)
+        {
+            var dbCounts = await _dbContext.SyncedOpenPositions
+                .GroupBy(e => e.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken);
+
+            syncedCount = dbCounts.FirstOrDefault(c => c.Status == "synced")?.Count ?? 0;
+            syncedCount += dbCounts.FirstOrDefault(c => c.Status == "vectorized")?.Count ?? 0;
+            incompleteCount = dbCounts.FirstOrDefault(c => c.Status == "incomplete")?.Count ?? 0;
+            notProcessedCount = dbCounts.FirstOrDefault(c => c.Status == "not-processed")?.Count ?? 0;
+        }
+
+        bool hasMorePages = true;
+
+        while (hasMorePages && processedInRun < maxToProcess)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var take = Math.Min(batchSize, maxToProcess - processedInRun);
+            var (batch, total) = await _upstreamApi.GetOpenPositionsPagedAsync(token, pageOffset, take);
+            totalRecords = total;
+
+            if (batch.Count == 0)
+                break;
+
+            _logger.LogInformation("Fetched open positions batch: offset={Offset}, count={Count}, total={Total}", pageOffset, batch.Count, totalRecords);
+
+            const int concurrency = 5;
+            for (int batchStart = 0; batchStart < batch.Count; batchStart += concurrency)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var currentBatch = batch.Skip(batchStart).Take(concurrency).ToList();
+
+                var fetchTasks = currentBatch.Select(async basicOp =>
+                {
+                    try
+                    {
+                        var detailTask = _upstreamApi.GetOpenPositionDetailAsync(token, basicOp.Id);
+                        var candidatesTask = LoadOrEmpty("PresentedCandidates", () => _upstreamApi.GetPresentedCandidatesAsync(token, basicOp.Id));
+                        await Task.WhenAll(detailTask, candidatesTask);
+
+                        return (
+                            Position: basicOp,
+                            Detail: (OpenPositionDetail?)detailTask.Result,
+                            Candidates: (List<PresentedCandidateItem>?)candidatesTask.Result,
+                            FetchError: (Exception?)null
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        return (
+                            Position: basicOp,
+                            Detail: (OpenPositionDetail?)null,
+                            Candidates: (List<PresentedCandidateItem>?)null,
+                            FetchError: (Exception?)ex
+                        );
+                    }
+                }).ToList();
+
+                var fetchResults = await Task.WhenAll(fetchTasks);
+
+                foreach (var result in fetchResults)
+                {
+                    fetchedRecords++;
+                    processedInRun++;
+
+                    SyncedOpenPosition? entity = null;
+                    string syncDetail = "not-processed";
+                    Exception? fatalError = null;
+
+                    try
+                    {
+                        try
+                        {
+                            if (result.FetchError != null)
+                                throw result.FetchError;
+
+                            entity = BuildOpenPositionEntity(result.Position, result.Detail!, result.Candidates!);
+                            (_, syncDetail) = await UpsertOpenPositionAsync(entity, result.Candidates!, cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            entity = new SyncedOpenPosition
+                            {
+                                UpstreamId = result.Position.Id,
+                                Account = result.Position.Account,
+                                Coe = result.Position.Coe,
+                                Practice = result.Position.Practice,
+                                Stakeholder = result.Position.Stakeholder,
+                                MainSkill = result.Position.MainSkill,
+                                Countries = result.Position.Countries,
+                                Seniorities = result.Position.Seniorities,
+                                AvailableRange = result.Position.AvailableRange,
+                                Status = "not-processed",
+                                StatusReason = ex.Message,
+                                SyncedAt = DateTime.UtcNow
+                            };
+
+                            var existingOnError = await _dbContext.SyncedOpenPositions
+                                .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, cancellationToken);
+                            if (existingOnError != null)
+                            {
+                                existingOnError.Account = entity.Account;
+                                existingOnError.Coe = entity.Coe;
+                                existingOnError.Practice = entity.Practice;
+                                existingOnError.MainSkill = entity.MainSkill;
+                                existingOnError.Status = entity.Status;
+                                existingOnError.StatusReason = entity.StatusReason;
+                                existingOnError.SyncedAt = entity.SyncedAt;
+                            }
+                            else
+                            {
+                                _dbContext.SyncedOpenPositions.Add(entity);
+                            }
+                            await _dbContext.SaveChangesAsync(cancellationToken);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to sync open position {UpstreamId} ({Account}) — skipping",
+                            result.Position.Id, result.Position.Account);
+                        fatalError = ex;
+                    }
+
+                    var candidatesCount = result.Candidates?.Count ?? 0;
+
+                    if (fatalError != null)
+                    {
+                        notProcessedCount++;
+
+                        yield return new SyncRecordEvent(new SyncRecordDto
+                        {
+                            Id = $"op-{result.Position.Id}",
+                            Source = "open-positions",
+                            Status = "not-processed",
+                            Name = $"{result.Position.Account} - {result.Position.MainSkill}",
+                            Email = string.Empty,
+                            MainSkill = result.Position.MainSkill,
+                            Account = result.Position.Account,
+                            Coe = result.Position.Coe,
+                            Practice = result.Position.Practice,
+                            Reason = fatalError.Message,
+                            UpstreamId = result.Position.Id,
+                            Failed = false,
+                            SyncDetail = "error",
+                            SyncedAt = DateTime.UtcNow.ToString("o"),
+                        });
+
+                        yield return new SyncProgressEvent(new SyncProgressDto
+                        {
+                            TotalRecords = totalRecords,
+                            FetchedRecords = fetchedRecords,
+                            SyncedCount = syncedCount,
+                            IncompleteCount = incompleteCount,
+                            NotProcessedCount = notProcessedCount,
+                            UpdatedCount = updatedCount,
+                            UnchangedCount = unchangedCount,
+                            CurrentRecord = $"{result.Position.Account} - {result.Position.MainSkill}",
+                            Status = "syncing"
+                        });
+
+                        continue;
+                    }
+
+                    if (entity!.Status == "incomplete")
+                        incompleteCount++;
+                    else if (entity.Status == "not-processed")
+                        notProcessedCount++;
+                    else
+                    {
+                        switch (syncDetail)
+                        {
+                            case "new": syncedCount++; break;
+                            case "updated": updatedCount++; break;
+                            case "unchanged": unchangedCount++; break;
+                        }
+                    }
+
+                    yield return new SyncRecordEvent(MapOpenPositionToDto(entity, syncDetail, candidatesCount));
+
+                    yield return new SyncProgressEvent(new SyncProgressDto
+                    {
+                        TotalRecords = totalRecords,
+                        FetchedRecords = fetchedRecords,
+                        SyncedCount = syncedCount,
+                        IncompleteCount = incompleteCount,
+                        NotProcessedCount = notProcessedCount,
+                        UpdatedCount = updatedCount,
+                        UnchangedCount = unchangedCount,
+                        CurrentRecord = $"{entity.Account} - {entity.MainSkill}",
+                        Status = "syncing"
+                    });
+
+                    if (processedInRun >= maxToProcess)
+                        break;
+                }
+            }
+
+            pageOffset += batch.Count;
+            hasMorePages = pageOffset < totalRecords;
+        }
+
+        yield return new SyncCompleteEvent(new SyncProgressDto
+        {
+            TotalRecords = totalRecords,
+            FetchedRecords = fetchedRecords,
+            SyncedCount = syncedCount,
+            IncompleteCount = incompleteCount,
+            NotProcessedCount = notProcessedCount,
+            UpdatedCount = updatedCount,
+            UnchangedCount = unchangedCount,
+            Status = "completed"
+        });
+    }
+
+    private static SyncedOpenPosition BuildOpenPositionEntity(
+        OpenPositionListItem paged,
+        OpenPositionDetail detail,
+        List<PresentedCandidateItem> candidates)
+    {
+        var missingFields = new List<string>();
+        if (string.IsNullOrEmpty(paged.Account)) missingFields.Add("Account");
+        if (string.IsNullOrEmpty(paged.MainSkill)) missingFields.Add("MainSkill");
+        if (string.IsNullOrEmpty(detail.JobDescription)) missingFields.Add("JobDescription");
+
+        var recordStatus = missingFields.Count == 0 ? "synced" : "incomplete";
+        var statusReason = missingFields.Count > 0 ? $"Missing: {string.Join(", ", missingFields)}" : null;
+
+        return new SyncedOpenPosition
+        {
+            UpstreamId = paged.Id,
+            Account = paged.Account,
+            Coe = paged.Coe,
+            Practice = paged.Practice,
+            Stakeholder = paged.Stakeholder,
+            MainSkill = !string.IsNullOrEmpty(detail.MainSkillName) ? detail.MainSkillName : paged.MainSkill,
+            Countries = paged.Countries,
+            Seniorities = paged.Seniorities,
+            AvailableRange = paged.AvailableRange,
+            AccountOverview = detail.CompanyName,
+            JobDescription = detail.JobDescription,
+            JobTitle = detail.JobTitle,
+            PositionStatus = "Active",
+            Aging = paged.Aging,
+            Created = paged.Created,
+            ReadyDate = paged.ReadyDate,
+            LastModification = paged.LastModification,
+            Sourcing = paged.Sourcing,
+            Replacement = paged.Replacement,
+            Status = recordStatus,
+            StatusReason = statusReason,
+            SyncedAt = DateTime.UtcNow
+        };
+    }
+
+    private async Task<(bool InfoChanged, string SyncDetail)> UpsertOpenPositionAsync(
+        SyncedOpenPosition entity,
+        List<PresentedCandidateItem> candidates,
+        CancellationToken ct)
+    {
+        var existing = await _dbContext.SyncedOpenPositions
+            .FirstOrDefaultAsync(e => e.UpstreamId == entity.UpstreamId, ct);
+
+        if (existing != null)
+        {
+            var infoChanged =
+                existing.Account != entity.Account ||
+                existing.Coe != entity.Coe ||
+                existing.Practice != entity.Practice ||
+                existing.Stakeholder != entity.Stakeholder ||
+                existing.MainSkill != entity.MainSkill ||
+                existing.Countries != entity.Countries ||
+                existing.Seniorities != entity.Seniorities ||
+                existing.AvailableRange != entity.AvailableRange ||
+                existing.AccountOverview != entity.AccountOverview ||
+                existing.JobDescription != entity.JobDescription ||
+                existing.JobTitle != entity.JobTitle ||
+                existing.Aging != entity.Aging ||
+                existing.Sourcing != entity.Sourcing ||
+                existing.Replacement != entity.Replacement;
+
+            if (!infoChanged)
+            {
+                var needsStatusFix = existing.Status != "vectorized"
+                    && (existing.Status != entity.Status || existing.Failed);
+
+                if (needsStatusFix)
+                {
+                    existing.Status = entity.Status;
+                    existing.StatusReason = entity.StatusReason;
+                    existing.Failed = false;
+                    await _dbContext.SaveChangesAsync(ct);
+                }
+
+                await ReplaceCandidatesAsync(existing.Id, candidates, ct);
+                return (false, "unchanged");
+            }
+
+            existing.Account = entity.Account;
+            existing.Coe = entity.Coe;
+            existing.Practice = entity.Practice;
+            existing.Stakeholder = entity.Stakeholder;
+            existing.MainSkill = entity.MainSkill;
+            existing.Countries = entity.Countries;
+            existing.Seniorities = entity.Seniorities;
+            existing.AvailableRange = entity.AvailableRange;
+            existing.AccountOverview = entity.AccountOverview;
+            existing.JobDescription = entity.JobDescription;
+            existing.JobTitle = entity.JobTitle;
+            existing.Aging = entity.Aging;
+            existing.Created = entity.Created;
+            existing.ReadyDate = entity.ReadyDate;
+            existing.LastModification = entity.LastModification;
+            existing.Sourcing = entity.Sourcing;
+            existing.Replacement = entity.Replacement;
+            existing.SyncedAt = entity.SyncedAt;
+
+            if (existing.JobDescription != entity.JobDescription)
+            {
+                var oldEmbedding = await _dbContext.ResumeEmbeddings
+                    .FirstOrDefaultAsync(e => e.SourceType == "open-positions" && e.SourceId == existing.Id, ct);
+                if (oldEmbedding != null)
+                    _dbContext.ResumeEmbeddings.Remove(oldEmbedding);
+
+                existing.Status = entity.Status;
+                existing.Failed = false;
+            }
+            else if (existing.Status != "vectorized")
+            {
+                existing.Status = entity.Status;
+                existing.Failed = false;
+            }
+
+            existing.StatusReason = entity.StatusReason;
+            await _dbContext.SaveChangesAsync(ct);
+
+            await ReplaceCandidatesAsync(existing.Id, candidates, ct);
+            return (true, "updated");
+        }
+
+        _dbContext.SyncedOpenPositions.Add(entity);
+        await _dbContext.SaveChangesAsync(ct);
+
+        await ReplaceCandidatesAsync(entity.Id, candidates, ct);
+        return (true, "new");
+    }
+
+    private async Task ReplaceCandidatesAsync(int openPositionId, List<PresentedCandidateItem> candidates, CancellationToken ct)
+    {
+        var existingCandidates = await _dbContext.OpenPositionCandidates
+            .Where(c => c.OpenPositionId == openPositionId)
+            .ToListAsync(ct);
+
+        _dbContext.OpenPositionCandidates.RemoveRange(existingCandidates);
+
+        var newCandidates = candidates.Select(c => new OpenPositionCandidate
+        {
+            OpenPositionId = openPositionId,
+            CandidateRequisitionId = c.CandidateRequisitionId,
+            CandidateId = c.CandidateId,
+            CandidateName = c.Candidate,
+            MainSkill = c.Skills,
+            IsEmployee = c.IsEmployee,
+            CandidateStatus = c.CandidateStatusName,
+            Rate = c.Rate,
+            StartDate = c.StartDate,
+            SyncedAt = DateTime.UtcNow
+        }).ToList();
+
+        _dbContext.OpenPositionCandidates.AddRange(newCandidates);
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    private static SyncRecordDto MapOpenPositionToDto(SyncedOpenPosition entity, string syncDetail, int candidatesCount) => new()
+    {
+        Id = $"op-{entity.UpstreamId}",
+        Source = "open-positions",
+        Status = entity.Status,
+        Name = $"{entity.Account} - {entity.MainSkill}",
+        Email = string.Empty,
+        MainSkill = entity.MainSkill,
+        Account = entity.Account,
+        Coe = entity.Coe,
+        Practice = entity.Practice,
+        Stakeholder = entity.Stakeholder,
+        Countries = entity.Countries,
+        Seniorities = entity.Seniorities,
+        AvailableRange = entity.AvailableRange,
+        PositionStatus = entity.PositionStatus,
+        Aging = entity.Aging,
+        HasJobDescription = !string.IsNullOrEmpty(entity.JobDescription),
+        CandidatesCount = candidatesCount,
+        JobTitle = entity.JobTitle,
+        Reason = entity.StatusReason,
+        UpstreamId = entity.UpstreamId,
+        Failed = entity.Failed,
+        SyncDetail = syncDetail,
+        SyncedAt = entity.SyncedAt.ToString("o"),
     };
 }

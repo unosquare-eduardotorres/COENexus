@@ -53,6 +53,49 @@ export const dataSyncService = {
     return { ...raw, pipelineStatus: raw.status, failed: raw.failed ?? false };
   },
 
+  retryNotProcessed(
+    source: SyncSourceType,
+    token: string,
+    onRecordRetried: (record: SyncRecord) => void,
+    onProgress: (progress: { total: number; retried: number }) => void,
+    signal: AbortSignal,
+    year?: number
+  ): Promise<{ total: number; retried: number }> {
+    return new Promise((resolve, reject) => {
+      let url = `${API_BASE}/retry-not-processed/${source}?token=${encodeURIComponent(token)}`;
+      if (year && source === 'candidates') url += `&year=${year}`;
+      const eventSource = new EventSource(url);
+
+      let lastResult = { total: 0, retried: 0 };
+
+      eventSource.addEventListener('record', (event) => {
+        const raw = JSON.parse(event.data);
+        const record: SyncRecord = { ...raw, pipelineStatus: raw.status, failed: raw.failed ?? false };
+        onRecordRetried(record);
+      });
+
+      eventSource.addEventListener('progress', (event) => {
+        lastResult = JSON.parse(event.data);
+        onProgress(lastResult);
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        eventSource.close();
+        resolve(JSON.parse(event.data));
+      });
+
+      eventSource.addEventListener('error', () => {
+        eventSource.close();
+        reject(new Error('Retry SSE connection error'));
+      });
+
+      signal.addEventListener('abort', () => {
+        eventSource.close();
+        resolve(lastResult);
+      });
+    });
+  },
+
   retryFailed(
     source: SyncSourceType,
     token: string,

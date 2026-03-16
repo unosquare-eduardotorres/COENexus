@@ -43,6 +43,18 @@ public record SyncRecordDto
     public string? SalaryExpectationsCurrency { get; init; }
     public string? JobTitle { get; init; }
     public string? CandidateStatus { get; init; }
+
+    public string? Account { get; init; }
+    public string? Coe { get; init; }
+    public string? Practice { get; init; }
+    public string? Stakeholder { get; init; }
+    public string? Countries { get; init; }
+    public string? Seniorities { get; init; }
+    public string? AvailableRange { get; init; }
+    public string? PositionStatus { get; init; }
+    public int? Aging { get; init; }
+    public bool HasJobDescription { get; init; }
+    public int CandidatesCount { get; init; }
 }
 
 public record SyncProgressDto

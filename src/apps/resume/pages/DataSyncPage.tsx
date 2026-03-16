@@ -303,7 +303,7 @@ export default function DataSyncPage() {
   }, [activeTab, token, loadRecordsFromDb, selectedYear]);
 
   const handleStartSync = useCallback(() => doStartSync(), [doStartSync]);
-  const handleStartSyncLimited = useCallback(() => doStartSync(10), [doStartSync]);
+  const handleResync = useCallback(() => doStartSync(), [doStartSync]);
 
   const handlePauseSync = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -336,6 +336,33 @@ export default function DataSyncPage() {
     setProgress((prev) => ({ ...prev, status: 'completed', lastSyncedAt: new Date().toISOString() }));
   }, [activeTab, token, loadRecordsFromDb, selectedYear]);
 
+  const handleRetryNotProcessed = useCallback(async () => {
+    const source = activeTab;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
+    const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
+
+    setProgress((prev) => ({ ...prev, status: 'syncing' }));
+
+    const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+
+    await dataSyncService.retryNotProcessed(
+      source,
+      token,
+      (record: SyncRecord) => setRecords((prev) =>
+        prev.map((r) => r.upstreamId === record.upstreamId ? record : r)
+      ),
+      () => {},
+      controller.signal,
+      yearParam
+    );
+
+    await loadRecordsFromDb(source, true, yearParam);
+    setProgress((prev) => ({ ...prev, status: 'completed', lastSyncedAt: new Date().toISOString() }));
+  }, [activeTab, token, loadRecordsFromDb, selectedYear]);
+
   const handleResumeSync = useCallback(() => {
     const currentProgress = activeTab === 'employees' ? employeeProgress : candidateProgress;
     doStartSync(undefined, true, currentProgress.fetchedRecords);
@@ -347,14 +374,14 @@ export default function DataSyncPage() {
     if (processed.status === 'completed') {
       setRecords((prev) =>
         prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'extracted' as const, failed: false } : r
+          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'extracted' as const, failed: false, reason: undefined } : r
         )
       );
       setExtractingUpstreamId(undefined);
     } else if (processed.status === 'failed') {
       setRecords((prev) =>
         prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, failed: true } : r
+          r.upstreamId === processed.upstreamId ? { ...r, failed: true, reason: processed.error } : r
         )
       );
       setExtractingUpstreamId(undefined);
@@ -369,14 +396,14 @@ export default function DataSyncPage() {
     if (processed.status === 'completed') {
       setRecords((prev) =>
         prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'vectorized' as const, failed: false } : r
+          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'vectorized' as const, failed: false, reason: undefined } : r
         )
       );
       setVectorizingUpstreamId(undefined);
     } else if (processed.status === 'failed') {
       setRecords((prev) =>
         prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, failed: true } : r
+          r.upstreamId === processed.upstreamId ? { ...r, failed: true, reason: processed.error } : r
         )
       );
       setVectorizingUpstreamId(undefined);
@@ -386,6 +413,7 @@ export default function DataSyncPage() {
   }, [activeTab]);
 
   const handleStartExtraction = useCallback(async () => {
+    extractionAbortRef.current?.abort();
     const source = activeTab;
     const controller = new AbortController();
     extractionAbortRef.current = controller;
@@ -419,6 +447,7 @@ export default function DataSyncPage() {
   }, []);
 
   const handleStartVectorization = useCallback(async () => {
+    vectorizationAbortRef.current?.abort();
     const source = activeTab;
     const controller = new AbortController();
     vectorizationAbortRef.current = controller;
@@ -449,6 +478,32 @@ export default function DataSyncPage() {
   const handlePauseVectorization = useCallback(() => {
     vectorizationAbortRef.current?.abort();
   }, []);
+
+  const handleRetryFailed = useCallback(async () => {
+    const source = activeTab;
+    try {
+      await resumeProcessingService.retryFailed(source);
+      const setExtrProg = source === 'employees' ? setEmployeeExtractionProgress : setCandidateExtractionProgress;
+      setExtrProg(initialProcessingProgress(source));
+      const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+      await loadRecordsFromDb(source, true, yearParam);
+    } catch (err) {
+      console.error('Failed to retry failed records:', err);
+    }
+  }, [activeTab, loadRecordsFromDb, selectedYear]);
+
+  const handleRetryFailedVectorization = useCallback(async () => {
+    const source = activeTab;
+    try {
+      await resumeProcessingService.retryFailedVectorization(source);
+      const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
+      const setVecProg = source === 'employees' ? setEmployeeVectorizationProgress : setCandidateVectorizationProgress;
+      setVecProg(initialProcessingProgress(source));
+      await loadRecordsFromDb(source, true, yearParam);
+    } catch (err) {
+      console.error('Failed to retry failed vectorization:', err);
+    }
+  }, [activeTab, loadRecordsFromDb, selectedYear]);
 
   const handleClearData = useCallback(async () => {
     const source = activeTab;
@@ -594,10 +649,11 @@ export default function DataSyncPage() {
               progress={activeProgress}
               records={activeRecords}
               onStartSync={isTokenValid ? handleStartSync : undefined}
-              onStartSyncLimited={isTokenValid ? handleStartSyncLimited : undefined}
+              onResync={isTokenValid ? handleResync : undefined}
               onPauseSync={handlePauseSync}
               onResumeSync={isTokenValid ? handleResumeSync : undefined}
               onRetryIncomplete={isTokenValid ? handleRetryIncomplete : undefined}
+              onRetryNotProcessed={isTokenValid ? handleRetryNotProcessed : undefined}
               onStartExtraction={isTokenValid ? handleStartExtraction : undefined}
               onPauseExtraction={handlePauseExtraction}
               onResumeExtraction={isTokenValid ? handleStartExtraction : undefined}
@@ -608,6 +664,8 @@ export default function DataSyncPage() {
               onResumeVectorization={handleStartVectorization}
               vectorizationProgress={activeVectorizationProgress}
               vectorizingUpstreamId={vectorizingUpstreamId}
+              onRetryFailed={handleRetryFailed}
+              onRetryFailedVectorization={handleRetryFailedVectorization}
               onRefreshRecord={isTokenValid ? handleRefreshRecord : undefined}
               onVectorizeRecord={handleVectorizeRecord}
               refreshingId={refreshingId}

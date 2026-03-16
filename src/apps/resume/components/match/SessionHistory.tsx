@@ -8,7 +8,6 @@ interface SessionHistoryProps {
 }
 
 const SOURCE_LABELS: Record<DataSource, string> = {
-  bench: 'Bench',
   'all-employees': 'Employees',
   candidates: 'Candidates',
   'all-sources': 'All Sources',

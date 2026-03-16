@@ -32,8 +32,14 @@ builder.Services.AddCors(options =>
 builder.Services.Configure<UpstreamSettings>(builder.Configuration.GetSection("Upstream"));
 builder.Services.Configure<CatalogSettings>(builder.Configuration.GetSection("Catalog"));
 
-builder.Services.AddHttpClient<UpstreamApiService>();
-builder.Services.AddHttpClient<CatalogService>();
+builder.Services.AddHttpClient<UpstreamApiService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+builder.Services.AddHttpClient<CatalogService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
 builder.Services.AddScoped<IUpstreamApiService, UpstreamApiService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<ISyncOrchestrator, SyncOrchestrator>();

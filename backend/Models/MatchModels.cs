@@ -7,7 +7,8 @@ public record MatchRequest
     public string JobDescription { get; init; } = string.Empty;
     public string DataSource { get; init; } = "bench";
     public int TopN { get; init; } = 10;
-    public MatchConstraints? Constraints { get; init; }
+    public string SearchMode { get; init; } = "opus";
+    public AdvancedConstraints? Constraints { get; init; }
 }
 
 public record MatchConstraints
@@ -20,12 +21,28 @@ public record MatchConstraints
     public string? Country { get; init; }
 }
 
+public record AdvancedConstraints
+{
+    public List<FilterRule> CandidateFilters { get; init; } = [];
+    public List<FilterRule> EmployeeFilters { get; init; } = [];
+}
+
+public record FilterRule
+{
+    public string Field { get; init; } = string.Empty;
+    public string Operator { get; init; } = "equals";
+    public string Value { get; init; } = string.Empty;
+    public string? Currency { get; init; }
+    public string Connector { get; init; } = "and";
+}
+
 public record FilterOptionsResponse
 {
     public List<string> Seniorities { get; init; } = [];
     public List<string> MainSkills { get; init; } = [];
     public List<string> Countries { get; init; } = [];
     public List<string> Currencies { get; init; } = [];
+    public List<string> CandidateStatuses { get; init; } = [];
 }
 
 public record MatchSearchProgress(int Percent, string Stage);
@@ -45,6 +62,10 @@ public class VectorSearchResult
     public bool IsBench { get; set; }
     public string? JobTitle { get; set; }
     public int UpstreamId { get; set; }
+    public string? CandidateStatus { get; set; }
+    public decimal? SalaryExpectations { get; set; }
+    public string? SalaryExpectationsCurrency { get; set; }
+    public decimal? GrossMonthlySalary { get; set; }
 }
 
 public record HaikuTriageResult
@@ -122,7 +143,10 @@ public record MatchCandidateResult
     public string Country { get; init; } = string.Empty;
     public string MainSkill { get; init; } = string.Empty;
     public bool IsBench { get; init; }
+    public string? CandidateStatus { get; init; }
     public SonnetAnalysis? Analysis { get; init; }
+    public decimal SalaryExpectations { get; init; }
+    public string SalaryExpectationsCurrency { get; init; } = string.Empty;
 }
 
 public record MatchSearchResult
@@ -183,6 +207,7 @@ public record MatchSessionDto
     public string MatchFlowType { get; init; } = string.Empty;
     public string DataSource { get; init; } = string.Empty;
     public int TopN { get; init; }
+    public string SearchMode { get; init; } = "opus";
     public string JdSource { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public DateTime CreatedAt { get; init; }
@@ -194,7 +219,7 @@ public record MatchSessionDto
 public record MatchSessionDetailDto : MatchSessionDto
 {
     public string JobDescription { get; init; } = string.Empty;
-    public MatchConstraints? Constraints { get; init; }
+    public AdvancedConstraints? Constraints { get; init; }
     public PipelineStatsDto? Stats { get; init; }
     public PipelineStagesDto? PipelineStages { get; init; }
     public List<MatchCandidateResult> Candidates { get; init; } = [];

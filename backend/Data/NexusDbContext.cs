@@ -11,6 +11,8 @@ public class NexusDbContext : DbContext
     public DbSet<SyncedCandidate> SyncedCandidates => Set<SyncedCandidate>();
     public DbSet<ResumeEmbedding> ResumeEmbeddings => Set<ResumeEmbedding>();
     public DbSet<MatchSession> MatchSessions => Set<MatchSession>();
+    public DbSet<SyncedOpenPosition> SyncedOpenPositions => Set<SyncedOpenPosition>();
+    public DbSet<OpenPositionCandidate> OpenPositionCandidates => Set<OpenPositionCandidate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +43,19 @@ public class NexusDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.CreatedAt).IsDescending();
+        });
+
+        modelBuilder.Entity<SyncedOpenPosition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UpstreamId).IsUnique();
+            entity.Ignore(e => e.Embedding);
+        });
+
+        modelBuilder.Entity<OpenPositionCandidate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OpenPositionId, e.CandidateRequisitionId }).IsUnique();
         });
     }
 }

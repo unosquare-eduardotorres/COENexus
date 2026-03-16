@@ -107,6 +107,25 @@ public class SyncController : ControllerBase
             });
         }
 
+        if (source == "open-positions")
+        {
+            var total = await _dbContext.SyncedOpenPositions.CountAsync();
+            var synced = await _dbContext.SyncedOpenPositions.CountAsync(e => e.Status == "synced");
+            var incomplete = await _dbContext.SyncedOpenPositions.CountAsync(e => e.Status == "incomplete");
+            var notProcessed = await _dbContext.SyncedOpenPositions.CountAsync(e => e.Status == "not-processed");
+            var vectorized = await _dbContext.SyncedOpenPositions.CountAsync(e => e.Status == "vectorized");
+            var failed = await _dbContext.SyncedOpenPositions.CountAsync(e => e.Failed);
+            return Ok(new
+            {
+                totalRecords = total,
+                syncedCount = synced,
+                incompleteCount = incomplete,
+                notProcessedCount = notProcessed,
+                vectorizedCount = vectorized,
+                failedCount = failed
+            });
+        }
+
         return BadRequest();
     }
 
@@ -199,18 +218,25 @@ public class SyncController : ControllerBase
             if (source == "employees")
             {
                 failedIds = await _dbContext.SyncedEmployees
-                    .Where(e => e.Status == "incomplete" || e.Status == "not-processed")
+                    .Where(e => e.Status == "incomplete")
                     .Select(e => e.UpstreamId)
                     .ToListAsync();
             }
             else if (source == "candidates")
             {
                 var candidateQuery = _dbContext.SyncedCandidates
-                    .Where(e => e.Status == "incomplete" || e.Status == "not-processed");
+                    .Where(e => e.Status == "incomplete");
                 if (year.HasValue)
                     candidateQuery = ApplyCandidateYearFilter(candidateQuery, year.Value)
-                        .Where(e => e.Status == "incomplete" || e.Status == "not-processed");
+                        .Where(e => e.Status == "incomplete");
                 failedIds = await candidateQuery
+                    .Select(e => e.UpstreamId)
+                    .ToListAsync();
+            }
+            else if (source == "open-positions")
+            {
+                failedIds = await _dbContext.SyncedOpenPositions
+                    .Where(e => e.Status == "incomplete")
                     .Select(e => e.UpstreamId)
                     .ToListAsync();
             }
@@ -224,6 +250,95 @@ public class SyncController : ControllerBase
             var retried = 0;
 
             foreach (var upstreamId in failedIds)
+            {
+                if (HttpContext.RequestAborted.IsCancellationRequested) break;
+
+                try
+                {
+                    var result = await _syncOrchestrator.SyncSingleAsync(source, token, upstreamId, HttpContext.RequestAborted);
+                    retried++;
+
+                    var recordData = JsonSerializer.Serialize(result, jsonOptions);
+                    await Response.WriteAsync($"event: record\ndata: {recordData}\n\n");
+
+                    var progress = new { total, retried };
+                    var progressData = JsonSerializer.Serialize(progress, jsonOptions);
+                    await Response.WriteAsync($"event: progress\ndata: {progressData}\n\n");
+                    await Response.Body.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    var errorRecord = new { upstreamId, error = ex.Message };
+                    var errorData = JsonSerializer.Serialize(errorRecord, jsonOptions);
+                    await Response.WriteAsync($"event: record-error\ndata: {errorData}\n\n");
+                    await Response.Body.FlushAsync();
+                    retried++;
+                }
+            }
+
+            var completeData = JsonSerializer.Serialize(new { total, retried }, jsonOptions);
+            await Response.WriteAsync($"event: complete\ndata: {completeData}\n\n");
+            await Response.Body.FlushAsync();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            var errorData = JsonSerializer.Serialize(new { error = ex.Message }, jsonOptions);
+            await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
+            await Response.Body.FlushAsync();
+        }
+    }
+
+    [HttpGet("retry-not-processed/{source}")]
+    public async Task RetryNotProcessed(string source, [FromQuery] string token, [FromQuery] int? year = null)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        try
+        {
+            List<int> notProcessedIds;
+            if (source == "employees")
+            {
+                notProcessedIds = await _dbContext.SyncedEmployees
+                    .Where(e => e.Status == "not-processed")
+                    .Select(e => e.UpstreamId)
+                    .ToListAsync();
+            }
+            else if (source == "candidates")
+            {
+                var candidateQuery = _dbContext.SyncedCandidates
+                    .Where(e => e.Status == "not-processed");
+                if (year.HasValue)
+                    candidateQuery = ApplyCandidateYearFilter(candidateQuery, year.Value)
+                        .Where(e => e.Status == "not-processed");
+                notProcessedIds = await candidateQuery
+                    .Select(e => e.UpstreamId)
+                    .ToListAsync();
+            }
+            else if (source == "open-positions")
+            {
+                notProcessedIds = await _dbContext.SyncedOpenPositions
+                    .Where(e => e.Status == "not-processed")
+                    .Select(e => e.UpstreamId)
+                    .ToListAsync();
+            }
+            else
+            {
+                await Response.WriteAsync($"event: error\ndata: {{\"error\":\"Invalid source\"}}\n\n");
+                return;
+            }
+
+            var total = notProcessedIds.Count;
+            var retried = 0;
+
+            foreach (var upstreamId in notProcessedIds)
             {
                 if (HttpContext.RequestAborted.IsCancellationRequested) break;
 
@@ -344,7 +459,48 @@ public class SyncController : ControllerBase
             return Ok(records);
         }
 
-        return BadRequest(new { error = "Invalid source. Use 'employees' or 'candidates'." });
+        if (source == "open-positions")
+        {
+            var positions = await _dbContext.SyncedOpenPositions
+                .OrderBy(e => e.Account)
+                .ThenBy(e => e.MainSkill)
+                .ToListAsync();
+
+            var candidateCounts = await _dbContext.OpenPositionCandidates
+                .GroupBy(c => c.OpenPositionId)
+                .Select(g => new { OpenPositionId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.OpenPositionId, x => x.Count);
+
+            var records = positions.Select(e => new SyncRecordDto
+            {
+                Id = $"op-{e.UpstreamId}",
+                Source = "open-positions",
+                Status = e.Status,
+                Name = $"{e.Account} - {e.MainSkill}",
+                Email = string.Empty,
+                MainSkill = e.MainSkill,
+                Account = e.Account,
+                Coe = e.Coe,
+                Practice = e.Practice,
+                Stakeholder = e.Stakeholder,
+                Countries = e.Countries,
+                Seniorities = e.Seniorities,
+                AvailableRange = e.AvailableRange,
+                PositionStatus = e.PositionStatus,
+                Aging = e.Aging,
+                HasJobDescription = !string.IsNullOrEmpty(e.JobDescription),
+                CandidatesCount = candidateCounts.GetValueOrDefault(e.Id, 0),
+                JobTitle = e.JobTitle,
+                Reason = e.StatusReason,
+                UpstreamId = e.UpstreamId,
+                Failed = e.Failed,
+                SyncedAt = e.SyncedAt.ToString("o"),
+            }).ToList();
+
+            return Ok(records);
+        }
+
+        return BadRequest(new { error = "Invalid source. Use 'employees', 'candidates', or 'open-positions'." });
     }
 
     [HttpDelete("clear/{source}")]
@@ -386,16 +542,30 @@ public class SyncController : ControllerBase
             return Ok(new { cleared = "candidates" });
         }
 
+        if (source == "open-positions")
+        {
+            var embeddings = await _dbContext.ResumeEmbeddings
+                .Where(e => e.SourceType == "open-positions")
+                .ToListAsync();
+            _dbContext.ResumeEmbeddings.RemoveRange(embeddings);
+            _dbContext.OpenPositionCandidates.RemoveRange(_dbContext.OpenPositionCandidates);
+            _dbContext.SyncedOpenPositions.RemoveRange(_dbContext.SyncedOpenPositions);
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { cleared = "open-positions" });
+        }
+
         if (source == "all")
         {
             _dbContext.ResumeEmbeddings.RemoveRange(_dbContext.ResumeEmbeddings);
+            _dbContext.OpenPositionCandidates.RemoveRange(_dbContext.OpenPositionCandidates);
+            _dbContext.SyncedOpenPositions.RemoveRange(_dbContext.SyncedOpenPositions);
             _dbContext.SyncedEmployees.RemoveRange(_dbContext.SyncedEmployees);
             _dbContext.SyncedCandidates.RemoveRange(_dbContext.SyncedCandidates);
             await _dbContext.SaveChangesAsync();
             return Ok(new { cleared = "all" });
         }
 
-        return BadRequest(new { error = "Invalid source. Use 'employees', 'candidates', or 'all'." });
+        return BadRequest(new { error = "Invalid source. Use 'employees', 'candidates', 'open-positions', or 'all'." });
     }
 
     [HttpGet("catalogs/skills")]

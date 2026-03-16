@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MatchCandidate, SonnetAnalysis } from '../../types';
+import { formatSalary } from '../../utils/formatSalary';
 import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
 import RadarChart from './RadarChart';
@@ -109,19 +110,37 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
             <div className="text-sm text-secondary">{candidate.role}</div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-center">
             <span className="glass-panel-subtle px-2 py-1 rounded-lg text-xs text-secondary">
               {candidate.location}
             </span>
             <span className="glass-panel-subtle px-2 py-1 rounded-lg text-xs text-secondary">
-              {candidate.salary}
+              {formatSalary(candidate.expectedRate, candidate.currency)}
             </span>
-            <span className="glass-panel-subtle px-2 py-1 rounded-lg text-xs text-secondary">
-              {candidate.availability}
+            <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+              candidate.type === 'employee'
+                ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+            }`}>
+              {candidate.candidateStatus ?? candidate.type}
             </span>
             <span className="glass-panel-subtle px-2 py-1 rounded-lg text-xs text-secondary">
               {candidate.years} yrs exp
             </span>
+            <a
+              href={candidate.type === 'employee'
+                ? `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Employees.aspx?employeeId=${candidate.id}`
+                : `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Candidates.aspx?CandidateId=${candidate.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-panel-subtle px-2 py-1 rounded-lg text-xs text-accent-500 hover:text-accent-600 transition-colors inline-flex items-center gap-1"
+              title="View in SharePoint"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              SharePoint
+            </a>
           </div>
 
           <div className="flex flex-col items-center gap-1">
@@ -170,11 +189,11 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
             </div>
             <div className="glass-card p-3">
               <div className="text-xs text-muted">Expected Rate</div>
-              <div className="text-sm font-semibold text-primary">{candidate.expectedRate}</div>
+              <div className="text-sm font-semibold text-primary">{formatSalary(candidate.expectedRate, candidate.currency)}</div>
             </div>
             <div className="glass-card p-3">
-              <div className="text-xs text-muted">Currency</div>
-              <div className="text-sm font-semibold text-primary">{candidate.currency}</div>
+              <div className="text-xs text-muted">Status</div>
+              <div className="text-sm font-semibold text-primary">{candidate.candidateStatus ?? candidate.type}</div>
             </div>
             <div className="glass-card p-3">
               <div className="text-xs text-muted">Bench</div>

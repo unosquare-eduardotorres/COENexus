@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { SyncRecord, SyncSourceType, PipelineStatus } from '../../types';
+import { formatSalary } from '../../utils/formatSalary';
+import ErrorDetailModal from './ErrorDetailModal';
 
 const PAGE_SIZE = 50;
 
@@ -123,6 +125,7 @@ export default function SyncRecordTable({
   const [page, setPage] = useState(0);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [errorDetail, setErrorDetail] = useState<{ name: string; error: string } | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -150,6 +153,10 @@ export default function SyncRecordTable({
         matchesStatus = true;
       } else if (statusFilter === 'excluded') {
         matchesStatus = !r.hasResume;
+      } else if (statusFilter === 'extracted') {
+        matchesStatus = r.pipelineStatus === 'extracted' || (r.pipelineStatus === 'synced' && r.failed);
+      } else if (statusFilter === 'vectorized') {
+        matchesStatus = r.pipelineStatus === 'vectorized' || (r.pipelineStatus === 'extracted' && r.failed);
       } else {
         matchesStatus = r.pipelineStatus === statusFilter;
       }
@@ -357,7 +364,7 @@ export default function SyncRecordTable({
                       </td>
                       <td className="px-4 py-3 text-secondary whitespace-nowrap">
                         {record.salaryExpectations != null
-                          ? `${record.salaryExpectationsCurrency ?? 'USD'} ${record.salaryExpectations.toLocaleString()}`
+                          ? formatSalary(record.salaryExpectations, record.salaryExpectationsCurrency ?? 'USD')
                           : '—'}
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
@@ -369,8 +376,8 @@ export default function SyncRecordTable({
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniority || '—'}</td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
                       <td className="px-4 py-3 text-secondary whitespace-nowrap">
-                        {record.grossMonthlySalary != null && record.currency
-                          ? `${record.currency} ${record.grossMonthlySalary.toLocaleString()}`
+                        {record.grossMonthlySalary != null
+                          ? formatSalary(record.grossMonthlySalary, record.currency)
                           : '—'}
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
@@ -416,9 +423,20 @@ export default function SyncRecordTable({
                   </td>
                   <td className="hidden lg:table-cell px-4 py-3">
                     {(record.syncDetail || record.reason) ? (
-                      <span className="text-xs text-gray-600 dark:text-gray-400 max-w-[200px] block truncate" title={record.syncDetail || record.reason}>
+                      <button
+                        onClick={() => setErrorDetail({
+                          name: record.name || record.email?.split('@')[0] || 'Unknown',
+                          error: record.syncDetail || record.reason || '',
+                        })}
+                        className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[200px] truncate hover:text-red-500 dark:hover:text-red-400 transition-colors group"
+                        title="Click to view full error"
+                      >
+                        <svg className="w-3.5 h-3.5 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
                         {record.syncDetail || record.reason}
-                      </span>
+                      </button>
                     ) : (
                       <span className="text-muted">—</span>
                     )}
@@ -465,6 +483,14 @@ export default function SyncRecordTable({
             </div>
           </div>
         </>
+      )}
+
+      {errorDetail && (
+        <ErrorDetailModal
+          name={errorDetail.name}
+          error={errorDetail.error}
+          onClose={() => setErrorDetail(null)}
+        />
       )}
     </div>
   );

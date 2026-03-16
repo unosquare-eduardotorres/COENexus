@@ -16,7 +16,6 @@ public class ProcessingController : ControllerBase
     private readonly IProcessingOrchestrator _processingOrchestrator;
     private readonly NexusDbContext _dbContext;
     private readonly VoyageSettings _voyageSettings;
-    private static CancellationTokenSource? _cts;
     private static CancellationTokenSource? _extractCts;
     private static CancellationTokenSource? _vectorizeCts;
 
@@ -33,15 +32,20 @@ public class ProcessingController : ControllerBase
     [HttpGet("voyage-key")]
     public IActionResult GetVoyageKeyStatus()
     {
-        var key = _voyageSettings.ApiKey;
-        if (string.IsNullOrEmpty(key))
-            return Ok(new { configured = false, source = "environment" });
+        var keys = _voyageSettings.ApiKeys.Count > 0
+            ? _voyageSettings.ApiKeys
+            : string.IsNullOrEmpty(_voyageSettings.ApiKey)
+                ? new List<string>()
+                : new List<string> { _voyageSettings.ApiKey };
 
-        var masked = key.Length > 7
-            ? key[..3] + "****" + key[^4..]
-            : "****";
+        if (keys.Count == 0)
+            return Ok(new { configured = false, keyCount = 0, source = "environment" });
 
-        return Ok(new { configured = true, maskedKey = masked, source = "environment" });
+        var maskedKeys = keys.Select(k => k.Length > 7
+            ? k[..3] + "****" + k[^4..]
+            : "****").ToList();
+
+        return Ok(new { configured = true, keyCount = keys.Count, maskedKeys, source = "environment" });
     }
 
     [HttpGet("status/{source}")]
@@ -83,41 +87,6 @@ public class ProcessingController : ControllerBase
         return Ok(new { totalEligible, alreadyProcessed, syncedCount, extractedCount, vectorizedCount, failedCount });
     }
 
-    [HttpGet("stream/{source}")]
-    public async Task StreamProcessing(string source, [FromQuery] string token, [FromQuery] string model = "voyage-4-large")
-    {
-        Response.ContentType = "text/event-stream";
-        Response.Headers["Cache-Control"] = "no-cache";
-        Response.Headers["Connection"] = "keep-alive";
-
-        _cts = new CancellationTokenSource();
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted, _cts.Token);
-
-        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-        try
-        {
-            await foreach (var processingEvent in _processingOrchestrator.ProcessAsync(source, token, model, linkedCts.Token))
-            {
-                var (eventName, data) = processingEvent switch
-                {
-                    ProcessingRecordEvent e => ("record", JsonSerializer.Serialize(e.Record, jsonOptions)),
-                    ProcessingProgressEvent e => ("progress", JsonSerializer.Serialize(e.Progress, jsonOptions)),
-                    ProcessingCompleteEvent e => ("complete", JsonSerializer.Serialize(e.Progress, jsonOptions)),
-                    _ => throw new InvalidOperationException()
-                };
-
-                await Response.WriteAsync($"event: {eventName}\ndata: {data}\n\n");
-                await Response.Body.FlushAsync();
-            }
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[StreamProcessing] Stream died: {ex}");
-        }
-    }
-
     [HttpPost("vectorize-single")]
     public async Task<IActionResult> VectorizeSingle(
         [FromQuery] string source,
@@ -138,20 +107,14 @@ public class ProcessingController : ControllerBase
         }
     }
 
-    [HttpPost("pause")]
-    public IActionResult Pause()
-    {
-        _cts?.Cancel();
-        return Ok();
-    }
-
     [HttpGet("extract-stream/{source}")]
-    public async Task StreamExtraction(string source, [FromQuery] string token)
+    public async Task StreamExtraction(string source, [FromQuery] string token, [FromQuery] int? year = null)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["Connection"] = "keep-alive";
 
+        _extractCts?.Cancel();
         _extractCts = new CancellationTokenSource();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted, _extractCts.Token);
 
@@ -159,7 +122,7 @@ public class ProcessingController : ControllerBase
 
         try
         {
-            await foreach (var processingEvent in _processingOrchestrator.ExtractAsync(source, token, linkedCts.Token))
+            await foreach (var processingEvent in _processingOrchestrator.ExtractAsync(source, token, year, linkedCts.Token))
             {
                 var (eventName, data) = processingEvent switch
                 {
@@ -188,12 +151,13 @@ public class ProcessingController : ControllerBase
     }
 
     [HttpGet("vectorize-stream/{source}")]
-    public async Task StreamVectorization(string source, [FromQuery] string model = "voyage-4-large")
+    public async Task StreamVectorization(string source, [FromQuery] string model = "voyage-4-large", [FromQuery] int? year = null)
     {
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["Connection"] = "keep-alive";
 
+        _vectorizeCts?.Cancel();
         _vectorizeCts = new CancellationTokenSource();
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted, _vectorizeCts.Token);
 
@@ -201,7 +165,7 @@ public class ProcessingController : ControllerBase
 
         try
         {
-            await foreach (var processingEvent in _processingOrchestrator.VectorizeAsync(source, model, linkedCts.Token))
+            await foreach (var processingEvent in _processingOrchestrator.VectorizeAsync(source, model, year, linkedCts.Token))
             {
                 var (eventName, data) = processingEvent switch
                 {
@@ -227,6 +191,75 @@ public class ProcessingController : ControllerBase
     {
         _vectorizeCts?.Cancel();
         return Ok();
+    }
+
+    [HttpPost("retry-failed/{source}")]
+    public async Task<IActionResult> RetryFailed(string source)
+    {
+        if (source == "employees")
+        {
+            var failed = await _dbContext.SyncedEmployees
+                .Where(e => e.Failed)
+                .ToListAsync();
+            foreach (var emp in failed)
+            {
+                emp.Failed = false;
+                emp.Status = "synced";
+                emp.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
+        else if (source == "candidates")
+        {
+            var failed = await _dbContext.SyncedCandidates
+                .Where(c => c.Failed)
+                .ToListAsync();
+            foreach (var cand in failed)
+            {
+                cand.Failed = false;
+                cand.Status = "synced";
+                cand.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
+        return BadRequest("Invalid source");
+    }
+
+    [HttpPost("retry-failed-vectorization/{source}")]
+    public async Task<IActionResult> RetryFailedVectorization(string source)
+    {
+        IQueryable<Models.Entities.SyncedEmployee>? empQuery = null;
+        IQueryable<Models.Entities.SyncedCandidate>? candQuery = null;
+
+        if (source == "employees")
+        {
+            var failed = await _dbContext.SyncedEmployees
+                .Where(e => e.Failed && e.Status == "extracted")
+                .ToListAsync();
+            foreach (var emp in failed)
+            {
+                emp.Failed = false;
+                emp.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
+        else if (source == "candidates")
+        {
+            var failed = await _dbContext.SyncedCandidates
+                .Where(c => c.Failed && c.Status == "extracted")
+                .ToListAsync();
+            foreach (var cand in failed)
+            {
+                cand.Failed = false;
+                cand.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
+        return BadRequest("Invalid source");
     }
 
     [HttpPost("reset-status/{source}/{upstreamId}")]

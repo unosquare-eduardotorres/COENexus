@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { DataSource, TopN, PoolCounts } from '../../types';
+import { DataSource, PoolCounts } from '../../types';
 
 interface DataSourceStepProps {
-  onNext: (source: DataSource, topN: TopN) => void;
+  onNext: (source: DataSource) => void;
   initialSource?: DataSource;
   poolCounts: PoolCounts | null;
 }
@@ -18,24 +18,6 @@ interface SourceOption {
 }
 
 const SOURCES: SourceOption[] = [
-  {
-    id: 'bench',
-    title: 'Bench',
-    description: 'Employees currently available for staffing — ready to start immediately.',
-    countKey: 'bench',
-    icon: (
-      <svg className="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 12h16" strokeWidth={2} />
-        <path d="M5 12v5M19 12v5" />
-        <path d="M4 17h2M18 17h2" />
-        <path d="M6 12V9.5a1 1 0 011-1h10a1 1 0 011 1V12" />
-        <path d="M3.5 9c0-.6.3-1.1.8-1.3" />
-        <path d="M20.5 9c0-.6-.3-1.1-.8-1.3" />
-      </svg>
-    ),
-    gradient: 'from-emerald-500 to-green-500',
-    badgeClass: 'bg-emerald-500/15 text-emerald-400',
-  },
   {
     id: 'all-employees',
     title: 'Employees',
@@ -85,16 +67,8 @@ const SOURCES: SourceOption[] = [
   },
 ];
 
-const TOP_N_OPTIONS: { value: TopN; label: string; tier: string; gradient: string; description: string }[] = [
-  { value: 1, label: 'Top 1', tier: 'Diamond', gradient: 'from-cyan-300 to-blue-500', description: 'Single best match' },
-  { value: 10, label: 'Top 10', tier: 'Gold', gradient: 'from-amber-400 to-yellow-500', description: 'Best matches, fastest results' },
-  { value: 20, label: 'Top 20', tier: 'Silver', gradient: 'from-gray-300 to-gray-400', description: 'Balanced depth and speed' },
-  { value: 30, label: 'Top 30', tier: 'Bronze', gradient: 'from-orange-400 to-amber-600', description: 'Maximum coverage' },
-];
-
 export default function DataSourceStep({ onNext, initialSource, poolCounts }: DataSourceStepProps) {
   const [selected, setSelected] = useState<DataSource | null>(initialSource ?? null);
-  const [topN, setTopN] = useState<TopN>(10);
 
   const getCount = (key: keyof PoolCounts) => (poolCounts ? poolCounts[key] : null);
   const isDisabled = (source: SourceOption) => poolCounts !== null && poolCounts[source.countKey] === 0;
@@ -106,7 +80,7 @@ export default function DataSourceStep({ onNext, initialSource, poolCounts }: Da
         <p className="text-sm text-muted mt-1">Choose which talent pool the AI will search through</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {SOURCES.map((source) => {
           const isSelected = selected === source.id;
           const disabled = isDisabled(source);
@@ -115,7 +89,7 @@ export default function DataSourceStep({ onNext, initialSource, poolCounts }: Da
               key={source.id}
               onClick={() => !disabled && setSelected(source.id)}
               disabled={disabled}
-              className={`text-left p-6 rounded-2xl border-2 transition-all duration-200 group ${
+              className={`text-center p-4 rounded-2xl border-2 transition-all duration-200 group ${
                 disabled
                   ? 'opacity-40 cursor-not-allowed border-gray-200/20 dark:border-dark-border/20'
                   : isSelected
@@ -123,29 +97,31 @@ export default function DataSourceStep({ onNext, initialSource, poolCounts }: Da
                     : 'border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-accent-500/20'
               }`}
             >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`w-16 h-16 rounded-xl bg-gradient-to-br ${source.gradient} flex items-center justify-center text-white flex-shrink-0`}
-                >
-                  {source.icon}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative">
+                  <div
+                    className={`w-12 h-12 rounded-xl bg-gradient-to-br ${source.gradient} flex items-center justify-center text-white`}
+                  >
+                    {source.icon}
+                  </div>
+                  {isSelected && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-primary">{source.title}</h3>
+                <div>
+                  <div className="flex items-center justify-center gap-2">
+                    <h3 className="text-sm font-semibold text-primary">{source.title}</h3>
                     {getCount(source.countKey) !== null && getCount(source.countKey)! > 0 && (
                       <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md ${source.badgeClass}`}>
-                        {getCount(source.countKey)!.toLocaleString()} profiles
+                        {getCount(source.countKey)!.toLocaleString()}
                       </span>
                     )}
-                    {isSelected && (
-                      <div className="w-5 h-5 rounded-full bg-accent-500 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
                   </div>
-                  <p className="text-sm text-muted mt-1.5 leading-relaxed">{source.description}</p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">{source.description}</p>
                 </div>
               </div>
             </button>
@@ -153,38 +129,12 @@ export default function DataSourceStep({ onNext, initialSource, poolCounts }: Da
         })}
       </div>
 
-      <div>
-        <h3 className="text-sm font-semibold text-primary mb-3 text-center">How many candidates to analyze?</h3>
-        <div className="grid grid-cols-4 gap-3">
-          {TOP_N_OPTIONS.map((option) => {
-            const isActive = topN === option.value;
-            return (
-              <button
-                key={option.value}
-                onClick={() => setTopN(option.value)}
-                className={`p-4 rounded-xl border-2 transition-all duration-200 text-center ${
-                  isActive
-                    ? 'border-accent-500/50 bg-accent-500/5'
-                    : 'border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-accent-500/20'
-                }`}
-              >
-                <div className={`text-xs font-bold uppercase tracking-wider bg-gradient-to-r ${option.gradient} bg-clip-text text-transparent`}>
-                  {option.tier}
-                </div>
-                <div className="text-lg font-bold text-primary mt-1">{option.label}</div>
-                <div className="text-[11px] text-muted mt-0.5">{option.description}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <button
-        onClick={() => selected && onNext(selected, topN)}
+        onClick={() => selected && onNext(selected)}
         disabled={!selected}
         className="w-full py-3 px-6 bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white rounded-xl font-semibold text-sm transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-accent-500 disabled:hover:to-accent-600"
       >
-        Search This Pool
+        Continue
       </button>
     </div>
   );

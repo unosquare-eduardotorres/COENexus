@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OperationNexus.Api.Data;
@@ -12,9 +13,11 @@ using Pgvector;
 namespace OperationNexus.Api.Migrations
 {
     [DbContext(typeof(NexusDbContext))]
-    partial class NexusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260316173759_AddOpenPositionSync")]
+    partial class AddOpenPositionSync
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -68,10 +71,6 @@ namespace OperationNexus.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ResultsJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("SearchMode")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Status")

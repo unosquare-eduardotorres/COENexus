@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SyncSourceType, SyncProgress, SyncRecord, PipelineStatus, ProcessingProgress } from '../../types';
 import SyncRecordTable from './SyncRecordTable';
 import ConfirmModal from './ConfirmModal';
+import DangerConfirmModal from './DangerConfirmModal';
 import YearSelector from './YearSelector';
 
 interface SyncDashboardProps {
@@ -9,10 +10,11 @@ interface SyncDashboardProps {
   progress: SyncProgress;
   records: SyncRecord[];
   onStartSync?: () => void;
-  onStartSyncLimited?: () => void;
+  onResync?: () => void;
   onPauseSync?: () => void;
   onResumeSync?: () => void;
   onRetryIncomplete?: () => void;
+  onRetryNotProcessed?: () => void;
   onStartExtraction?: () => void;
   onPauseExtraction?: () => void;
   onResumeExtraction?: () => void;
@@ -27,6 +29,8 @@ interface SyncDashboardProps {
   onVectorizeRecord?: (upstreamId: number) => void;
   refreshingId?: number;
   vectorizingId?: number;
+  onRetryFailed?: () => void;
+  onRetryFailedVectorization?: () => void;
   onClearData?: () => void;
   isLoadingRecords?: boolean;
   isClearing?: boolean;
@@ -111,7 +115,7 @@ const PIPELINE_CARDS: StatusCardDef[] = [
     iconBg: 'text-emerald-600 dark:text-emerald-400',
     glowRing: 'ring-2 ring-emerald-400 dark:ring-emerald-500',
     glowShadow: 'shadow-lg shadow-emerald-500/20',
-    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'synced').length,
+    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'synced' && !r.failed).length,
   },
   {
     key: 'extracted',
@@ -122,7 +126,7 @@ const PIPELINE_CARDS: StatusCardDef[] = [
     iconBg: 'text-blue-600 dark:text-blue-400',
     glowRing: 'ring-2 ring-blue-400 dark:ring-blue-500',
     glowShadow: 'shadow-lg shadow-blue-500/20',
-    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'extracted').length,
+    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'extracted' || (r.pipelineStatus === 'synced' && r.failed)).length,
   },
   {
     key: 'vectorized',
@@ -140,7 +144,7 @@ const PIPELINE_CARDS: StatusCardDef[] = [
     iconBg: 'text-violet-600 dark:text-violet-400',
     glowRing: 'ring-2 ring-violet-400 dark:ring-violet-500',
     glowShadow: 'shadow-lg shadow-violet-500/20',
-    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'vectorized').length,
+    getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'vectorized' || (r.pipelineStatus === 'extracted' && r.failed)).length,
   },
 ];
 
@@ -175,7 +179,8 @@ function ProcessActionButtons({
   const isRunning = status === 'processing';
   const isPaused = status === 'paused';
   const isCompleted = status === 'completed';
-  const isError = status === 'error';
+  const isAuthFailed = status === 'auth_failed';
+  const isError = status === 'error' || isAuthFailed;
   const isIdle = status === 'idle';
 
   if (isRunning && onPause) {
@@ -208,18 +213,25 @@ function ProcessActionButtons({
 
   if (isError && onStart) {
     return (
-      <button
-        onClick={onStart}
-        disabled={disabled}
-        className={`inline-flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-semibold text-sm ${
-          disabled ? 'opacity-60 cursor-not-allowed' : ''
-        }`}
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Retry
-      </button>
+      <div className="flex items-center gap-3">
+        {isAuthFailed && (
+          <span className="text-xs font-medium text-red-500 dark:text-red-400">
+            Token expired or invalid
+          </span>
+        )}
+        <button
+          onClick={onStart}
+          disabled={disabled}
+          className={`inline-flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-semibold text-sm ${
+            disabled ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Retry
+        </button>
+      </div>
     );
   }
 
@@ -333,10 +345,11 @@ export default function SyncDashboard({
   progress,
   records,
   onStartSync,
-  onStartSyncLimited,
+  onResync,
   onPauseSync,
   onResumeSync,
   onRetryIncomplete,
+  onRetryNotProcessed,
   onStartExtraction,
   onPauseExtraction,
   onResumeExtraction,
@@ -351,6 +364,8 @@ export default function SyncDashboard({
   onVectorizeRecord,
   refreshingId,
   vectorizingId,
+  onRetryFailed,
+  onRetryFailedVectorization,
   onClearData,
   isLoadingRecords,
   isClearing,
@@ -359,6 +374,7 @@ export default function SyncDashboard({
 }: SyncDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusCardKey>('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showResyncConfirm, setShowResyncConfirm] = useState(false);
 
   const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
   const isActiveOrPaused = progress.status === 'syncing' || progress.status === 'paused';
@@ -530,7 +546,19 @@ export default function SyncDashboard({
         </div>
 
         <div className="flex items-center gap-2">
-          {(statusFilter === 'incomplete' || statusFilter === 'not-processed') && onRetryIncomplete && (progress.incompleteCount > 0 || progress.notProcessedCount > 0) && (
+          {statusFilter === 'not-processed' && onRetryNotProcessed && progress.notProcessedCount > 0 && (
+            <button
+              onClick={onRetryNotProcessed}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors duration-200 font-semibold text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry Not Processed ({progress.notProcessedCount})
+            </button>
+          )}
+
+          {statusFilter === 'incomplete' && onRetryIncomplete && progress.incompleteCount > 0 && (
             <button
               onClick={onRetryIncomplete}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors duration-200 font-semibold text-sm"
@@ -538,38 +566,38 @@ export default function SyncDashboard({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Retry Incomplete ({progress.incompleteCount + progress.notProcessedCount})
+              Retry Incomplete ({progress.incompleteCount})
+            </button>
+          )}
+
+          {statusFilter === 'synced' && onRetryFailed && records.some(r => r.pipelineStatus === 'synced' && r.failed) && (
+            <button
+              onClick={onRetryFailed}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm"
+              disabled={isSyncInProgress}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry Failed ({records.filter(r => r.pipelineStatus === 'synced' && r.failed).length})
+            </button>
+          )}
+
+          {statusFilter === 'extracted' && onRetryFailedVectorization && records.some(r => r.pipelineStatus === 'extracted' && r.failed) && (
+            <button
+              onClick={onRetryFailedVectorization}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors duration-200 font-semibold text-sm"
+              disabled={isSyncInProgress}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry Failed ({records.filter(r => r.pipelineStatus === 'extracted' && r.failed).length})
             </button>
           )}
 
           {(statusFilter === 'synced' || statusFilter === 'all') && (
             <>
-              {progress.status === 'idle' && (
-                <>
-                  {onStartSyncLimited && (
-                    <button
-                      onClick={onStartSyncLimited}
-                      disabled={candidateNeedsYear}
-                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-dark-hover border border-emerald-300 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Sync 10
-                    </button>
-                  )}
-                  <button
-                    onClick={onStartSync}
-                    disabled={candidateNeedsYear}
-                    className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Start Sync
-                  </button>
-                </>
-              )}
               {progress.status === 'syncing' && (
                 <button
                   onClick={onPauseSync}
@@ -589,31 +617,35 @@ export default function SyncDashboard({
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z" />
                   </svg>
-                  Resume Sync
+                  Resume
                 </button>
               )}
-              {progress.status === 'completed' && (
+              {(progress.status === 'idle' || progress.status === 'completed') && (
                 <>
-                  {onStartSyncLimited && (
+                  {onStartSync && (
                     <button
-                      onClick={onStartSyncLimited}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-dark-hover border border-emerald-300 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors duration-200 font-semibold text-sm"
+                      onClick={onStartSync}
+                      disabled={candidateNeedsYear}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                      Sync
+                    </button>
+                  )}
+                  {onResync && records.length > 0 && (
+                    <button
+                      onClick={() => setShowResyncConfirm(true)}
+                      disabled={candidateNeedsYear}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-dark-hover border border-emerald-300 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      Sync 10
+                      Re-Sync
                     </button>
                   )}
-                  <button
-                    onClick={onStartSync}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl transition-all duration-200 font-semibold text-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Sync All
-                  </button>
                 </>
               )}
             </>
@@ -640,10 +672,10 @@ export default function SyncDashboard({
             />
           )}
 
-          {statusFilter === 'vectorized' && (
+          {(statusFilter === 'vectorized' || statusFilter === 'extracted') && (
             <ProcessActionButtons
               progress={vectorizationProgress}
-              hasEligible={records.some((r) => r.pipelineStatus === 'extracted' && !r.failed)}
+              hasEligible={records.some((r) => r.pipelineStatus === 'extracted')}
               onStart={onStartVectorization}
               onPause={onPauseVectorization}
               onResume={onResumeVectorization}
@@ -717,14 +749,24 @@ export default function SyncDashboard({
       )}
 
       {showClearConfirm && (
-        <ConfirmModal
+        <DangerConfirmModal
           title={`Clear ${sourceLabel} Data`}
           message={`This will permanently delete all synced ${sourceLabel.toLowerCase()} records and their embeddings. This action cannot be undone.`}
           confirmLabel="Clear Data"
-          cancelLabel="Cancel"
-          variant="danger"
           onConfirm={handleConfirmClear}
           onCancel={() => setShowClearConfirm(false)}
+        />
+      )}
+
+      {showResyncConfirm && (
+        <ConfirmModal
+          title={`Re-Sync ${sourceLabel}`}
+          message={`This will re-check all ${sourceLabel.toLowerCase()} records from the source system. No existing records will be removed — only updated or inserted when changes are detected. This may take a while for large datasets.`}
+          confirmLabel="Continue"
+          cancelLabel="Cancel"
+          variant="default"
+          onConfirm={() => { setShowResyncConfirm(false); onResync?.(); }}
+          onCancel={() => setShowResyncConfirm(false)}
         />
       )}
     </div>

@@ -7,6 +7,7 @@ public class MatchSession
     public string MatchFlowType { get; set; } = string.Empty;
     public string DataSource { get; set; } = string.Empty;
     public int TopN { get; set; }
+    public string SearchMode { get; set; } = "opus";
     public string JobDescription { get; set; } = string.Empty;
     public string JdSource { get; set; } = string.Empty;
     public string? ConstraintsJson { get; set; }

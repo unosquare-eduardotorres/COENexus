@@ -4,7 +4,7 @@ import {
   PipelineStages,
   HaikuConfirmPayload,
   DataSource,
-  HardConstraints,
+  AdvancedConstraints,
   SearchProgress,
   TopN,
   PoolCounts,
@@ -126,7 +126,7 @@ export const matchEngineService = {
     jobDescription: string,
     source: DataSource,
     topN: TopN,
-    constraints: HardConstraints,
+    constraints: AdvancedConstraints,
     onProgress: (progress: SearchProgress) => void,
     onPipelineStages?: (stages: PipelineStages) => void,
     onHaikuConfirm?: (payload: HaikuConfirmPayload) => void,
@@ -138,14 +138,7 @@ export const matchEngineService = {
         jobDescription,
         dataSource: source,
         topN,
-        constraints: {
-          seniority: constraints.seniority || null,
-          mainSkill: constraints.mainSkill || null,
-          salary: constraints.salary || null,
-          salaryOperator: constraints.salaryOperator || 'lte',
-          salaryCurrency: constraints.salaryCurrency || null,
-          country: constraints.country || null,
-        },
+        constraints,
       }),
     });
 
@@ -175,14 +168,8 @@ export const matchEngineService = {
         jobDescription: request.jobDescription,
         dataSource: request.dataSource,
         topN: request.topN,
-        constraints: request.constraints ? {
-          seniority: request.constraints.seniority || null,
-          mainSkill: request.constraints.mainSkill || null,
-          salary: request.constraints.salary || null,
-          salaryOperator: request.constraints.salaryOperator || 'lte',
-          salaryCurrency: request.constraints.salaryCurrency || null,
-          country: request.constraints.country || null,
-        } : null,
+        searchMode: request.searchMode,
+        constraints: request.constraints ?? null,
       }),
     });
 

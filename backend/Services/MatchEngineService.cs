@@ -104,14 +104,24 @@ public class MatchEngineService : IMatchEngineService
             _ => ""
         };
 
+        var (constraintSql, constraintParams) = BuildAdvancedConstraintSql(request.Constraints);
+
+        var vectorLimit = request.SearchMode switch
+        {
+            "vector" => request.TopN,
+            "haiku" => request.TopN * 3,
+            _ => 50
+        };
+
         var sql = $@"
             SELECT re.""SourceId"", re.""SourceType"", re.""ResumeText"", re.""IsBench"", re.""UpstreamId"",
                    1 - (re.""Embedding"" <=> '{vectorString}'::vector) AS ""CosineSimilarity""
             FROM ""ResumeEmbeddings"" re
             WHERE re.""Embedding"" IS NOT NULL
             {sourceFilter}
+            {constraintSql}
             ORDER BY re.""Embedding"" <=> '{vectorString}'::vector
-            LIMIT 50";
+            LIMIT {vectorLimit}";
 
         var vectorResults = new List<VectorSearchRaw>();
         var conn = _dbContext.Database.GetDbConnection();
@@ -120,6 +130,8 @@ public class MatchEngineService : IMatchEngineService
 
         await using (var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn))
         {
+            foreach (var p in constraintParams)
+                cmd.Parameters.Add(p);
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {
@@ -176,6 +188,8 @@ public class MatchEngineService : IMatchEngineService
                     result.Rate = emp.Rate;
                     result.Currency = emp.SalaryCurrency;
                     result.JobTitle = emp.JobTitle;
+                    result.CandidateStatus = "Employee";
+                    result.GrossMonthlySalary = emp.GrossMonthlySalary;
                 }
             }
             else if (vr.SourceType == "candidates")
@@ -190,6 +204,9 @@ public class MatchEngineService : IMatchEngineService
                     result.Country = cand.Country;
                     result.Rate = cand.CurrentSalary;
                     result.Currency = cand.SalaryCurrency;
+                    result.CandidateStatus = cand.CandidateStatus;
+                    result.SalaryExpectations = cand.SalaryExpectations;
+                    result.SalaryExpectationsCurrency = cand.SalaryExpectationsCurrency;
                 }
             }
 
@@ -215,73 +232,88 @@ public class MatchEngineService : IMatchEngineService
         await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(35, "Deconstructing role into eigenstates...")), ct);
 
         phase = Stopwatch.StartNew();
-        var constrained = enriched.AsEnumerable();
-
-        if (!string.IsNullOrEmpty(request.Constraints?.Seniority))
-            constrained = constrained.Where(c =>
-                string.Equals(c.Seniority, request.Constraints.Seniority, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrEmpty(request.Constraints?.MainSkill))
-            constrained = constrained.Where(c =>
-                string.Equals(c.MainSkill, request.Constraints.MainSkill, StringComparison.OrdinalIgnoreCase));
-
-        if (request.Constraints?.Salary > 0)
-        {
-            var op = request.Constraints.SalaryOperator ?? "lte";
-            constrained = constrained.Where(c =>
-                c.Rate == null || (op == "gte" ? c.Rate >= request.Constraints.Salary : c.Rate <= request.Constraints.Salary));
-        }
-
-        if (!string.IsNullOrEmpty(request.Constraints?.SalaryCurrency))
-            constrained = constrained.Where(c =>
-                string.IsNullOrEmpty(c.Currency) ||
-                string.Equals(c.Currency, request.Constraints.SalaryCurrency, StringComparison.OrdinalIgnoreCase));
-
-        if (!string.IsNullOrEmpty(request.Constraints?.Country))
-            constrained = constrained.Where(c =>
-                string.IsNullOrEmpty(c.Country) ||
-                string.Equals(c.Country, request.Constraints.Country, StringComparison.OrdinalIgnoreCase));
-
-        var afterConstraints = constrained.ToList();
+        var afterConstraints = enriched;
         constraintsAppliedCount = afterConstraints.Count;
         phase.Stop();
         timings["constraintsMs"] = phase.ElapsedMilliseconds;
-        _logger.LogInformation("[MatchEngine] Phase 5 — Constraint Filtering: {Ms}ms ({Count} remaining)", phase.ElapsedMilliseconds, constraintsAppliedCount);
+        _logger.LogInformation("[MatchEngine] Phase 5 — Constraints applied at SQL level: {Count} results already filtered", constraintsAppliedCount);
 
-        var afterConstraintsUpstreamIds = new HashSet<int>(afterConstraints.Select(c => c.UpstreamId));
-        var constraintsStageCandidates = enriched.Select(c =>
+        var constraintsStageCandidates = enriched.Select(c => new PipelineStageCandidateDto
         {
-            string? eliminationReason = null;
-            if (!afterConstraintsUpstreamIds.Contains(c.UpstreamId))
-            {
-                if (!string.IsNullOrEmpty(request.Constraints?.Seniority) &&
-                    !string.Equals(c.Seniority, request.Constraints.Seniority, StringComparison.OrdinalIgnoreCase))
-                    eliminationReason = "Seniority mismatch";
-                else if (!string.IsNullOrEmpty(request.Constraints?.MainSkill) &&
-                    !string.Equals(c.MainSkill, request.Constraints.MainSkill, StringComparison.OrdinalIgnoreCase))
-                    eliminationReason = "Main skill mismatch";
-                else if (!string.IsNullOrEmpty(request.Constraints?.Country) &&
-                    !string.IsNullOrEmpty(c.Country) &&
-                    !string.Equals(c.Country, request.Constraints.Country, StringComparison.OrdinalIgnoreCase))
-                    eliminationReason = "Country mismatch";
-                else if (request.Constraints?.Salary > 0 && c.Rate != null)
-                    eliminationReason = "Salary constraint";
-                else
-                    eliminationReason = "Constraint filter";
-            }
-            return new PipelineStageCandidateDto
-            {
-                UpstreamId = c.UpstreamId,
-                Name = c.Name,
-                SourceType = c.SourceType,
-                CosineSimilarity = c.CosineSimilarity,
-                Seniority = c.Seniority,
-                MainSkill = c.MainSkill,
-                Country = c.Country,
-                IsBench = c.IsBench,
-                EliminationReason = eliminationReason,
-            };
+            UpstreamId = c.UpstreamId,
+            Name = c.Name,
+            SourceType = c.SourceType,
+            CosineSimilarity = c.CosineSimilarity,
+            Seniority = c.Seniority,
+            MainSkill = c.MainSkill,
+            Country = c.Country,
+            IsBench = c.IsBench,
+            EliminationReason = null,
         }).ToList();
+
+        if (request.SearchMode == "vector")
+        {
+            var vectorOnlyResults = enriched
+                .OrderByDescending(c => c.CosineSimilarity)
+                .Take(request.TopN)
+                .Select((c, i) => new MatchCandidateResult
+                {
+                    Id = c.UpstreamId,
+                    Name = c.Name ?? "Unknown",
+                    Type = c.SourceType == "employees" ? "employee" : "candidate",
+                    Role = c.JobTitle ?? "Unknown",
+                    MatchScore = (int)(c.CosineSimilarity * 100),
+                    Summary = $"Vector similarity: {c.CosineSimilarity:P1}",
+                    Seniority = c.Seniority ?? "",
+                    ExpectedRate = c.Rate ?? 0,
+                    Currency = c.Currency ?? "",
+                    Country = c.Country ?? "",
+                    MainSkill = c.MainSkill ?? "",
+                    IsBench = c.IsBench,
+                    CandidateStatus = c.CandidateStatus ?? (c.SourceType == "employees" ? "Employee" : null),
+                    SalaryExpectations = c.SalaryExpectations ?? 0,
+                    SalaryExpectationsCurrency = c.SalaryExpectationsCurrency ?? "",
+                    Scores = new MatchScoresDto
+                    {
+                        Technical = (int)(c.CosineSimilarity * 90),
+                        Domain = (int)(c.CosineSimilarity * 70),
+                        Leadership = 50,
+                        SoftSkills = 50,
+                        Availability = c.IsBench ? 100 : 70
+                    }
+                })
+                .ToList();
+
+            stopwatch.Stop();
+            var vectorPipelineStats = new PipelineStatsDto
+            {
+                ProfilesScanned = totalScanned.ToString("N0"),
+                PreFiltered = preFilteredCount.ToString(),
+                ConstraintsApplied = constraintsAppliedCount.ToString(),
+                HaikuTriage = "Skipped",
+                SonnetAnalyzed = "Skipped",
+                SearchCost = "$0.00",
+                Time = $"{stopwatch.Elapsed.TotalSeconds:F1}s",
+                Timings = timings,
+                CandidateTimings = []
+            };
+
+            var vectorPipelineStages = new PipelineStagesDto
+            {
+                VectorResults = vectorStageCandidates,
+                AfterConstraints = constraintsStageCandidates,
+                AfterHaikuTriage = [],
+            };
+
+            await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(100, "Vector search complete!")), ct);
+            await writer.WriteAsync(new MatchPipelineStagesEvent(vectorPipelineStages), ct);
+            await writer.WriteAsync(new MatchResultEvent(new MatchSearchResult
+            {
+                Candidates = vectorOnlyResults,
+                Stats = vectorPipelineStats
+            }), ct);
+            return;
+        }
 
         await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(45, "Mapping requirement vectors onto neural fabric...")), ct);
 
@@ -445,6 +477,89 @@ Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": 
             .Take(request.TopN)
             .ToList();
 
+        if (request.SearchMode == "haiku")
+        {
+            var haikuOnlyResults = topCandidates
+                .Select((item, i) => new MatchCandidateResult
+                {
+                    Id = item.Candidate.UpstreamId,
+                    Name = item.Candidate.Name ?? "Unknown",
+                    Type = item.Candidate.SourceType == "employees" ? "employee" : "candidate",
+                    Role = item.Candidate.JobTitle ?? "Unknown",
+                    MatchScore = item.Score,
+                    Summary = $"Haiku relevance score: {item.Score}%",
+                    Seniority = item.Candidate.Seniority ?? "",
+                    ExpectedRate = item.Candidate.Rate ?? 0,
+                    Currency = item.Candidate.Currency ?? "",
+                    Country = item.Candidate.Country ?? "",
+                    MainSkill = item.Candidate.MainSkill ?? "",
+                    IsBench = item.Candidate.IsBench,
+                    CandidateStatus = item.Candidate.CandidateStatus ?? (item.Candidate.SourceType == "employees" ? "Employee" : null),
+                    SalaryExpectations = item.Candidate.SalaryExpectations ?? 0,
+                    SalaryExpectationsCurrency = item.Candidate.SalaryExpectationsCurrency ?? "",
+                    Scores = new MatchScoresDto
+                    {
+                        Technical = (int)(item.Candidate.CosineSimilarity * 90),
+                        Domain = (int)(item.Candidate.CosineSimilarity * 70),
+                        Leadership = 50,
+                        SoftSkills = 50,
+                        Availability = item.Candidate.IsBench ? 100 : 70
+                    }
+                })
+                .ToList();
+
+            stopwatch.Stop();
+
+            var triagedUpstreamIdsHaiku = new HashSet<int>(triaged.Select(t => t.Candidate.UpstreamId));
+            var haikuStageCandidatesForMode = afterConstraints.Select(c =>
+            {
+                var score = haikuScores.GetValueOrDefault(c.UpstreamId);
+                var kept = triagedUpstreamIdsHaiku.Contains(c.UpstreamId);
+                return new PipelineStageCandidateDto
+                {
+                    UpstreamId = c.UpstreamId,
+                    Name = c.Name,
+                    SourceType = c.SourceType,
+                    CosineSimilarity = c.CosineSimilarity,
+                    Seniority = c.Seniority,
+                    MainSkill = c.MainSkill,
+                    Country = c.Country,
+                    IsBench = c.IsBench,
+                    HaikuScore = score,
+                    EliminationReason = kept ? null : $"Haiku score: {score} — below threshold",
+                };
+            }).ToList();
+
+            var haikuPipelineStats = new PipelineStatsDto
+            {
+                ProfilesScanned = totalScanned.ToString("N0"),
+                PreFiltered = preFilteredCount.ToString(),
+                ConstraintsApplied = constraintsAppliedCount.ToString(),
+                HaikuTriage = haikuTriageCount.ToString(),
+                SonnetAnalyzed = "Skipped",
+                SearchCost = "$0.00",
+                Time = $"{stopwatch.Elapsed.TotalSeconds:F1}s",
+                Timings = timings,
+                CandidateTimings = candidateTimings.ToList()
+            };
+
+            var haikuPipelineStages = new PipelineStagesDto
+            {
+                VectorResults = vectorStageCandidates,
+                AfterConstraints = constraintsStageCandidates,
+                AfterHaikuTriage = haikuStageCandidatesForMode,
+            };
+
+            await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(100, "Haiku triage complete!")), ct);
+            await writer.WriteAsync(new MatchPipelineStagesEvent(haikuPipelineStages), ct);
+            await writer.WriteAsync(new MatchResultEvent(new MatchSearchResult
+            {
+                Candidates = haikuOnlyResults,
+                Stats = haikuPipelineStats
+            }), ct);
+            return;
+        }
+
         await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(70, "Infusing latent space with enriched context...")), ct);
 
         phase = Stopwatch.StartNew();
@@ -548,6 +663,9 @@ Return ONLY valid JSON, no markdown or explanation.";
                                 Country = candidate.Country ?? parsed.Country,
                                 MainSkill = candidate.MainSkill ?? parsed.MainSkill,
                                 IsBench = candidate.IsBench,
+                                CandidateStatus = candidate.CandidateStatus ?? (candidate.SourceType == "employees" ? "Employee" : null),
+                                SalaryExpectations = candidate.SalaryExpectations ?? 0,
+                                SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
                             });
                         }
                     }
@@ -580,6 +698,9 @@ Return ONLY valid JSON, no markdown or explanation.";
                         Country = candidate.Country ?? "",
                         MainSkill = candidate.MainSkill ?? "",
                         IsBench = candidate.IsBench,
+                        CandidateStatus = candidate.CandidateStatus ?? (candidate.SourceType == "employees" ? "Employee" : null),
+                        SalaryExpectations = candidate.SalaryExpectations ?? 0,
+                        SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
                         Scores = new MatchScoresDto
                         {
                             Technical = (int)(candidate.CosineSimilarity * 90),
@@ -688,33 +809,26 @@ Return ONLY valid JSON, no markdown or explanation.";
 
     public async Task<FilterOptionsResponse> GetFilterOptionsAsync(CancellationToken ct = default)
     {
-        var seniorities = await _dbContext.SyncedEmployees
-            .Where(e => e.Seniority != "")
-            .Select(e => e.Seniority)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToListAsync(ct);
+        var empSeniorities = _dbContext.SyncedEmployees.Where(e => e.Seniority != "").Select(e => e.Seniority);
+        var candSeniorities = _dbContext.SyncedCandidates.Where(c => c.Seniority != null && c.Seniority != "").Select(c => c.Seniority!);
+        var seniorities = await empSeniorities.Union(candSeniorities).Distinct().OrderBy(s => s).ToListAsync(ct);
 
-        var mainSkills = await _dbContext.SyncedEmployees
-            .Where(e => e.MainSkill != "")
-            .Select(e => e.MainSkill)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToListAsync(ct);
+        var empSkills = _dbContext.SyncedEmployees.Where(e => e.MainSkill != "").Select(e => e.MainSkill);
+        var candSkills = _dbContext.SyncedCandidates.Where(c => c.MainSkill != null && c.MainSkill != "").Select(c => c.MainSkill!);
+        var mainSkills = await empSkills.Union(candSkills).Distinct().OrderBy(s => s).ToListAsync(ct);
 
-        var countries = await _dbContext.SyncedEmployees
-            .Where(e => e.Country != "")
-            .Select(e => e.Country)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToListAsync(ct);
+        var empCountries = _dbContext.SyncedEmployees.Where(e => e.Country != "").Select(e => e.Country);
+        var candCountries = _dbContext.SyncedCandidates.Where(c => c.Country != null && c.Country != "").Select(c => c.Country!);
+        var countries = await empCountries.Union(candCountries).Distinct().OrderBy(s => s).ToListAsync(ct);
 
-        var currencies = await _dbContext.SyncedEmployees
-            .Where(e => e.SalaryCurrency != null && e.SalaryCurrency != "")
-            .Select(e => e.SalaryCurrency!)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToListAsync(ct);
+        var empCurrencies = _dbContext.SyncedEmployees.Where(e => e.SalaryCurrency != null && e.SalaryCurrency != "").Select(e => e.SalaryCurrency!);
+        var candCurrencies = _dbContext.SyncedCandidates.Where(c => c.SalaryCurrency != null && c.SalaryCurrency != "").Select(c => c.SalaryCurrency!);
+        var currencies = await empCurrencies.Union(candCurrencies).Distinct().OrderBy(s => s).ToListAsync(ct);
+
+        var statuses = await _dbContext.SyncedCandidates
+            .Where(c => c.CandidateStatus != null && c.CandidateStatus != "")
+            .Select(c => c.CandidateStatus!)
+            .Distinct().OrderBy(s => s).ToListAsync(ct);
 
         return new FilterOptionsResponse
         {
@@ -722,6 +836,153 @@ Return ONLY valid JSON, no markdown or explanation.";
             MainSkills = mainSkills,
             Countries = countries,
             Currencies = currencies,
+            CandidateStatuses = statuses,
+        };
+    }
+
+    private static (string sql, List<NpgsqlParameter> parameters) BuildAdvancedConstraintSql(AdvancedConstraints? constraints)
+    {
+        if (constraints == null)
+            return ("", []);
+
+        var parameters = new List<NpgsqlParameter>();
+        var paramIndex = 0;
+        var sqlParts = new List<string>();
+
+        string NextParam(object value)
+        {
+            var name = $"@constraint_p{paramIndex++}";
+            parameters.Add(new NpgsqlParameter(name, value));
+            return name;
+        }
+
+        if (constraints.CandidateFilters.Count > 0)
+        {
+            var candidateSql = BuildFilterGroupSql(constraints.CandidateFilters, "candidates", "SyncedCandidates", "sc", NextParam);
+            if (!string.IsNullOrEmpty(candidateSql))
+                sqlParts.Add($@"
+                AND (re.""SourceType"" != 'candidates' OR EXISTS (
+                    SELECT 1 FROM ""SyncedCandidates"" sc WHERE sc.""UpstreamId"" = re.""UpstreamId"" AND ({candidateSql})
+                ))");
+        }
+
+        if (constraints.EmployeeFilters.Count > 0)
+        {
+            var employeeSql = BuildFilterGroupSql(constraints.EmployeeFilters, "employees", "SyncedEmployees", "se", NextParam);
+            if (!string.IsNullOrEmpty(employeeSql))
+                sqlParts.Add($@"
+                AND (re.""SourceType"" != 'employees' OR EXISTS (
+                    SELECT 1 FROM ""SyncedEmployees"" se WHERE se.""UpstreamId"" = re.""UpstreamId"" AND ({employeeSql})
+                ))");
+        }
+
+        return (string.Join("", sqlParts), parameters);
+    }
+
+    private static readonly Dictionary<string, Dictionary<string, string>> FieldColumnMap = new()
+    {
+        ["candidates"] = new()
+        {
+            ["mainSkill"] = @"""MainSkill""",
+            ["country"] = @"""Country""",
+            ["seniority"] = @"""Seniority""",
+            ["currentSalary"] = @"""CurrentSalary""",
+            ["salaryExpectation"] = @"""SalaryExpectations""",
+            ["status"] = @"""CandidateStatus""",
+        },
+        ["employees"] = new()
+        {
+            ["mainSkill"] = @"""MainSkill""",
+            ["country"] = @"""Country""",
+            ["seniority"] = @"""Seniority""",
+            ["currentSalary"] = "EMPLOYEE_SALARY_EXPR",
+        },
+    };
+
+    private static string BuildFilterGroupSql(
+        List<FilterRule> rules,
+        string sourceType,
+        string tableName,
+        string alias,
+        Func<object, string> nextParam)
+    {
+        if (rules.Count == 0) return "";
+
+        var columnMap = FieldColumnMap.GetValueOrDefault(sourceType) ?? new();
+        var andGroups = new List<List<string>>();
+        var currentOrGroup = new List<string>();
+
+        for (int i = 0; i < rules.Count; i++)
+        {
+            var rule = rules[i];
+            var condition = BuildRuleCondition(rule, sourceType, alias, columnMap, nextParam);
+            if (string.IsNullOrEmpty(condition)) continue;
+
+            currentOrGroup.Add(condition);
+
+            var isLast = i == rules.Count - 1;
+            if (isLast || rule.Connector == "and")
+            {
+                andGroups.Add(currentOrGroup);
+                currentOrGroup = new List<string>();
+            }
+        }
+
+        if (currentOrGroup.Count > 0)
+            andGroups.Add(currentOrGroup);
+
+        var andParts = andGroups
+            .Where(g => g.Count > 0)
+            .Select(g => g.Count == 1 ? g[0] : $"({string.Join(" OR ", g)})")
+            .ToList();
+
+        return string.Join(" AND ", andParts);
+    }
+
+    private static string BuildRuleCondition(
+        FilterRule rule,
+        string sourceType,
+        string alias,
+        Dictionary<string, string> columnMap,
+        Func<object, string> nextParam)
+    {
+        if (!columnMap.TryGetValue(rule.Field, out var column)) return "";
+
+        if (rule.Field == "currentSalary" && sourceType == "employees")
+        {
+            var salaryExpr = $@"CASE WHEN {alias}.""SalaryCurrency"" = 'USD' AND {alias}.""Rate"" IS NOT NULL AND {alias}.""Rate"" <= 100 THEN {alias}.""Rate"" * 160 ELSE COALESCE({alias}.""GrossMonthlySalary"", 0) END";
+            if (decimal.TryParse(rule.Value.ToString(), out var salVal))
+            {
+                var p = nextParam(salVal);
+                var op = rule.Operator == "gte" ? ">=" : "<=";
+                return $"{salaryExpr} {op} {p}";
+            }
+            return "";
+        }
+
+        var isSalaryField = rule.Field is "currentSalary" or "salaryExpectation";
+
+        if (isSalaryField)
+        {
+            if (decimal.TryParse(rule.Value.ToString(), out var salaryValue) && salaryValue > 0)
+            {
+                var p = nextParam(salaryValue);
+                var op = rule.Operator == "gte" ? ">=" : "<=";
+                return $"{column} {op} {p}";
+            }
+            return "";
+        }
+
+        var value = rule.Value.ToString() ?? "";
+        if (string.IsNullOrEmpty(value)) return "";
+
+        return rule.Operator switch
+        {
+            "equals" => $"{column} = {nextParam(value)}",
+            "notEquals" => $"{column} != {nextParam(value)}",
+            "in" => $"{column} = {nextParam(value)}",
+            "notIn" => $"({column} IS NULL OR {column} != {nextParam(value)})",
+            _ => ""
         };
     }
 
@@ -735,6 +996,7 @@ Return ONLY valid JSON, no markdown or explanation.";
             MatchFlowType = request.MatchFlowType,
             DataSource = request.DataSource,
             TopN = request.TopN,
+            SearchMode = request.SearchMode,
             JobDescription = request.JobDescription,
             JdSource = request.JdSource,
             ConstraintsJson = request.Constraints != null
@@ -784,6 +1046,7 @@ Return ONLY valid JSON, no markdown or explanation.";
                 MatchFlowType = s.MatchFlowType,
                 DataSource = s.DataSource,
                 TopN = s.TopN,
+                SearchMode = s.SearchMode,
                 JdSource = s.JdSource,
                 Status = s.Status,
                 CreatedAt = s.CreatedAt,
@@ -803,9 +1066,20 @@ Return ONLY valid JSON, no markdown or explanation.";
         var session = await _dbContext.MatchSessions.FindAsync([id], ct);
         if (session == null) return null;
 
-        var constraints = session.ConstraintsJson != null
-            ? JsonSerializer.Deserialize<MatchConstraints>(session.ConstraintsJson, JsonOptions)
-            : null;
+        AdvancedConstraints? constraints = null;
+        if (session.ConstraintsJson != null)
+        {
+            try
+            {
+                constraints = JsonSerializer.Deserialize<AdvancedConstraints>(session.ConstraintsJson, JsonOptions);
+                if (constraints?.CandidateFilters == null && constraints?.EmployeeFilters == null)
+                    constraints = new AdvancedConstraints();
+            }
+            catch
+            {
+                constraints = new AdvancedConstraints();
+            }
+        }
         var stats = session.PipelineStatsJson != null
             ? JsonSerializer.Deserialize<PipelineStatsDto>(session.PipelineStatsJson, JsonOptions)
             : null;
@@ -823,6 +1097,7 @@ Return ONLY valid JSON, no markdown or explanation.";
             MatchFlowType = session.MatchFlowType,
             DataSource = session.DataSource,
             TopN = session.TopN,
+            SearchMode = session.SearchMode,
             JdSource = session.JdSource,
             Status = session.Status,
             CreatedAt = session.CreatedAt,
