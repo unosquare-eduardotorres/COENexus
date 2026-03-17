@@ -47,15 +47,20 @@ export default function CandidateCard({
     ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
     : 'bg-amber-500/10 text-amber-600 dark:text-amber-400');
 
-  const salaryDisplay = (() => {
+  const salaryLines = (() => {
     if (candidate.type === 'candidate') {
+      const lines: { label: string; value: string }[] = [];
+      const cur = candidate.expectedRate;
+      const curCurrency = candidate.currency || undefined;
+      if (cur && cur > 0) lines.push({ label: 'Current', value: formatSalary(cur, curCurrency) });
       const exp = candidate.salaryExpectations;
-      const expCur = candidate.salaryExpectationsCurrency;
-      if (exp && exp > 0) return formatSalary(exp, expCur);
-      return 'No salary info';
+      const expCur = candidate.salaryExpectationsCurrency || undefined;
+      if (exp && exp > 0) lines.push({ label: 'Expected', value: formatSalary(exp, expCur) });
+      if (lines.length === 0) lines.push({ label: '', value: 'No salary info' });
+      return lines;
     }
     const { display } = formatEmployeeRate(candidate.expectedRate, candidate.currency);
-    return display;
+    return [{ label: '', value: display }];
   })();
 
   const sharepointUrl = candidate.type === 'employee'
@@ -91,13 +96,27 @@ export default function CandidateCard({
               {statusLabel}
             </span>
           </div>
-          <div className="text-xs text-secondary">{candidate.role}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-secondary">{candidate.role}</span>
+            {candidate.mainSkill && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 flex-shrink-0">
+                {candidate.mainSkill}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-muted truncate">{candidate.summary}</div>
         </div>
 
-        <div className="hidden lg:flex flex-col items-end text-right gap-0.5 min-w-[120px]">
-          <span className="text-xs text-muted">{candidate.location}</span>
-          <span className="text-xs text-muted">{salaryDisplay}</span>
+        <div className="hidden lg:flex flex-col items-end text-right gap-0.5 min-w-[140px]">
+          {candidate.country && (
+            <span className="text-xs text-secondary font-medium">{candidate.country}</span>
+          )}
+          {salaryLines.map((line, i) => (
+            <span key={i} className="text-xs text-muted" title={line.label ? `${line.label} Salary` : undefined}>
+              {line.label ? <span className="text-[10px] text-muted/60 mr-1">{line.label}:</span> : null}
+              {line.value}
+            </span>
+          ))}
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${typeBadge}`}>
             {candidate.type}
           </span>

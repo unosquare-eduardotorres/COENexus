@@ -1,6 +1,28 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace OperationNexus.Api.Models;
+
+public class StringOrNumberConverter : JsonConverter<string>
+{
+    public override string Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.String => reader.GetString() ?? string.Empty,
+            JsonTokenType.Number => reader.GetDecimal().ToString(),
+            JsonTokenType.True => "true",
+            JsonTokenType.False => "false",
+            JsonTokenType.Null => string.Empty,
+            _ => throw new JsonException($"Unexpected token {reader.TokenType} for string property")
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value);
+    }
+}
 
 public record MatchRequest
 {
@@ -31,7 +53,10 @@ public record FilterRule
 {
     public string Field { get; init; } = string.Empty;
     public string Operator { get; init; } = "equals";
+
+    [JsonConverter(typeof(StringOrNumberConverter))]
     public string Value { get; init; } = string.Empty;
+
     public string? Currency { get; init; }
     public string Connector { get; init; } = "and";
 }

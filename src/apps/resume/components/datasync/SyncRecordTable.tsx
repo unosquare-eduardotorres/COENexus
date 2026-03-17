@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { SyncRecord, SyncSourceType, PipelineStatus } from '../../types';
 import { formatSalary } from '../../utils/formatSalary';
+import { exportToExcel, ColumnDef } from '../../utils/exportToExcel';
 import ErrorDetailModal from './ErrorDetailModal';
 
 const PAGE_SIZE = 50;
@@ -126,6 +127,7 @@ export default function SyncRecordTable({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [errorDetail, setErrorDetail] = useState<{ name: string; error: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -236,6 +238,53 @@ export default function SyncRecordTable({
     });
   }, [records, statusFilter, searchQuery, sortKey, sortDirection]);
 
+  const handleExport = useCallback(async () => {
+    if (exporting || filtered.length === 0) return;
+    setExporting(true);
+    try {
+      const candidateColumns: ColumnDef[] = [
+        { header: 'Pipeline Status', accessor: (r) => PIPELINE_LABELS[(r as unknown as SyncRecord).pipelineStatus] },
+        { header: 'Name', accessor: (r) => (r as unknown as SyncRecord).name || (r as unknown as SyncRecord).email?.split('@')[0] || '' },
+        { header: 'COE Certified', accessor: (r) => (r as unknown as SyncRecord).coeCertified ?? false },
+        { header: 'Email', accessor: (r) => (r as unknown as SyncRecord).email },
+        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
+        { header: 'Candidate Status', accessor: (r) => (r as unknown as SyncRecord).candidateStatus },
+        { header: 'Last Status Update', accessor: (r) => {
+          const d = (r as unknown as SyncRecord).lastStatusUpdate;
+          return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        }},
+        { header: 'Current Salary', accessor: (r) => (r as unknown as SyncRecord).grossMonthlySalary },
+        { header: 'Current Salary Currency', accessor: (r) => (r as unknown as SyncRecord).currency },
+        { header: 'Salary Expectations', accessor: (r) => (r as unknown as SyncRecord).salaryExpectations },
+        { header: 'Salary Exp. Currency', accessor: (r) => (r as unknown as SyncRecord).salaryExpectationsCurrency },
+        { header: 'Country', accessor: (r) => (r as unknown as SyncRecord).country },
+        { header: 'Has Resume', accessor: (r) => (r as unknown as SyncRecord).hasResume },
+        { header: 'Reason', accessor: (r) => (r as unknown as SyncRecord).syncDetail || (r as unknown as SyncRecord).reason },
+      ];
+
+      const employeeColumns: ColumnDef[] = [
+        { header: 'Pipeline Status', accessor: (r) => PIPELINE_LABELS[(r as unknown as SyncRecord).pipelineStatus] },
+        { header: 'Name', accessor: (r) => (r as unknown as SyncRecord).name || (r as unknown as SyncRecord).email?.split('@')[0] || '' },
+        { header: 'Job Title', accessor: (r) => (r as unknown as SyncRecord).jobTitle },
+        { header: 'Email', accessor: (r) => (r as unknown as SyncRecord).email },
+        { header: 'Seniority', accessor: (r) => (r as unknown as SyncRecord).seniority },
+        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
+        { header: 'Salary', accessor: (r) => (r as unknown as SyncRecord).grossMonthlySalary },
+        { header: 'Currency', accessor: (r) => (r as unknown as SyncRecord).currency },
+        { header: 'Country', accessor: (r) => (r as unknown as SyncRecord).country },
+        { header: 'Has Resume', accessor: (r) => (r as unknown as SyncRecord).hasResume },
+        { header: 'Reason', accessor: (r) => (r as unknown as SyncRecord).syncDetail || (r as unknown as SyncRecord).reason },
+      ];
+
+      const columns = source === 'candidates' ? candidateColumns : employeeColumns;
+      const statusLabel = statusFilter === 'all' ? 'All' : statusFilter === 'excluded' ? 'Excluded' : PIPELINE_LABELS[statusFilter as PipelineStatus] ?? statusFilter;
+      const filename = `${source}-${statusLabel}-${new Date().toISOString().slice(0, 10)}`;
+      await exportToExcel(filtered as unknown as Record<string, unknown>[], columns, filename);
+    } finally {
+      setExporting(false);
+    }
+  }, [filtered, source, statusFilter, exporting]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginatedRecords = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const rangeStart = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1;
@@ -244,22 +293,42 @@ export default function SyncRecordTable({
   return (
     <div className="glass-card overflow-x-auto">
       <div className="p-4 border-b border-gray-100 dark:border-dark-border/30">
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-9 pr-4 py-2 bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl text-sm text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-400/60 dark:focus:border-accent-500/40 transition-all duration-200"
+            />
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting || filtered.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-500/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+            title={`Export ${filtered.length} records to Excel`}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-9 pr-4 py-2 bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl text-sm text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-400/60 dark:focus:border-accent-500/40 transition-all duration-200"
-          />
+            {exporting ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            Export
+          </button>
         </div>
       </div>
 
@@ -284,6 +353,7 @@ export default function SyncRecordTable({
                   { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
                   { key: 'candidateStatus' as SortKey, label: 'Cand. Status', className: 'hidden lg:table-cell' },
                   { key: 'lastStatusUpdate' as SortKey, label: 'Last Status', className: 'hidden lg:table-cell' },
+                  { key: 'salary' as SortKey, label: 'Current Salary', className: 'hidden lg:table-cell' },
                   { key: 'salaryExpectations' as SortKey, label: 'Salary Exp.', className: '' },
                   { key: 'country' as SortKey, label: 'Country', className: 'hidden lg:table-cell' },
                   { key: 'hasResume' as SortKey, label: 'Resume', className: '' },
@@ -362,9 +432,14 @@ export default function SyncRecordTable({
                           ? new Date(record.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                           : '—'}
                       </td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary whitespace-nowrap">
+                        {record.grossMonthlySalary != null && record.grossMonthlySalary > 0
+                          ? formatSalary(record.grossMonthlySalary, record.currency || undefined)
+                          : '—'}
+                      </td>
                       <td className="px-4 py-3 text-secondary whitespace-nowrap">
-                        {record.salaryExpectations != null
-                          ? formatSalary(record.salaryExpectations, record.salaryExpectationsCurrency ?? 'USD')
+                        {record.salaryExpectations != null && record.salaryExpectations > 0
+                          ? formatSalary(record.salaryExpectations, record.salaryExpectationsCurrency || undefined)
                           : '—'}
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>

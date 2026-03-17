@@ -12,9 +12,23 @@ import {
   MatchSessionSummary,
   MatchSessionDetail,
   CreateSessionRequest,
+  FilterRule,
 } from '../types';
 
 const API_BASE = '/api/match';
+
+function normalizeConstraints(constraints: AdvancedConstraints | null | undefined): Omit<AdvancedConstraints, 'candidateFilters' | 'employeeFilters'> & { candidateFilters: Omit<FilterRule, 'id'>[]; employeeFilters: Omit<FilterRule, 'id'>[] } | null {
+  if (!constraints) return null;
+  const normalize = (rules: FilterRule[]) =>
+    rules.map(({ id: _id, ...rule }) => ({
+      ...rule,
+      value: String(rule.value),
+    }));
+  return {
+    candidateFilters: normalize(constraints.candidateFilters),
+    employeeFilters: normalize(constraints.employeeFilters),
+  };
+}
 
 export interface SearchResult {
   candidates: MatchCandidate[];
@@ -138,7 +152,7 @@ export const matchEngineService = {
         jobDescription,
         dataSource: source,
         topN,
-        constraints,
+        constraints: normalizeConstraints(constraints),
       }),
     });
 
@@ -169,7 +183,7 @@ export const matchEngineService = {
         dataSource: request.dataSource,
         topN: request.topN,
         searchMode: request.searchMode,
-        constraints: request.constraints ?? null,
+        constraints: normalizeConstraints(request.constraints),
       }),
     });
 

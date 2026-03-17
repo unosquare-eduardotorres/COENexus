@@ -68,8 +68,8 @@ const CANDIDATE_FIELDS: FieldConfig[] = [
     field: 'status',
     label: 'Status',
     operators: [
-      { value: 'notIn', label: 'not in' },
-      { value: 'in', label: 'in' },
+      { value: 'notEquals', label: '≠' },
+      { value: 'equals', label: '=' },
     ],
     valueType: 'multi-select',
     optionsKey: 'candidateStatuses',
@@ -124,8 +124,8 @@ function generateId(): string {
 
 function createDefaultCandidateFilters(): FilterRule[] {
   return [
-    { id: generateId(), field: 'status', operator: 'notIn', value: 'Do Not Call', connector: 'or' },
-    { id: generateId(), field: 'status', operator: 'notIn', value: 'Hired', connector: 'and' },
+    { id: generateId(), field: 'status', operator: 'notEquals', value: 'Do Not Call', connector: 'and' },
+    { id: generateId(), field: 'status', operator: 'notEquals', value: 'Hired', connector: 'and' },
   ];
 }
 
@@ -228,9 +228,9 @@ export default function FilterStep({
         group.forEach((rule, ri) => {
           const isLastInGroup = ri === group.length - 1;
           const isLastGroup = gi === groups.length - 1;
-          let connector: 'and' | 'or' = 'and';
-          if (!isLastInGroup) connector = 'or';
-          else if (!isLastGroup) connector = 'and';
+          let connector = rule.connector;
+          if (isLastInGroup && !isLastGroup) connector = 'and';
+          if (isLastInGroup && isLastGroup) connector = 'and';
           result.push({ ...rule, connector });
         });
       });
@@ -362,9 +362,22 @@ export default function FilterStep({
                     <div key={rule.id}>
                       {ruleIndex > 0 && (
                         <div className="flex items-center justify-center py-0.5">
-                          <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500">
-                            OR
-                          </span>
+                          <button
+                            onClick={() => {
+                              const prevRule = group.rules[ruleIndex - 1];
+                              handleUpdateRule(prevRule.id, {
+                                connector: prevRule.connector === 'or' ? 'and' : 'or',
+                              });
+                            }}
+                            className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full cursor-pointer transition-all ${
+                              group.rules[ruleIndex - 1].connector === 'and'
+                                ? 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
+                                : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                            }`}
+                            title="Click to toggle AND/OR"
+                          >
+                            {group.rules[ruleIndex - 1].connector === 'and' ? 'AND' : 'OR'}
+                          </button>
                         </div>
                       )}
                       <FilterRuleRow
@@ -419,10 +432,22 @@ function FilterRuleRow({ rule, fieldConfig, filterOptions, onUpdate, onRemove }:
     onUpdate({ operator: ops[nextIdx].value });
   };
 
-  const isNegativeOp = ['notEquals', 'notIn', 'gte'].includes(rule.operator);
+  const isNegativeOp = ['notEquals', 'gte'].includes(rule.operator);
 
   return (
     <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg">
+      <button
+        onClick={cycleOperator}
+        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex-shrink-0 ${
+          isNegativeOp
+            ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
+            : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 border border-indigo-500/20'
+        }`}
+        title="Click to toggle operator"
+      >
+        {fieldConfig.operators.find((o) => o.value === rule.operator)?.label}
+      </button>
+
       {fieldConfig.valueType === 'dropdown' && (
         options.length > 0 ? (
           <select
@@ -491,18 +516,6 @@ function FilterRuleRow({ rule, fieldConfig, filterOptions, onUpdate, onRemove }:
           </select>
         </div>
       )}
-
-      <button
-        onClick={cycleOperator}
-        className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all flex-shrink-0 ${
-          isNegativeOp
-            ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
-            : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 border border-indigo-500/20'
-        }`}
-        title="Click to toggle operator"
-      >
-        {fieldConfig.operators.find((o) => o.value === rule.operator)?.label}
-      </button>
 
       <button
         onClick={onRemove}

@@ -979,7 +979,7 @@ Return ONLY valid JSON, no markdown or explanation.";
         return rule.Operator switch
         {
             "equals" => $"{column} = {nextParam(value)}",
-            "notEquals" => $"{column} != {nextParam(value)}",
+            "notEquals" => $"({column} IS NULL OR {column} != {nextParam(value)})",
             "in" => $"{column} = {nextParam(value)}",
             "notIn" => $"({column} IS NULL OR {column} != {nextParam(value)})",
             _ => ""
