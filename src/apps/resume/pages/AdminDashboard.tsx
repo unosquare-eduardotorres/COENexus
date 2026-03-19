@@ -6,6 +6,7 @@ import {
   AIConfig,
   RefinementPrompt,
   RefinementMode,
+  MatchEnginePromptConfig,
   VectorizationConfig,
 } from '../types';
 import {
@@ -14,6 +15,7 @@ import {
   resetTemplate,
 } from '../data/mockTemplates';
 import { getPrompts, savePrompt, resetPrompt, resetAllPrompts } from '../data/defaultPrompts';
+import { getMatchPrompts, saveMatchPrompt, resetMatchPrompt, resetAllMatchPrompts } from '../data/defaultMatchPrompts';
 import { aiService } from '../services/aiService';
 import { vectorizationConfigService } from '../services/vectorizationConfigService';
 
@@ -29,6 +31,9 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
   const [prompts, setPrompts] = useState<RefinementPrompt[]>(getPrompts());
   const [expandedPromptId, setExpandedPromptId] = useState<string | null>(null);
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
+  const [matchPrompts, setMatchPrompts] = useState<MatchEnginePromptConfig[]>(getMatchPrompts());
+  const [expandedMatchPromptId, setExpandedMatchPromptId] = useState<string | null>(null);
+  const [editingMatchPromptId, setEditingMatchPromptId] = useState<string | null>(null);
   const [outputTemplateName, setOutputTemplateName] = useState<string>(
     localStorage.getItem('output_template_name') || 'USQ Resume Template.docx'
   );
@@ -155,7 +160,47 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
       setPrompts(defaults);
       setExpandedPromptId(null);
       setEditingPromptId(null);
+      handleResetAllMatchPrompts();
     }
+  }, []);
+
+  const handleToggleMatchPromptExpand = useCallback((promptId: string) => {
+    setExpandedMatchPromptId((prev) => (prev === promptId ? null : promptId));
+    setEditingMatchPromptId(null);
+  }, []);
+
+  const handleEditMatchPrompt = useCallback((promptId: string) => {
+    setEditingMatchPromptId(promptId);
+  }, []);
+
+  const handleSaveMatchPrompt = useCallback((prompt: MatchEnginePromptConfig) => {
+    saveMatchPrompt(prompt);
+    setMatchPrompts(getMatchPrompts());
+    setEditingMatchPromptId(null);
+    setSaveStatus('saving');
+    setTimeout(() => {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }, 500);
+  }, []);
+
+  const handleResetMatchPrompt = useCallback((promptId: string) => {
+    const reset = resetMatchPrompt(promptId);
+    if (reset) {
+      setMatchPrompts(getMatchPrompts());
+      setSaveStatus('saving');
+      setTimeout(() => {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }, 500);
+    }
+  }, []);
+
+  const handleResetAllMatchPrompts = useCallback(() => {
+    const defaults = resetAllMatchPrompts();
+    setMatchPrompts(defaults);
+    setExpandedMatchPromptId(null);
+    setEditingMatchPromptId(null);
   }, []);
 
   const handleTemplateUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -592,6 +637,163 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                           )}
                           <button
                             onClick={() => handleResetPrompt(prompt.id)}
+                            className="px-3 py-1.5 text-xs text-secondary hover:text-primary hover:bg-white/50 dark:hover:bg-dark-hover/50 rounded-lg transition-colors"
+                          >
+                            Reset to Default
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="glass-card p-5">
+              <h3 className="text-sm font-semibold text-primary mb-1">Match Engine Prompts</h3>
+              <p className="text-xs text-muted mb-5">
+                Configure Match Engine prompt templates used for fast triage and deep analysis of candidate fit.
+              </p>
+              <div className="space-y-3">
+                {matchPrompts.map((prompt) => (
+                  <div
+                    key={prompt.id}
+                    className={`rounded-xl border transition-all ${
+                      expandedMatchPromptId === prompt.id
+                        ? 'border-violet-200/50 dark:border-violet-500/30 bg-violet-50/30 dark:bg-violet-500/10'
+                        : 'border-gray-200/50 dark:border-dark-border/50 bg-white/50 dark:bg-dark-hover/30'
+                    }`}
+                  >
+                    <button
+                      onClick={() => handleToggleMatchPromptExpand(prompt.id)}
+                      className="w-full flex items-center gap-3 p-3 text-left"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-violet-100/80 dark:bg-violet-500/20 flex items-center justify-center text-sm flex-shrink-0">
+                        {prompt.key === 'haiku-triage' ? '🎯' : '🔬'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-primary">{prompt.name}</h4>
+                        <p className="text-xs text-muted truncate">{prompt.description}</p>
+                      </div>
+                      <span className="px-2 py-0.5 text-[10px] font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full">
+                        {`${prompt.maxTokens} tok • ${prompt.temperature} temp`}
+                      </span>
+                      <svg
+                        className={`w-4 h-4 text-muted transition-transform ${expandedMatchPromptId === prompt.id ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {expandedMatchPromptId === prompt.id && (
+                      <div className="px-3 pb-3 space-y-3">
+                        <textarea
+                          value={prompt.promptTemplate}
+                          onChange={(e) => {
+                            if (editingMatchPromptId === prompt.id) {
+                              setMatchPrompts((prev) =>
+                                prev.map((p) =>
+                                  p.id === prompt.id ? { ...p, promptTemplate: e.target.value } : p
+                                )
+                              );
+                            }
+                          }}
+                          readOnly={editingMatchPromptId !== prompt.id}
+                          rows={10}
+                          className={`glass-input w-full px-3 py-2 font-mono text-xs resize-none ${
+                            editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                          }`}
+                        />
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Max Tokens</label>
+                            <input
+                              type="number"
+                              value={prompt.maxTokens}
+                              onChange={(e) => {
+                                if (editingMatchPromptId === prompt.id) {
+                                  setMatchPrompts((prev) =>
+                                    prev.map((p) =>
+                                      p.id === prompt.id ? { ...p, maxTokens: Number(e.target.value) } : p
+                                    )
+                                  );
+                                }
+                              }}
+                              readOnly={editingMatchPromptId !== prompt.id}
+                              min={64}
+                              max={8192}
+                              className={`glass-input w-full px-3 py-2 text-xs ${
+                                editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                              }`}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Temperature</label>
+                            <input
+                              type="number"
+                              value={prompt.temperature}
+                              onChange={(e) => {
+                                if (editingMatchPromptId === prompt.id) {
+                                  setMatchPrompts((prev) =>
+                                    prev.map((p) =>
+                                      p.id === prompt.id ? { ...p, temperature: Number(e.target.value) } : p
+                                    )
+                                  );
+                                }
+                              }}
+                              readOnly={editingMatchPromptId !== prompt.id}
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              className={`glass-input w-full px-3 py-2 text-xs ${
+                                editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-1.5">
+                          {prompt.variables.map((variable) => (
+                            <span
+                              key={variable}
+                              className="px-2 py-0.5 text-[10px] font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full"
+                            >
+                              {`{{${variable}}}`}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          {editingMatchPromptId === prompt.id ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveMatchPrompt(prompt)}
+                                className="px-3 py-1.5 bg-violet-500 text-white text-xs font-medium rounded-lg hover:bg-violet-600 transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingMatchPromptId(null);
+                                  setMatchPrompts(getMatchPrompts());
+                                }}
+                                className="px-3 py-1.5 text-xs text-secondary hover:text-primary hover:bg-white/50 dark:hover:bg-dark-hover/50 rounded-lg transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleEditMatchPrompt(prompt.id)}
+                              className="px-3 py-1.5 bg-violet-500 text-white text-xs font-medium rounded-lg hover:bg-violet-600 transition-colors"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleResetMatchPrompt(prompt.id)}
                             className="px-3 py-1.5 text-xs text-secondary hover:text-primary hover:bg-white/50 dark:hover:bg-dark-hover/50 rounded-lg transition-colors"
                           >
                             Reset to Default

@@ -72,7 +72,7 @@ function RefreshIcon({ spinning }: { spinning?: boolean }) {
   );
 }
 
-type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations';
+type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations' | 'account' | 'coe' | 'stakeholder' | 'countries' | 'seniorities' | 'aging' | 'hasJobDescription' | 'candidatesCount';
 type SortDirection = 'asc' | 'desc';
 
 const PIPELINE_ORDER: Record<PipelineStatus, number> = {
@@ -154,7 +154,7 @@ export default function SyncRecordTable({
       if (statusFilter === 'all') {
         matchesStatus = true;
       } else if (statusFilter === 'excluded') {
-        matchesStatus = !r.hasResume;
+        matchesStatus = source === 'open-positions' ? !r.hasJobDescription : !r.hasResume;
       } else if (statusFilter === 'extracted') {
         matchesStatus = r.pipelineStatus === 'extracted' || (r.pipelineStatus === 'synced' && r.failed);
       } else if (statusFilter === 'vectorized') {
@@ -164,7 +164,7 @@ export default function SyncRecordTable({
       }
       const q = searchQuery.toLowerCase();
       const displayName = r.name || (r.email ? r.email.split('@')[0] : '');
-      const matchesSearch = !q || displayName.toLowerCase().includes(q) || (r.email ?? '').toLowerCase().includes(q);
+      const matchesSearch = !q || displayName.toLowerCase().includes(q) || (r.email ?? '').toLowerCase().includes(q) || (r.account ?? '').toLowerCase().includes(q);
       return matchesStatus && matchesSearch;
     });
 
@@ -231,6 +231,38 @@ export default function SyncRecordTable({
           valA = a.syncDetail || a.reason || null;
           valB = b.syncDetail || b.reason || null;
           break;
+        case 'account':
+          valA = a.account;
+          valB = b.account;
+          break;
+        case 'coe':
+          valA = a.coe;
+          valB = b.coe;
+          break;
+        case 'stakeholder':
+          valA = a.stakeholder;
+          valB = b.stakeholder;
+          break;
+        case 'countries':
+          valA = a.countries;
+          valB = b.countries;
+          break;
+        case 'seniorities':
+          valA = a.seniorities;
+          valB = b.seniorities;
+          break;
+        case 'aging':
+          valA = a.aging ?? null;
+          valB = b.aging ?? null;
+          break;
+        case 'hasJobDescription':
+          valA = a.hasJobDescription ?? false;
+          valB = b.hasJobDescription ?? false;
+          break;
+        case 'candidatesCount':
+          valA = a.candidatesCount ?? 0;
+          valB = b.candidatesCount ?? 0;
+          break;
       }
 
       const result = compareValues(valA, valB);
@@ -276,7 +308,21 @@ export default function SyncRecordTable({
         { header: 'Reason', accessor: (r) => (r as unknown as SyncRecord).syncDetail || (r as unknown as SyncRecord).reason },
       ];
 
-      const columns = source === 'candidates' ? candidateColumns : employeeColumns;
+      const openPositionColumns: ColumnDef[] = [
+        { header: 'Pipeline Status', accessor: (r) => PIPELINE_LABELS[(r as unknown as SyncRecord).pipelineStatus] },
+        { header: 'Position', accessor: (r) => (r as unknown as SyncRecord).name || '' },
+        { header: 'Account', accessor: (r) => (r as unknown as SyncRecord).account },
+        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
+        { header: 'CoE', accessor: (r) => (r as unknown as SyncRecord).coe },
+        { header: 'Stakeholder', accessor: (r) => (r as unknown as SyncRecord).stakeholder },
+        { header: 'Countries', accessor: (r) => (r as unknown as SyncRecord).countries },
+        { header: 'Seniorities', accessor: (r) => (r as unknown as SyncRecord).seniorities },
+        { header: 'Has JD', accessor: (r) => (r as unknown as SyncRecord).hasJobDescription ?? false },
+        { header: 'Candidates', accessor: (r) => (r as unknown as SyncRecord).candidatesCount ?? 0 },
+        { header: 'Reason', accessor: (r) => (r as unknown as SyncRecord).syncDetail || (r as unknown as SyncRecord).reason },
+      ];
+
+      const columns = source === 'open-positions' ? openPositionColumns : source === 'candidates' ? candidateColumns : employeeColumns;
       const statusLabel = statusFilter === 'all' ? 'All' : statusFilter === 'excluded' ? 'Excluded' : PIPELINE_LABELS[statusFilter as PipelineStatus] ?? statusFilter;
       const filename = `${source}-${statusLabel}-${new Date().toISOString().slice(0, 10)}`;
       await exportToExcel(filtered as unknown as Record<string, unknown>[], columns, filename);
@@ -307,7 +353,7 @@ export default function SyncRecordTable({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or email..."
+              placeholder={source === 'open-positions' ? 'Search by position or account...' : 'Search by name or email...'}
               className="w-full pl-9 pr-4 py-2 bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl text-sm text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-400/60 dark:focus:border-accent-500/40 transition-all duration-200"
             />
           </div>
@@ -345,7 +391,18 @@ export default function SyncRecordTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-border/30">
-                {(source === 'candidates' ? [
+                {(source === 'open-positions' ? [
+                  { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
+                  { key: 'name' as SortKey, label: 'Position', className: '' },
+                  { key: 'account' as SortKey, label: 'Account', className: 'hidden md:table-cell' },
+                  { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
+                  { key: 'coe' as SortKey, label: 'CoE', className: 'hidden lg:table-cell' },
+                  { key: 'stakeholder' as SortKey, label: 'Stakeholder', className: 'hidden lg:table-cell' },
+                  { key: 'countries' as SortKey, label: 'Countries', className: 'hidden lg:table-cell' },
+                  { key: 'seniorities' as SortKey, label: 'Seniorities', className: 'hidden lg:table-cell' },
+                  { key: 'hasJobDescription' as SortKey, label: 'JD', className: '' },
+                  { key: 'candidatesCount' as SortKey, label: 'Candidates', className: '' },
+                ] : source === 'candidates' ? [
                   { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
                   { key: 'name' as SortKey, label: 'Candidate', className: '' },
                   { key: 'coeCertified' as SortKey, label: 'COE Certified', className: 'hidden md:table-cell' },
@@ -419,7 +476,20 @@ export default function SyncRecordTable({
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  {source === 'candidates' ? (
+                  {source === 'open-positions' ? (
+                    <>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.account || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.coe || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.stakeholder || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.countries || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniorities || '—'}</td>
+                      <td className="px-4 py-3">
+                        {record.hasJobDescription ? <CheckIcon /> : <XIcon />}
+                      </td>
+                      <td className="px-4 py-3 text-secondary">{record.candidatesCount ?? 0}</td>
+                    </>
+                  ) : source === 'candidates' ? (
                     <>
                       <td className="hidden md:table-cell px-4 py-3">
                         {record.coeCertified ? <CheckIcon /> : <XIcon />}
@@ -458,18 +528,20 @@ export default function SyncRecordTable({
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
                     </>
                   )}
-                  <td className="px-4 py-3">
-                    {record.hasResume ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <CheckIcon />
-                        {record.resumeFilename && (
-                          <span className="text-xs text-accent-500 truncate max-w-[120px]" title={record.resumeFilename}>
-                            {record.resumeFilename}
-                          </span>
-                        )}
-                      </span>
-                    ) : <XIcon />}
-                  </td>
+                  {source !== 'open-positions' && (
+                    <td className="px-4 py-3">
+                      {record.hasResume ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <CheckIcon />
+                          {record.resumeFilename && (
+                            <span className="text-xs text-accent-500 truncate max-w-[120px]" title={record.resumeFilename}>
+                              {record.resumeFilename}
+                            </span>
+                          )}
+                        </span>
+                      ) : <XIcon />}
+                    </td>
+                  )}
                   <td className="hidden md:table-cell px-4 py-3">
                     {extractingUpstreamId === record.upstreamId ? (
                       <SpinnerIcon color="text-blue-500" />

@@ -117,6 +117,11 @@ export default function CandidateCard({
               {line.value}
             </span>
           ))}
+          {candidate.lastStatusUpdate && (
+            <span className="text-[10px] text-muted">
+              Updated: {new Date(candidate.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+            </span>
+          )}
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${typeBadge}`}>
             {candidate.type}
           </span>

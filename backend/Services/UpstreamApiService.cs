@@ -69,6 +69,7 @@ public class UpstreamApiService : IUpstreamApiService
         {
             Skip = 0,
             Take = 100,
+            Counter = 3,
             Columns = BuildRateColumns()
         });
         var response = await _httpClient.SendAsync(request);
@@ -169,7 +170,7 @@ public class UpstreamApiService : IUpstreamApiService
 
     public async Task<(List<OpenPositionListItem> Items, int TotalRecords)> GetOpenPositionsPagedAsync(string token, int skip, int take)
     {
-        var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}op/paged/false", token);
+        var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}op/paged/true/1/", token);
         request.Content = JsonContent.Create(new PagedRequest
         {
             Skip = skip,
@@ -180,41 +181,55 @@ public class UpstreamApiService : IUpstreamApiService
         response.EnsureSuccessStatusCode();
         var paged = await response.Content.ReadFromJsonAsync<PagedResponse>() ?? new();
 
-        var items = paged.Payload.Select(row => new OpenPositionListItem
+        var items = paged.Payload.Select((row, idx) =>
         {
-            Id = GetInt(row, 1),
-            Account = GetString(row, 2),
-            Coe = GetString(row, 4),
-            Practice = GetString(row, 5),
-            Stakeholder = GetString(row, 6),
-            MainSkill = GetString(row, 7),
-            Status = GetString(row, 8),
-            Countries = GetString(row, 9),
-            Aging = row.Length > 13 ? GetInt(row, 13) : 0,
-            Seniorities = row.Length > 14 ? GetString(row, 14) : string.Empty,
-            AvailableRange = row.Length > 15 ? GetString(row, 15) : string.Empty,
-            Created = row.Length > 16 ? GetString(row, 16) : string.Empty,
-            ReadyDate = row.Length > 17 ? GetString(row, 17) : string.Empty,
-            LastModification = row.Length > 18 ? GetString(row, 18) : string.Empty,
-            Sourcing = row.Length > 19 ? GetString(row, 19) : string.Empty,
-            Replacement = row.Length > 20 && GetBool(row, 20),
+            if (idx == 0)
+            {
+                Console.WriteLine($"[OP Paged] Row length={row.Length}");
+                for (int i = 0; i < Math.Min(row.Length, 10); i++)
+                    Console.WriteLine($"[OP Paged] Row[{i}] kind={row[i].ValueKind} val={row[i]}");
+            }
+            return new OpenPositionListItem
+            {
+                Id = GetInt(row, 1),
+                Account = GetString(row, 2),
+                Coe = GetString(row, 4),
+                Practice = GetString(row, 5),
+                Stakeholder = GetString(row, 6),
+                MainSkill = GetString(row, 7),
+                Status = GetString(row, 8),
+                Countries = GetString(row, 9),
+                Aging = row.Length > 13 ? GetInt(row, 13) : 0,
+                Seniorities = row.Length > 14 ? GetString(row, 14) : string.Empty,
+                AvailableRange = row.Length > 15 ? GetString(row, 15) : string.Empty,
+                Created = row.Length > 16 ? GetString(row, 16) : string.Empty,
+                ReadyDate = row.Length > 17 ? GetString(row, 17) : string.Empty,
+                LastModification = row.Length > 18 ? GetString(row, 18) : string.Empty,
+                Sourcing = row.Length > 19 ? GetString(row, 19) : string.Empty,
+                Replacement = row.Length > 20 && GetBool(row, 20),
+            };
         }).ToList();
 
         return (items, paged.FilteredRecordCount);
     }
 
-    public async Task<OpenPositionDetail> GetOpenPositionDetailAsync(string token, int id)
+    public async Task<OpenPositionDetail?> GetOpenPositionDetailAsync(string token, int id)
     {
         var request = CreateAuthorizedRequest(HttpMethod.Get, $"{_baseUrl}op/{id}", token);
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Detail fetch for OP {Id} returned {StatusCode} — skipping detail", id, (int)response.StatusCode);
+            return null;
+        }
+
         var json = await response.Content.ReadAsStringAsync();
         var options = new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true,
-            NumberHandling = JsonNumberHandling.AllowReadingFromString
+            PropertyNameCaseInsensitive = true
         };
-        return JsonSerializer.Deserialize<OpenPositionDetail>(json, options) ?? new();
+        return JsonSerializer.Deserialize<OpenPositionDetail>(json, options);
     }
 
     public async Task<List<PresentedCandidateItem>> GetPresentedCandidatesAsync(string token, int positionId)
@@ -227,7 +242,13 @@ public class UpstreamApiService : IUpstreamApiService
             Columns = BuildPresentedCandidateColumns()
         });
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Candidates fetch for OP {Id} returned {StatusCode} — returning empty list", positionId, (int)response.StatusCode);
+            return new List<PresentedCandidateItem>();
+        }
+
         var paged = await response.Content.ReadFromJsonAsync<PagedResponse>() ?? new();
 
         return paged.Payload.Select(row => new PresentedCandidateItem
@@ -323,10 +344,10 @@ public class UpstreamApiService : IUpstreamApiService
     {
         return new List<ColumnDefinition>
         {
-            new() { Name = "AccountName", Label = "Account", Searchable = true },
-            new() { Name = "ProjectName", Label = "Project", Searchable = true },
-            new() { Name = "Rate", Label = "Rate", DataType = "numeric", Searchable = false },
-            new() { Name = "StartDate", Label = "Start Date", DataType = "datetimeutc", Searchable = false },
+            new() { Name = "Account", Label = "Account", Searchable = true, FilterOperator = "None" },
+            new() { Name = "WorkOrderProjectName", Label = "Project Name", Searchable = true, FilterOperator = "None" },
+            new() { Name = "Rate", Label = "Rate", DataType = "numeric", Searchable = true, FilterOperator = "None" },
+            new() { Name = "StartDate", Label = "Start Date", DataType = "date", Searchable = true, SortDirection = "Descending", SortOrder = 1, FilterOperator = "None" },
         };
     }
 

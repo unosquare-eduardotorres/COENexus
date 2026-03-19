@@ -113,6 +113,13 @@ export default function DataSyncPage() {
   );
   const [employeeRecords, setEmployeeRecords] = useState<SyncRecord[]>([]);
   const [candidateRecords, setCandidateRecords] = useState<SyncRecord[]>([]);
+  const [openPositionProgress, setOpenPositionProgress] = useState<SyncProgress>(() =>
+    restoreProgress(
+      safeParseJSON(localStorage.getItem('datasync-openposition-progress'), null),
+      'open-positions'
+    )
+  );
+  const [openPositionRecords, setOpenPositionRecords] = useState<SyncRecord[]>([]);
 
   const [employeeExtractionProgress, setEmployeeExtractionProgress] = useState<ProcessingProgress>(() =>
     initialProcessingProgress('employees')
@@ -120,11 +127,17 @@ export default function DataSyncPage() {
   const [candidateExtractionProgress, setCandidateExtractionProgress] = useState<ProcessingProgress>(() =>
     initialProcessingProgress('candidates')
   );
+  const [openPositionExtractionProgress, setOpenPositionExtractionProgress] = useState<ProcessingProgress>(() =>
+    initialProcessingProgress('open-positions')
+  );
   const [employeeVectorizationProgress, setEmployeeVectorizationProgress] = useState<ProcessingProgress>(() =>
     initialProcessingProgress('employees')
   );
   const [candidateVectorizationProgress, setCandidateVectorizationProgress] = useState<ProcessingProgress>(() =>
     initialProcessingProgress('candidates')
+  );
+  const [openPositionVectorizationProgress, setOpenPositionVectorizationProgress] = useState<ProcessingProgress>(() =>
+    initialProcessingProgress('open-positions')
   );
 
   const [refreshingId, setRefreshingId] = useState<number | undefined>();
@@ -133,6 +146,7 @@ export default function DataSyncPage() {
   const [vectorizingUpstreamId, setVectorizingUpstreamId] = useState<number | undefined>();
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  const [isLoadingOpenPositions, setIsLoadingOpenPositions] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number | null>(() =>
     safeParseJSON(localStorage.getItem('datasync-candidate-year'), null)
@@ -142,8 +156,8 @@ export default function DataSyncPage() {
   const extractionAbortRef = useRef<AbortController | null>(null);
   const vectorizationAbortRef = useRef<AbortController | null>(null);
 
-  const isSyncing = employeeProgress.status === 'syncing' || candidateProgress.status === 'syncing';
-  const isLoadingRecords = activeTab === 'employees' ? isLoadingEmployees : isLoadingCandidates;
+  const isSyncing = employeeProgress.status === 'syncing' || candidateProgress.status === 'syncing' || openPositionProgress.status === 'syncing';
+  const isLoadingRecords = activeTab === 'employees' ? isLoadingEmployees : activeTab === 'candidates' ? isLoadingCandidates : isLoadingOpenPositions;
 
   const minutesRemaining = useMemo(() => {
     const expiresAt = getTokenExpiration(token);
@@ -152,9 +166,9 @@ export default function DataSyncPage() {
   }, [token, showExpirationWarning]);
 
   const loadRecordsFromDb = useCallback(async (source: SyncSourceType, reconcileStats = false, year?: number | null) => {
-    const setLoading = source === 'employees' ? setIsLoadingEmployees : setIsLoadingCandidates;
-    const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
-    const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
+    const setLoading = source === 'employees' ? setIsLoadingEmployees : source === 'candidates' ? setIsLoadingCandidates : setIsLoadingOpenPositions;
+    const setRecords = source === 'employees' ? setEmployeeRecords : source === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
+    const setProgress = source === 'employees' ? setEmployeeProgress : source === 'candidates' ? setCandidateProgress : setOpenPositionProgress;
     try {
       setLoading(true);
       const yearParam = source === 'candidates' && year != null ? year : undefined;
@@ -173,6 +187,7 @@ export default function DataSyncPage() {
   useEffect(() => {
     loadRecordsFromDb('employees', true);
     loadRecordsFromDb('candidates', true, selectedYear);
+    loadRecordsFromDb('open-positions', true);
   }, [loadRecordsFromDb]);
 
   const handleYearChange = useCallback((year: number) => {
@@ -205,6 +220,10 @@ export default function DataSyncPage() {
   useEffect(() => {
     localStorage.setItem('datasync-candidate-progress', JSON.stringify(candidateProgress));
   }, [candidateProgress]);
+
+  useEffect(() => {
+    localStorage.setItem('datasync-openposition-progress', JSON.stringify(openPositionProgress));
+  }, [openPositionProgress]);
 
   useEffect(() => {
     if (selectedYear != null) {
@@ -258,8 +277,8 @@ export default function DataSyncPage() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
-    const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
+    const setProgress = source === 'employees' ? setEmployeeProgress : source === 'candidates' ? setCandidateProgress : setOpenPositionProgress;
+    const setRecords = source === 'employees' ? setEmployeeRecords : source === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
 
     if (!isResume) {
       setRecords([]);
@@ -314,8 +333,8 @@ export default function DataSyncPage() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
-    const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
+    const setProgress = source === 'employees' ? setEmployeeProgress : source === 'candidates' ? setCandidateProgress : setOpenPositionProgress;
+    const setRecords = source === 'employees' ? setEmployeeRecords : source === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
 
     setProgress((prev) => ({ ...prev, status: 'syncing' }));
 
@@ -341,8 +360,8 @@ export default function DataSyncPage() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
-    const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
+    const setProgress = source === 'employees' ? setEmployeeProgress : source === 'candidates' ? setCandidateProgress : setOpenPositionProgress;
+    const setRecords = source === 'employees' ? setEmployeeRecords : source === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
 
     setProgress((prev) => ({ ...prev, status: 'syncing' }));
 
@@ -364,12 +383,12 @@ export default function DataSyncPage() {
   }, [activeTab, token, loadRecordsFromDb, selectedYear]);
 
   const handleResumeSync = useCallback(() => {
-    const currentProgress = activeTab === 'employees' ? employeeProgress : candidateProgress;
+    const currentProgress = activeTab === 'employees' ? employeeProgress : activeTab === 'candidates' ? candidateProgress : openPositionProgress;
     doStartSync(undefined, true, currentProgress.fetchedRecords);
-  }, [doStartSync, activeTab, employeeProgress, candidateProgress]);
+  }, [doStartSync, activeTab, employeeProgress, candidateProgress, openPositionProgress]);
 
   const handleRecordExtracted = useCallback((processed: ProcessingRecord) => {
-    const setRecords = activeTab === 'employees' ? setEmployeeRecords : setCandidateRecords;
+    const setRecords = activeTab === 'employees' ? setEmployeeRecords : activeTab === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
 
     if (processed.status === 'completed') {
       setRecords((prev) =>
@@ -391,7 +410,7 @@ export default function DataSyncPage() {
   }, [activeTab]);
 
   const handleRecordVectorized = useCallback((processed: ProcessingRecord) => {
-    const setRecords = activeTab === 'employees' ? setEmployeeRecords : setCandidateRecords;
+    const setRecords = activeTab === 'employees' ? setEmployeeRecords : activeTab === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
 
     if (processed.status === 'completed') {
       setRecords((prev) =>
@@ -418,7 +437,7 @@ export default function DataSyncPage() {
     const controller = new AbortController();
     extractionAbortRef.current = controller;
 
-    const setProgress = source === 'employees' ? setEmployeeExtractionProgress : setCandidateExtractionProgress;
+    const setProgress = source === 'employees' ? setEmployeeExtractionProgress : source === 'candidates' ? setCandidateExtractionProgress : setOpenPositionExtractionProgress;
 
     setProgress({
       source,
@@ -452,7 +471,7 @@ export default function DataSyncPage() {
     const controller = new AbortController();
     vectorizationAbortRef.current = controller;
 
-    const setProgress = source === 'employees' ? setEmployeeVectorizationProgress : setCandidateVectorizationProgress;
+    const setProgress = source === 'employees' ? setEmployeeVectorizationProgress : source === 'candidates' ? setCandidateVectorizationProgress : setOpenPositionVectorizationProgress;
 
     setProgress({
       source,
@@ -483,7 +502,7 @@ export default function DataSyncPage() {
     const source = activeTab;
     try {
       await resumeProcessingService.retryFailed(source);
-      const setExtrProg = source === 'employees' ? setEmployeeExtractionProgress : setCandidateExtractionProgress;
+      const setExtrProg = source === 'employees' ? setEmployeeExtractionProgress : source === 'candidates' ? setCandidateExtractionProgress : setOpenPositionExtractionProgress;
       setExtrProg(initialProcessingProgress(source));
       const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
       await loadRecordsFromDb(source, true, yearParam);
@@ -497,7 +516,7 @@ export default function DataSyncPage() {
     try {
       await resumeProcessingService.retryFailedVectorization(source);
       const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
-      const setVecProg = source === 'employees' ? setEmployeeVectorizationProgress : setCandidateVectorizationProgress;
+      const setVecProg = source === 'employees' ? setEmployeeVectorizationProgress : source === 'candidates' ? setCandidateVectorizationProgress : setOpenPositionVectorizationProgress;
       setVecProg(initialProcessingProgress(source));
       await loadRecordsFromDb(source, true, yearParam);
     } catch (err) {
@@ -512,10 +531,10 @@ export default function DataSyncPage() {
       const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
       await dataSyncService.clearRecords(source, yearParam);
 
-      const setRecords = source === 'employees' ? setEmployeeRecords : setCandidateRecords;
-      const setProgress = source === 'employees' ? setEmployeeProgress : setCandidateProgress;
-      const setExtrProg = source === 'employees' ? setEmployeeExtractionProgress : setCandidateExtractionProgress;
-      const setVecProg = source === 'employees' ? setEmployeeVectorizationProgress : setCandidateVectorizationProgress;
+      const setRecords = source === 'employees' ? setEmployeeRecords : source === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
+      const setProgress = source === 'employees' ? setEmployeeProgress : source === 'candidates' ? setCandidateProgress : setOpenPositionProgress;
+      const setExtrProg = source === 'employees' ? setEmployeeExtractionProgress : source === 'candidates' ? setCandidateExtractionProgress : setOpenPositionExtractionProgress;
+      const setVecProg = source === 'employees' ? setEmployeeVectorizationProgress : source === 'candidates' ? setCandidateVectorizationProgress : setOpenPositionVectorizationProgress;
 
       setRecords([]);
       const freshProgress = initialProgress(source);
@@ -523,8 +542,9 @@ export default function DataSyncPage() {
       setExtrProg(initialProcessingProgress(source));
       setVecProg(initialProcessingProgress(source));
 
+      const storageKey = source === 'employees' ? 'employee' : source === 'candidates' ? 'candidate' : 'openposition';
       localStorage.setItem(
-        `datasync-${source === 'employees' ? 'employee' : 'candidate'}-progress`,
+        `datasync-${storageKey}-progress`,
         JSON.stringify(freshProgress)
       );
     } finally {
@@ -536,7 +556,7 @@ export default function DataSyncPage() {
     setRefreshingId(upstreamId);
     try {
       const updated = await dataSyncService.syncSingleRecord(activeTab, token, upstreamId);
-      const setRecords = activeTab === 'employees' ? setEmployeeRecords : setCandidateRecords;
+      const setRecords = activeTab === 'employees' ? setEmployeeRecords : activeTab === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
       setRecords((prev) => prev.map((r) => r.upstreamId === upstreamId ? { ...r, ...updated } : r));
     } finally {
       setRefreshingId(undefined);
@@ -548,7 +568,7 @@ export default function DataSyncPage() {
     try {
       const result = await resumeProcessingService.vectorizeSingle(activeTab, upstreamId);
       if (result.status === 'completed') {
-        const setRecords = activeTab === 'employees' ? setEmployeeRecords : setCandidateRecords;
+        const setRecords = activeTab === 'employees' ? setEmployeeRecords : activeTab === 'candidates' ? setCandidateRecords : setOpenPositionRecords;
         setRecords((prev) =>
           prev.map((r) => r.upstreamId === upstreamId ? { ...r, pipelineStatus: 'vectorized' as const, failed: false } : r)
         );
@@ -558,10 +578,10 @@ export default function DataSyncPage() {
     }
   }, [activeTab, token]);
 
-  const activeProgress = activeTab === 'employees' ? employeeProgress : candidateProgress;
-  const activeRecords = activeTab === 'employees' ? employeeRecords : candidateRecords;
-  const activeExtractionProgress = activeTab === 'employees' ? employeeExtractionProgress : candidateExtractionProgress;
-  const activeVectorizationProgress = activeTab === 'employees' ? employeeVectorizationProgress : candidateVectorizationProgress;
+  const activeProgress = activeTab === 'employees' ? employeeProgress : activeTab === 'candidates' ? candidateProgress : openPositionProgress;
+  const activeRecords = activeTab === 'employees' ? employeeRecords : activeTab === 'candidates' ? candidateRecords : openPositionRecords;
+  const activeExtractionProgress = activeTab === 'employees' ? employeeExtractionProgress : activeTab === 'candidates' ? candidateExtractionProgress : openPositionExtractionProgress;
+  const activeVectorizationProgress = activeTab === 'employees' ? employeeVectorizationProgress : activeTab === 'candidates' ? candidateVectorizationProgress : openPositionVectorizationProgress;
 
   return (
     <div className="min-h-screen py-12">
@@ -573,7 +593,7 @@ export default function DataSyncPage() {
           </div>
           <h1 className="text-3xl font-bold text-primary tracking-tight">Data Sync</h1>
           <p className="text-base text-secondary mt-3 max-w-xl mx-auto">
-            Import employee & candidate data from source systems
+            Import employee, candidate & open position data from source systems
           </p>
         </div>
 
@@ -613,6 +633,16 @@ export default function DataSyncPage() {
                   }`}
                 >
                   Candidates
+                </button>
+                <button
+                  onClick={() => setActiveTab('open-positions')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    activeTab === 'open-positions'
+                      ? 'bg-white dark:bg-dark-hover shadow-sm text-primary'
+                      : 'text-muted hover:text-secondary'
+                  }`}
+                >
+                  Open Positions
                 </button>
               </div>
 

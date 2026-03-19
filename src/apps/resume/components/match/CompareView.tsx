@@ -69,7 +69,7 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
               ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
               : 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
 
-          const matchCount = candidate.skills.filter((s) => s.status === 'match').length;
+          const metCount = candidate.skills.filter((s) => s.status === 'met' || s.status === 'surpassed').length;
           const partialCount = candidate.skills.filter((s) => s.status === 'partial').length;
           const missingCount = candidate.skills.filter((s) => s.status === 'missing').length;
 
@@ -113,7 +113,7 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
                   <div key={skill.name} className="flex items-center gap-2">
                     <div
                       className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        skill.status === 'match'
+                        skill.status === 'met' || skill.status === 'surpassed'
                           ? 'bg-emerald-500'
                           : skill.status === 'partial'
                             ? 'bg-amber-500'
@@ -128,7 +128,7 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
 
               <div className="flex items-center gap-2 pt-2 border-t border-gray-200/20 dark:border-dark-border/20">
                 <span className="text-xs font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded">
-                  {matchCount} match
+                  {metCount} met
                 </span>
                 <span className="text-xs font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
                   {partialCount} partial

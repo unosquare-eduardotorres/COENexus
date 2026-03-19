@@ -653,7 +653,9 @@ public class SyncOrchestrator : ISyncOrchestrator
         EmployeeDetail basicEmployee)
     {
         var contract = contracts.FirstOrDefault();
-        var rate = rates.FirstOrDefault();
+        var rate = rates
+            .OrderByDescending(r => DateTime.TryParse(r.StartDate, out var d) ? d : DateTime.MinValue)
+            .FirstOrDefault();
         var resumeNote = notes
             .Where(n => n.NoteTypeName == "Resume"
                 && !string.IsNullOrEmpty(n.Filename)
@@ -671,8 +673,16 @@ public class SyncOrchestrator : ISyncOrchestrator
             ? countries.GetValueOrDefault(detail.CountryId, basicEmployee.OfficeName)
             : basicEmployee.OfficeName;
 
-        var isBench = string.IsNullOrEmpty(detail.AccountName) ||
-            string.Equals(detail.AccountName, "Bench", StringComparison.OrdinalIgnoreCase);
+        var isBench = rate != null
+            ? string.Equals(rate.ProjectName, "Unosquare - Bench", StringComparison.OrdinalIgnoreCase)
+            : string.IsNullOrEmpty(detail.AccountName) ||
+              string.Equals(detail.AccountName, "Bench", StringComparison.OrdinalIgnoreCase);
+
+        if (isBench || rates.Count > 0)
+            _logger.LogInformation(
+                "[BENCH-TRACE] Employee {Id} ({Name}): rateCount={RateCount}, mostRecentProject={Project}, isBench={IsBench}",
+                detail.UserId, detail.FullName, rates.Count,
+                rate?.ProjectName ?? "(no rates)", isBench);
 
         var missingFields = new List<string>();
         if (string.IsNullOrEmpty(detail.FullName)) missingFields.Add("FullName");
@@ -1021,7 +1031,7 @@ public class SyncOrchestrator : ISyncOrchestrator
         var candidates = await LoadOrEmpty("PresentedCandidates", () => _upstreamApi.GetPresentedCandidatesAsync(token, upstreamId));
 
         var pagedFallback = new OpenPositionListItem { Id = upstreamId };
-        var entity = BuildOpenPositionEntity(pagedFallback, detail, candidates);
+        var entity = BuildOpenPositionEntity(pagedFallback, detail ?? new OpenPositionDetail(), candidates);
         var (_, syncDetail) = await UpsertOpenPositionAsync(entity, candidates, ct);
 
         return MapOpenPositionToDto(entity, syncDetail, candidates.Count);
@@ -1120,22 +1130,22 @@ public class SyncOrchestrator : ISyncOrchestrator
                             if (result.FetchError != null)
                                 throw result.FetchError;
 
-                            entity = BuildOpenPositionEntity(result.Position, result.Detail!, result.Candidates!);
-                            (_, syncDetail) = await UpsertOpenPositionAsync(entity, result.Candidates!, cancellationToken);
+                            entity = BuildOpenPositionEntity(result.Position, result.Detail ?? new OpenPositionDetail(), result.Candidates ?? new List<PresentedCandidateItem>());
+                            (_, syncDetail) = await UpsertOpenPositionAsync(entity, result.Candidates ?? new List<PresentedCandidateItem>(), cancellationToken);
                         }
                         catch (Exception ex)
                         {
                             entity = new SyncedOpenPosition
                             {
                                 UpstreamId = result.Position.Id,
-                                Account = result.Position.Account,
-                                Coe = result.Position.Coe,
-                                Practice = result.Position.Practice,
-                                Stakeholder = result.Position.Stakeholder,
-                                MainSkill = result.Position.MainSkill,
-                                Countries = result.Position.Countries,
-                                Seniorities = result.Position.Seniorities,
-                                AvailableRange = result.Position.AvailableRange,
+                                Account = result.Position.Account ?? string.Empty,
+                                Coe = result.Position.Coe ?? string.Empty,
+                                Practice = result.Position.Practice ?? string.Empty,
+                                Stakeholder = result.Position.Stakeholder ?? string.Empty,
+                                MainSkill = result.Position.MainSkill ?? string.Empty,
+                                Countries = result.Position.Countries ?? string.Empty,
+                                Seniorities = result.Position.Seniorities ?? string.Empty,
+                                AvailableRange = result.Position.AvailableRange ?? string.Empty,
                                 Status = "not-processed",
                                 StatusReason = ex.Message,
                                 SyncedAt = DateTime.UtcNow
@@ -1165,6 +1175,45 @@ public class SyncOrchestrator : ISyncOrchestrator
                         _logger.LogError(ex, "Failed to sync open position {UpstreamId} ({Account}) — skipping",
                             result.Position.Id, result.Position.Account);
                         fatalError = ex;
+
+                        try
+                        {
+                            _dbContext.ChangeTracker.Clear();
+
+                            var fallback = await _dbContext.SyncedOpenPositions
+                                .FirstOrDefaultAsync(e => e.UpstreamId == result.Position.Id, cancellationToken);
+
+                            if (fallback != null)
+                            {
+                                fallback.Status = "not-processed";
+                                fallback.StatusReason = ex.Message;
+                                fallback.SyncedAt = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                _dbContext.SyncedOpenPositions.Add(new SyncedOpenPosition
+                                {
+                                    UpstreamId = result.Position.Id,
+                                    Account = result.Position.Account ?? string.Empty,
+                                    Coe = result.Position.Coe ?? string.Empty,
+                                    Practice = result.Position.Practice ?? string.Empty,
+                                    Stakeholder = result.Position.Stakeholder ?? string.Empty,
+                                    MainSkill = result.Position.MainSkill ?? string.Empty,
+                                    Countries = result.Position.Countries ?? string.Empty,
+                                    Seniorities = result.Position.Seniorities ?? string.Empty,
+                                    AvailableRange = result.Position.AvailableRange ?? string.Empty,
+                                    Status = "not-processed",
+                                    StatusReason = ex.Message,
+                                    SyncedAt = DateTime.UtcNow
+                                });
+                            }
+
+                            await _dbContext.SaveChangesAsync(cancellationToken);
+                        }
+                        catch (Exception persistEx)
+                        {
+                            _logger.LogError(persistEx, "Last-resort persist also failed for OP {UpstreamId}", result.Position.Id);
+                        }
                     }
 
                     var candidatesCount = result.Candidates?.Count ?? 0;
@@ -1178,7 +1227,7 @@ public class SyncOrchestrator : ISyncOrchestrator
                             Id = $"op-{result.Position.Id}",
                             Source = "open-positions",
                             Status = "not-processed",
-                            Name = $"{result.Position.Account} - {result.Position.MainSkill}",
+                            Name = $"[{result.Position.Id}] {result.Position.Account} - {result.Position.MainSkill}",
                             Email = string.Empty,
                             MainSkill = result.Position.MainSkill,
                             Account = result.Position.Account,
@@ -1200,7 +1249,7 @@ public class SyncOrchestrator : ISyncOrchestrator
                             NotProcessedCount = notProcessedCount,
                             UpdatedCount = updatedCount,
                             UnchangedCount = unchangedCount,
-                            CurrentRecord = $"{result.Position.Account} - {result.Position.MainSkill}",
+                            CurrentRecord = $"[{result.Position.Id}] {result.Position.Account} - {result.Position.MainSkill}",
                             Status = "syncing"
                         });
 
@@ -1232,7 +1281,7 @@ public class SyncOrchestrator : ISyncOrchestrator
                         NotProcessedCount = notProcessedCount,
                         UpdatedCount = updatedCount,
                         UnchangedCount = unchangedCount,
-                        CurrentRecord = $"{entity.Account} - {entity.MainSkill}",
+                        CurrentRecord = $"[{entity.UpstreamId}] {entity.Account} - {entity.MainSkill}",
                         Status = "syncing"
                     });
 
@@ -1274,23 +1323,23 @@ public class SyncOrchestrator : ISyncOrchestrator
         return new SyncedOpenPosition
         {
             UpstreamId = paged.Id,
-            Account = paged.Account,
-            Coe = paged.Coe,
-            Practice = paged.Practice,
-            Stakeholder = paged.Stakeholder,
-            MainSkill = !string.IsNullOrEmpty(detail.MainSkillName) ? detail.MainSkillName : paged.MainSkill,
-            Countries = paged.Countries,
-            Seniorities = paged.Seniorities,
-            AvailableRange = paged.AvailableRange,
-            AccountOverview = detail.CompanyName,
-            JobDescription = detail.JobDescription,
-            JobTitle = detail.JobTitle,
+            Account = !string.IsNullOrEmpty(paged.Account) ? paged.Account : detail.CompanyName ?? string.Empty,
+            Coe = paged.Coe ?? string.Empty,
+            Practice = paged.Practice ?? string.Empty,
+            Stakeholder = paged.Stakeholder ?? string.Empty,
+            MainSkill = !string.IsNullOrEmpty(detail.MainSkillName) ? detail.MainSkillName : paged.MainSkill ?? string.Empty,
+            Countries = paged.Countries ?? string.Empty,
+            Seniorities = paged.Seniorities ?? string.Empty,
+            AvailableRange = paged.AvailableRange ?? string.Empty,
+            AccountOverview = detail.CompanyName ?? string.Empty,
+            JobDescription = detail.JobDescription ?? string.Empty,
+            JobTitle = detail.JobTitle ?? string.Empty,
             PositionStatus = "Active",
             Aging = paged.Aging,
             Created = paged.Created,
             ReadyDate = paged.ReadyDate,
             LastModification = paged.LastModification,
-            Sourcing = paged.Sourcing,
+            Sourcing = paged.Sourcing ?? string.Empty,
             Replacement = paged.Replacement,
             Status = recordStatus,
             StatusReason = statusReason,
@@ -1407,7 +1456,7 @@ public class SyncOrchestrator : ISyncOrchestrator
             MainSkill = c.Skills,
             IsEmployee = c.IsEmployee,
             CandidateStatus = c.CandidateStatusName,
-            Rate = c.Rate,
+            Rate = c.Rate ?? 0m,
             StartDate = c.StartDate,
             SyncedAt = DateTime.UtcNow
         }).ToList();
@@ -1421,7 +1470,7 @@ public class SyncOrchestrator : ISyncOrchestrator
         Id = $"op-{entity.UpstreamId}",
         Source = "open-positions",
         Status = entity.Status,
-        Name = $"{entity.Account} - {entity.MainSkill}",
+        Name = $"[{entity.UpstreamId}] {entity.Account} - {entity.MainSkill}",
         Email = string.Empty,
         MainSkill = entity.MainSkill,
         Account = entity.Account,

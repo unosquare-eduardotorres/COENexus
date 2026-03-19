@@ -294,7 +294,20 @@ export interface RefinementPrompt {
   updatedAt: string;
 }
 
-export type DataSource = 'all-employees' | 'candidates' | 'all-sources';
+export interface MatchEnginePromptConfig {
+  id: string;
+  key: 'haiku-triage' | 'opus-analysis';
+  name: string;
+  description: string;
+  promptTemplate: string;
+  variables: string[];
+  maxTokens: number;
+  temperature: number;
+  isDefault: boolean;
+  updatedAt: string;
+}
+
+export type DataSource = 'bench' | 'all-employees' | 'candidates' | 'all-sources';
 
 export type Seniority = 'Junior' | 'Mid' | 'Senior' | 'Lead' | 'Architect' | 'Trainee' | 'Not Specified';
 
@@ -321,7 +334,8 @@ export interface FilterOptions {
 
 export type FilterField =
   | 'mainSkill' | 'country' | 'seniority'
-  | 'currentSalary' | 'salaryExpectation' | 'status';
+  | 'currentSalary' | 'salaryExpectation' | 'status' | 'lastStatusUpdate'
+  | 'coeCertified';
 
 export type FilterOperator =
   | 'equals' | 'notEquals'
@@ -334,7 +348,7 @@ export interface FilterRule {
   id: string;
   field: FilterField;
   operator: FilterOperator;
-  value: string | number;
+  value: string | number | boolean;
   currency?: string;
   connector: FilterConnector;
 }
@@ -344,7 +358,8 @@ export interface AdvancedConstraints {
   employeeFilters: FilterRule[];
 }
 
-export type SkillMatchStatus = 'match' | 'partial' | 'missing';
+export type SkillMatchStatus = 'met' | 'surpassed' | 'partial' | 'missing';
+export type SkillPriority = 'required' | 'nice-to-have' | 'optional';
 export type GapSeverity = 'low' | 'medium' | 'high';
 export type CandidateType = 'employee' | 'candidate';
 
@@ -352,6 +367,13 @@ export interface SkillMatch {
   name: string;
   status: SkillMatchStatus;
   years: number;
+  priority?: SkillPriority;
+}
+
+export interface NonTechSkill {
+  label: string;
+  priority: SkillPriority;
+  status: SkillMatchStatus;
 }
 
 export interface DomainExperience {
@@ -389,8 +411,8 @@ export interface MatchCandidate {
   skills: SkillMatch[];
   domains: DomainExperience[];
   gaps: GapAnalysis[];
-  leadership: string[];
-  softSkills: string[];
+  leadership: string[] | NonTechSkill[];
+  softSkills: string[] | NonTechSkill[];
   seniority: Seniority;
   expectedRate: number;
   currency: Currency;
@@ -403,6 +425,7 @@ export interface MatchCandidate {
   analysis?: SonnetAnalysis;
   salaryExpectations?: number;
   salaryExpectationsCurrency?: string;
+  lastStatusUpdate?: string;
 }
 
 export interface CandidateTiming {
@@ -430,9 +453,9 @@ export interface SearchProgress {
   stage: string;
 }
 
-export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op';
+export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op' | 'bench-burn';
 
-export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive';
+export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn';
 
 export type JdSource = 'position' | 'custom';
 
@@ -456,7 +479,7 @@ export interface BatchResult {
 
 export type BatchStepKey = 'flow' | 'upload' | 'configure' | 'processing' | 'results';
 
-export type SyncSourceType = 'employees' | 'candidates';
+export type SyncSourceType = 'employees' | 'candidates' | 'open-positions';
 export type PipelineStatus = 'not-processed' | 'incomplete' | 'synced' | 'extracted' | 'vectorized';
 
 export interface SyncRecord {
@@ -489,6 +512,17 @@ export interface SyncRecord {
   lastStatusUpdate?: string;
   salaryExpectations?: number;
   salaryExpectationsCurrency?: string;
+  account?: string;
+  coe?: string;
+  practice?: string;
+  stakeholder?: string;
+  countries?: string;
+  seniorities?: string;
+  availableRange?: string;
+  positionStatus?: string;
+  aging?: number;
+  hasJobDescription?: boolean;
+  candidatesCount?: number;
 }
 
 export interface SyncProgress {
@@ -632,5 +666,70 @@ export interface CreateSessionRequest {
   topN: number;
   searchMode: SearchMode;
   constraints?: AdvancedConstraints;
+  haikuPromptConfig?: { promptTemplate: string; maxTokens: number; temperature: number };
+  opusPromptConfig?: { promptTemplate: string; maxTokens: number; temperature: number };
+  candidateUpstreamIds?: number[];
 }
 
+export type BenchBurnStepKey = 'data-source' | 'positions' | 'search-depth' | 'searching' | 'results';
+
+export interface BenchEmployee {
+  upstreamId: number;
+  name: string;
+  email: string;
+  seniority: string;
+  mainSkill: string;
+  country: string;
+  grossMonthlySalary: number | null;
+  salaryCurrency: string | null;
+  lastAccount: string | null;
+  isVectorized: boolean;
+}
+
+export interface BenchOpenPosition {
+  upstreamId: number;
+  id: number;
+  account: string;
+  coe: string;
+  practice: string;
+  stakeholder: string;
+  mainSkill: string;
+  jobTitle: string;
+  isVectorized: boolean;
+}
+
+export interface BenchBurnRequest {
+  employeeUpstreamIds: number[];
+  positionUpstreamIds: number[];
+  searchMode: 'opus';
+  topNPerEmployee: number;
+  topNPerPosition: number;
+  opusPromptConfig?: { promptTemplate: string; maxTokens: number; temperature: number };
+  customPositions?: { name: string; jobDescription: string }[];
+}
+
+export interface CrossMatchResult {
+  employeeUpstreamId: number;
+  employeeName: string;
+  positionUpstreamId: number;
+  positionLabel: string;
+  matchScore: number;
+  cosineSimilarity: number;
+  scores: MatchScores;
+  skills: SkillMatch[];
+  gaps: GapAnalysis[];
+  domains: DomainExperience[];
+  analysis: SonnetAnalysis | null;
+  summary: string;
+}
+
+export interface BenchBurnResult {
+  employeeResults: Record<number, CrossMatchResult[]>;
+  positionResults: Record<number, CrossMatchResult[]>;
+  stats: {
+    totalPairs: number;
+    analyzed: number;
+    time: string;
+    searchCost: string;
+  };
+}

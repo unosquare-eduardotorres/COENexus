@@ -376,7 +376,7 @@ export default function SyncDashboard({
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showResyncConfirm, setShowResyncConfirm] = useState(false);
 
-  const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
+  const sourceLabel = source === 'open-positions' ? 'Open Positions' : source.charAt(0).toUpperCase() + source.slice(1);
   const isActiveOrPaused = progress.status === 'syncing' || progress.status === 'paused';
   const progressPercent =
     progress.totalRecords > 0
@@ -654,15 +654,17 @@ export default function SyncDashboard({
           {(statusFilter === 'synced' || statusFilter === 'extracted') && (
             <ProcessActionButtons
               progress={extractionProgress}
-              hasEligible={records.some((r) => r.pipelineStatus === 'synced' && r.hasResume)}
+              hasEligible={source === 'open-positions'
+                ? records.some((r) => r.pipelineStatus === 'synced' && r.hasJobDescription)
+                : records.some((r) => r.pipelineStatus === 'synced' && r.hasResume)}
               onStart={onStartExtraction}
               onPause={onPauseExtraction}
               onResume={onResumeExtraction}
               bgClass="bg-blue-500"
               hoverBgClass="hover:bg-blue-600"
               gradientClass="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
-              label="Extract Resumes"
-              reLabel="Re-extract"
+              label={source === 'open-positions' ? 'Extract JDs' : 'Extract Resumes'}
+              reLabel={source === 'open-positions' ? 'Re-extract JDs' : 'Re-extract'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -682,8 +684,8 @@ export default function SyncDashboard({
               bgClass="bg-violet-500"
               hoverBgClass="hover:bg-violet-600"
               gradientClass="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
-              label="Vectorize"
-              reLabel="Re-vectorize"
+              label={source === 'open-positions' ? 'Vectorize JDs' : 'Vectorize'}
+              reLabel={source === 'open-positions' ? 'Re-vectorize JDs' : 'Re-vectorize'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <circle cx="5" cy="12" r="2" strokeWidth={2} />
@@ -700,7 +702,7 @@ export default function SyncDashboard({
 
       {isExtracting && extractionProgress && (
         <ProgressBar
-          label="Extracting resumes"
+          label={source === 'open-positions' ? 'Extracting JDs' : 'Extracting resumes'}
           progress={extractionProgress}
           percent={extractionPercent}
           dotColor="bg-blue-500"
@@ -713,7 +715,7 @@ export default function SyncDashboard({
 
       {isVectorizing && vectorizationProgress && (
         <ProgressBar
-          label="Vectorizing resumes"
+          label={source === 'open-positions' ? 'Vectorizing JDs' : 'Vectorizing resumes'}
           progress={vectorizationProgress}
           percent={vectorizationPercent}
           dotColor="bg-violet-500"

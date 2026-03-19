@@ -79,6 +79,16 @@ public class ProcessingController : ControllerBase
             failedCount = await _dbContext.SyncedCandidates.CountAsync(c => c.Failed);
             totalEligible = withResume;
         }
+        else if (source == "open-positions")
+        {
+            var withJd = await _dbContext.SyncedOpenPositions.CountAsync(op => op.JobDescription != "");
+            alreadyProcessed = await _dbContext.ResumeEmbeddings.CountAsync(e => e.SourceType == "open-positions");
+            syncedCount = await _dbContext.SyncedOpenPositions.CountAsync(op => op.Status == "synced" && op.JobDescription != "");
+            extractedCount = await _dbContext.SyncedOpenPositions.CountAsync(op => op.Status == "extracted");
+            vectorizedCount = await _dbContext.SyncedOpenPositions.CountAsync(op => op.Status == "vectorized");
+            failedCount = await _dbContext.SyncedOpenPositions.CountAsync(op => op.Failed);
+            totalEligible = withJd;
+        }
         else
         {
             return BadRequest();
@@ -93,7 +103,7 @@ public class ProcessingController : ControllerBase
         [FromQuery] int upstreamId,
         [FromQuery] string model = "voyage-4-large")
     {
-        if (source is not ("employees" or "candidates"))
+        if (source is not ("employees" or "candidates" or "open-positions"))
             return BadRequest("Invalid source");
 
         try
@@ -224,6 +234,20 @@ public class ProcessingController : ControllerBase
             await _dbContext.SaveChangesAsync();
             return Ok(new { reset = failed.Count });
         }
+        else if (source == "open-positions")
+        {
+            var failed = await _dbContext.SyncedOpenPositions
+                .Where(op => op.Failed)
+                .ToListAsync();
+            foreach (var op in failed)
+            {
+                op.Failed = false;
+                op.Status = "synced";
+                op.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
         return BadRequest("Invalid source");
     }
 
@@ -259,6 +283,19 @@ public class ProcessingController : ControllerBase
             await _dbContext.SaveChangesAsync();
             return Ok(new { reset = failed.Count });
         }
+        else if (source == "open-positions")
+        {
+            var failed = await _dbContext.SyncedOpenPositions
+                .Where(op => op.Failed && (op.Status == "synced" || op.Status == "extracted"))
+                .ToListAsync();
+            foreach (var op in failed)
+            {
+                op.Failed = false;
+                op.StatusReason = null;
+            }
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { reset = failed.Count });
+        }
         return BadRequest("Invalid source");
     }
 
@@ -283,9 +320,18 @@ public class ProcessingController : ControllerBase
             await _dbContext.SaveChangesAsync();
             return Ok(new { cand.UpstreamId, cand.FullName, cand.Status });
         }
+        else if (source == "open-positions")
+        {
+            var op = await _dbContext.SyncedOpenPositions.FirstOrDefaultAsync(o => o.UpstreamId == upstreamId);
+            if (op == null) return NotFound();
+            op.Status = "synced";
+            op.Failed = false;
+            await _dbContext.SaveChangesAsync();
+            return Ok(new { op.UpstreamId, Name = $"{op.Account} - {op.MainSkill}", Status = op.Status });
+        }
         else
         {
-            return BadRequest("Invalid source. Use 'employees' or 'candidates'.");
+            return BadRequest("Invalid source. Use 'employees', 'candidates', or 'open-positions'.");
         }
     }
 }

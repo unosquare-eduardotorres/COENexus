@@ -1,9 +1,57 @@
 import { useState } from 'react';
-import { MatchCandidate, SonnetAnalysis } from '../../types';
+import { MatchCandidate, SkillMatch, SkillMatchStatus, NonTechSkill, SonnetAnalysis } from '../../types';
 import { formatSalary } from '../../utils/formatSalary';
 import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
 import RadarChart from './RadarChart';
+
+function getStatusChipClasses(status: SkillMatchStatus): string {
+  switch (status) {
+    case 'met': return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400';
+    case 'surpassed': return 'bg-blue-500/15 text-blue-700 dark:text-blue-400';
+    case 'partial': return 'bg-amber-500/15 text-amber-700 dark:text-amber-400';
+    case 'missing': return 'bg-red-500/15 text-red-700 dark:text-red-400';
+  }
+}
+
+function getStatusLabel(status: SkillMatchStatus): string {
+  switch (status) {
+    case 'met': return 'Met';
+    case 'surpassed': return 'Surpassed';
+    case 'partial': return 'Partial';
+    case 'missing': return 'Missing';
+  }
+}
+
+function getStatusDotColor(status: SkillMatchStatus): string {
+  switch (status) {
+    case 'met': return 'bg-emerald-500';
+    case 'surpassed': return 'bg-blue-500';
+    case 'partial': return 'bg-amber-500';
+    case 'missing': return 'bg-red-500';
+  }
+}
+
+const PRIORITY_ORDER: Record<string, number> = { required: 0, 'nice-to-have': 1, optional: 2 };
+const STATUS_ORDER: Record<string, number> = { met: 0, surpassed: 1, partial: 2, missing: 3 };
+const PRIORITY_LABELS: Record<string, string> = { required: 'Required', 'nice-to-have': 'Nice to Have', optional: 'Optional' };
+
+function SkillRow({ skill }: { skill: SkillMatch }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusDotColor(skill.status)}`} />
+      <span className="text-sm text-primary flex-1">{skill.name}</span>
+      <span className="text-xs font-mono text-muted">{skill.years}y</span>
+      <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(skill.status)}`}>
+        {getStatusLabel(skill.status)}
+      </span>
+    </div>
+  );
+}
+
+function isStructuredNonTech(arr: unknown[]): arr is NonTechSkill[] {
+  return arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null && 'label' in arr[0];
+}
 
 interface CandidateProfileProps {
   candidate: MatchCandidate;
@@ -222,36 +270,43 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
 
             <div className="glass-card p-6">
               <h3 className="text-sm font-semibold text-primary mb-4">Stack Alignment</h3>
-              <div className="space-y-2 mb-4">
-                {candidate.skills.map((skill) => (
-                  <div key={skill.name} className="flex items-center gap-3">
-                    <div
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        skill.status === 'match'
-                          ? 'bg-emerald-500'
-                          : skill.status === 'partial'
-                            ? 'bg-amber-500'
-                            : 'bg-red-500'
-                      }`}
-                    />
-                    <span className="text-sm text-primary flex-1">{skill.name}</span>
-                    <span className="text-xs font-mono text-muted">{skill.years}y</span>
+              <div className="mb-4">
+                {candidate.skills.length === 0 ? (
+                  <p className="text-sm text-muted italic">
+                    No required skills defined in this job description
+                  </p>
+                ) : candidate.skills.some(s => s.priority) ? (
+                  (['required', 'nice-to-have', 'optional'] as const).map(tier => {
+                    const skills = candidate.skills
+                      .filter(s => (s.priority ?? 'required') === tier)
+                      .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+                    if (!skills.length) return null;
+                    return (
+                      <div key={tier} className="mb-4 last:mb-0">
+                        <h4 className="text-xs font-medium text-secondary mb-2 uppercase tracking-wide">
+                          {PRIORITY_LABELS[tier]}
+                        </h4>
+                        <div className="space-y-2">
+                          {skills.map(skill => <SkillRow key={skill.name} skill={skill} />)}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="space-y-2">
+                    {[...candidate.skills]
+                      .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))
+                      .map(skill => <SkillRow key={skill.name} skill={skill} />)}
                   </div>
-                ))}
+                )}
               </div>
               <div className="flex items-center gap-3 pt-3 border-t border-gray-200/20 dark:border-dark-border/20">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-muted">Match</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-xs text-muted">Partial</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-xs text-muted">Missing</span>
-                </div>
+                {(['met', 'surpassed', 'partial', 'missing'] as const).map(status => (
+                  <div key={status} className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full ${getStatusDotColor(status)}`} />
+                    <span className="text-xs text-muted">{getStatusLabel(status)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -282,28 +337,93 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
 
             <div className="glass-card p-6">
               <h3 className="text-sm font-semibold text-primary mb-4">Leadership & Soft Skills</h3>
-              <div className="mb-4">
-                <h4 className="text-xs font-medium text-secondary mb-2">Leadership</h4>
-                <ul className="space-y-1.5">
-                  {candidate.leadership.map((item, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0" />
-                      <span className="text-xs text-muted">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-xs font-medium text-secondary mb-2">Soft Skills</h4>
-                <ul className="space-y-1.5">
-                  {candidate.softSkills.map((item, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
-                      <span className="text-xs text-muted">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {(() => {
+                const hasLeadership = candidate.leadership.length > 0;
+                const hasSoftSkills = candidate.softSkills.length > 0;
+
+                if (!hasLeadership && !hasSoftSkills) {
+                  return (
+                    <p className="text-sm text-muted italic">
+                      No leadership or soft skill requirements defined
+                    </p>
+                  );
+                }
+
+                const renderNonTechSection = (title: string, items: string[] | NonTechSkill[]) => {
+                  if (!items.length) return null;
+
+                  if (isStructuredNonTech(items)) {
+                    const hasPriorities = items.some(i => i.priority);
+                    if (hasPriorities) {
+                      return (
+                        <div className="mb-4 last:mb-0">
+                          <h4 className="text-xs font-medium text-secondary mb-2">{title}</h4>
+                          {(['required', 'nice-to-have', 'optional'] as const).map(tier => {
+                            const tierItems = items.filter(i => i.priority === tier)
+                              .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+                            if (!tierItems.length) return null;
+                            return (
+                              <div key={tier} className="mb-3 last:mb-0">
+                                <span className="text-[10px] uppercase tracking-wide text-muted">{PRIORITY_LABELS[tier]}</span>
+                                <ul className="space-y-1.5 mt-1">
+                                  {tierItems.map((item, idx) => (
+                                    <li key={idx} className="flex items-center gap-2">
+                                      <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotColor(item.status)}`} />
+                                      <span className="text-xs text-muted flex-1">{item.label}</span>
+                                      <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
+                                        {getStatusLabel(item.status)}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mb-4 last:mb-0">
+                        <h4 className="text-xs font-medium text-secondary mb-2">{title}</h4>
+                        <ul className="space-y-1.5">
+                          {[...items]
+                            .sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99))
+                            .map((item, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotColor(item.status)}`} />
+                              <span className="text-xs text-muted flex-1">{item.label}</span>
+                              <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
+                                {getStatusLabel(item.status)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="mb-4 last:mb-0">
+                      <h4 className="text-xs font-medium text-secondary mb-2">{title}</h4>
+                      <ul className="space-y-1.5">
+                        {(items as string[]).map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0" />
+                            <span className="text-xs text-muted">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                };
+
+                return (
+                  <>
+                    {renderNonTechSection('Leadership', candidate.leadership)}
+                    {renderNonTechSection('Soft Skills', candidate.softSkills)}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>

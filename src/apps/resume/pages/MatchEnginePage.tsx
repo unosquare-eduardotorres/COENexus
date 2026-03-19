@@ -18,7 +18,11 @@ import {
   SearchMode,
 } from '../types';
 import { matchEngineService } from '../services/matchEngineService';
+import { normalizeCandidate } from '../utils/normalizeCandidate';
+import { exportToExcel, ColumnDef } from '../utils/exportToExcel';
+import { formatSalary } from '../utils/formatSalary';
 import { SAMPLE_JOB_DESCRIPTION } from '../data/mockMatchCandidates';
+import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import StepperBar from '../components/shared/StepperBar';
 import IntentSelector from '../components/match/IntentSelector';
 import JobDescriptionStep from '../components/match/JobDescriptionStep';
@@ -33,8 +37,10 @@ import CompareView from '../components/match/CompareView';
 import SessionHistory from '../components/match/SessionHistory';
 import SessionHistoryPage from '../components/match/SessionHistoryPage';
 import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
+import BenchBurnPage from './BenchBurnPage';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
+  bench: 'Bench',
   'all-employees': 'Employees',
   candidates: 'Candidates',
   'all-sources': 'All Sources',
@@ -44,6 +50,7 @@ const MATCH_FLOW_LABELS: Record<MatchFlowType, string> = {
   'find-for-position': 'Find for Position',
   'match-to-positions': 'Match to Positions',
   'delivery-to-op': 'Delivery Pro to OP',
+  'bench-burn': 'Bench Burn',
 };
 
 const PIPELINE_STAGE_LABELS: Record<PipelineStageKey, string> = {
@@ -132,6 +139,28 @@ const STEP_LABELS: { key: MatchStepKey; title: string; icon: ReactNode }[] = [
 export default function MatchEnginePage() {
   const [currentStepKey, setCurrentStepKey] = useState<MatchStepKey>('intent');
   const [completedSteps, setCompletedSteps] = useState<Set<MatchStepKey>>(new Set());
+
+  const navigateToStep = useCallback((step: MatchStepKey, replace = false) => {
+    setCurrentStepKey(step);
+    if (replace) {
+      window.history.replaceState({ matchStep: step }, '');
+    } else {
+      window.history.pushState({ matchStep: step }, '');
+    }
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState({ matchStep: 'intent' }, '');
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state?.matchStep) {
+        setCurrentStepKey(e.state.matchStep);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [matchFlow, setMatchFlow] = useState<MatchFlowType | null>(null);
 
   const [jobDescription, setJobDescription] = useState(SAMPLE_JOB_DESCRIPTION);
@@ -141,6 +170,8 @@ export default function MatchEnginePage() {
   const [topN, setTopN] = useState<TopN>(10);
 
   const [searchMode, setSearchMode] = useState<SearchMode>('opus');
+  const [deeperTopN, setDeeperTopN] = useState<TopN>(10);
+  const [candidateUpstreamIds, setCandidateUpstreamIds] = useState<number[] | null>(null);
   const [showAnalyzeDeeper, setShowAnalyzeDeeper] = useState(false);
 
   const [poolCounts, setPoolCounts] = useState<PoolCounts | null>(null);
@@ -190,9 +221,15 @@ export default function MatchEnginePage() {
     (flow: MatchFlowType) => {
       setMatchFlow(flow);
       completeStep('intent');
-      setCurrentStepKey('data-source');
+
+      if (flow === 'bench-burn') {
+        navigateToStep('bench-burn');
+        return;
+      }
+
+      navigateToStep('data-source');
     },
-    [completeStep]
+    [completeStep, navigateToStep]
   );
 
   const handleJdNext = useCallback(
@@ -200,18 +237,18 @@ export default function MatchEnginePage() {
       setJobDescription(jd);
       setJdSource(source);
       completeStep('job-description');
-      setCurrentStepKey('filters');
+      navigateToStep('filters');
     },
-    [completeStep]
+    [completeStep, navigateToStep]
   );
 
   const handleFiltersNext = useCallback(
     (constraints: AdvancedConstraints) => {
       setAdvancedConstraints(constraints);
       completeStep('filters');
-      setCurrentStepKey('search-depth');
+      navigateToStep('search-depth');
     },
-    [completeStep]
+    [completeStep, navigateToStep]
   );
 
   const handleSearchDepthNext = useCallback(
@@ -233,9 +270,9 @@ export default function MatchEnginePage() {
     (source: DataSource) => {
       setDataSource(source);
       completeStep('data-source');
-      setCurrentStepKey('job-description');
+      navigateToStep('job-description');
     },
-    [completeStep]
+    [completeStep, navigateToStep]
   );
 
   const executeSearch = useCallback(
@@ -248,10 +285,13 @@ export default function MatchEnginePage() {
       setDataSource(source);
       setTopN(selectedTopN);
       completeStep('data-source');
-      setCurrentStepKey('searching');
+      navigateToStep('searching');
       setAnimateIn(false);
       setProgress({ percent: 0, stage: '' });
       setPipelineStages(null);
+      const matchPromptConfigs = getMatchPrompts();
+      const haikuConfig = matchPromptConfigs.find(p => p.key === 'haiku-triage');
+      const opusConfig = matchPromptConfigs.find(p => p.key === 'opus-analysis');
 
       try {
         const result = await matchEngineService.searchWithSession(
@@ -264,18 +304,30 @@ export default function MatchEnginePage() {
             topN: selectedTopN,
             searchMode,
             constraints: advancedConstraints,
+            haikuPromptConfig: haikuConfig ? {
+              promptTemplate: haikuConfig.promptTemplate,
+              maxTokens: haikuConfig.maxTokens,
+              temperature: haikuConfig.temperature,
+            } : undefined,
+            opusPromptConfig: opusConfig ? {
+              promptTemplate: opusConfig.promptTemplate,
+              maxTokens: opusConfig.maxTokens,
+              temperature: opusConfig.temperature,
+            } : undefined,
+            candidateUpstreamIds: candidateUpstreamIds ?? undefined,
           },
           (p) => setProgress(p),
           (stages) => setPipelineStages(stages),
           (payload) => setHaikuConfirm(payload),
         );
+        setCandidateUpstreamIds(null);
 
-        setCandidates(result.candidates);
+        setCandidates(result.candidates.map(normalizeCandidate));
         setStats(result.stats);
         if (result.pipelineStages) setPipelineStages(result.pipelineStages);
         if (result.sessionId) setSessionId(result.sessionId);
         completeStep('searching');
-        setCurrentStepKey('results');
+        navigateToStep('results');
         setTimeout(() => setAnimateIn(true), 50);
 
         matchEngineService.listSessions()
@@ -283,10 +335,10 @@ export default function MatchEnginePage() {
           .catch(() => {});
       } catch (err) {
         console.error('Search failed:', err);
-        setCurrentStepKey('data-source');
+        navigateToStep('data-source');
       }
     },
-    [pendingDataSource, sessionName, matchFlow, jdSource, jobDescription, advancedConstraints, completeStep]
+    [pendingDataSource, sessionName, matchFlow, jdSource, jobDescription, advancedConstraints, candidateUpstreamIds, completeStep, searchMode, navigateToStep]
   );
 
   const handleStartSearch = useCallback(
@@ -334,17 +386,17 @@ export default function MatchEnginePage() {
       setDataSource(detail.dataSource);
       setTopN(detail.topN);
       setSearchMode(detail.searchMode || 'opus');
-      setCandidates(detail.candidates);
+      setCandidates(detail.candidates.map(normalizeCandidate));
       setStats(detail.stats || null);
       setPipelineStages(detail.pipelineStages || null);
       setCompletedSteps(new Set<MatchStepKey>(['intent', 'job-description', 'data-source', 'filters', 'search-depth', 'searching']));
-      setCurrentStepKey('results');
+      navigateToStep('results');
       setShowSessionHistory(false);
       setTimeout(() => setAnimateIn(true), 50);
     } catch (err) {
       console.error('Failed to load session:', err);
     }
-  }, []);
+  }, [navigateToStep]);
 
   const handleSelectCandidate = useCallback((candidate: MatchCandidate) => {
     setSelectedProfile(candidate);
@@ -354,8 +406,8 @@ export default function MatchEnginePage() {
       next.add('results');
       return next;
     });
-    setCurrentStepKey('deep-dive');
-  }, []);
+    navigateToStep('deep-dive');
+  }, [navigateToStep]);
 
   const handleToggleCompare = useCallback((candidate: MatchCandidate) => {
     setCompareList((prev) => {
@@ -374,20 +426,74 @@ export default function MatchEnginePage() {
         next.add('results');
         return next;
       });
-      setCurrentStepKey('deep-dive');
+      navigateToStep('deep-dive');
     }
-  }, [compareList.length]);
+  }, [compareList.length, navigateToStep]);
+
+  const handleExportToExcel = useCallback(() => {
+    const columns: ColumnDef[] = [
+      { header: 'Rank', key: 'rank', type: 'number' },
+      { header: 'Score', key: 'matchScore', type: 'score' },
+      { header: 'Name', key: 'name' },
+      { header: 'Status', key: 'candidateStatus' },
+      { header: 'Seniority', key: 'seniority' },
+      { header: 'Title', key: 'role' },
+      { header: 'Main Skill', key: 'mainSkill' },
+      { header: 'Country', key: 'country' },
+      { header: 'Expected Salary', key: 'expectedSalary' },
+      { header: 'Current Salary', key: 'currentSalary' },
+      { header: 'Last Updated', key: 'lastStatusUpdate' },
+      { header: 'Type', key: 'type' },
+      { header: 'Technical %', key: 'technical', type: 'score' },
+      { header: 'Domain %', key: 'domain', type: 'score' },
+      { header: 'Leadership %', key: 'leadership', type: 'score' },
+      { header: 'Soft Skills %', key: 'softSkills', type: 'score' },
+      { header: 'Availability %', key: 'availability', type: 'score' },
+      { header: 'SharePoint', key: 'sharepointUrl', type: 'hyperlink' },
+    ];
+
+    const data = candidates.map((c, i) => ({
+      rank: i + 1,
+      matchScore: c.matchScore,
+      name: c.name,
+      candidateStatus: c.candidateStatus ?? c.type,
+      seniority: c.seniority,
+      role: c.role,
+      mainSkill: c.mainSkill,
+      country: c.country,
+      expectedSalary: c.salaryExpectations && c.salaryExpectations > 0
+        ? formatSalary(c.salaryExpectations, c.salaryExpectationsCurrency || undefined)
+        : '',
+      currentSalary: c.expectedRate > 0
+        ? formatSalary(c.expectedRate, c.currency || undefined)
+        : '',
+      lastStatusUpdate: c.lastStatusUpdate
+        ? new Date(c.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : '',
+      type: c.type === 'employee' ? 'Employee' : 'Candidate',
+      technical: c.scores.technical,
+      domain: c.scores.domain,
+      leadership: c.scores.leadership,
+      softSkills: c.scores.softSkills,
+      availability: c.scores.availability,
+      sharepointUrl: c.type === 'employee'
+        ? `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Employees.aspx?employeeId=${c.id}`
+        : `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Candidates.aspx?CandidateId=${c.id}`,
+    }));
+
+    exportToExcel(data, columns, `match-results-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [candidates]);
 
   const handleBackToResults = useCallback(() => {
-    setCurrentStepKey('results');
-  }, []);
+    navigateToStep('results');
+  }, [navigateToStep]);
 
   const handleStepClick = useCallback((step: MatchStepKey) => {
-    setCurrentStepKey(step);
-  }, []);
+    navigateToStep(step);
+  }, [navigateToStep]);
 
   const handleReset = useCallback(() => {
-    setCurrentStepKey('intent');
+    navigateToStep('intent', true);
     setCompletedSteps(new Set());
     setMatchFlow(null);
     setJobDescription(SAMPLE_JOB_DESCRIPTION);
@@ -406,7 +512,7 @@ export default function MatchEnginePage() {
     setAnimateIn(false);
     setSessionId(null);
     setActiveStageDrawer(null);
-  }, []);
+  }, [navigateToStep]);
 
   const handleStageClick = useCallback((stage: PipelineStageKey) => {
     if (stage === 'sonnetAnalyzed') return;
@@ -553,13 +659,15 @@ export default function MatchEnginePage() {
           </div>
         )}
 
-        <StepperBar
-          stepLabels={STEP_LABELS}
-          currentStepKey={currentStepKey}
-          completedSteps={completedSteps}
-          onStepClick={handleStepClick}
-          stepSummaries={stepSummaries}
-        />
+        {currentStepKey !== 'bench-burn' && (
+          <StepperBar
+            stepLabels={STEP_LABELS}
+            currentStepKey={currentStepKey}
+            completedSteps={completedSteps}
+            onStepClick={handleStepClick}
+            stepSummaries={stepSummaries}
+          />
+        )}
 
         {currentStepKey === 'intent' && !showHistoryPage && (
           <IntentSelector
@@ -592,6 +700,10 @@ export default function MatchEnginePage() {
             initialConstraints={advancedConstraints}
             onNext={handleFiltersNext}
           />
+        )}
+
+        {currentStepKey === 'bench-burn' && (
+          <BenchBurnPage onReset={handleReset} />
         )}
 
         {currentStepKey === 'data-source' && (
@@ -662,6 +774,16 @@ export default function MatchEnginePage() {
                   className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-accent-500 disabled:hover:to-accent-600"
                 >
                   Compare Selected ({compareList.length})
+                </button>
+                <button
+                  onClick={handleExportToExcel}
+                  disabled={candidates.length === 0}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export to Excel
                 </button>
               </div>
             </div>
@@ -813,14 +935,32 @@ export default function MatchEnginePage() {
               </div>
             </div>
 
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted">Analyze Top</span>
+              {([10, 20, 30] as TopN[]).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setDeeperTopN(n)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    deeperTopN === n
+                      ? 'bg-violet-500 text-white shadow-sm'
+                      : 'glass-panel-subtle text-secondary hover:text-primary'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-3">
               {searchMode === 'vector' && (
                 <button
                   onClick={() => {
                     setShowAnalyzeDeeper(false);
                     setSearchMode('haiku');
-                    setTopN(50 as TopN);
-                    setPendingDataSource({ source: dataSource, topN: 50 as TopN });
+                    setTopN(deeperTopN);
+                    setCandidateUpstreamIds(candidates.map(c => c.id));
+                    setPendingDataSource({ source: dataSource, topN: deeperTopN });
                     const now = new Date();
                     const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                     setSessionName(defaultName);
@@ -849,8 +989,9 @@ export default function MatchEnginePage() {
                 onClick={() => {
                   setShowAnalyzeDeeper(false);
                   setSearchMode('opus');
-                  setTopN(10 as TopN);
-                  setPendingDataSource({ source: dataSource, topN: 10 as TopN });
+                  setTopN(deeperTopN);
+                  setCandidateUpstreamIds(candidates.map(c => c.id));
+                  setPendingDataSource({ source: dataSource, topN: deeperTopN });
                   const now = new Date();
                   const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                   setSessionName(defaultName);
@@ -867,10 +1008,10 @@ export default function MatchEnginePage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-primary">Full Sonnet Analysis</h4>
+                      <h4 className="text-sm font-semibold text-primary">Full Opus Analysis</h4>
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400">🔬 Deepest</span>
                     </div>
-                    <p className="text-xs text-muted mt-1">Complete pipeline with deep Sonnet analysis — fit narratives, skill gaps, leadership assessment. Top 10 candidates.</p>
+                    <p className="text-xs text-muted mt-1">Complete pipeline with deep Opus analysis — fit narratives, skill gaps, leadership assessment. Top 10 candidates.</p>
                   </div>
                 </div>
               </button>

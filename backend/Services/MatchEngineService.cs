@@ -29,6 +29,60 @@ public class MatchEngineService : IMatchEngineService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    private const string DEFAULT_OPUS_TEMPLATE = @"You are a senior technical recruiter AI performing deep candidate analysis.
+
+Job Description:
+{{jobDescription}}
+
+Candidate Name: {{candidateName}}
+Current Title: {{jobTitle}}
+Seniority: {{seniority}}
+Main Skill: {{mainSkill}}
+Country: {{country}}
+Rate: {{rate}} {{currency}}
+On Bench: {{isBench}}
+Source: {{sourceType}}
+
+Resume:
+{{resume}}
+
+Analyze this candidate's fit for the role. Return a JSON object with this exact structure:
+{
+  ""matchScore"": <0-100>,
+  ""role"": ""<candidate's best-fit role title>"",
+  ""years"": <total years of experience>,
+  ""location"": ""{{country}}"",
+  ""salary"": ""{{salaryDisplay}}"",
+  ""availability"": ""{{availabilityDisplay}}"",
+  ""scores"": { ""technical"": <0-100>, ""domain"": <0-100>, ""leadership"": <0-100>, ""softSkills"": <0-100>, ""availability"": <0-100> },
+  ""summary"": ""<2-3 sentence executive summary of fit>"",
+  ""skills"": [{ ""name"": ""<skill>"", ""status"": ""met|surpassed|partial|missing"", ""years"": <years>, ""priority"": ""required|nice-to-have|optional"" }],
+  ""domains"": [{ ""name"": ""<domain>"", ""confidence"": <0-100>, ""evidence"": ""<brief evidence>"" }],
+  ""gaps"": [{ ""skill"": ""<gap area>"", ""severity"": ""high|medium|low"", ""note"": ""<explanation>"" }],
+  ""leadership"": [{ ""label"": ""<leadership quality>"", ""priority"": ""required|nice-to-have|optional"", ""status"": ""met|surpassed|partial|missing"" }],
+  ""softSkills"": [{ ""label"": ""<soft skill>"", ""priority"": ""required|nice-to-have|optional"", ""status"": ""met|surpassed|partial|missing"" }],
+  ""analysis"": {
+    ""whyRightFit"": ""<detailed narrative on why this candidate fits>"",
+    ""immediateValue"": ""<what value they bring day one>"",
+    ""rampUpEstimate"": ""<realistic ramp-up time and what they need to learn>"",
+    ""riskFactors"": ""<risks and how to mitigate them>"",
+    ""beyondJd"": ""<hidden strengths beyond the JD requirements>"",
+    ""leadershipDynamics"": ""<leadership style and team dynamics>"",
+    ""industryDepth"": ""<industry and domain knowledge depth>"",
+    ""trackRecord"": ""<proof points and track record>"",
+    ""culturalFit"": ""<cultural and work style compatibility>"",
+    ""retentionPotential"": ""<long-term retention potential and growth path>""
+  }
+}
+
+IMPORTANT rules for skills, leadership, and softSkills:
+- ""priority"" is derived from the JD: use ""required"" for must-have skills, ""nice-to-have"" for preferred skills, and ""optional"" for bonus skills.
+- ""surpassed"" means the candidate significantly exceeds the JD requirement (e.g., JD asks 2 years but candidate has 5+, or candidate holds a relevant certification not listed).
+- All JD-required skills MUST appear in the output regardless of whether the candidate matches them. Missing skills get status ""missing"".
+- Leadership and softSkills must be returned as structured objects with label, priority, and status fields.
+
+Return ONLY valid JSON, no markdown or explanation.";
+
     public MatchEngineService(
         NexusDbContext dbContext,
         IVoyageEmbeddingService voyageService,
@@ -96,7 +150,7 @@ public class MatchEngineService : IMatchEngineService
         await writer.WriteAsync(new MatchProgressEvent(new MatchSearchProgress(12, "Extracting metadata from quantum foam...")), ct);
 
         phase = Stopwatch.StartNew();
-        var sourceFilter = request.DataSource switch
+        var sourceFilterSql = request.DataSource switch
         {
             "bench" => "AND re.\"SourceType\" = 'employees' AND re.\"IsBench\" = true",
             "all-employees" => "AND re.\"SourceType\" = 'employees'",
@@ -105,50 +159,100 @@ public class MatchEngineService : IMatchEngineService
         };
 
         var (constraintSql, constraintParams) = BuildAdvancedConstraintSql(request.Constraints);
+        _logger.LogInformation("[MatchEngine] Constraint SQL: {Sql}, Params: {Params}",
+            constraintSql,
+            string.Join(", ", constraintParams.Select(p => $"{p.ParameterName}={p.Value}")));
+        var candidateUpstreamIds = (request.CandidateUpstreamIds ?? [])
+            .Distinct()
+            .ToList();
+        var hasCandidateContinuation = candidateUpstreamIds.Count > 0;
+        var vectorResults = new List<VectorSearchRaw>();
 
-        var vectorLimit = request.SearchMode switch
+        if (hasCandidateContinuation)
         {
-            "vector" => request.TopN,
-            "haiku" => request.TopN * 3,
-            _ => 50
-        };
+            var continuationOrder = candidateUpstreamIds
+                .Select((id, index) => new { id, index })
+                .ToDictionary(x => x.id, x => x.index);
 
-        var sql = $@"
+            IQueryable<ResumeEmbedding> continuationQuery = _dbContext.ResumeEmbeddings
+                .AsNoTracking()
+                .Where(re => re.Embedding != null && candidateUpstreamIds.Contains(re.UpstreamId));
+
+            continuationQuery = request.DataSource switch
+            {
+                "bench" => continuationQuery.Where(re => re.SourceType == "employees" && re.IsBench),
+                "all-employees" => continuationQuery.Where(re => re.SourceType == "employees"),
+                "candidates" => continuationQuery.Where(re => re.SourceType == "candidates"),
+                _ => continuationQuery
+            };
+
+            var continuationEmbeddings = await continuationQuery.ToListAsync(ct);
+            vectorResults = continuationEmbeddings
+                .OrderBy(re => continuationOrder.GetValueOrDefault(re.UpstreamId, int.MaxValue))
+                .Select(re => new VectorSearchRaw
+                {
+                    SourceId = re.SourceId,
+                    SourceType = re.SourceType,
+                    ResumeText = re.ResumeText,
+                    IsBench = re.IsBench,
+                    UpstreamId = re.UpstreamId,
+                    CosineSimilarity = 1.0
+                })
+                .ToList();
+
+            phase.Stop();
+            timings["vectorSearchMs"] = phase.ElapsedMilliseconds;
+            _logger.LogInformation(
+                "[MatchEngine] Phase 2 — Vector Search skipped (continuation mode): {Ms}ms ({Count} results from upstream IDs)",
+                phase.ElapsedMilliseconds,
+                vectorResults.Count);
+        }
+        else
+        {
+            var vectorLimit = request.SearchMode switch
+            {
+                "vector" => request.TopN,
+                "haiku" => request.TopN * 3,
+                _ => 50
+            };
+
+            var sql = $@"
             SELECT re.""SourceId"", re.""SourceType"", re.""ResumeText"", re.""IsBench"", re.""UpstreamId"",
                    1 - (re.""Embedding"" <=> '{vectorString}'::vector) AS ""CosineSimilarity""
             FROM ""ResumeEmbeddings"" re
             WHERE re.""Embedding"" IS NOT NULL
-            {sourceFilter}
+            {sourceFilterSql}
             {constraintSql}
             ORDER BY re.""Embedding"" <=> '{vectorString}'::vector
             LIMIT {vectorLimit}";
 
-        var vectorResults = new List<VectorSearchRaw>();
-        var conn = _dbContext.Database.GetDbConnection();
-        if (conn.State != System.Data.ConnectionState.Open)
-            await conn.OpenAsync(ct);
+            var conn = _dbContext.Database.GetDbConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+                await conn.OpenAsync(ct);
 
-        await using (var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn))
-        {
-            foreach (var p in constraintParams)
-                cmd.Parameters.Add(p);
-            await using var reader = await cmd.ExecuteReaderAsync(ct);
-            while (await reader.ReadAsync(ct))
+            await using (var cmd = new NpgsqlCommand(sql, (NpgsqlConnection)conn))
             {
-                vectorResults.Add(new VectorSearchRaw
+                foreach (var p in constraintParams)
+                    cmd.Parameters.Add(p);
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
                 {
-                    SourceId = reader.GetInt32(reader.GetOrdinal("SourceId")),
-                    SourceType = reader.GetString(reader.GetOrdinal("SourceType")),
-                    ResumeText = reader.IsDBNull(reader.GetOrdinal("ResumeText")) ? null : reader.GetString(reader.GetOrdinal("ResumeText")),
-                    IsBench = reader.GetBoolean(reader.GetOrdinal("IsBench")),
-                    UpstreamId = reader.GetInt32(reader.GetOrdinal("UpstreamId")),
-                    CosineSimilarity = reader.GetDouble(reader.GetOrdinal("CosineSimilarity"))
-                });
+                    vectorResults.Add(new VectorSearchRaw
+                    {
+                        SourceId = reader.GetInt32(reader.GetOrdinal("SourceId")),
+                        SourceType = reader.GetString(reader.GetOrdinal("SourceType")),
+                        ResumeText = reader.IsDBNull(reader.GetOrdinal("ResumeText")) ? null : reader.GetString(reader.GetOrdinal("ResumeText")),
+                        IsBench = reader.GetBoolean(reader.GetOrdinal("IsBench")),
+                        UpstreamId = reader.GetInt32(reader.GetOrdinal("UpstreamId")),
+                        CosineSimilarity = reader.GetDouble(reader.GetOrdinal("CosineSimilarity"))
+                    });
+                }
             }
+
+            phase.Stop();
+            timings["vectorSearchMs"] = phase.ElapsedMilliseconds;
+            _logger.LogInformation("[MatchEngine] Phase 2 — Vector Search: {Ms}ms ({Count} results)", phase.ElapsedMilliseconds, vectorResults.Count);
         }
-        phase.Stop();
-        timings["vectorSearchMs"] = phase.ElapsedMilliseconds;
-        _logger.LogInformation("[MatchEngine] Phase 2 — Vector Search: {Ms}ms ({Count} results)", phase.ElapsedMilliseconds, vectorResults.Count);
 
         phase = Stopwatch.StartNew();
         totalScanned = await _dbContext.ResumeEmbeddings
@@ -207,6 +311,7 @@ public class MatchEngineService : IMatchEngineService
                     result.CandidateStatus = cand.CandidateStatus;
                     result.SalaryExpectations = cand.SalaryExpectations;
                     result.SalaryExpectationsCurrency = cand.SalaryExpectationsCurrency;
+                    result.LastStatusUpdate = cand.LastStatusUpdate;
                 }
             }
 
@@ -236,7 +341,18 @@ public class MatchEngineService : IMatchEngineService
         constraintsAppliedCount = afterConstraints.Count;
         phase.Stop();
         timings["constraintsMs"] = phase.ElapsedMilliseconds;
-        _logger.LogInformation("[MatchEngine] Phase 5 — Constraints applied at SQL level: {Count} results already filtered", constraintsAppliedCount);
+        if (hasCandidateContinuation)
+        {
+            _logger.LogInformation(
+                "[MatchEngine] Phase 5 — Constraints skipped (continuation mode): {Count} pre-filtered results",
+                constraintsAppliedCount);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "[MatchEngine] Phase 5 — Constraints applied at SQL level: {Count} results already filtered",
+                constraintsAppliedCount);
+        }
 
         var constraintsStageCandidates = enriched.Select(c => new PipelineStageCandidateDto
         {
@@ -253,6 +369,7 @@ public class MatchEngineService : IMatchEngineService
 
         if (request.SearchMode == "vector")
         {
+            var emptyArr = JsonSerializer.Deserialize<JsonElement>("[]");
             var vectorOnlyResults = enriched
                 .OrderByDescending(c => c.CosineSimilarity)
                 .Take(request.TopN)
@@ -273,6 +390,9 @@ public class MatchEngineService : IMatchEngineService
                     CandidateStatus = c.CandidateStatus ?? (c.SourceType == "employees" ? "Employee" : null),
                     SalaryExpectations = c.SalaryExpectations ?? 0,
                     SalaryExpectationsCurrency = c.SalaryExpectationsCurrency ?? "",
+                    LastStatusUpdate = c.LastStatusUpdate?.ToString("yyyy-MM-dd"),
+                    Leadership = emptyArr,
+                    SoftSkills = emptyArr,
                     Scores = new MatchScoresDto
                     {
                         Technical = (int)(c.CosineSimilarity * 90),
@@ -323,6 +443,10 @@ public class MatchEngineService : IMatchEngineService
         var triaged = new ConcurrentBag<(VectorSearchResult Candidate, int Score)>();
         var haikuCompleted = 0;
         var semaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
+        var haikuTemplate = request.HaikuPromptConfig?.PromptTemplate
+            ?? "You are a technical recruiter AI. Given this job description and resume, assess relevance.\n\nJob Description:\n{{jobDescription}}\n\nResume:\n{{resume}}\n\nRespond in JSON only: {\"relevant\": true/false, \"score\": 0-100, \"reason\": \"brief explanation\"}";
+        var haikuMaxTokens = request.HaikuPromptConfig?.MaxTokens ?? 256;
+        var haikuTemp = request.HaikuPromptConfig?.Temperature ?? 0.1;
 
         var haikuTasks = afterConstraints.Select(async (candidate, i) =>
         {
@@ -334,21 +458,15 @@ public class MatchEngineService : IMatchEngineService
                     ? candidate.ResumeText![..3000]
                     : candidate.ResumeText ?? "No resume text available";
 
-                var haikuPrompt = $@"You are a technical recruiter AI. Given this job description and resume, assess relevance.
-
-Job Description:
-{request.JobDescription}
-
-Resume:
-{resumeSnippet}
-
-Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": ""brief explanation""}}";
+                var haikuPrompt = haikuTemplate
+                    .Replace("{{jobDescription}}", request.JobDescription)
+                    .Replace("{{resume}}", resumeSnippet);
 
                 var callTimer = Stopwatch.StartNew();
                 try
                 {
                     var haikuResponse = await _claudeProxy.ChatAsync(
-                        _claudeSettings.HaikuModel, haikuPrompt, 256, 0.1, ct);
+                        _claudeSettings.HaikuModel, haikuPrompt, haikuMaxTokens, haikuTemp, ct);
                     callTimer.Stop();
 
                     candidateTimings.Add(new CandidateTimingDto
@@ -479,6 +597,7 @@ Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": 
 
         if (request.SearchMode == "haiku")
         {
+            var emptyJsonArr = JsonSerializer.Deserialize<JsonElement>("[]");
             var haikuOnlyResults = topCandidates
                 .Select((item, i) => new MatchCandidateResult
                 {
@@ -497,6 +616,9 @@ Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": 
                     CandidateStatus = item.Candidate.CandidateStatus ?? (item.Candidate.SourceType == "employees" ? "Employee" : null),
                     SalaryExpectations = item.Candidate.SalaryExpectations ?? 0,
                     SalaryExpectationsCurrency = item.Candidate.SalaryExpectationsCurrency ?? "",
+                    LastStatusUpdate = item.Candidate.LastStatusUpdate?.ToString("yyyy-MM-dd"),
+                    Leadership = emptyJsonArr,
+                    SoftSkills = emptyJsonArr,
                     Scores = new MatchScoresDto
                     {
                         Technical = (int)(item.Candidate.CosineSimilarity * 90),
@@ -567,6 +689,12 @@ Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": 
         var results = new ConcurrentBag<MatchCandidateResult>();
         var sonnetCompleted = 0;
         var sonnetSemaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
+        var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? DEFAULT_OPUS_TEMPLATE;
+        var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 4096;
+        var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
+        var model = request.SearchMode == "opus"
+            ? _claudeSettings.OpusModel
+            : _claudeSettings.SonnetModel;
 
         var sonnetTasks = topCandidates.Select(async (item, i) =>
         {
@@ -579,59 +707,26 @@ Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": 
                     ? candidate.ResumeText![..6000]
                     : candidate.ResumeText ?? "No resume text available";
 
-                var sonnetPrompt = $@"You are a senior technical recruiter AI performing deep candidate analysis.
-
-Job Description:
-{request.JobDescription}
-
-Candidate Name: {candidate.Name}
-Current Title: {candidate.JobTitle ?? "Unknown"}
-Seniority: {candidate.Seniority ?? "Unknown"}
-Main Skill: {candidate.MainSkill ?? "Unknown"}
-Country: {candidate.Country ?? "Unknown"}
-Rate: {candidate.Rate?.ToString() ?? "Unknown"} {candidate.Currency ?? ""}
-On Bench: {candidate.IsBench}
-Source: {candidate.SourceType}
-
-Resume:
-{resumeSnippet}
-
-Analyze this candidate's fit for the role. Return a JSON object with this exact structure:
-{{
-  ""matchScore"": <0-100>,
-  ""role"": ""<candidate's best-fit role title>"",
-  ""years"": <total years of experience>,
-  ""location"": ""{candidate.Country ?? "Unknown"}"",
-  ""salary"": ""{(candidate.Rate != null ? $"${candidate.Rate}/hr" : "Unknown")}"",
-  ""availability"": ""{(candidate.IsBench ? "Immediately" : "2-4 weeks")}"",
-  ""scores"": {{ ""technical"": <0-100>, ""domain"": <0-100>, ""leadership"": <0-100>, ""softSkills"": <0-100>, ""availability"": <0-100> }},
-  ""summary"": ""<2-3 sentence executive summary of fit>"",
-  ""skills"": [{{ ""name"": ""<skill>"", ""status"": ""match|partial|missing"", ""years"": <years> }}],
-  ""domains"": [{{ ""name"": ""<domain>"", ""confidence"": <0-100>, ""evidence"": ""<brief evidence>"" }}],
-  ""gaps"": [{{ ""skill"": ""<gap area>"", ""severity"": ""high|medium|low"", ""note"": ""<explanation>"" }}],
-  ""leadership"": [""<leadership quality or achievement>""],
-  ""softSkills"": [""<soft skill>""],
-  ""analysis"": {{
-    ""whyRightFit"": ""<detailed narrative on why this candidate fits>"",
-    ""immediateValue"": ""<what value they bring day one>"",
-    ""rampUpEstimate"": ""<realistic ramp-up time and what they need to learn>"",
-    ""riskFactors"": ""<risks and how to mitigate them>"",
-    ""beyondJd"": ""<hidden strengths beyond the JD requirements>"",
-    ""leadershipDynamics"": ""<leadership style and team dynamics>"",
-    ""industryDepth"": ""<industry and domain knowledge depth>"",
-    ""trackRecord"": ""<proof points and track record>"",
-    ""culturalFit"": ""<cultural and work style compatibility>"",
-    ""retentionPotential"": ""<long-term retention potential and growth path>""
-  }}
-}}
-
-Return ONLY valid JSON, no markdown or explanation.";
+                var sonnetPrompt = opusTemplate
+                    .Replace("{{jobDescription}}", request.JobDescription)
+                    .Replace("{{candidateName}}", candidate.Name ?? "Unknown")
+                    .Replace("{{jobTitle}}", candidate.JobTitle ?? "Unknown")
+                    .Replace("{{seniority}}", candidate.Seniority ?? "Unknown")
+                    .Replace("{{mainSkill}}", candidate.MainSkill ?? "Unknown")
+                    .Replace("{{country}}", candidate.Country ?? "Unknown")
+                    .Replace("{{rate}}", candidate.Rate?.ToString() ?? "Unknown")
+                    .Replace("{{currency}}", candidate.Currency ?? "")
+                    .Replace("{{isBench}}", candidate.IsBench.ToString())
+                    .Replace("{{sourceType}}", candidate.SourceType)
+                    .Replace("{{resume}}", resumeSnippet)
+                    .Replace("{{salaryDisplay}}", candidate.Rate != null ? $"${candidate.Rate}/hr" : "Unknown")
+                    .Replace("{{availabilityDisplay}}", candidate.IsBench ? "Immediately" : "2-4 weeks");
 
                 var callTimer = Stopwatch.StartNew();
                 try
                 {
                     var sonnetResponse = await _claudeProxy.ChatAsync(
-                        _claudeSettings.SonnetModel, sonnetPrompt, 4096, 0.2, ct);
+                        model, sonnetPrompt, opusMaxTokens, opusTemp, ct);
                     callTimer.Stop();
 
                     candidateTimings.Add(new CandidateTimingDto
@@ -666,6 +761,7 @@ Return ONLY valid JSON, no markdown or explanation.";
                                 CandidateStatus = candidate.CandidateStatus ?? (candidate.SourceType == "employees" ? "Employee" : null),
                                 SalaryExpectations = candidate.SalaryExpectations ?? 0,
                                 SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
+                                LastStatusUpdate = candidate.LastStatusUpdate?.ToString("yyyy-MM-dd"),
                             });
                         }
                     }
@@ -684,6 +780,7 @@ Return ONLY valid JSON, no markdown or explanation.";
                     });
                     _logger.LogWarning("[MatchEngine] Sonnet FALLBACK [{I}/{Total}] {Name}: {Ms}ms — {Err}",
                         i + 1, topCandidates.Count, candidate.Name, callTimer.ElapsedMilliseconds, ex.Message);
+                    var emptyArray = JsonSerializer.Deserialize<JsonElement>("[]");
                     results.Add(new MatchCandidateResult
                     {
                         Id = candidate.UpstreamId,
@@ -701,6 +798,9 @@ Return ONLY valid JSON, no markdown or explanation.";
                         CandidateStatus = candidate.CandidateStatus ?? (candidate.SourceType == "employees" ? "Employee" : null),
                         SalaryExpectations = candidate.SalaryExpectations ?? 0,
                         SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
+                        LastStatusUpdate = candidate.LastStatusUpdate?.ToString("yyyy-MM-dd"),
+                        Leadership = emptyArray,
+                        SoftSkills = emptyArray,
                         Scores = new MatchScoresDto
                         {
                             Technical = (int)(candidate.CosineSimilarity * 90),
@@ -889,6 +989,8 @@ Return ONLY valid JSON, no markdown or explanation.";
             ["currentSalary"] = @"""CurrentSalary""",
             ["salaryExpectation"] = @"""SalaryExpectations""",
             ["status"] = @"""CandidateStatus""",
+            ["lastStatusUpdate"] = @"""LastStatusUpdate""",
+            ["coeCertified"] = @"""CoeCertified""",
         },
         ["employees"] = new()
         {
@@ -947,6 +1049,24 @@ Return ONLY valid JSON, no markdown or explanation.";
         Func<object, string> nextParam)
     {
         if (!columnMap.TryGetValue(rule.Field, out var column)) return "";
+
+        if (rule.Field == "lastStatusUpdate")
+        {
+            if (DateTime.TryParse(rule.Value.ToString(), out var dateValue))
+            {
+                var p = nextParam(dateValue);
+                var op = rule.Operator == "gte" ? ">=" : "<=";
+                return $"{alias}.{column} {op} {p}";
+            }
+            return "";
+        }
+
+        if (rule.Field == "coeCertified")
+        {
+            var boolVal = rule.Value.ToString()?.ToLowerInvariant() == "true";
+            var p = nextParam(boolVal);
+            return $"{alias}.{column} = {p}";
+        }
 
         if (rule.Field == "currentSalary" && sourceType == "employees")
         {

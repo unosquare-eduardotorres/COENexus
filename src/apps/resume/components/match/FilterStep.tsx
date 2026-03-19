@@ -21,7 +21,7 @@ interface FieldConfig {
   field: FilterField;
   label: string;
   operators: { value: FilterOperator; label: string }[];
-  valueType: 'dropdown' | 'number-currency' | 'multi-select';
+  valueType: 'dropdown' | 'number-currency' | 'multi-select' | 'date' | 'boolean';
   optionsKey?: keyof FilterOptions;
 }
 
@@ -73,6 +73,23 @@ const CANDIDATE_FIELDS: FieldConfig[] = [
     ],
     valueType: 'multi-select',
     optionsKey: 'candidateStatuses',
+  },
+  {
+    field: 'lastStatusUpdate',
+    label: 'Last Status Update',
+    operators: [
+      { value: 'gte', label: '≥' },
+      { value: 'lte', label: '≤' },
+    ],
+    valueType: 'date',
+  },
+  {
+    field: 'coeCertified',
+    label: 'CoE Qualified',
+    operators: [
+      { value: 'equals', label: '=' },
+    ],
+    valueType: 'boolean',
   },
 ];
 
@@ -126,6 +143,10 @@ function createDefaultCandidateFilters(): FilterRule[] {
   return [
     { id: generateId(), field: 'status', operator: 'notEquals', value: 'Do Not Call', connector: 'and' },
     { id: generateId(), field: 'status', operator: 'notEquals', value: 'Hired', connector: 'and' },
+    { id: generateId(), field: 'status', operator: 'notEquals', value: 'Incompatible', connector: 'and' },
+    { id: generateId(), field: 'country', operator: 'notEquals', value: 'Argentina', connector: 'and' },
+    { id: generateId(), field: 'lastStatusUpdate', operator: 'gte', value: '2026-01-01', connector: 'and' },
+    { id: generateId(), field: 'coeCertified', operator: 'equals', value: true, connector: 'and' },
   ];
 }
 
@@ -187,7 +208,9 @@ export default function FilterStep({
 
   const handleAddRule = useCallback((fieldConfig: FieldConfig) => {
     const defaultOp = fieldConfig.operators[0].value;
-    const defaultValue = fieldConfig.valueType === 'number-currency' ? 0 : '';
+    const defaultValue = fieldConfig.valueType === 'number-currency' ? 0
+      : fieldConfig.valueType === 'boolean' ? true
+      : '';
     const newRule: FilterRule = {
       id: generateId(),
       field: fieldConfig.field,
@@ -515,6 +538,26 @@ function FilterRuleRow({ rule, fieldConfig, filterOptions, onUpdate, onRemove }:
             ))}
           </select>
         </div>
+      )}
+
+      {fieldConfig.valueType === 'date' && (
+        <input
+          type="date"
+          value={rule.value as string || ''}
+          onChange={(e) => onUpdate({ value: e.target.value })}
+          className="glass-input text-sm py-1 px-2 flex-1 text-primary"
+        />
+      )}
+
+      {fieldConfig.valueType === 'boolean' && (
+        <select
+          value={String(rule.value)}
+          onChange={(e) => onUpdate({ value: e.target.value === 'true' })}
+          className="glass-input text-sm py-1 px-2 flex-1 text-primary"
+        >
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
       )}
 
       <button

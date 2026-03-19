@@ -9,7 +9,9 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(5002));
+var configuredBackendPort = builder.Configuration["BACKEND_PORT"] ?? builder.Configuration["Server:Port"];
+var backendPort = int.TryParse(configuredBackendPort, out var parsedBackendPort) ? parsedBackendPort : 5002;
+builder.WebHost.ConfigureKestrel(options => options.ListenLocalhost(backendPort));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -55,6 +57,7 @@ builder.Services.Configure<ClaudeProxySettings>(builder.Configuration.GetSection
 builder.Services.AddHttpClient<ClaudeProxyService>();
 builder.Services.AddScoped<IClaudeProxyService, ClaudeProxyService>();
 builder.Services.AddScoped<IMatchEngineService, MatchEngineService>();
+builder.Services.AddScoped<BenchBurnService>();
 
 var connectionString = builder.Configuration.GetConnectionString("NexusDb");
 builder.Services.AddDbContext<NexusDbContext>(options =>

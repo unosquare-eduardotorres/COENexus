@@ -23,7 +23,9 @@ const GRID_LEVELS = [0.2, 0.4, 0.6, 0.8, 1.0];
 const AXIS_COUNT = 5;
 
 export default function RadarChart({ candidates, size = 300 }: RadarChartProps) {
-  const center = size / 2;
+  const padding = size * 0.15;
+  const svgSize = size + padding * 2;
+  const center = svgSize / 2;
   const radius = size * 0.35;
   const labelRadius = radius + size * 0.1;
 
@@ -60,7 +62,7 @@ export default function RadarChart({ candidates, size = 300 }: RadarChartProps) 
   }
 
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+    <svg viewBox={`0 0 ${svgSize} ${svgSize}`} width={size} height={size}>
       {GRID_LEVELS.map((level) => (
         <polygon
           key={level}

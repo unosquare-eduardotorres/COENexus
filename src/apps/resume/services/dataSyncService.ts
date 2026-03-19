@@ -32,7 +32,7 @@ export const dataSyncService = {
     return raw.map((r: any) => ({ ...r, pipelineStatus: r.status, failed: r.failed ?? false }));
   },
 
-  async clearRecords(source: 'employees' | 'candidates' | 'all', year?: number): Promise<void> {
+  async clearRecords(source: 'employees' | 'candidates' | 'open-positions' | 'all', year?: number): Promise<void> {
     let url = `${API_BASE}/clear/${source}`;
     if (year && source === 'candidates') url += `?year=${year}`;
     const res = await fetch(url, { method: 'DELETE' });

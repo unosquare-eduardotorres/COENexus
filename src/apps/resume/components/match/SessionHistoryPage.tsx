@@ -8,6 +8,7 @@ interface SessionHistoryPageProps {
 }
 
 const SOURCE_LABELS: Record<DataSource, string> = {
+  bench: 'Bench',
   'all-employees': 'Employees',
   candidates: 'Candidates',
   'all-sources': 'All Sources',
@@ -17,6 +18,7 @@ const FLOW_LABELS: Record<MatchFlowType, string> = {
   'find-for-position': 'Find for Position',
   'match-to-positions': 'Match to Positions',
   'delivery-to-op': 'Delivery Pro to OP',
+  'bench-burn': 'Bench Burn',
 };
 
 const STATUS_STYLES: Record<string, { bg: string; dot: string }> = {

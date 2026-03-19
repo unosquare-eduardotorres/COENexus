@@ -35,6 +35,13 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
         string source, string token, int? year = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        if (source == "open-positions")
+        {
+            await foreach (var evt in ExtractOpenPositionsAsync(ct))
+                yield return evt;
+            yield break;
+        }
+
         var eligibleIds = source == "employees"
             ? await GetEligibleEmployeesForExtraction(ct)
             : await GetEligibleCandidatesForExtraction(year, ct);
@@ -271,7 +278,9 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
     {
         var eligibleIds = source == "employees"
             ? await GetEligibleEmployeesForVectorization(ct)
-            : await GetEligibleCandidatesForVectorization(year, ct);
+            : source == "candidates"
+                ? await GetEligibleCandidatesForVectorization(year, ct)
+                : await GetEligibleOpenPositionsForVectorization(ct);
 
         int total = eligibleIds.Count;
         int processed = 0, success = 0, failed = 0, skipped = 0;
@@ -314,7 +323,9 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
 
                 var textToVectorize = source == "employees"
                     ? await BuildEnrichedTextForEmployee(dbId, embedding.ResumeText, ct)
-                    : embedding.ResumeText;
+                    : source == "open-positions"
+                        ? await BuildEnrichedTextForOpenPosition(dbId, embedding.ResumeText, ct)
+                        : embedding.ResumeText;
 
                 batchData.Add((item, recordId, apiKey, textToVectorize, null));
             }
@@ -546,6 +557,18 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
             isBench = emp.IsBench;
             entityStatus = emp.Status;
         }
+        else if (source == "open-positions")
+        {
+            var op = await _dbContext.SyncedOpenPositions
+                .FirstOrDefaultAsync(o => o.UpstreamId == upstreamId, ct)
+                ?? throw new InvalidOperationException($"Open position with upstreamId {upstreamId} not found");
+            dbId = op.Id;
+            name = $"{op.Account} - {op.MainSkill}";
+            noteId = null;
+            filename = null;
+            isBench = false;
+            entityStatus = op.Status;
+        }
         else
         {
             var cand = await _dbContext.SyncedCandidates
@@ -603,7 +626,9 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
 
             var textToVectorize = source == "employees"
                 ? await BuildEnrichedTextForEmployee(dbId, embedding.ResumeText, ct)
-                : embedding.ResumeText;
+                : source == "open-positions"
+                    ? await BuildEnrichedTextForOpenPosition(dbId, embedding.ResumeText, ct)
+                    : embedding.ResumeText;
             var vector = await _voyageService.GenerateEmbeddingAsync(textToVectorize, model, ct);
             embedding.Embedding = new Vector(vector);
             embedding.UpdatedAt = DateTime.UtcNow;
@@ -648,6 +673,16 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
                 await _dbContext.SaveChangesAsync(ct);
             }
         }
+        else if (source == "open-positions")
+        {
+            var op = await _dbContext.SyncedOpenPositions.FirstOrDefaultAsync(o => o.Id == dbId, ct);
+            if (op != null)
+            {
+                op.Status = status;
+                op.Failed = failed;
+                await _dbContext.SaveChangesAsync(ct);
+            }
+        }
         else
         {
             var cand = await _dbContext.SyncedCandidates.FirstOrDefaultAsync(c => c.Id == dbId, ct);
@@ -672,6 +707,16 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
                 await _dbContext.SaveChangesAsync(ct);
             }
         }
+        else if (source == "open-positions")
+        {
+            var op = await _dbContext.SyncedOpenPositions.FirstOrDefaultAsync(o => o.Id == dbId, ct);
+            if (op != null)
+            {
+                op.Failed = true;
+                op.StatusReason = reason;
+                await _dbContext.SaveChangesAsync(ct);
+            }
+        }
         else
         {
             var cand = await _dbContext.SyncedCandidates.FirstOrDefaultAsync(c => c.Id == dbId, ct);
@@ -682,6 +727,116 @@ public class ProcessingOrchestrator : IProcessingOrchestrator
                 await _dbContext.SaveChangesAsync(ct);
             }
         }
+    }
+
+    private async IAsyncEnumerable<ProcessingEvent> ExtractOpenPositionsAsync(
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var eligible = await _dbContext.SyncedOpenPositions
+            .Where(op => op.Status == "synced" && op.JobDescription != "" && !op.Failed)
+            .Select(op => new { op.Id, op.UpstreamId, op.Account, op.MainSkill, op.JobDescription })
+            .ToListAsync(ct);
+
+        int total = eligible.Count, processed = 0, success = 0, failed = 0, skipped = 0;
+        yield return MakeProgress("open-positions", total, processed, success, failed, skipped);
+
+        foreach (var op in eligible)
+        {
+            ct.ThrowIfCancellationRequested();
+            var name = $"{op.Account} - {op.MainSkill}";
+            var recordId = $"open-positions-{op.UpstreamId}";
+            processed++;
+
+            ProcessingRecordEvent recordEvent;
+            try
+            {
+                var sanitizedText = SanitizeUnicode(op.JobDescription);
+                var existing = await _dbContext.ResumeEmbeddings
+                    .FirstOrDefaultAsync(e => e.SourceType == "open-positions" && e.SourceId == op.Id, ct);
+
+                if (existing != null)
+                {
+                    existing.ResumeText = sanitizedText;
+                    existing.Embedding = null;
+                    existing.UpstreamId = op.UpstreamId;
+                    existing.IsBench = false;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    _dbContext.ResumeEmbeddings.Add(new ResumeEmbedding
+                    {
+                        SourceType = "open-positions",
+                        SourceId = op.Id,
+                        UpstreamId = op.UpstreamId,
+                        Embedding = null,
+                        ResumeText = sanitizedText,
+                        IsBench = false,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+
+                await UpdateEntityStatus("open-positions", op.Id, "extracted", false, ct);
+                success++;
+
+                recordEvent = new ProcessingRecordEvent(new ProcessingRecordDto
+                {
+                    Id = recordId, UpstreamId = op.UpstreamId, Name = name,
+                    Status = "completed",
+                    ExtractedChunks = (int)Math.Ceiling(sanitizedText.Length / 512.0)
+                });
+            }
+            catch (Exception ex)
+            {
+                _dbContext.ChangeTracker.Clear();
+                try { await MarkEntityFailed("open-positions", op.Id, ex.Message, ct); } catch { }
+                failed++;
+                recordEvent = new ProcessingRecordEvent(new ProcessingRecordDto
+                {
+                    Id = recordId, UpstreamId = op.UpstreamId, Name = name,
+                    Status = "failed", Error = ex.Message
+                });
+            }
+
+            yield return recordEvent;
+            yield return MakeProgress("open-positions", total, processed, success, failed, skipped);
+        }
+
+        yield return new ProcessingCompleteEvent(new ProcessingProgressDto
+        {
+            Source = "open-positions", Status = "completed",
+            TotalRecords = total, ProcessedRecords = processed,
+            SuccessCount = success, FailedCount = failed, SkippedCount = skipped
+        });
+    }
+
+    private async Task<List<(int DbId, int UpstreamId, string Name)>> GetEligibleOpenPositionsForVectorization(CancellationToken ct)
+    {
+        return await _dbContext.SyncedOpenPositions
+            .Where(op => op.Status == "extracted" && !op.Failed)
+            .Select(op => new { op.Id, op.UpstreamId, op.Account, op.MainSkill })
+            .AsAsyncEnumerable()
+            .Select(op => (op.Id, op.UpstreamId, $"{op.Account} - {op.MainSkill}"))
+            .ToListAsync(ct);
+    }
+
+    private async Task<string> BuildEnrichedTextForOpenPosition(int dbId, string rawText, CancellationToken ct)
+    {
+        var op = await _dbContext.SyncedOpenPositions.FirstOrDefaultAsync(o => o.Id == dbId, ct);
+        if (op == null) return rawText;
+
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(op.Account)) lines.Add($"Account: {op.Account}");
+        if (!string.IsNullOrWhiteSpace(op.MainSkill)) lines.Add($"Main Skill: {op.MainSkill}");
+        if (!string.IsNullOrWhiteSpace(op.Seniorities)) lines.Add($"Seniorities: {op.Seniorities}");
+        if (!string.IsNullOrWhiteSpace(op.Countries)) lines.Add($"Countries: {op.Countries}");
+        if (!string.IsNullOrWhiteSpace(op.Coe)) lines.Add($"CoE: {op.Coe}");
+        if (!string.IsNullOrWhiteSpace(op.Practice)) lines.Add($"Practice: {op.Practice}");
+        if (!string.IsNullOrWhiteSpace(op.JobTitle)) lines.Add($"Job Title: {op.JobTitle}");
+
+        if (lines.Count == 0) return rawText;
+        return string.Join("\n", lines) + "\n---\n" + rawText;
     }
 
     private async Task<List<(int DbId, int UpstreamId, string Name, int? NoteId, string? Filename, bool IsBench)>> GetEligibleEmployeesForExtraction(CancellationToken ct)

@@ -184,6 +184,9 @@ export const matchEngineService = {
         topN: request.topN,
         searchMode: request.searchMode,
         constraints: normalizeConstraints(request.constraints),
+        haikuPromptConfig: request.haikuPromptConfig,
+        opusPromptConfig: request.opusPromptConfig,
+        candidateUpstreamIds: request.candidateUpstreamIds,
       }),
     });
 

@@ -31,6 +31,9 @@ public record MatchRequest
     public int TopN { get; init; } = 10;
     public string SearchMode { get; init; } = "opus";
     public AdvancedConstraints? Constraints { get; init; }
+    public PromptConfig? HaikuPromptConfig { get; init; }
+    public PromptConfig? OpusPromptConfig { get; init; }
+    public List<int>? CandidateUpstreamIds { get; init; }
 }
 
 public record MatchConstraints
@@ -91,6 +94,7 @@ public class VectorSearchResult
     public decimal? SalaryExpectations { get; set; }
     public string? SalaryExpectationsCurrency { get; set; }
     public decimal? GrossMonthlySalary { get; set; }
+    public DateTime? LastStatusUpdate { get; set; }
 }
 
 public record HaikuTriageResult
@@ -128,6 +132,14 @@ public record SkillMatchDto
     public string Name { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public int Years { get; init; }
+    public string? Priority { get; init; }
+}
+
+public record NonTechSkillDto
+{
+    public string Label { get; init; } = string.Empty;
+    public string Priority { get; init; } = "required";
+    public string Status { get; init; } = string.Empty;
 }
 
 public record DomainExperienceDto
@@ -160,8 +172,8 @@ public record MatchCandidateResult
     public List<SkillMatchDto> Skills { get; init; } = [];
     public List<DomainExperienceDto> Domains { get; init; } = [];
     public List<GapAnalysisDto> Gaps { get; init; } = [];
-    public List<string> Leadership { get; init; } = [];
-    public List<string> SoftSkills { get; init; } = [];
+    public JsonElement Leadership { get; init; }
+    public JsonElement SoftSkills { get; init; }
     public string Seniority { get; init; } = string.Empty;
     public decimal ExpectedRate { get; init; }
     public string Currency { get; init; } = string.Empty;
@@ -172,6 +184,7 @@ public record MatchCandidateResult
     public SonnetAnalysis? Analysis { get; init; }
     public decimal SalaryExpectations { get; init; }
     public string SalaryExpectationsCurrency { get; init; } = string.Empty;
+    public string? LastStatusUpdate { get; init; }
 }
 
 public record MatchSearchResult
@@ -292,4 +305,11 @@ public record HaikuRejectedCandidate
 public record HaikuConfirmRequest
 {
     public string Action { get; init; } = "proceed";
+}
+
+public record PromptConfig
+{
+    public string PromptTemplate { get; init; } = string.Empty;
+    public int MaxTokens { get; init; } = 256;
+    public double Temperature { get; init; } = 0.1;
 }

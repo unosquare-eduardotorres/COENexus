@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using OperationNexus.Api.Converters;
+
 namespace OperationNexus.Api.Models.Upstream;
 
 public class OpenPositionListItem
@@ -33,8 +36,11 @@ public class OpenPositionDetail
     public string Seniority { get; set; } = string.Empty;
     public string Research { get; set; } = string.Empty;
     public string Active { get; set; } = string.Empty;
-    public decimal MaximumRate { get; set; }
-    public decimal MinimumRate { get; set; }
+    [JsonConverter(typeof(NullableDecimalConverter))]
+    public decimal? MaximumRate { get; set; }
+
+    [JsonConverter(typeof(NullableDecimalConverter))]
+    public decimal? MinimumRate { get; set; }
     public string? Comments { get; set; }
 }
 
@@ -45,7 +51,8 @@ public class PresentedCandidateItem
     public string CandidateStatusName { get; set; } = string.Empty;
     public string StartDate { get; set; } = string.Empty;
     public string Skills { get; set; } = string.Empty;
-    public decimal Rate { get; set; }
+    [JsonConverter(typeof(NullableDecimalConverter))]
+    public decimal? Rate { get; set; }
     public bool IsEmployee { get; set; }
     public int CandidateId { get; set; }
 }
