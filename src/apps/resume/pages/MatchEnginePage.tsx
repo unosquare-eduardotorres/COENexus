@@ -39,6 +39,7 @@ import SessionHistoryPage from '../components/match/SessionHistoryPage';
 import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
 import BenchBurnPage from './BenchBurnPage';
 import DeliveryToOpPage from './DeliveryToOpPage';
+import ExternalCandidateToOpPage from './ExternalCandidateToOpPage';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
   bench: 'Bench',
@@ -52,6 +53,7 @@ const MATCH_FLOW_LABELS: Record<MatchFlowType, string> = {
   'match-to-positions': 'Match to Positions',
   'delivery-to-op': 'Delivery Pro to OP',
   'bench-burn': 'Bench Burn',
+  'external-candidate-to-op': 'External Candidate to OP',
 };
 
 const PIPELINE_STAGE_LABELS: Record<PipelineStageKey, string> = {
@@ -233,6 +235,11 @@ export default function MatchEnginePage() {
         return;
       }
 
+      if (flow === 'external-candidate-to-op') {
+        navigateToStep('external-candidate-to-op');
+        return;
+      }
+
       navigateToStep('data-source');
     },
     [completeStep, navigateToStep]
@@ -391,7 +398,7 @@ export default function MatchEnginePage() {
       setMatchFlow(detail.matchFlowType);
       setShowSessionHistory(false);
 
-      if (detail.matchFlowType === 'delivery-to-op' || detail.matchFlowType === 'bench-burn') {
+      if (detail.matchFlowType === 'delivery-to-op' || detail.matchFlowType === 'bench-burn' || detail.matchFlowType === 'external-candidate-to-op') {
         setCompletedSteps(new Set<MatchStepKey>(['intent']));
         navigateToStep(detail.matchFlowType);
         setTimeout(() => setAnimateIn(true), 50);
@@ -676,7 +683,7 @@ export default function MatchEnginePage() {
           </div>
         )}
 
-        {currentStepKey !== 'bench-burn' && currentStepKey !== 'delivery-to-op' && (
+        {currentStepKey !== 'bench-burn' && currentStepKey !== 'delivery-to-op' && currentStepKey !== 'external-candidate-to-op' && (
           <StepperBar
             stepLabels={STEP_LABELS}
             currentStepKey={currentStepKey}
@@ -725,6 +732,10 @@ export default function MatchEnginePage() {
 
         {currentStepKey === 'delivery-to-op' && (
           <DeliveryToOpPage onReset={handleReset} initialSessionId={sessionId} />
+        )}
+
+        {currentStepKey === 'external-candidate-to-op' && (
+          <ExternalCandidateToOpPage onReset={handleReset} initialSessionId={sessionId} />
         )}
 
         {currentStepKey === 'data-source' && (

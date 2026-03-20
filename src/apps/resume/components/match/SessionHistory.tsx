@@ -19,6 +19,7 @@ const FLOW_LABELS: Record<MatchFlowType, string> = {
   'match-to-positions': 'Match to Positions',
   'delivery-to-op': 'Delivery Pro to OP',
   'bench-burn': 'Bench Burn',
+  'external-candidate-to-op': 'External Candidate to OP',
 };
 
 const STATUS_STYLES: Record<string, string> = {

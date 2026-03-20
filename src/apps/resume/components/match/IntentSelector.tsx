@@ -63,6 +63,16 @@ function FlameIcon() {
   );
 }
 
+function UploadCloudIcon() {
+  return (
+    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+      <path d="M12 12v9" />
+      <path d="m16 16-4-4-4 4" />
+    </svg>
+  );
+}
+
 function ClockHistoryIcon() {
   return (
     <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -115,6 +125,17 @@ const INTENTS: IntentOption[] = [
     icon: <MicroscopeIcon />,
     gradient: 'from-rose-500 to-pink-500',
     tagColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    enabled: true,
+  },
+  {
+    id: 'external-candidate-to-op',
+    title: 'External Candidate to OP',
+    description:
+      'Upload external candidate resumes and evaluate their fit against an open position — ideal for vendor-submitted applicants.',
+    tags: ['Resume Upload', 'Fit Assessment', 'Recommendations'],
+    icon: <UploadCloudIcon />,
+    gradient: 'from-cyan-500 to-blue-500',
+    tagColor: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
     enabled: true,
   },
 ];

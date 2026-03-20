@@ -462,11 +462,31 @@ export interface SearchProgress {
   stage: string;
 }
 
-export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op' | 'bench-burn';
+export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op' | 'bench-burn' | 'external-candidate-to-op';
 
-export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn' | 'delivery-to-op';
+export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn' | 'delivery-to-op' | 'external-candidate-to-op';
 
 export type DeliveryToOpStepKey = 'employee' | 'positions' | 'summary' | 'analyzing' | 'results';
+
+export type ExternalCandidateToOpStepKey = 'upload' | 'position' | 'summary' | 'analyzing' | 'results';
+
+export interface ExternalResumeFile {
+  id: string;
+  file: File;
+  name: string;
+  text: string | null;
+  error: string | null;
+  status: 'pending' | 'parsing' | 'parsed' | 'error';
+}
+
+export interface ExternalCandidateMatchRequest {
+  name: string;
+  matchFlowType: 'external-candidate-to-op';
+  positionUpstreamIds: number[];
+  candidates: { name: string; resumeText: string }[];
+  opusPromptConfig?: { promptTemplate: string; maxTokens: number; temperature: number };
+  customPosition?: { name: string; jobDescription: string };
+}
 
 export type JdSource = 'position' | 'custom';
 

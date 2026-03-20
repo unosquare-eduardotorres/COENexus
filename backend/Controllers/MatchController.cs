@@ -340,4 +340,35 @@ public class MatchController : ControllerBase
             await Response.Body.FlushAsync();
         }
     }
+
+    [HttpPost("external-candidate")]
+    public async Task StreamExternalCandidateMatch([FromBody] ExternalCandidateMatchRequest request)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        try
+        {
+            await foreach (var evt in _benchBurnService.ExecuteExternalCandidateAsync(request, HttpContext.RequestAborted))
+            {
+                var (eventName, data) = evt switch
+                {
+                    BenchBurnProgressEvent e => ("progress", JsonSerializer.Serialize(e.Progress, jsonOptions)),
+                    BenchBurnResultEvent e => ("result", JsonSerializer.Serialize(e.Result, jsonOptions)),
+                    _ => throw new InvalidOperationException()
+                };
+                await Response.WriteAsync($"event: {eventName}\ndata: {data}\n\n");
+                await Response.Body.FlushAsync();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ExternalCandidate] Stream died: {ex}");
+            var errorData = JsonSerializer.Serialize(new { error = ex.Message }, jsonOptions);
+            await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
+            await Response.Body.FlushAsync();
+        }
+    }
 }

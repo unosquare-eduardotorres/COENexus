@@ -31,6 +31,22 @@ public record BenchBurnPairInput
     public int PositionUpstreamId { get; init; }
 }
 
+public record ExternalCandidateMatchRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string MatchFlowType { get; init; } = "external-candidate-to-op";
+    public List<int> PositionUpstreamIds { get; init; } = [];
+    public List<ExternalCandidateInput> Candidates { get; init; } = [];
+    public PromptConfig? OpusPromptConfig { get; init; }
+    public CustomPositionInput? CustomPosition { get; init; }
+}
+
+public record ExternalCandidateInput
+{
+    public string Name { get; init; } = string.Empty;
+    public string ResumeText { get; init; } = string.Empty;
+}
+
 public record CrossMatchResultDto
 {
     public int EmployeeUpstreamId { get; init; }

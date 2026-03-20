@@ -2,6 +2,7 @@ import {
   BenchEmployee,
   BenchOpenPosition,
   BenchBurnRequest,
+  ExternalCandidateMatchRequest,
   CrossMatchResult,
   CandidateTiming,
   SearchProgress,
@@ -22,6 +23,59 @@ export interface BenchBurnSearchResult {
     candidateTimings?: CandidateTiming[];
   };
 }
+
+const parseSSEStream = (
+  res: Response,
+  onProgress: (p: SearchProgress) => void,
+  errorMessage = 'Search error',
+  noResultMessage = 'No result received from stream',
+): Promise<BenchBurnSearchResult> =>
+  new Promise(async (resolve, reject) => {
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+    let result: BenchBurnSearchResult | null = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ') && currentEvent) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (currentEvent === 'progress') {
+                onProgress(data);
+              } else if (currentEvent === 'result') {
+                result = data;
+              } else if (currentEvent === 'error') {
+                reject(new Error(data.error || errorMessage));
+                return;
+              }
+            } catch {
+            }
+            currentEvent = '';
+          }
+        }
+      }
+
+      if (!result) {
+        reject(new Error(noResultMessage));
+      } else {
+        resolve(result);
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
 
 export const benchBurnService = {
   async getBenchEmployees(): Promise<BenchEmployee[]> {
@@ -62,52 +116,7 @@ export const benchBurnService = {
     if (!res.ok) throw new Error(`Retry failed: ${res.status}`);
     if (!res.body) throw new Error('No response body');
 
-    return new Promise(async (resolve, reject) => {
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
-      let result: BenchBurnSearchResult | null = null;
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              currentEvent = line.slice(7).trim();
-            } else if (line.startsWith('data: ') && currentEvent) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (currentEvent === 'progress') {
-                  onProgress(data);
-                } else if (currentEvent === 'result') {
-                  result = data;
-                } else if (currentEvent === 'error') {
-                  reject(new Error(data.error || 'Retry error'));
-                  return;
-                }
-              } catch {
-              }
-              currentEvent = '';
-            }
-          }
-        }
-
-        if (!result) {
-          reject(new Error('No result received from retry'));
-        } else {
-          resolve(result);
-        }
-      } catch (err) {
-        reject(err);
-      }
-    });
+    return parseSSEStream(res, onProgress, 'Retry error', 'No result received from retry');
   },
 
   async executeBenchBurn(
@@ -123,52 +132,21 @@ export const benchBurnService = {
     if (!res.ok) throw new Error(`Bench burn failed: ${res.status}`);
     if (!res.body) throw new Error('No response body');
 
-    return new Promise(async (resolve, reject) => {
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
-      let result: BenchBurnSearchResult | null = null;
+    return parseSSEStream(res, onProgress, 'Bench burn error', 'No result received from bench burn');
+  },
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              currentEvent = line.slice(7).trim();
-            } else if (line.startsWith('data: ') && currentEvent) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (currentEvent === 'progress') {
-                  onProgress(data);
-                } else if (currentEvent === 'result') {
-                  result = data;
-                } else if (currentEvent === 'error') {
-                  reject(new Error(data.error || 'Bench burn error'));
-                  return;
-                }
-              } catch {
-                // skip malformed JSON
-              }
-              currentEvent = '';
-            }
-          }
-        }
-
-        if (!result) {
-          reject(new Error('No result received from bench burn'));
-        } else {
-          resolve(result);
-        }
-      } catch (err) {
-        reject(err);
-      }
+  async executeExternalCandidateMatch(
+    request: ExternalCandidateMatchRequest,
+    onProgress: (p: SearchProgress) => void,
+  ): Promise<BenchBurnSearchResult> {
+    const res = await fetch(`${API_BASE}/external-candidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
     });
+
+    if (!res.ok) throw new Error(`External candidate match failed: ${res.status}`);
+    if (!res.body) throw new Error('No response body');
+    return parseSSEStream(res, onProgress);
   },
 };

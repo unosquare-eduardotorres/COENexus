@@ -108,4 +108,15 @@ Current Title: {{employeeJobTitle}}
 Seniority: {{seniority}}
 Main Skill: {{employeeMainSkill}}
 Country: {{country}}";
+
+    public const string ExternalCandidateContextBlock = @"Open Position:
+Account: {{account}}
+Job Title: {{jobTitle}}
+Main Skill: {{positionMainSkill}}
+Job Description:
+{{jobDescription}}
+
+External Candidate:
+Name: {{candidateName}}
+Source File: {{sourceFileName}}";
 }

@@ -9,6 +9,7 @@ interface BenchPositionSelectorProps {
   onNext: (positions: BenchOpenPosition[], customPositions: { name: string; jd: string }[]) => void;
   initialSelected?: BenchOpenPosition[];
   initialCustom?: { name: string; jd: string }[];
+  singleSelect?: boolean;
 }
 
 function posAccessor(pos: BenchOpenPosition, key: string): string | number | null {
@@ -28,15 +29,16 @@ export default function BenchPositionSelector({
   onNext,
   initialSelected = [],
   initialCustom = [],
+  singleSelect = false,
 }: BenchPositionSelectorProps) {
   const [positions, setPositions] = useState<BenchOpenPosition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Map<number, BenchOpenPosition>>(
-    () => new Map(initialSelected.map(p => [p.upstreamId, p]))
+    () => new Map((singleSelect ? initialSelected.slice(0, 1) : initialSelected).map(p => [p.upstreamId, p]))
   );
-  const [customPositions, setCustomPositions] = useState<{ name: string; jd: string }[]>(initialCustom);
+  const [customPositions, setCustomPositions] = useState<{ name: string; jd: string }[]>(singleSelect ? [] : initialCustom);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customJd, setCustomJd] = useState('');
@@ -47,6 +49,17 @@ export default function BenchPositionSelector({
       .then(data => { setPositions(data); setLoading(false); })
       .catch(err => { setError(err.message); setLoading(false); });
   }, []);
+
+  useEffect(() => {
+    if (!singleSelect) return;
+    setSelected(prev => {
+      if (prev.size <= 1) return prev;
+      const first = prev.values().next().value;
+      return first ? new Map([[first.upstreamId, first]]) : new Map();
+    });
+    setCustomPositions([]);
+    setShowCustomForm(false);
+  }, [singleSelect]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return positions;
@@ -70,6 +83,12 @@ export default function BenchPositionSelector({
   const toggleSelect = (pos: BenchOpenPosition) => {
     if (!pos.isVectorized) return;
     setSelected(prev => {
+      if (singleSelect) {
+        if (prev.has(pos.upstreamId)) {
+          return new Map();
+        }
+        return new Map([[pos.upstreamId, pos]]);
+      }
       const next = new Map(prev);
       if (next.has(pos.upstreamId)) {
         next.delete(pos.upstreamId);
@@ -142,13 +161,15 @@ export default function BenchPositionSelector({
               placeholder="Search by account, skill, COE, stakeholder..."
             />
           </div>
-          <button
-            onClick={selectAllFiltered}
-            className="px-3 py-2 text-xs font-medium text-accent-500 hover:bg-accent-500/10 rounded-lg transition-colors whitespace-nowrap"
-          >
-            Select All ({filtered.filter(p => p.isVectorized).length})
-          </button>
-          {selected.size > 0 && (
+          {!singleSelect && (
+            <button
+              onClick={selectAllFiltered}
+              className="px-3 py-2 text-xs font-medium text-accent-500 hover:bg-accent-500/10 rounded-lg transition-colors whitespace-nowrap"
+            >
+              Select All ({filtered.filter(p => p.isVectorized).length})
+            </button>
+          )}
+          {!singleSelect && selected.size > 0 && (
             <button
               onClick={deselectAll}
               className="px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors whitespace-nowrap"
@@ -156,18 +177,20 @@ export default function BenchPositionSelector({
               Clear
             </button>
           )}
-          <button
-            onClick={() => setShowCustomForm(!showCustomForm)}
-            className="px-3 py-2 text-xs font-medium text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Custom
-          </button>
+          {!singleSelect && (
+            <button
+              onClick={() => setShowCustomForm(!showCustomForm)}
+              className="px-3 py-2 text-xs font-medium text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Custom
+            </button>
+          )}
         </div>
 
-        {showCustomForm && (
+        {!singleSelect && showCustomForm && (
           <div className="mb-4 p-4 rounded-xl border-2 border-dashed border-emerald-500/30 bg-emerald-500/5">
             <h4 className="text-sm font-medium text-primary mb-3">Add Custom Position</h4>
             <input
@@ -202,7 +225,7 @@ export default function BenchPositionSelector({
           </div>
         )}
 
-        {customPositions.length > 0 && (
+        {!singleSelect && customPositions.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2">
             {customPositions.map((cp, i) => (
               <div

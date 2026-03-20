@@ -33,6 +33,8 @@ public class BenchBurnService
 
     private static readonly string CROSS_MATCH_PROMPT =
         PromptTemplates.OpusAnalysis.Replace("{{contextBlock}}", PromptTemplates.BenchBurnContextBlock);
+    private static readonly string EXTERNAL_CANDIDATE_PROMPT =
+        PromptTemplates.OpusAnalysis.Replace("{{contextBlock}}", PromptTemplates.ExternalCandidateContextBlock);
 
     public BenchBurnService(
         NexusDbContext dbContext,
@@ -357,6 +359,341 @@ public class BenchBurnService
         result = result with { SessionId = session.Id };
 
         yield return new BenchBurnProgressEvent(new MatchSearchProgress(100, "Bench burn analysis complete!"));
+        yield return new BenchBurnResultEvent(result);
+    }
+
+    public async IAsyncEnumerable<BenchBurnEvent> ExecuteExternalCandidateAsync(
+        ExternalCandidateMatchRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var timings = new Dictionary<string, long>();
+        var candidateTimings = new ConcurrentBag<CandidateTimingDto>();
+
+        yield return new BenchBurnProgressEvent(new MatchSearchProgress(2, "Loading external candidates and positions..."));
+
+        var phase = Stopwatch.StartNew();
+
+        var positions = await _dbContext.SyncedOpenPositions
+            .AsNoTracking()
+            .Where(p => request.PositionUpstreamIds.Contains(p.UpstreamId))
+            .ToListAsync(ct);
+
+        var allPositionIds = request.PositionUpstreamIds.ToList();
+        var customPositionMap = new Dictionary<int, CustomPositionInput>();
+        if (request.CustomPosition != null)
+        {
+            customPositionMap[-100] = request.CustomPosition;
+            allPositionIds.Add(-100);
+        }
+
+        var candidates = request.Candidates
+            .Select((candidate, index) => new { CandidateId = -(index + 1), Candidate = candidate })
+            .ToList();
+
+        phase.Stop();
+        timings["dataLoadMs"] = phase.ElapsedMilliseconds;
+
+        yield return new BenchBurnProgressEvent(new MatchSearchProgress(8, "Computing vector similarities..."));
+
+        phase = Stopwatch.StartNew();
+
+        var positionEmbeddings = await _dbContext.ResumeEmbeddings
+            .AsNoTracking()
+            .Where(re => re.SourceType == "open-positions"
+                && request.PositionUpstreamIds.Contains(re.UpstreamId)
+                && re.Embedding != null)
+            .Select(re => new { re.UpstreamId, re.Embedding })
+            .ToListAsync(ct);
+
+        var positionEmbeddingMap = positionEmbeddings
+            .Where(p => p.Embedding != null)
+            .ToDictionary(p => p.UpstreamId, p => p.Embedding!.ToArray());
+
+        if (customPositionMap.Count > 0)
+        {
+            foreach (var (customId, cp) in customPositionMap)
+            {
+                var posEmb = await _voyageService.GenerateEmbeddingAsync(cp.JobDescription, "voyage-4-large", ct);
+                positionEmbeddingMap[customId] = posEmb;
+            }
+        }
+
+        var similarityMap = new Dictionary<(int empId, int posId), double>();
+        foreach (var candidate in candidates)
+        {
+            var resumeText = candidate.Candidate.ResumeText ?? string.Empty;
+            var candidateEmbedding = await _voyageService.GenerateEmbeddingAsync(resumeText, "voyage-4-large", ct);
+
+            foreach (var posId in allPositionIds)
+            {
+                var cosine = positionEmbeddingMap.TryGetValue(posId, out var posEmbedding)
+                    ? CosineSimilarity(candidateEmbedding, posEmbedding)
+                    : 0.0;
+                similarityMap[(candidate.CandidateId, posId)] = cosine;
+            }
+        }
+
+        phase.Stop();
+        timings["vectorSimilarityMs"] = phase.ElapsedMilliseconds;
+
+        var pairs = new List<(int empId, int posId)>();
+        foreach (var candidate in candidates)
+        foreach (var posId in allPositionIds)
+            pairs.Add((candidate.CandidateId, posId));
+
+        var totalPairs = pairs.Count;
+        yield return new BenchBurnProgressEvent(new MatchSearchProgress(15, $"Analyzing {totalPairs} candidate×position pairs..."));
+
+        var allResults = new ConcurrentBag<CrossMatchResultDto>();
+        var completed = 0;
+        var fallbackCount = 0;
+        var semaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
+
+        var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? EXTERNAL_CANDIDATE_PROMPT;
+        if (request.OpusPromptConfig?.ContextBlock != null)
+            opusTemplate = opusTemplate.Replace("{{contextBlock}}", request.OpusPromptConfig.ContextBlock);
+        var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 5120;
+        var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
+        var model = _claudeSettings.OpusModel;
+
+        var candidateLookup = candidates.ToDictionary(c => c.CandidateId, c => c.Candidate);
+        var posLookup = positions.ToDictionary(p => p.UpstreamId);
+
+        phase = Stopwatch.StartNew();
+
+        var tasks = pairs.Select(async pair =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var (candidateId, posId) = pair;
+                var candidate = candidateLookup.GetValueOrDefault(candidateId);
+                var candidateName = string.IsNullOrWhiteSpace(candidate?.Name) ? "External Candidate" : candidate!.Name;
+                var cosine = similarityMap.GetValueOrDefault((candidateId, posId), 0.0);
+                var resumeText = candidate?.ResumeText ?? "No resume text available";
+                var snippet = resumeText.Length > 6000 ? resumeText[..6000] : resumeText;
+
+                string posAccount, posJobTitle, posMainSkill, posJd, posLabel;
+                if (posId < 0 && customPositionMap.TryGetValue(posId, out var custom))
+                {
+                    posAccount = "Custom";
+                    posJobTitle = custom.Name;
+                    posMainSkill = custom.Name;
+                    posJd = custom.JobDescription;
+                    posLabel = $"Custom - {custom.Name}";
+                }
+                else
+                {
+                    var pos = posLookup.GetValueOrDefault(posId);
+                    posAccount = pos?.Account ?? "N/A";
+                    posJobTitle = pos?.JobTitle ?? "N/A";
+                    posMainSkill = pos?.MainSkill ?? "N/A";
+                    posJd = pos?.JobDescription ?? "No job description available";
+                    var posStakeholder = pos?.Stakeholder ?? "";
+                    posLabel = $"{posAccount} - {posMainSkill} ({posStakeholder}) [#{posId}]";
+                }
+
+                var prompt = opusTemplate
+                    .Replace("{{candidateName}}", candidateName)
+                    .Replace("{{sourceFileName}}", "External Candidate")
+                    .Replace("{{account}}", posAccount)
+                    .Replace("{{jobTitle}}", posJobTitle)
+                    .Replace("{{positionMainSkill}}", posMainSkill)
+                    .Replace("{{jobDescription}}", posJd)
+                    .Replace("{{employeeName}}", candidateName)
+                    .Replace("{{employeeJobTitle}}", "External Candidate")
+                    .Replace("{{employeeMainSkill}}", "N/A")
+                    .Replace("{{mainSkill}}", "N/A")
+                    .Replace("{{seniority}}", "N/A")
+                    .Replace("{{country}}", "N/A")
+                    .Replace("{{salaryDisplay}}", "N/A")
+                    .Replace("{{availabilityDisplay}}", "N/A")
+                    .Replace("{{rate}}", "N/A")
+                    .Replace("{{currency}}", "N/A")
+                    .Replace("{{isBench}}", "External Candidate")
+                    .Replace("{{sourceType}}", "External Candidate")
+                    .Replace("{{resume}}", snippet);
+
+                var callTimer = Stopwatch.StartNew();
+
+                const int maxRetries = 1;
+                CrossMatchParsed? parsed = null;
+                Exception? lastEx = null;
+
+                for (var attempt = 0; attempt <= maxRetries; attempt++)
+                {
+                    try
+                    {
+                        var response = await _claudeProxy.ChatAsync(model, prompt, opusMaxTokens, opusTemp, ct: ct);
+                        var jsonStart = response.IndexOf('{');
+                        var jsonEnd = response.LastIndexOf('}');
+                        if (jsonStart >= 0 && jsonEnd > jsonStart)
+                        {
+                            var jsonStr = response[jsonStart..(jsonEnd + 1)];
+                            parsed = JsonSerializer.Deserialize<CrossMatchParsed>(jsonStr, JsonOptions);
+                            if (parsed != null) break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        lastEx = ex;
+                        _logger.LogWarning("[ExternalCandidate] Opus attempt {Attempt} failed for {Candidate}×{Pos}: {Err}",
+                            attempt + 1, candidateId, posId, ex.Message);
+                        if (attempt < maxRetries)
+                            await Task.Delay(1000 * (attempt + 1), ct);
+                    }
+                }
+
+                callTimer.Stop();
+
+                if (parsed != null)
+                {
+                    candidateTimings.Add(new CandidateTimingDto
+                    {
+                        Name = $"{candidateName} × {posLabel}",
+                        Phase = "opus",
+                        DurationMs = callTimer.ElapsedMilliseconds,
+                        Fallback = false,
+                    });
+
+                    allResults.Add(new CrossMatchResultDto
+                    {
+                        EmployeeUpstreamId = candidateId,
+                        EmployeeName = candidateName,
+                        PositionUpstreamId = posId,
+                        PositionLabel = posLabel,
+                        MatchScore = parsed.MatchScore,
+                        CosineSimilarity = cosine,
+                        Scores = parsed.Scores ?? new MatchScoresDto(),
+                        Skills = SkillMatchDto.Normalize(parsed.Skills ?? []),
+                        Gaps = parsed.Gaps ?? [],
+                        Domains = parsed.Domains ?? [],
+                        Analysis = parsed.Analysis,
+                        Summary = parsed.Summary ?? ""
+                    });
+                }
+                else
+                {
+                    candidateTimings.Add(new CandidateTimingDto
+                    {
+                        Name = $"{candidateName} × {posLabel}",
+                        Phase = "opus",
+                        DurationMs = callTimer.ElapsedMilliseconds,
+                        Fallback = true,
+                        Error = lastEx?.Message,
+                    });
+                    Interlocked.Increment(ref fallbackCount);
+
+                    allResults.Add(new CrossMatchResultDto
+                    {
+                        EmployeeUpstreamId = candidateId,
+                        EmployeeName = candidateName,
+                        PositionUpstreamId = posId,
+                        PositionLabel = posLabel,
+                        MatchScore = (int)(cosine * 100),
+                        CosineSimilarity = cosine,
+                        Scores = new MatchScoresDto
+                        {
+                            Technical = (int)(cosine * 90),
+                            Domain = (int)(cosine * 70),
+                            Leadership = 50,
+                            SoftSkills = 50,
+                            Availability = 100
+                        },
+                        Summary = "AI analysis unavailable — score based on vector similarity only."
+                    });
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+                Interlocked.Increment(ref completed);
+            }
+        }).ToList();
+
+        while (!Task.WhenAll(tasks).IsCompleted)
+        {
+            await Task.Delay(500, ct);
+            var pct = 15 + (int)(80.0 * completed / Math.Max(totalPairs, 1));
+            yield return new BenchBurnProgressEvent(new MatchSearchProgress(
+                Math.Min(pct, 95),
+                $"Analyzing pairs... ({completed}/{totalPairs})"));
+        }
+
+        await Task.WhenAll(tasks);
+
+        phase.Stop();
+        timings["opusAnalysisMs"] = phase.ElapsedMilliseconds;
+        timings["opusCallCount"] = totalPairs;
+        timings["opusFallbackCount"] = fallbackCount;
+        timings["opusAvgMs"] = totalPairs > 0 ? phase.ElapsedMilliseconds / totalPairs : 0;
+        timings["opusMaxConcurrency"] = _claudeSettings.MaxConcurrency;
+
+        yield return new BenchBurnProgressEvent(new MatchSearchProgress(96, "Building result matrix..."));
+
+        var resultsList = allResults.ToList();
+        const int topNPerCandidate = 5;
+        const int topNPerPosition = 3;
+
+        var employeeResults = resultsList
+            .GroupBy(r => r.EmployeeUpstreamId)
+            .ToDictionary(
+                g => g.Key.ToString(),
+                g => g.OrderByDescending(r => r.MatchScore)
+                       .Take(topNPerCandidate)
+                       .ToList());
+
+        var positionResults = resultsList
+            .GroupBy(r => r.PositionUpstreamId)
+            .ToDictionary(
+                g => g.Key.ToString(),
+                g => g.OrderByDescending(r => r.MatchScore)
+                       .Take(topNPerPosition)
+                       .ToList());
+
+        stopwatch.Stop();
+
+        var result = new BenchBurnResultDto
+        {
+            EmployeeResults = employeeResults,
+            PositionResults = positionResults,
+            Stats = new BenchBurnStatsDto
+            {
+                TotalPairs = totalPairs,
+                Analyzed = resultsList.Count,
+                Time = $"{stopwatch.Elapsed.TotalSeconds:F1}s",
+                SearchCost = "$0.00",
+                Timings = timings,
+                CandidateTimings = candidateTimings.ToList(),
+            }
+        };
+
+        var session = new MatchSession
+        {
+            Name = string.IsNullOrWhiteSpace(request.Name)
+                ? $"External Candidate — {DateTime.UtcNow:yyyy-MM-dd HH:mm}"
+                : request.Name,
+            MatchFlowType = "external-candidate-to-op",
+            DataSource = "external-candidate",
+            TopN = topNPerCandidate,
+            SearchMode = "opus",
+            JobDescription = "",
+            JdSource = "external-candidate-to-op",
+            Status = "completed",
+            CreatedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            PipelineStatsJson = JsonSerializer.Serialize(result.Stats, JsonOptions),
+            ResultsJson = JsonSerializer.Serialize(result, JsonOptions),
+        };
+        _dbContext.MatchSessions.Add(session);
+        await _dbContext.SaveChangesAsync(ct);
+
+        result = result with { SessionId = session.Id };
+
+        yield return new BenchBurnProgressEvent(new MatchSearchProgress(100, "External candidate analysis complete!"));
         yield return new BenchBurnResultEvent(result);
     }
 
