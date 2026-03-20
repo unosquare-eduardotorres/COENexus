@@ -1,7 +1,9 @@
 import { BenchEmployee, BenchOpenPosition, CrossMatchResult } from '../../types';
 import { BenchBurnSearchResult } from '../../services/benchBurnService';
 import ScoreRing from './ScoreRing';
+import CategoryBar from './CategoryBar';
 import BenchBurnPipelineStats from './BenchBurnPipelineStats';
+import { getFitVerdictConfig, getInitials } from './shared/matchDetailUtils';
 
 interface DeliveryToOpResultsProps {
   results: BenchBurnSearchResult;
@@ -65,7 +67,7 @@ export default function DeliveryToOpResults({
 
       <div className="glass-card p-4 flex items-center gap-4">
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
-          {employee.name.charAt(0)}
+          {getInitials(employee.name)}
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-primary">{employee.name}</div>
@@ -90,16 +92,28 @@ export default function DeliveryToOpResults({
       <div className="space-y-2">
         {sortedMatches.map((match, idx) => {
           const pos = getPosition(match.positionUpstreamId);
+          const verdictConfig = match.analysis?.fitVerdict ? getFitVerdictConfig(match.analysis.fitVerdict) : null;
           return (
             <button
               key={`${match.positionUpstreamId}-${idx}`}
               onClick={() => onSelectMatch(match, employee, pos)}
-              className="w-full glass-card p-4 flex items-center gap-4 hover:bg-white/5 transition-colors text-left"
+              className="w-full glass-card glass-card-hover p-4 flex items-center gap-4 text-left"
+              style={{ transitionDelay: `${idx * 30}ms` }}
             >
               <span className="text-sm font-mono text-muted w-6">#{idx + 1}</span>
               <ScoreRing score={match.matchScore} size={48} />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                {pos.account.charAt(0)}
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-primary truncate">{match.positionLabel}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-primary truncate">{match.positionLabel}</span>
+                  {verdictConfig && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                      {verdictConfig.icon} {verdictConfig.label}
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-muted mt-0.5">
                   {pos.account} · {pos.coe} · {pos.mainSkill}
                 </div>
@@ -111,6 +125,10 @@ export default function DeliveryToOpResults({
                   )}
                   {match.summary}
                 </div>
+              </div>
+              <div className="hidden lg:flex flex-col gap-1.5 flex-shrink-0 w-32">
+                <CategoryBar label="Technical" value={match.scores.technical} />
+                <CategoryBar label="Domain" value={match.scores.domain} />
               </div>
               <div className="text-right flex-shrink-0">
                 <div className="text-xs font-mono text-muted">

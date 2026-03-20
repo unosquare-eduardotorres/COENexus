@@ -1,7 +1,9 @@
 import { CrossMatchResult, BenchOpenPosition, ExternalResumeFile } from '../../types';
 import { BenchBurnSearchResult } from '../../services/benchBurnService';
 import ScoreRing from './ScoreRing';
+import CategoryBar from './CategoryBar';
 import BenchBurnPipelineStats from './BenchBurnPipelineStats';
+import { getFitVerdictConfig, getInitials } from './shared/matchDetailUtils';
 
 interface ExternalCandidateToOpResultsProps {
   results: BenchBurnSearchResult;
@@ -64,38 +66,56 @@ export default function ExternalCandidateToOpResults({
       <BenchBurnPipelineStats stats={results.stats} onRetryFallbacks={onRetryFallbacks} />
 
       <div className="space-y-2">
-        {sortedMatches.map((match, idx) => (
-          <button
-            key={`${match.employeeUpstreamId}-${idx}`}
-            onClick={() => onSelectMatch(match)}
-            className="w-full glass-card p-4 flex items-center gap-4 hover:bg-white/5 transition-colors text-left"
-          >
-            <span className="text-sm font-mono text-muted w-6">#{idx + 1}</span>
-            <ScoreRing score={match.matchScore} size={48} />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-primary truncate">{match.employeeName}</div>
-              <div className="text-xs text-muted mt-0.5">
-                {position.account} · {position.jobTitle} · {position.mainSkill}
+        {sortedMatches.map((match, idx) => {
+          const verdictConfig = match.analysis?.fitVerdict ? getFitVerdictConfig(match.analysis.fitVerdict) : null;
+          return (
+            <button
+              key={`${match.employeeUpstreamId}-${idx}`}
+              onClick={() => onSelectMatch(match)}
+              className="w-full glass-card glass-card-hover p-4 flex items-center gap-4 text-left"
+              style={{ transitionDelay: `${idx * 30}ms` }}
+            >
+              <span className="text-sm font-mono text-muted w-6">#{idx + 1}</span>
+              <ScoreRing score={match.matchScore} size={48} />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                {getInitials(match.employeeName)}
               </div>
-              <div className="text-xs text-muted mt-1 truncate">
-                {match.summary?.includes('AI analysis unavailable') && (
-                  <span className="mr-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                    Cosine Only
-                  </span>
-                )}
-                {match.summary}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-primary truncate">{match.employeeName}</span>
+                  {verdictConfig && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                      {verdictConfig.icon} {verdictConfig.label}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted mt-0.5">
+                  {position.account} · {position.jobTitle} · {position.mainSkill}
+                </div>
+                <div className="text-xs text-muted mt-1 truncate">
+                  {match.summary?.includes('AI analysis unavailable') && (
+                    <span className="mr-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      Cosine Only
+                    </span>
+                  )}
+                  {match.summary}
+                </div>
               </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <div className="text-xs font-mono text-muted">
-                cos: {match.cosineSimilarity.toFixed(3)}
+              <div className="hidden lg:flex flex-col gap-1.5 flex-shrink-0 w-32">
+                <CategoryBar label="Technical" value={match.scores.technical} />
+                <CategoryBar label="Domain" value={match.scores.domain} />
               </div>
-            </div>
-            <svg className="w-4 h-4 text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        ))}
+              <div className="text-right flex-shrink-0">
+                <div className="text-xs font-mono text-muted">
+                  cos: {match.cosineSimilarity.toFixed(3)}
+                </div>
+              </div>
+              <svg className="w-4 h-4 text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          );
+        })}
       </div>
 
       {sortedMatches.length === 0 && (
