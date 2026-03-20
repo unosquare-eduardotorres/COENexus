@@ -16,4 +16,5 @@ public interface IUpstreamApiService
     Task<(List<OpenPositionListItem> Items, int TotalRecords)> GetOpenPositionsPagedAsync(string token, int skip, int take);
     Task<OpenPositionDetail?> GetOpenPositionDetailAsync(string token, int id);
     Task<List<PresentedCandidateItem>> GetPresentedCandidatesAsync(string token, int positionId);
+    Task<int> SavePersonaNoteAsync(string token, int personId, string noteType, string fileName, byte[] fileContent);
 }

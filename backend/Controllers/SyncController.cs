@@ -573,4 +573,38 @@ public class SyncController : ControllerBase
     {
         return Ok(await _catalogService.GetMainSkillsAsync(token));
     }
+
+    [HttpPost("upload-note")]
+    public async Task<IActionResult> UploadNote(
+        [FromQuery] string token,
+        [FromQuery] int personId,
+        [FromQuery] string noteType,
+        IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "No file provided" });
+
+        try
+        {
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+
+            var noteId = await _upstreamApi.SavePersonaNoteAsync(
+                token, personId, noteType, file.FileName, ms.ToArray());
+
+            return Ok(new { personaNoteId = noteId, success = true });
+        }
+        catch (HttpRequestException ex)
+        {
+            var statusCode = ex.StatusCode.HasValue ? (int)ex.StatusCode.Value : 0;
+            return StatusCode(statusCode > 0 ? statusCode : 502, new
+            {
+                error = $"Upstream API returned {ex.StatusCode}: {ex.Message}"
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(502, new { error = $"Upload failed: {ex.Message}" });
+        }
+    }
 }

@@ -264,6 +264,24 @@ public class UpstreamApiService : IUpstreamApiService
         }).ToList();
     }
 
+    public async Task<int> SavePersonaNoteAsync(string token, int personId, string noteType, string fileName, byte[] fileContent)
+    {
+        var request = CreateAuthorizedRequest(HttpMethod.Post, $"{_baseUrl}personanote/save", token);
+
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent(personId.ToString()), "PersonId");
+        content.Add(new StringContent(noteType), "NoteTypeName");
+        content.Add(new ByteArrayContent(fileContent), "File", fileName);
+
+        request.Content = content;
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return result.TryGetProperty("personaNoteId", out var idProp) ? idProp.GetInt32() : 0;
+    }
+
     private HttpRequestMessage CreateAuthorizedRequest(HttpMethod method, string url, string token)
     {
         var request = new HttpRequestMessage(method, url);

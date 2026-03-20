@@ -139,6 +139,31 @@ export const dataSyncService = {
     });
   },
 
+  async uploadNote(
+    token: string,
+    personId: number,
+    noteType: string,
+    file: Blob,
+    fileName: string
+  ): Promise<{ personaNoteId: number; success: boolean }> {
+    const formData = new FormData();
+    formData.append('file', file, fileName);
+    const params = new URLSearchParams({
+      token,
+      personId: String(personId),
+      noteType,
+    });
+    const res = await fetch(`${API_BASE}/upload-note?${params}`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw new Error(err.error || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  },
+
   startSync(
     source: SyncSourceType,
     token: string,

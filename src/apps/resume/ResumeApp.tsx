@@ -7,6 +7,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import MatchEnginePage from './pages/MatchEnginePage';
 import BatchPage from './pages/BatchPage';
 import DataSyncPage from './pages/DataSyncPage';
+import TransformHistoryPage from './pages/TransformHistoryPage';
 
 function SettingsWrapper() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function ResumeApp() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/enhance" element={<TransformPage />} />
+        <Route path="/history" element={<TransformHistoryPage />} />
         <Route path="/match" element={<MatchEnginePage />} />
         <Route path="/batch" element={<BatchPage />} />
         <Route path="/data-sync" element={<DataSyncPage />} />

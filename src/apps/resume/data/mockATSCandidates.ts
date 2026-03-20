@@ -4,6 +4,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-001',
     name: 'Gustavo Cereceres',
+    upstreamId: 12345,
     email: 'gustavo.cereceres@email.com',
     phone: '+1 (555) 123-4567',
     skills: ['C#', 'Angular', 'React'],
@@ -74,6 +75,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-002',
     name: 'Sarah Johnson',
+    upstreamId: 12346,
     email: 'sarah.johnson@email.com',
     phone: '+1 (555) 234-5678',
     skills: ['Python', 'Java'],
@@ -121,6 +123,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-003',
     name: 'Michael Chen',
+    upstreamId: 12347,
     email: 'michael.chen@email.com',
     phone: '+1 (555) 345-6789',
     skills: ['Java', 'Python', 'React'],
@@ -183,6 +186,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-004',
     name: 'Emily Rodriguez',
+    upstreamId: 12348,
     email: 'emily.rodriguez@email.com',
     phone: '+1 (555) 456-7890',
     skills: ['React', 'Angular'],
@@ -230,6 +234,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-005',
     name: 'David Kim',
+    upstreamId: 12349,
     email: 'david.kim@email.com',
     phone: '+1 (555) 567-8901',
     skills: ['Python', 'Ruby'],
@@ -277,6 +282,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-006',
     name: 'Amanda Foster',
+    upstreamId: 12350,
     email: 'amanda.foster@email.com',
     phone: '+1 (555) 678-9012',
     skills: ['React', 'Angular', 'Ruby'],
@@ -316,6 +322,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-007',
     name: 'James Wilson',
+    upstreamId: 12351,
     email: 'james.wilson@email.com',
     phone: '+1 (555) 789-0123',
     skills: ['C#', 'Java', 'Python'],
@@ -378,6 +385,7 @@ export const mockATSCandidates: ATSCandidate[] = [
   {
     id: 'ats-008',
     name: 'Lisa Thompson',
+    upstreamId: 12352,
     email: 'lisa.thompson@email.com',
     phone: '+1 (555) 890-1234',
     skills: ['Ruby', 'Python', 'React'],

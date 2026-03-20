@@ -248,6 +248,7 @@ export interface ATSCandidate {
   email?: string;
   phone?: string;
   resumeFile?: string;
+  upstreamId?: number;
 }
 
 export interface PresentedCandidate {
@@ -805,4 +806,50 @@ export interface ResumeSessionDetail extends ResumeSessionSummary {
   originalFileName: string | null;
   originalFileType: string | null;
   refinementMode: RefinementMode | null;
+}
+
+export type TransformSessionStatus = 'draft' | 'processing' | 'completed';
+export type SessionContextType = 'candidate' | 'employee' | 'upload';
+
+export interface TransformSessionSummary {
+  id: number;
+  name: string;
+  contextType: SessionContextType;
+  contextName: string | null;
+  status: TransformSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransformSessionDetail {
+  id: number;
+  name: string;
+  contextType: SessionContextType;
+  contextId: number | null;
+  contextName: string | null;
+  processingMode: string;
+  refinementMode: string;
+  jobDescription: string | null;
+  jobDescriptionSource: string | null;
+  selectedPositionId: string | null;
+  resumeContentJson: string | null;
+  wizardStateJson: string | null;
+  status: TransformSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrUpdateTransformSession {
+  name: string;
+  contextType: SessionContextType;
+  contextId?: number | null;
+  contextName?: string | null;
+  processingMode?: string;
+  refinementMode?: string;
+  jobDescription?: string | null;
+  jobDescriptionSource?: string | null;
+  selectedPositionId?: string | null;
+  resumeContentJson?: string | null;
+  wizardStateJson?: string | null;
+  status?: string;
 }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import FileUpload from '../components/FileUpload';
 import ResumeEditor from '../components/ResumeEditor';
 import PdfPreviewPanel from '../components/PdfPreviewPanel';
@@ -10,6 +10,8 @@ import { validationService } from '../services/validationService';
 import { fileExtractionService } from '../services/fileExtractionService';
 import { templateFillService } from '../services/templateFillService';
 import { pdfExportService } from '../services/pdfExportService';
+import { transformSessionService } from '../services/transformSessionService';
+import { dataSyncService } from '../services/dataSyncService';
 import {
   StructuredResume,
   ATSCandidate,
@@ -21,6 +23,8 @@ import {
   AISuggestion,
   ValidationResult,
   ResumeProcessingMetrics,
+  CreateOrUpdateTransformSession,
+  SessionContextType,
 } from '../types';
 import { mockATSCandidates } from '../data/mockATSCandidates';
 
@@ -279,6 +283,8 @@ function OriginalDocxViewer({ fileUrl }: { fileUrl: string }) {
 
 export default function TransformPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionIdParam = searchParams.get('session');
 
   const [currentStepKey, setCurrentStepKey] = useState<StepKey>('processing');
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
@@ -323,6 +329,10 @@ export default function TransformPage() {
   const [showEnhanceWarningModal, setShowEnhanceWarningModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadTargetResume, setDownloadTargetResume] = useState<StructuredResume | null>(null);
+  const [uploadingToATS, setUploadingToATS] = useState<Set<string>>(new Set());
+  const [uploadedToATS, setUploadedToATS] = useState<Set<string>>(new Set());
+  const [savedSessionId, setSavedSessionId] = useState<number | null>(null);
+  const [savingSession, setSavingSession] = useState(false);
 
   const stepLabels = useMemo(() => {
     const base: { key: StepKey; title: string }[] = [
@@ -371,6 +381,48 @@ export default function TransformPage() {
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!sessionIdParam) return;
+    const id = parseInt(sessionIdParam, 10);
+    if (isNaN(id)) return;
+
+    transformSessionService.get(id).then((detail) => {
+      setSavedSessionId(id);
+      if (detail.wizardStateJson) {
+        try {
+          const state: PersistedWizardState = JSON.parse(detail.wizardStateJson);
+          setProcessingMode(state.processingMode);
+          setSourceType(state.sourceType);
+          setRefinementMode(state.refinementMode);
+          setJobDescriptionSource(state.jobDescriptionSource);
+          setCustomJobDescription(state.customJobDescription);
+          setCompletedSteps(new Set(state.completedSteps));
+          if (state.selectedCandidateId) {
+            const candidate = mockATSCandidates.find((c) => c.id === state.selectedCandidateId);
+            if (candidate) {
+              setSelectedCandidate(candidate);
+              if (state.selectedPositionId) {
+                const position = candidate.positions.find((p) => p.id === state.selectedPositionId);
+                if (position) setSelectedPosition(position);
+              }
+            }
+          }
+          setCurrentStepKey(state.currentStepKey);
+        } catch { /* ignore parse errors */ }
+      }
+      if (detail.resumeContentJson) {
+        try {
+          const resumes: StructuredResume[] = JSON.parse(detail.resumeContentJson);
+          setTransformedResumes(resumes);
+        } catch { /* ignore parse errors */ }
+      }
+    }).catch((err) => {
+      console.error('Failed to load session:', err);
+      setError('Failed to load session');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionIdParam]);
 
   useEffect(() => {
     const state: PersistedWizardState = {
@@ -457,6 +509,11 @@ export default function TransformPage() {
   );
 
   const canPresent = selectedPosition !== null && !isCandidateAlreadyPresented(selectedPosition);
+
+  const canUploadToATS = sourceType !== 'upload' && (
+    (sourceType === 'ats-candidates' && selectedCandidate?.upstreamId != null) ||
+    (sourceType === 'employees')
+  );
 
   const canProceedFromStep2 =
     (sourceType === 'upload' && selectedFiles.length > 0) ||
@@ -766,9 +823,42 @@ export default function TransformPage() {
     }
   }, [resumeWarnings, handleEnhanceResume]);
 
-  const handleSyncToATS = useCallback((resume: StructuredResume) => {
-    alert(`Resume for ${resume.candidateName} would be synced/uploaded to the ATS. (Demo feature)`);
-  }, []);
+  const handleSyncToATS = useCallback(async (resume: StructuredResume) => {
+    const token = localStorage.getItem('datasync-token') ?? '';
+    if (!token) {
+      setError('No ELP token found. Please validate your token on the Data Sync page first.');
+      return;
+    }
+
+    const personId = sourceType === 'ats-candidates'
+      ? selectedCandidate?.upstreamId
+      : undefined;
+
+    if (!personId) {
+      setError('No person ID available for upload. Please select a candidate or employee.');
+      return;
+    }
+
+    setUploadingToATS(prev => new Set([...prev, resume.id]));
+
+    try {
+      const docxBlob = await templateFillService.fillTemplate(resume);
+      const fileName = `${resume.candidateName.replace(/\s+/g, '_')}_resume.docx`;
+
+      await dataSyncService.uploadNote(token, personId, 'Resume', docxBlob, fileName);
+
+      setUploadedToATS(prev => new Set([...prev, resume.id]));
+    } catch (err) {
+      console.error('Upload to ATS failed:', err);
+      setError(err instanceof Error ? err.message : 'Upload to ATS failed.');
+    } finally {
+      setUploadingToATS(prev => {
+        const next = new Set(prev);
+        next.delete(resume.id);
+        return next;
+      });
+    }
+  }, [sourceType, selectedCandidate]);
 
   const handleReset = useCallback(() => {
     setSelectedFiles([]);
@@ -803,8 +893,62 @@ export default function TransformPage() {
     setCurrentStepKey('processing');
     setCompletedSteps(new Set());
     setProcessingMetrics([]);
+    setUploadingToATS(new Set());
+    setUploadedToATS(new Set());
     sessionStorage.removeItem(SESSION_KEY);
+    setSavedSessionId(null);
   }, []);
+
+  const handleSaveSession = useCallback(async () => {
+    setSavingSession(true);
+    try {
+      let contextType: SessionContextType = 'upload';
+      if (sourceType === 'ats-candidates') contextType = 'candidate';
+      else if (sourceType === 'employees') contextType = 'employee';
+
+      const wizardState: PersistedWizardState = {
+        currentStepKey,
+        completedSteps: [...completedSteps],
+        processingMode,
+        sourceType,
+        refinementMode,
+        jobDescriptionSource,
+        customJobDescription,
+        selectedCandidateId: selectedCandidate?.id || null,
+        selectedPositionId: selectedPosition?.id || null,
+        fileNames: selectedFiles.map((f) => f.name),
+      };
+
+      const resumesToSave = transformedResumes.map((r) => editedResumes.get(r.id) || r);
+
+      const payload: CreateOrUpdateTransformSession = {
+        name: selectedCandidate?.name || selectedFiles[0]?.name || `Session ${new Date().toLocaleString()}`,
+        contextType,
+        contextName: selectedCandidate?.name || selectedFiles[0]?.name || null,
+        processingMode,
+        refinementMode,
+        jobDescription: customJobDescription || null,
+        jobDescriptionSource,
+        selectedPositionId: selectedPosition?.id || null,
+        resumeContentJson: JSON.stringify(resumesToSave),
+        wizardStateJson: JSON.stringify(wizardState),
+        status: transformedResumes.length > 0 ? 'completed' : 'draft',
+      };
+
+      if (savedSessionId) {
+        await transformSessionService.update(savedSessionId, payload);
+      } else {
+        const created = await transformSessionService.create(payload);
+        setSavedSessionId(created.id);
+      }
+      setHasSaved(true);
+    } catch (err) {
+      console.error('Failed to save session:', err);
+      setError('Failed to save session');
+    } finally {
+      setSavingSession(false);
+    }
+  }, [currentStepKey, completedSteps, processingMode, sourceType, refinementMode, jobDescriptionSource, customJobDescription, selectedCandidate, selectedPosition, selectedFiles, transformedResumes, editedResumes, savedSessionId]);
 
   const handleNextFromStep3 = useCallback(() => {
     const nextStep: StepKey = refinementMode === 'job-tailoring' ? 'job-description' : 'review';
@@ -1777,18 +1921,42 @@ export default function TransformPage() {
 
                     <button
                       onClick={() => { handleSyncToATS(resume); setHasSaved(true); }}
-                      className="glass-card-hover p-4 text-left rounded-xl transition-all"
+                      disabled={!canUploadToATS || uploadingToATS.has(resume.id) || uploadedToATS.has(resume.id)}
+                      className={`p-4 text-left rounded-xl transition-all ${
+                        canUploadToATS && !uploadingToATS.has(resume.id) && !uploadedToATS.has(resume.id)
+                          ? 'glass-card-hover'
+                          : 'glass-card opacity-50 cursor-not-allowed'
+                      }`}
                     >
                       <div className="w-8 h-8 rounded-lg bg-accent-500/10 flex items-center justify-center mb-2.5">
-                        <svg className="w-4 h-4 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
+                        {uploadingToATS.has(resume.id) ? (
+                          <svg className="w-4 h-4 text-accent-600 dark:text-accent-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : uploadedToATS.has(resume.id) ? (
+                          <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                        )}
                       </div>
                       <p className="text-sm font-semibold text-primary mb-0.5">
-                        {sourceType === 'ats-candidates' ? 'Upload to ATS' : sourceType === 'employees' ? 'Upload to Profile' : 'Save to Cloud'}
+                        {uploadingToATS.has(resume.id)
+                          ? 'Uploading...'
+                          : uploadedToATS.has(resume.id)
+                          ? 'Uploaded ✓'
+                          : sourceType === 'ats-candidates' ? 'Upload to ATS' : sourceType === 'employees' ? 'Upload to Profile' : 'Save to Cloud'}
                       </p>
                       <p className="text-xs text-muted">
-                        {sourceType === 'ats-candidates'
+                        {!canUploadToATS
+                          ? 'Select a candidate or employee to enable upload'
+                          : uploadedToATS.has(resume.id)
+                          ? 'Resume successfully uploaded to the ATS'
+                          : sourceType === 'ats-candidates'
                           ? 'Sync the enhanced resume back to the ATS'
                           : sourceType === 'employees'
                           ? 'Update the employee profile with the enhanced resume'
@@ -1819,6 +1987,57 @@ export default function TransformPage() {
                 </div>
               );
               })}
+            </div>
+
+            <div className="glass-card p-5 mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-primary">Save Session</p>
+                  <p className="text-xs text-muted">Save your progress to resume later from Session History</p>
+                </div>
+                <button
+                  onClick={handleSaveSession}
+                  disabled={savingSession}
+                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-violet-500 rounded-xl hover:bg-violet-600 transition-colors disabled:opacity-50"
+                >
+                  {savingSession ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : savedSessionId ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Update Session
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                      Save Session
+                    </>
+                  )}
+                </button>
+              </div>
+              {savedSessionId && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Session saved — you can find it in Session History
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-gray-200/30 dark:border-dark-border/30">
