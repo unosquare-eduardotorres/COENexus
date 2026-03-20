@@ -15,6 +15,7 @@ public class SyncOrchestratorTests : IDisposable
 
     private readonly IUpstreamApiService _upstreamApi = Substitute.For<IUpstreamApiService>();
     private readonly ICatalogService _catalogService = Substitute.For<ICatalogService>();
+    private readonly IEmbeddingJobQueue _embeddingQueue = Substitute.For<IEmbeddingJobQueue>();
     private readonly NexusDbContext _dbContext;
     private readonly SyncOrchestrator _orchestrator;
 
@@ -26,7 +27,7 @@ public class SyncOrchestratorTests : IDisposable
         _dbContext = new TestDbContext(options);
 
         var logger = Substitute.For<ILogger<SyncOrchestrator>>();
-        _orchestrator = new SyncOrchestrator(_upstreamApi, _catalogService, _dbContext, logger);
+        _orchestrator = new SyncOrchestrator(_upstreamApi, _catalogService, _dbContext, logger, _embeddingQueue);
     }
 
     public void Dispose() => _dbContext.Dispose();

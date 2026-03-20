@@ -24,6 +24,13 @@ public class TestDbContext : NexusDbContext
             entity.Ignore(e => e.Embedding);
         });
 
+        modelBuilder.Entity<SyncedOpenPosition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.UpstreamId).IsUnique();
+            entity.Ignore(e => e.Embedding);
+        });
+
         modelBuilder.Entity<ResumeEmbedding>(entity =>
         {
             entity.HasKey(e => e.Id);

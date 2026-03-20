@@ -11,15 +11,23 @@ public class EmbeddingJobQueue : IEmbeddingJobQueue
             SingleReader = true
         });
 
-    public int PendingCount => _channel.Reader.Count;
+    private int _pendingCount;
 
-    public ValueTask EnqueueAsync(EmbeddingJob job, CancellationToken ct = default)
-        => _channel.Writer.WriteAsync(job, ct);
+    public int PendingCount => _pendingCount;
+
+    public async ValueTask EnqueueAsync(EmbeddingJob job, CancellationToken ct = default)
+    {
+        await _channel.Writer.WriteAsync(job, ct);
+        Interlocked.Increment(ref _pendingCount);
+    }
 
     public async IAsyncEnumerable<EmbeddingJob> DequeueAllAsync(
         [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var job in _channel.Reader.ReadAllAsync(ct))
+        {
+            Interlocked.Decrement(ref _pendingCount);
             yield return job;
+        }
     }
 }

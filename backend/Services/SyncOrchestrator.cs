@@ -1067,6 +1067,9 @@ public class SyncOrchestrator : ISyncOrchestrator
         var pagedFallback = new OpenPositionListItem { Id = upstreamId };
         var entity = BuildOpenPositionEntity(pagedFallback, detail ?? new OpenPositionDetail(), candidates);
         var (_, syncDetail) = await UpsertOpenPositionAsync(entity, candidates, ct);
+        await EnqueueEmbeddingIfEligible("open-positions", entity.Id, entity.UpstreamId,
+            $"{entity.Account} - {entity.MainSkill}", null, null,
+            false, token, !string.IsNullOrEmpty(entity.JobDescription), entity.Status);
 
         return MapOpenPositionToDto(entity, syncDetail, candidates.Count);
     }
