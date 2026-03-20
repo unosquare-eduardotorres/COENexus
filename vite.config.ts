@@ -30,6 +30,10 @@ export default defineConfig({
         target: backendTarget,
         changeOrigin: true,
       },
+      '/api/database': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
     },
   },
   optimizeDeps: {

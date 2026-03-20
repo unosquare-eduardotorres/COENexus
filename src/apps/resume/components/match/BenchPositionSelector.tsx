@@ -1,11 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BenchOpenPosition } from '../../types';
 import { benchBurnService } from '../../services/benchBurnService';
+import SortableHeader, { useSort, sortData } from './SortableHeader';
+
+type PosSortKey = 'upstreamId' | 'account' | 'coe' | 'practice' | 'stakeholder' | 'mainSkill' | 'jobTitle';
 
 interface BenchPositionSelectorProps {
   onNext: (positions: BenchOpenPosition[], customPositions: { name: string; jd: string }[]) => void;
   initialSelected?: BenchOpenPosition[];
   initialCustom?: { name: string; jd: string }[];
+}
+
+function posAccessor(pos: BenchOpenPosition, key: string): string | number | null {
+  switch (key) {
+    case 'upstreamId': return pos.upstreamId;
+    case 'account': return pos.account;
+    case 'coe': return pos.coe;
+    case 'practice': return pos.practice;
+    case 'stakeholder': return pos.stakeholder;
+    case 'mainSkill': return pos.mainSkill;
+    case 'jobTitle': return pos.jobTitle;
+    default: return null;
+  }
 }
 
 export default function BenchPositionSelector({
@@ -24,6 +40,7 @@ export default function BenchPositionSelector({
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customJd, setCustomJd] = useState('');
+  const { sortKey, sortDir, handleSort } = useSort<PosSortKey>('account');
 
   useEffect(() => {
     benchBurnService.getOpenPositions()
@@ -44,6 +61,11 @@ export default function BenchPositionSelector({
       p.upstreamId.toString().includes(q)
     );
   }, [positions, search]);
+
+  const sorted = useMemo(
+    () => sortData(filtered, sortKey, sortDir, posAccessor),
+    [filtered, sortKey, sortDir]
+  );
 
   const toggleSelect = (pos: BenchOpenPosition) => {
     if (!pos.isVectorized) return;
@@ -206,17 +228,17 @@ export default function BenchPositionSelector({
             <thead>
               <tr className="border-b border-gray-200/30 dark:border-dark-border/30">
                 <th className="text-left py-2 px-2 text-xs font-medium text-muted w-8" />
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">ID</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">Account</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">COE</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">Practice</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">Stakeholder</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">Main Skill</th>
-                <th className="text-left py-2 px-2 text-xs font-medium text-muted">Job Title</th>
+                <SortableHeader<PosSortKey> label="ID" sortKey="upstreamId" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="Account" sortKey="account" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="COE" sortKey="coe" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="Practice" sortKey="practice" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="Stakeholder" sortKey="stakeholder" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="Main Skill" sortKey="mainSkill" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
+                <SortableHeader<PosSortKey> label="Job Title" sortKey="jobTitle" currentSortKey={sortKey} currentDirection={sortDir} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
-              {filtered.map(pos => {
+              {sorted.map(pos => {
                 const isSelected = selected.has(pos.upstreamId);
                 const disabled = !pos.isVectorized;
 
@@ -271,7 +293,7 @@ export default function BenchPositionSelector({
           </table>
         </div>
 
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <p className="text-center text-sm text-muted py-6">
             {search ? 'No positions match your search.' : 'No open positions found.'}
           </p>

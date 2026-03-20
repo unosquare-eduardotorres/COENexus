@@ -7,5 +7,6 @@ public class ClaudeProxySettings
     public string SonnetModel { get; set; } = "claude-sonnet-4-20250514";
     public string OpusModel { get; set; } = "claude-opus-4-20250514";
     public int TimeoutSeconds { get; set; } = 120;
-    public int MaxConcurrency { get; set; } = 5;
+    public int MaxConcurrency { get; set; } = 8;
+    public int HaikuMaxConcurrency { get; set; } = 20;
 }

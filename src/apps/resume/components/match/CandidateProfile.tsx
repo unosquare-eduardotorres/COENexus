@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MatchCandidate, SkillMatch, SkillMatchStatus, NonTechSkill, SonnetAnalysis } from '../../types';
+import { MatchCandidate, SkillMatch, SkillMatchStatus, NonTechSkill, SonnetAnalysis, FitVerdict } from '../../types';
 import { formatSalary } from '../../utils/formatSalary';
 import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
@@ -76,6 +76,21 @@ function getConfidenceBarClass(confidence: number): string {
   if (confidence >= 85) return 'bg-emerald-500';
   if (confidence >= 70) return 'bg-amber-500';
   return 'bg-red-500';
+}
+
+function getFitVerdictConfig(verdict: FitVerdict) {
+  switch (verdict) {
+    case 'strong-fit':
+      return { label: 'Strong Fit', icon: '✅', classes: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', calloutBg: 'bg-emerald-500/5 border-emerald-500/20' };
+    case 'good-fit':
+      return { label: 'Good Fit', icon: '👍', classes: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30', calloutBg: 'bg-blue-500/5 border-blue-500/20' };
+    case 'partial-fit':
+      return { label: 'Partial Fit', icon: '⚠️', classes: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30', calloutBg: 'bg-amber-500/5 border-amber-500/20' };
+    case 'not-a-fit':
+      return { label: 'Not a Fit', icon: '❌', classes: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30', calloutBg: 'bg-red-500/5 border-red-500/20' };
+    default:
+      return { label: 'Unknown', icon: '❓', classes: 'bg-gray-500/10 text-gray-500', calloutBg: 'bg-gray-500/5 border-gray-500/20' };
+  }
 }
 
 const AI_ASSESSMENT_SECTIONS: { key: keyof SonnetAnalysis; title: string; icon: string; borderColor: string }[] = [
@@ -260,11 +275,11 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
                 <RadarChart candidates={[candidate]} size={260} />
               </div>
               <div className="space-y-3">
-                <CategoryBar label="Technical" value={candidate.scores.technical} description="Hard skills, frameworks, and tools match against the JD requirements" />
-                <CategoryBar label="Domain" value={candidate.scores.domain} description="Industry knowledge and vertical experience relevant to the role" />
-                <CategoryBar label="Leadership" value={candidate.scores.leadership} description="Team management, mentoring, and architectural decision-making ability" />
-                <CategoryBar label="Soft Skills" value={candidate.scores.softSkills} description="Communication, collaboration, and stakeholder interaction capabilities" />
-                <CategoryBar label="Availability" value={candidate.scores.availability} description="How quickly the candidate can start based on bench status and notice period" />
+                <CategoryBar label="Technical" value={candidate.scores.technical} description={candidate.scores.technicalReason || "Hard skills, frameworks, and tools match against the JD requirements"} />
+                <CategoryBar label="Domain" value={candidate.scores.domain} description={candidate.scores.domainReason || "Industry knowledge and vertical experience relevant to the role"} />
+                <CategoryBar label="Leadership" value={candidate.scores.leadership} description={candidate.scores.leadershipReason || "Team management, mentoring, and architectural decision-making ability"} />
+                <CategoryBar label="Soft Skills" value={candidate.scores.softSkills} description={candidate.scores.softSkillsReason || "Communication, collaboration, and stakeholder interaction capabilities"} />
+                <CategoryBar label="Availability" value={candidate.scores.availability} description={candidate.scores.availabilityReason || "How quickly the candidate can start based on bench status and notice period"} />
               </div>
             </div>
 
@@ -469,6 +484,35 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
 
       {activeTab === 3 && candidate.analysis && (
         <div className="space-y-3">
+          {candidate.analysis.fitVerdict && (() => {
+            const config = getFitVerdictConfig(candidate.analysis!.fitVerdict);
+            return (
+              <div className="space-y-3">
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border font-semibold text-sm ${config.classes}`}>
+                  <span className="text-base">{config.icon}</span>
+                  {config.label}
+                </div>
+                {candidate.analysis!.fitSummary && (
+                  <div className={`p-4 rounded-xl border ${config.calloutBg}`}>
+                    <p className="text-sm text-primary font-medium">{candidate.analysis!.fitSummary}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {candidate.analysis.whyNotFit && (candidate.analysis.fitVerdict === 'partial-fit' || candidate.analysis.fitVerdict === 'not-a-fit') && (
+            <div className="glass-card border-l-4 border-red-500">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span>🚫</span>
+                  <span className="text-sm font-semibold text-primary">Why This Candidate Is NOT a Fit</span>
+                </div>
+                <p className="text-sm text-secondary">{candidate.analysis.whyNotFit}</p>
+              </div>
+            </div>
+          )}
+
           {AI_ASSESSMENT_SECTIONS.map((section, index) => {
             const isExpanded = expandedCards.has(index);
             return (

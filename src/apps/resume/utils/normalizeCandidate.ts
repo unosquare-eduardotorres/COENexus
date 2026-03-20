@@ -1,7 +1,8 @@
 import { MatchCandidate, SkillMatchStatus, NonTechSkill } from '../types';
 
-function normalizeStatus(status: string): SkillMatchStatus {
+function normalizeStatus(status: string, years?: number): SkillMatchStatus {
   if (status === 'match') return 'met';
+  if (years === -1 && (status === 'partial' || status === 'met' || status === 'surpassed')) return 'missing';
   return status as SkillMatchStatus;
 }
 
@@ -14,7 +15,7 @@ export function normalizeCandidate(candidate: MatchCandidate): MatchCandidate {
     ...candidate,
     skills: candidate.skills.map(s => ({
       ...s,
-      status: normalizeStatus(s.status),
+      status: normalizeStatus(s.status, s.years),
     })),
     leadership: isStructuredNonTech(candidate.leadership)
       ? candidate.leadership.map(item => ({ ...item, status: normalizeStatus(item.status) }))

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
 import {
-  BenchBurnStepKey,
+  DeliveryToOpStepKey,
   BenchEmployee,
   BenchOpenPosition,
   CrossMatchResult,
@@ -8,22 +8,22 @@ import {
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
 import StepperBar from '../components/shared/StepperBar';
-import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
+import DeliveryEmployeeSelector from '../components/match/DeliveryEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
-import BenchBurnSearchDepth from '../components/match/BenchBurnSearchDepth';
+import DeliveryToOpSummary from '../components/match/DeliveryToOpSummary';
 import SearchProgressComponent from '../components/match/SearchProgress';
-import BenchBurnResults from '../components/match/BenchBurnResults';
+import DeliveryToOpResults from '../components/match/DeliveryToOpResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
 
-interface BenchBurnPageProps {
+interface DeliveryToOpPageProps {
   onReset: () => void;
 }
 
-const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] = [
+const STEP_LABELS: { key: DeliveryToOpStepKey; title: string; icon: ReactNode }[] = [
   {
-    key: 'data-source',
-    title: 'Employees',
+    key: 'employee',
+    title: 'Employee',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -40,7 +40,7 @@ const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] =
     ),
   },
   {
-    key: 'search-depth',
+    key: 'summary',
     title: 'Summary',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,7 +49,7 @@ const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] =
     ),
   },
   {
-    key: 'searching',
+    key: 'analyzing',
     title: 'Analyzing',
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,33 +68,30 @@ const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] =
   },
 ];
 
-export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPageProps) {
-  const [currentStep, setCurrentStep] = useState<BenchBurnStepKey>('data-source');
-  const [completedSteps, setCompletedSteps] = useState<Set<BenchBurnStepKey>>(new Set());
+export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpPageProps) {
+  const [currentStep, setCurrentStep] = useState<DeliveryToOpStepKey>('employee');
+  const [completedSteps, setCompletedSteps] = useState<Set<DeliveryToOpStepKey>>(new Set());
 
-  const [selectedEmployees, setSelectedEmployees] = useState<BenchEmployee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<BenchEmployee | null>(null);
   const [selectedPositions, setSelectedPositions] = useState<BenchOpenPosition[]>([]);
   const [customPositions, setCustomPositions] = useState<{ name: string; jd: string }[]>([]);
   const [progress, setProgress] = useState<SearchProgressType>({ percent: 0, stage: '' });
   const [results, setResults] = useState<BenchBurnSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [showSessionNamePrompt, setShowSessionNamePrompt] = useState(false);
-  const [sessionName, setSessionName] = useState('');
-
   const [detailMatch, setDetailMatch] = useState<CrossMatchResult | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<BenchEmployee | null>(null);
   const [detailPosition, setDetailPosition] = useState<BenchOpenPosition | null>(null);
 
-  const navigateStep = useCallback((step: BenchBurnStepKey) => {
+  const navigateStep = useCallback((step: DeliveryToOpStepKey) => {
     setCurrentStep(step);
-    window.history.pushState({ matchStep: 'bench-burn', benchStep: step }, '');
+    window.history.pushState({ matchStep: 'delivery-to-op', deliveryStep: step }, '');
   }, []);
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
-      if (e.state?.benchStep) {
-        setCurrentStep(e.state.benchStep);
+      if (e.state?.deliveryStep) {
+        setCurrentStep(e.state.deliveryStep);
         setDetailMatch(null);
         setDetailEmployee(null);
         setDetailPosition(null);
@@ -105,7 +102,7 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const completeStep = useCallback((step: BenchBurnStepKey) => {
+  const completeStep = useCallback((step: DeliveryToOpStepKey) => {
     setCompletedSteps(prev => {
       const next = new Set(prev);
       next.add(step);
@@ -113,9 +110,9 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     });
   }, []);
 
-  const handleEmployeesNext = useCallback((employees: BenchEmployee[]) => {
-    setSelectedEmployees(employees);
-    completeStep('data-source');
+  const handleEmployeeNext = useCallback((employee: BenchEmployee) => {
+    setSelectedEmployee(employee);
+    completeStep('employee');
     navigateStep('positions');
   }, [completeStep, navigateStep]);
 
@@ -123,35 +120,30 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     setSelectedPositions(positions);
     setCustomPositions(custom);
     completeStep('positions');
-    navigateStep('search-depth');
+    navigateStep('summary');
   }, [completeStep, navigateStep]);
 
-  const handleSearchDepthNext = useCallback(() => {
-    const now = new Date();
-    const defaultName = `Bench Burn — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
-    setSessionName(defaultName);
-    setShowSessionNamePrompt(true);
-  }, []);
-
-  const executeBenchBurn = useCallback(async () => {
-    setShowSessionNamePrompt(false);
-    completeStep('search-depth');
-    navigateStep('searching');
+  const handleSummaryNext = useCallback(async () => {
+    if (!selectedEmployee) return;
+    completeStep('summary');
+    navigateStep('analyzing');
     setProgress({ percent: 0, stage: '' });
     setError(null);
 
     try {
+      const posCount = selectedPositions.length + customPositions.length;
       const matchPromptConfigs = getMatchPrompts();
       const opusConfig = matchPromptConfigs.find(p => p.key === 'opus-analysis');
 
       const result = await benchBurnService.executeBenchBurn(
         {
-          name: sessionName,
-          employeeUpstreamIds: selectedEmployees.map(e => e.upstreamId),
+          name: `Delivery-to-OP: ${selectedEmployee.name}`,
+          matchFlowType: 'delivery-to-op',
+          employeeUpstreamIds: [selectedEmployee.upstreamId],
           positionUpstreamIds: selectedPositions.map(p => p.upstreamId),
           searchMode: 'opus',
-          topNPerEmployee: 5,
-          topNPerPosition: 3,
+          topNPerEmployee: posCount,
+          topNPerPosition: 1,
           customPositions: customPositions.length > 0
             ? customPositions.map(cp => ({ name: cp.name, jobDescription: cp.jd }))
             : undefined,
@@ -164,23 +156,20 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
         (p) => setProgress(p),
       );
       setResults(result);
-      completeStep('searching');
+      completeStep('analyzing');
       navigateStep('results');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
-      navigateStep('search-depth');
+      navigateStep('summary');
     }
-  }, [sessionName, selectedEmployees, selectedPositions, customPositions, completeStep, navigateStep]);
+  }, [selectedEmployee, selectedPositions, customPositions, completeStep, navigateStep]);
 
   const handleRetryFallbacks = useCallback(async () => {
     if (!results?.stats.candidateTimings) return;
     const fallbackPairs = results.stats.candidateTimings
       .filter(ct => ct.fallback)
       .map(ct => {
-        const allMatches = [
-          ...Object.values(results.employeeResults).flat(),
-          ...Object.values(results.positionResults).flat(),
-        ];
+        const allMatches = Object.values(results.employeeResults).flat();
         const match = allMatches.find(m => {
           const label = `${m.employeeName} × ${m.positionLabel}`;
           return label === ct.name;
@@ -197,7 +186,7 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
 
     if (uniquePairs.length === 0) return;
 
-    navigateStep('searching');
+    navigateStep('analyzing');
     setProgress({ percent: 0, stage: '' });
     setError(null);
 
@@ -227,15 +216,15 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     setDetailPosition(null);
   }, []);
 
-  const handleStepClick = useCallback((step: BenchBurnStepKey) => {
+  const handleStepClick = useCallback((step: DeliveryToOpStepKey) => {
     navigateStep(step);
     if (detailMatch) handleBackFromDetail();
   }, [detailMatch, handleBackFromDetail, navigateStep]);
 
   const handleFullReset = useCallback(() => {
-    setCurrentStep('data-source');
+    setCurrentStep('employee');
     setCompletedSteps(new Set());
-    setSelectedEmployees([]);
+    setSelectedEmployee(null);
     setSelectedPositions([]);
     setCustomPositions([]);
     setProgress({ percent: 0, stage: '' });
@@ -248,17 +237,17 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     parentReset();
   }, [parentReset]);
 
-  const stepSummaries = useMemo<Partial<Record<BenchBurnStepKey, { icon: ReactNode; label: string } | null>>>(() => {
-    const summaries: Partial<Record<BenchBurnStepKey, { icon: ReactNode; label: string } | null>> = {};
+  const stepSummaries = useMemo<Partial<Record<DeliveryToOpStepKey, { icon: ReactNode; label: string } | null>>>(() => {
+    const summaries: Partial<Record<DeliveryToOpStepKey, { icon: ReactNode; label: string } | null>> = {};
 
-    if (completedSteps.has('data-source')) {
-      summaries['data-source'] = {
+    if (completedSteps.has('employee') && selectedEmployee) {
+      summaries['employee'] = {
         icon: (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
         ),
-        label: `${selectedEmployees.length} employees`,
+        label: selectedEmployee.name,
       };
     }
 
@@ -274,9 +263,9 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
       };
     }
 
-    if (completedSteps.has('search-depth')) {
-      const pairs = selectedEmployees.length * (selectedPositions.length + customPositions.length);
-      summaries['search-depth'] = {
+    if (completedSteps.has('summary')) {
+      const pairs = selectedPositions.length + customPositions.length;
+      summaries['summary'] = {
         icon: (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -287,7 +276,7 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     }
 
     return summaries;
-  }, [completedSteps, selectedEmployees.length, selectedPositions.length, customPositions.length]);
+  }, [completedSteps, selectedEmployee, selectedPositions.length, customPositions.length]);
 
   if (detailMatch && detailEmployee && detailPosition) {
     return (
@@ -343,10 +332,10 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
         </div>
       )}
 
-      {currentStep === 'data-source' && (
-        <BenchEmployeeSelector
-          onNext={handleEmployeesNext}
-          initialSelected={selectedEmployees}
+      {currentStep === 'employee' && (
+        <DeliveryEmployeeSelector
+          onNext={handleEmployeeNext}
+          initialSelected={selectedEmployee}
         />
       )}
 
@@ -358,60 +347,27 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
         />
       )}
 
-      {currentStep === 'search-depth' && (
-        <BenchBurnSearchDepth
-          employeeCount={selectedEmployees.length}
+      {currentStep === 'summary' && selectedEmployee && (
+        <DeliveryToOpSummary
+          employee={selectedEmployee}
           positionCount={selectedPositions.length + customPositions.length}
-          onNext={handleSearchDepthNext}
+          onNext={handleSummaryNext}
         />
       )}
 
-      {currentStep === 'searching' && (
+      {currentStep === 'analyzing' && (
         <SearchProgressComponent progress={progress} />
       )}
 
-      {currentStep === 'results' && results && (
-        <BenchBurnResults
+      {currentStep === 'results' && results && selectedEmployee && (
+        <DeliveryToOpResults
           results={results}
-          employees={selectedEmployees}
+          employee={selectedEmployee}
           positions={selectedPositions}
           onReset={handleFullReset}
           onSelectMatch={handleSelectMatch}
           onRetryFallbacks={handleRetryFallbacks}
         />
-      )}
-
-      {showSessionNamePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSessionNamePrompt(false)} />
-          <div className="relative glass-panel rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
-            <h3 className="text-lg font-bold text-primary mb-1">Name This Search</h3>
-            <p className="text-sm text-secondary mb-4">Give this bench burn session a name so you can find it later.</p>
-            <input
-              type="text"
-              value={sessionName}
-              onChange={(e) => setSessionName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && executeBenchBurn()}
-              className="w-full px-4 py-2.5 rounded-xl glass-input text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-              placeholder="e.g., Bench Burn — March 2026"
-              autoFocus
-            />
-            <div className="flex items-center justify-end gap-3 mt-4">
-              <button
-                onClick={() => setShowSessionNamePrompt(false)}
-                className="px-4 py-2 text-sm text-muted hover:text-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={executeBenchBurn}
-                className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25 transition-all"
-              >
-                Start Analysis
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

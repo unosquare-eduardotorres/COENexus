@@ -5,9 +5,9 @@ import SortableHeader, { useSort, sortData } from './SortableHeader';
 
 type EmpSortKey = 'upstreamId' | 'name' | 'email' | 'seniority' | 'mainSkill' | 'country' | 'salary' | 'lastAccount';
 
-interface BenchEmployeeSelectorProps {
-  onNext: (employees: BenchEmployee[]) => void;
-  initialSelected?: BenchEmployee[];
+interface DeliveryEmployeeSelectorProps {
+  onNext: (employee: BenchEmployee) => void;
+  initialSelected?: BenchEmployee | null;
 }
 
 function empAccessor(emp: BenchEmployee, key: string): string | number | null {
@@ -24,18 +24,16 @@ function empAccessor(emp: BenchEmployee, key: string): string | number | null {
   }
 }
 
-export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: BenchEmployeeSelectorProps) {
+export default function DeliveryEmployeeSelector({ onNext, initialSelected = null }: DeliveryEmployeeSelectorProps) {
   const [employees, setEmployees] = useState<BenchEmployee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Map<number, BenchEmployee>>(
-    () => new Map(initialSelected.map(e => [e.upstreamId, e]))
-  );
+  const [selected, setSelected] = useState<BenchEmployee | null>(initialSelected);
   const { sortKey, sortDir, handleSort } = useSort<EmpSortKey>('name');
 
   useEffect(() => {
-    benchBurnService.getBenchEmployees()
+    benchBurnService.getAllEmployees()
       .then(data => { setEmployees(data); setLoading(false); })
       .catch(err => { setError(err.message); setLoading(false); });
   }, []);
@@ -59,36 +57,16 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
     [filtered, sortKey, sortDir]
   );
 
-  const toggleSelect = (emp: BenchEmployee) => {
+  const handleSelect = (emp: BenchEmployee) => {
     if (!emp.isVectorized) return;
-    setSelected(prev => {
-      const next = new Map(prev);
-      if (next.has(emp.upstreamId)) {
-        next.delete(emp.upstreamId);
-      } else {
-        next.set(emp.upstreamId, emp);
-      }
-      return next;
-    });
+    setSelected(prev => (prev?.upstreamId === emp.upstreamId ? null : emp));
   };
-
-  const selectAllFiltered = () => {
-    setSelected(prev => {
-      const next = new Map(prev);
-      filtered.filter(e => e.isVectorized).forEach(e => next.set(e.upstreamId, e));
-      return next;
-    });
-  };
-
-  const deselectAll = () => setSelected(new Map());
-
-  const selectedCount = selected.size;
 
   if (loading) {
     return (
       <div className="glass-card p-8 text-center">
         <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-sm text-muted">Loading bench employees...</p>
+        <p className="text-sm text-muted">Loading employees...</p>
       </div>
     );
   }
@@ -96,7 +74,7 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
   if (error) {
     return (
       <div className="glass-card p-8 text-center">
-        <p className="text-sm text-red-500">Failed to load bench employees: {error}</p>
+        <p className="text-sm text-red-500">Failed to load employees: {error}</p>
       </div>
     );
   }
@@ -104,8 +82,8 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
   return (
     <div className="space-y-4">
       <div className="text-center mb-2">
-        <h2 className="text-lg font-semibold text-primary">Select Bench Employees</h2>
-        <p className="text-sm text-muted mt-1">Choose employees currently on bench to match against positions</p>
+        <h2 className="text-lg font-semibold text-primary">Select Delivery Professional</h2>
+        <p className="text-sm text-muted mt-1">Choose an employee to analyze against open positions</p>
       </div>
 
       <div className="glass-card p-4">
@@ -122,15 +100,9 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
               placeholder="Search by name, skill, seniority, country..."
             />
           </div>
-          <button
-            onClick={selectAllFiltered}
-            className="px-3 py-2 text-xs font-medium text-accent-500 hover:bg-accent-500/10 rounded-lg transition-colors whitespace-nowrap"
-          >
-            Select All ({filtered.filter(e => e.isVectorized).length})
-          </button>
-          {selectedCount > 0 && (
+          {selected && (
             <button
-              onClick={deselectAll}
+              onClick={() => setSelected(null)}
               className="px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors whitespace-nowrap"
             >
               Clear
@@ -155,34 +127,32 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
             </thead>
             <tbody>
               {sorted.map(emp => {
-                const isSelected = selected.has(emp.upstreamId);
+                const isSelected = selected?.upstreamId === emp.upstreamId;
                 const disabled = !emp.isVectorized;
 
                 return (
                   <tr
                     key={emp.upstreamId}
-                    onClick={() => toggleSelect(emp)}
+                    onClick={() => handleSelect(emp)}
                     className={`border-b border-gray-100/20 dark:border-dark-border/20 transition-colors ${
                       disabled
                         ? 'opacity-40 cursor-not-allowed'
                         : isSelected
-                        ? 'bg-accent-500/5 cursor-pointer'
+                        ? 'bg-rose-500/5 cursor-pointer'
                         : 'hover:bg-white/5 cursor-pointer'
                     }`}
                     title={disabled ? 'Not vectorized — run processing first' : undefined}
                   >
                     <td className="py-2 px-2">
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                         isSelected
-                          ? 'bg-accent-500 border-accent-500'
+                          ? 'bg-rose-500 border-rose-500'
                           : disabled
                           ? 'border-gray-300 dark:border-gray-600'
                           : 'border-gray-300 dark:border-gray-600'
                       }`}>
                         {isSelected && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
                         )}
                       </div>
                     </td>
@@ -192,6 +162,16 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
                       {disabled && (
                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                           Not vectorized
+                        </span>
+                      )}
+                      {!disabled && emp.isBench && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                          Bench
+                        </span>
+                      )}
+                      {!disabled && emp.isBench === false && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          Active
                         </span>
                       )}
                     </td>
@@ -218,22 +198,28 @@ export default function BenchEmployeeSelector({ onNext, initialSelected = [] }: 
 
         {sorted.length === 0 && (
           <p className="text-center text-sm text-muted py-6">
-            {search ? 'No employees match your search.' : 'No bench employees found.'}
+            {search ? 'No employees match your search.' : 'No employees found.'}
           </p>
         )}
       </div>
 
       <div className="flex items-center justify-between glass-card p-4">
         <div className="text-sm text-secondary">
-          <span className="font-mono font-semibold text-primary">{selectedCount}</span> employee{selectedCount !== 1 ? 's' : ''} selected
-          <span className="text-muted ml-2">of {employees.length} on bench</span>
+          {selected ? (
+            <span>
+              Selected: <span className="font-semibold text-primary">{selected.name}</span>
+              <span className="text-muted ml-2">({selected.seniority} · {selected.mainSkill})</span>
+            </span>
+          ) : (
+            <span className="text-muted">No employee selected</span>
+          )}
         </div>
         <button
-          onClick={() => onNext(Array.from(selected.values()))}
-          disabled={selectedCount === 0}
-          className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          onClick={() => selected && onNext(selected)}
+          disabled={!selected}
+          className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Continue with {selectedCount} employee{selectedCount !== 1 ? 's' : ''}
+          Continue with {selected?.name ?? 'Employee'}
         </button>
       </div>
     </div>

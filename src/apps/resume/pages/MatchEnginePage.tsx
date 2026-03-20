@@ -38,6 +38,7 @@ import SessionHistory from '../components/match/SessionHistory';
 import SessionHistoryPage from '../components/match/SessionHistoryPage';
 import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
 import BenchBurnPage from './BenchBurnPage';
+import DeliveryToOpPage from './DeliveryToOpPage';
 
 const SOURCE_LABELS: Record<DataSource, string> = {
   bench: 'Bench',
@@ -224,6 +225,11 @@ export default function MatchEnginePage() {
 
       if (flow === 'bench-burn') {
         navigateToStep('bench-burn');
+        return;
+      }
+
+      if (flow === 'delivery-to-op') {
+        navigateToStep('delivery-to-op');
         return;
       }
 
@@ -659,7 +665,7 @@ export default function MatchEnginePage() {
           </div>
         )}
 
-        {currentStepKey !== 'bench-burn' && (
+        {currentStepKey !== 'bench-burn' && currentStepKey !== 'delivery-to-op' && (
           <StepperBar
             stepLabels={STEP_LABELS}
             currentStepKey={currentStepKey}
@@ -704,6 +710,10 @@ export default function MatchEnginePage() {
 
         {currentStepKey === 'bench-burn' && (
           <BenchBurnPage onReset={handleReset} />
+        )}
+
+        {currentStepKey === 'delivery-to-op' && (
+          <DeliveryToOpPage onReset={handleReset} />
         )}
 
         {currentStepKey === 'data-source' && (

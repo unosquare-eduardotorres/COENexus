@@ -2,6 +2,8 @@ namespace OperationNexus.Api.Models;
 
 public record BenchBurnRequest
 {
+    public string Name { get; init; } = string.Empty;
+    public string? MatchFlowType { get; init; }
     public List<int> EmployeeUpstreamIds { get; init; } = [];
     public List<int> PositionUpstreamIds { get; init; } = [];
     public int TopNPerEmployee { get; init; } = 5;
@@ -14,6 +16,19 @@ public record CustomPositionInput
 {
     public string Name { get; init; } = string.Empty;
     public string JobDescription { get; init; } = string.Empty;
+}
+
+public record BenchBurnRetryRequest
+{
+    public int SessionId { get; init; }
+    public List<BenchBurnPairInput> Pairs { get; init; } = [];
+    public PromptConfig? OpusPromptConfig { get; init; }
+}
+
+public record BenchBurnPairInput
+{
+    public int EmployeeUpstreamId { get; init; }
+    public int PositionUpstreamId { get; init; }
 }
 
 public record CrossMatchResultDto
@@ -34,6 +49,7 @@ public record CrossMatchResultDto
 
 public record BenchBurnResultDto
 {
+    public int SessionId { get; init; }
     public Dictionary<string, List<CrossMatchResultDto>> EmployeeResults { get; init; } = new();
     public Dictionary<string, List<CrossMatchResultDto>> PositionResults { get; init; } = new();
     public BenchBurnStatsDto Stats { get; init; } = new();
@@ -45,4 +61,6 @@ public record BenchBurnStatsDto
     public int Analyzed { get; init; }
     public string Time { get; init; } = string.Empty;
     public string SearchCost { get; init; } = string.Empty;
+    public Dictionary<string, long> Timings { get; init; } = new();
+    public List<CandidateTimingDto> CandidateTimings { get; init; } = [];
 }

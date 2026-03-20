@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BenchEmployee, BenchOpenPosition, CrossMatchResult } from '../../types';
 import { BenchBurnSearchResult } from '../../services/benchBurnService';
 import ScoreRing from './ScoreRing';
+import BenchBurnPipelineStats from './BenchBurnPipelineStats';
 
 interface BenchBurnResultsProps {
   results: BenchBurnSearchResult;
@@ -9,6 +10,7 @@ interface BenchBurnResultsProps {
   positions: BenchOpenPosition[];
   onReset: () => void;
   onSelectMatch: (match: CrossMatchResult, employee: BenchEmployee, position: BenchOpenPosition) => void;
+  onRetryFallbacks?: () => void;
 }
 
 export default function BenchBurnResults({
@@ -17,6 +19,7 @@ export default function BenchBurnResults({
   positions,
   onReset,
   onSelectMatch,
+  onRetryFallbacks,
 }: BenchBurnResultsProps) {
   const [activeTab, setActiveTab] = useState<'employees' | 'positions'>('employees');
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -38,6 +41,7 @@ export default function BenchBurnResults({
       stakeholder: '',
       mainSkill: '',
       jobTitle: '',
+      jobDescription: '',
       isVectorized: false,
     };
   };
@@ -80,26 +84,7 @@ export default function BenchBurnResults({
         </div>
       </div>
 
-      <div className="glass-card p-3">
-        <div className="grid grid-cols-4 gap-3">
-          <div className="text-center">
-            <div className="text-lg font-bold font-mono text-primary">{results.stats.totalPairs}</div>
-            <div className="text-[11px] text-muted">Total Pairs</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-bold font-mono text-primary">{results.stats.analyzed}</div>
-            <div className="text-[11px] text-muted">Analyzed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-bold font-mono text-primary">{results.stats.time}</div>
-            <div className="text-[11px] text-muted">Duration</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-bold font-mono text-primary">{results.stats.searchCost}</div>
-            <div className="text-[11px] text-muted">Cost</div>
-          </div>
-        </div>
-      </div>
+      <BenchBurnPipelineStats stats={results.stats} onRetryFallbacks={onRetryFallbacks} />
 
       <div className="flex gap-1 p-1 rounded-xl glass-panel-subtle">
         <button
@@ -173,7 +158,17 @@ export default function BenchBurnResults({
                           <ScoreRing score={match.matchScore} size={40} />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-primary truncate">{match.positionLabel}</div>
-                            <div className="text-xs text-muted truncate">{match.summary}</div>
+                            <div className="text-xs text-muted truncate">
+                              {pos.stakeholder && <span className="text-secondary">{pos.stakeholder}</span>}
+                              {pos.stakeholder && ' · '}
+                              <span className="font-mono">OP#{match.positionUpstreamId}</span>
+                              {match.summary?.includes('AI analysis unavailable') && (
+                                <span className="ml-1 mr-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                  Cosine Only
+                                </span>
+                              )}
+                              {match.summary && ` — ${match.summary}`}
+                            </div>
                           </div>
                           <div className="text-xs font-mono text-muted">
                             cos: {match.cosineSimilarity.toFixed(3)}
@@ -237,7 +232,17 @@ export default function BenchBurnResults({
                           <ScoreRing score={match.matchScore} size={40} />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-primary truncate">{match.employeeName}</div>
-                            <div className="text-xs text-muted truncate">{match.summary}</div>
+                            <div className="text-xs text-muted truncate">
+                              {emp.seniority && <span className="text-secondary">{emp.seniority}</span>}
+                              {emp.seniority && emp.mainSkill && ' · '}
+                              {emp.mainSkill && <span className="text-secondary">{emp.mainSkill}</span>}
+                              {match.summary?.includes('AI analysis unavailable') && (
+                                <span className="ml-1 mr-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                  Cosine Only
+                                </span>
+                              )}
+                              {match.summary && ` — ${match.summary}`}
+                            </div>
                           </div>
                           <div className="text-xs font-mono text-muted">
                             cos: {match.cosineSimilarity.toFixed(3)}

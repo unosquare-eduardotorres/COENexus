@@ -115,7 +115,7 @@ const INTENTS: IntentOption[] = [
     icon: <MicroscopeIcon />,
     gradient: 'from-rose-500 to-pink-500',
     tagColor: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-    enabled: false,
+    enabled: true,
   },
 ];
 

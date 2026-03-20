@@ -58,6 +58,7 @@ builder.Services.AddHttpClient<ClaudeProxyService>();
 builder.Services.AddScoped<IClaudeProxyService, ClaudeProxyService>();
 builder.Services.AddScoped<IMatchEngineService, MatchEngineService>();
 builder.Services.AddScoped<BenchBurnService>();
+builder.Services.AddScoped<IDatabaseSharingService, DatabaseSharingService>();
 
 var connectionString = builder.Configuration.GetConnectionString("NexusDb");
 builder.Services.AddDbContext<NexusDbContext>(options =>

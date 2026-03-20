@@ -106,6 +106,9 @@ public record HaikuTriageResult
 
 public record SonnetAnalysis
 {
+    public string FitVerdict { get; init; } = string.Empty;
+    public string FitSummary { get; init; } = string.Empty;
+    public string WhyNotFit { get; init; } = string.Empty;
     public string WhyRightFit { get; init; } = string.Empty;
     public string ImmediateValue { get; init; } = string.Empty;
     public string RampUpEstimate { get; init; } = string.Empty;
@@ -121,10 +124,15 @@ public record SonnetAnalysis
 public record MatchScoresDto
 {
     public int Technical { get; init; }
+    public string TechnicalReason { get; init; } = string.Empty;
     public int Domain { get; init; }
+    public string DomainReason { get; init; } = string.Empty;
     public int Leadership { get; init; }
+    public string LeadershipReason { get; init; } = string.Empty;
     public int SoftSkills { get; init; }
+    public string SoftSkillsReason { get; init; } = string.Empty;
     public int Availability { get; init; }
+    public string AvailabilityReason { get; init; } = string.Empty;
 }
 
 public record SkillMatchDto
@@ -133,6 +141,11 @@ public record SkillMatchDto
     public string Status { get; init; } = string.Empty;
     public int Years { get; init; }
     public string? Priority { get; init; }
+
+    public static List<SkillMatchDto> Normalize(List<SkillMatchDto> skills) =>
+        skills.Select(s => s.Years == -1 && s.Status is "partial" or "met" or "surpassed"
+            ? s with { Status = "missing" }
+            : s).ToList();
 }
 
 public record NonTechSkillDto

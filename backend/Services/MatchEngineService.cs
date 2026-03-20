@@ -29,59 +29,8 @@ public class MatchEngineService : IMatchEngineService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private const string DEFAULT_OPUS_TEMPLATE = @"You are a senior technical recruiter AI performing deep candidate analysis.
-
-Job Description:
-{{jobDescription}}
-
-Candidate Name: {{candidateName}}
-Current Title: {{jobTitle}}
-Seniority: {{seniority}}
-Main Skill: {{mainSkill}}
-Country: {{country}}
-Rate: {{rate}} {{currency}}
-On Bench: {{isBench}}
-Source: {{sourceType}}
-
-Resume:
-{{resume}}
-
-Analyze this candidate's fit for the role. Return a JSON object with this exact structure:
-{
-  ""matchScore"": <0-100>,
-  ""role"": ""<candidate's best-fit role title>"",
-  ""years"": <total years of experience>,
-  ""location"": ""{{country}}"",
-  ""salary"": ""{{salaryDisplay}}"",
-  ""availability"": ""{{availabilityDisplay}}"",
-  ""scores"": { ""technical"": <0-100>, ""domain"": <0-100>, ""leadership"": <0-100>, ""softSkills"": <0-100>, ""availability"": <0-100> },
-  ""summary"": ""<2-3 sentence executive summary of fit>"",
-  ""skills"": [{ ""name"": ""<skill>"", ""status"": ""met|surpassed|partial|missing"", ""years"": <years>, ""priority"": ""required|nice-to-have|optional"" }],
-  ""domains"": [{ ""name"": ""<domain>"", ""confidence"": <0-100>, ""evidence"": ""<brief evidence>"" }],
-  ""gaps"": [{ ""skill"": ""<gap area>"", ""severity"": ""high|medium|low"", ""note"": ""<explanation>"" }],
-  ""leadership"": [{ ""label"": ""<leadership quality>"", ""priority"": ""required|nice-to-have|optional"", ""status"": ""met|surpassed|partial|missing"" }],
-  ""softSkills"": [{ ""label"": ""<soft skill>"", ""priority"": ""required|nice-to-have|optional"", ""status"": ""met|surpassed|partial|missing"" }],
-  ""analysis"": {
-    ""whyRightFit"": ""<detailed narrative on why this candidate fits>"",
-    ""immediateValue"": ""<what value they bring day one>"",
-    ""rampUpEstimate"": ""<realistic ramp-up time and what they need to learn>"",
-    ""riskFactors"": ""<risks and how to mitigate them>"",
-    ""beyondJd"": ""<hidden strengths beyond the JD requirements>"",
-    ""leadershipDynamics"": ""<leadership style and team dynamics>"",
-    ""industryDepth"": ""<industry and domain knowledge depth>"",
-    ""trackRecord"": ""<proof points and track record>"",
-    ""culturalFit"": ""<cultural and work style compatibility>"",
-    ""retentionPotential"": ""<long-term retention potential and growth path>""
-  }
-}
-
-IMPORTANT rules for skills, leadership, and softSkills:
-- ""priority"" is derived from the JD: use ""required"" for must-have skills, ""nice-to-have"" for preferred skills, and ""optional"" for bonus skills.
-- ""surpassed"" means the candidate significantly exceeds the JD requirement (e.g., JD asks 2 years but candidate has 5+, or candidate holds a relevant certification not listed).
-- All JD-required skills MUST appear in the output regardless of whether the candidate matches them. Missing skills get status ""missing"".
-- Leadership and softSkills must be returned as structured objects with label, priority, and status fields.
-
-Return ONLY valid JSON, no markdown or explanation.";
+    private static readonly string DEFAULT_OPUS_TEMPLATE =
+        PromptTemplates.OpusAnalysis.Replace("{{contextBlock}}", PromptTemplates.MatchEngineContextBlock);
 
     public MatchEngineService(
         NexusDbContext dbContext,
@@ -442,7 +391,7 @@ Return ONLY valid JSON, no markdown or explanation.";
         var haikuScores = new ConcurrentDictionary<int, int>();
         var triaged = new ConcurrentBag<(VectorSearchResult Candidate, int Score)>();
         var haikuCompleted = 0;
-        var semaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
+        var semaphore = new SemaphoreSlim(_claudeSettings.HaikuMaxConcurrency);
         var haikuTemplate = request.HaikuPromptConfig?.PromptTemplate
             ?? "You are a technical recruiter AI. Given this job description and resume, assess relevance.\n\nJob Description:\n{{jobDescription}}\n\nResume:\n{{resume}}\n\nRespond in JSON only: {\"relevant\": true/false, \"score\": 0-100, \"reason\": \"brief explanation\"}";
         var haikuMaxTokens = request.HaikuPromptConfig?.MaxTokens ?? 256;
@@ -529,9 +478,9 @@ Return ONLY valid JSON, no markdown or explanation.";
         timings["haikuCallCount"] = afterConstraints.Count;
         timings["haikuFallbackCount"] = haikuFallbackCount;
         timings["haikuAvgMs"] = afterConstraints.Count > 0 ? phase.ElapsedMilliseconds / afterConstraints.Count : 0;
-        timings["haikuMaxConcurrency"] = _claudeSettings.MaxConcurrency;
+        timings["haikuMaxConcurrency"] = _claudeSettings.HaikuMaxConcurrency;
         _logger.LogInformation("[MatchEngine] Phase 6 — Haiku Triage: {Ms}ms ({Count} calls, {Fallbacks} fallbacks, concurrency={Concurrency})",
-            phase.ElapsedMilliseconds, afterConstraints.Count, haikuFallbackCount, _claudeSettings.MaxConcurrency);
+            phase.ElapsedMilliseconds, afterConstraints.Count, haikuFallbackCount, _claudeSettings.HaikuMaxConcurrency);
 
         haikuTriageCount = triaged.Count;
 
@@ -690,7 +639,7 @@ Return ONLY valid JSON, no markdown or explanation.";
         var sonnetCompleted = 0;
         var sonnetSemaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
         var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? DEFAULT_OPUS_TEMPLATE;
-        var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 4096;
+        var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 5120;
         var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
         var model = request.SearchMode == "opus"
             ? _claudeSettings.OpusModel
@@ -762,6 +711,7 @@ Return ONLY valid JSON, no markdown or explanation.";
                                 SalaryExpectations = candidate.SalaryExpectations ?? 0,
                                 SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
                                 LastStatusUpdate = candidate.LastStatusUpdate?.ToString("yyyy-MM-dd"),
+                                Skills = SkillMatchDto.Normalize(parsed.Skills),
                             });
                         }
                     }
@@ -1156,10 +1106,50 @@ Return ONLY valid JSON, no markdown or explanation.";
 
     public async Task<List<MatchSessionDto>> ListSessionsAsync(CancellationToken ct = default)
     {
-        var jsonOpts = JsonOptions;
-        return await _dbContext.MatchSessions
+        var sessions = await _dbContext.MatchSessions
             .OrderByDescending(s => s.CreatedAt)
-            .Select(s => new MatchSessionDto
+            .Select(s => new
+            {
+                s.Id,
+                s.Name,
+                s.MatchFlowType,
+                s.DataSource,
+                s.TopN,
+                s.SearchMode,
+                s.JdSource,
+                s.Status,
+                s.CreatedAt,
+                s.CompletedAt,
+                s.ResultsJson,
+                s.PipelineStatsJson,
+            })
+            .ToListAsync(ct);
+
+        return sessions.Select(s =>
+        {
+            int? candidateCount = null;
+            string? time = null;
+
+            if (s.ResultsJson != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(s.ResultsJson);
+                    candidateCount = doc.RootElement.GetArrayLength();
+                }
+                catch { }
+            }
+
+            if (s.PipelineStatsJson != null)
+            {
+                try
+                {
+                    time = JsonSerializer.Deserialize<PipelineStatsDto>(s.PipelineStatsJson, JsonOptions)?.Time;
+                }
+                catch { }
+            }
+
+            return new MatchSessionDto
             {
                 Id = s.Id,
                 Name = s.Name,
@@ -1171,14 +1161,10 @@ Return ONLY valid JSON, no markdown or explanation.";
                 Status = s.Status,
                 CreatedAt = s.CreatedAt,
                 CompletedAt = s.CompletedAt,
-                CandidateCount = s.ResultsJson != null
-                    ? JsonSerializer.Deserialize<List<MatchCandidateResult>>(s.ResultsJson, jsonOpts)!.Count
-                    : null,
-                Time = s.PipelineStatsJson != null
-                    ? JsonSerializer.Deserialize<PipelineStatsDto>(s.PipelineStatsJson, jsonOpts)!.Time
-                    : null,
-            })
-            .ToListAsync(ct);
+                CandidateCount = candidateCount,
+                Time = time,
+            };
+        }).ToList();
     }
 
     public async Task<MatchSessionDetailDto?> GetSessionAsync(int id, CancellationToken ct = default)

@@ -390,10 +390,15 @@ export interface GapAnalysis {
 
 export interface MatchScores {
   technical: number;
+  technicalReason?: string;
   domain: number;
+  domainReason?: string;
   leadership: number;
+  leadershipReason?: string;
   softSkills: number;
+  softSkillsReason?: string;
   availability: number;
+  availabilityReason?: string;
 }
 
 export interface MatchCandidate {
@@ -430,7 +435,7 @@ export interface MatchCandidate {
 
 export interface CandidateTiming {
   name: string;
-  phase: 'haiku' | 'sonnet';
+  phase: 'haiku' | 'sonnet' | 'opus';
   durationMs: number;
   fallback: boolean;
   error?: string;
@@ -455,7 +460,9 @@ export interface SearchProgress {
 
 export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op' | 'bench-burn';
 
-export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn';
+export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn' | 'delivery-to-op';
+
+export type DeliveryToOpStepKey = 'employee' | 'positions' | 'summary' | 'analyzing' | 'results';
 
 export type JdSource = 'position' | 'custom';
 
@@ -577,7 +584,12 @@ export type TopN = 1 | 10 | 20 | 30;
 
 export type SearchMode = 'vector' | 'haiku' | 'opus';
 
+export type FitVerdict = 'strong-fit' | 'good-fit' | 'partial-fit' | 'not-a-fit';
+
 export interface SonnetAnalysis {
+  fitVerdict: FitVerdict;
+  fitSummary: string;
+  whyNotFit: string;
   whyRightFit: string;
   immediateValue: string;
   rampUpEstimate: string;
@@ -684,6 +696,7 @@ export interface BenchEmployee {
   salaryCurrency: string | null;
   lastAccount: string | null;
   isVectorized: boolean;
+  isBench?: boolean;
 }
 
 export interface BenchOpenPosition {
@@ -695,10 +708,13 @@ export interface BenchOpenPosition {
   stakeholder: string;
   mainSkill: string;
   jobTitle: string;
+  jobDescription?: string;
   isVectorized: boolean;
 }
 
 export interface BenchBurnRequest {
+  name: string;
+  matchFlowType?: 'bench-burn' | 'delivery-to-op';
   employeeUpstreamIds: number[];
   positionUpstreamIds: number[];
   searchMode: 'opus';
@@ -724,6 +740,7 @@ export interface CrossMatchResult {
 }
 
 export interface BenchBurnResult {
+  sessionId: number;
   employeeResults: Record<number, CrossMatchResult[]>;
   positionResults: Record<number, CrossMatchResult[]>;
   stats: {

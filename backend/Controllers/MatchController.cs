@@ -217,6 +217,30 @@ public class MatchController : ControllerBase
         return Ok(employees);
     }
 
+    [HttpGet("all-employees")]
+    public async Task<IActionResult> GetAllEmployees()
+    {
+        var employees = await _dbContext.SyncedEmployees
+            .Select(e => new
+            {
+                e.UpstreamId,
+                Name = e.FullName,
+                e.Email,
+                e.Seniority,
+                e.MainSkill,
+                e.Country,
+                e.GrossMonthlySalary,
+                e.SalaryCurrency,
+                e.LastAccount,
+                e.IsBench,
+                IsVectorized = _dbContext.ResumeEmbeddings
+                    .Any(re => re.SourceType == "employees" && re.UpstreamId == e.UpstreamId && re.Embedding != null)
+            })
+            .OrderBy(e => e.Name)
+            .ToListAsync();
+        return Ok(employees);
+    }
+
     [HttpGet("open-positions")]
     public async Task<IActionResult> GetOpenPositions()
     {
@@ -231,6 +255,7 @@ public class MatchController : ControllerBase
                 op.Stakeholder,
                 op.MainSkill,
                 op.JobTitle,
+                op.JobDescription,
                 IsVectorized = _dbContext.ResumeEmbeddings
                     .Any(re => re.SourceType == "open-positions" && re.UpstreamId == op.UpstreamId && re.Embedding != null)
             })
@@ -268,6 +293,40 @@ public class MatchController : ControllerBase
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[BenchBurn] Stream died: {ex}");
+            var errorData = JsonSerializer.Serialize(new { error = ex.Message }, jsonOptions);
+            await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
+            await Response.Body.FlushAsync();
+        }
+    }
+
+    [HttpPost("bench-burn/retry")]
+    public async Task StreamBenchBurnRetry([FromBody] BenchBurnRetryRequest request)
+    {
+        Response.ContentType = "text/event-stream";
+        Response.Headers["Cache-Control"] = "no-cache";
+        Response.Headers["Connection"] = "keep-alive";
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        try
+        {
+            await foreach (var evt in _benchBurnService.RetryPairsAsync(request, HttpContext.RequestAborted))
+            {
+                var (eventName, data) = evt switch
+                {
+                    BenchBurnProgressEvent e => ("progress", JsonSerializer.Serialize(e.Progress, jsonOptions)),
+                    BenchBurnResultEvent e => ("result", JsonSerializer.Serialize(e.Result, jsonOptions)),
+                    _ => throw new InvalidOperationException()
+                };
+
+                await Response.WriteAsync($"event: {eventName}\ndata: {data}\n\n");
+                await Response.Body.FlushAsync();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[BenchBurn/Retry] Stream died: {ex}");
             var errorData = JsonSerializer.Serialize(new { error = ex.Message }, jsonOptions);
             await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
             await Response.Body.FlushAsync();

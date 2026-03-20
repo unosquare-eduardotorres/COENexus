@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
+import DatabaseUpdateBanner from './DatabaseUpdateBanner';
 
 type SidebarMode = 'expanded' | 'collapsed' | 'top';
 
@@ -480,7 +481,10 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            <main className="flex-1 md:pt-0 pt-14">{children}</main>
+            <main className="flex-1 md:pt-0 pt-14">
+              <DatabaseUpdateBanner />
+              {children}
+            </main>
 
             <footer className="border-t border-gray-200/30 dark:border-dark-border/30 mt-auto">
               <div className="max-w-[1400px] mx-auto px-6 py-4">
@@ -496,7 +500,10 @@ export default function Layout({ children }: LayoutProps) {
         <>
           <TopBar onSwitchMode={handleSwitchToSidebar} onNavClick={handleNavClick} />
 
-          <main className="pt-14">{children}</main>
+          <main className="pt-14">
+            <DatabaseUpdateBanner />
+            {children}
+          </main>
 
           <footer className="border-t border-gray-200/30 dark:border-dark-border/30 mt-auto">
             <div className="max-w-[1400px] mx-auto px-6 py-4">

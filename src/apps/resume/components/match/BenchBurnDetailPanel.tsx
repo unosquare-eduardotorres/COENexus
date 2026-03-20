@@ -1,4 +1,4 @@
-import { BenchEmployee, BenchOpenPosition, CrossMatchResult } from '../../types';
+import { BenchEmployee, BenchOpenPosition, CrossMatchResult, FitVerdict } from '../../types';
 import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
 
@@ -20,6 +20,21 @@ function SeverityBadge({ severity }: { severity: string }) {
       {severity}
     </span>
   );
+}
+
+function getFitVerdictConfig(verdict: FitVerdict) {
+  switch (verdict) {
+    case 'strong-fit':
+      return { label: 'Strong Fit', icon: '✅', classes: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', calloutBg: 'bg-emerald-500/5 border-emerald-500/20' };
+    case 'good-fit':
+      return { label: 'Good Fit', icon: '👍', classes: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30', calloutBg: 'bg-blue-500/5 border-blue-500/20' };
+    case 'partial-fit':
+      return { label: 'Partial Fit', icon: '⚠️', classes: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30', calloutBg: 'bg-amber-500/5 border-amber-500/20' };
+    case 'not-a-fit':
+      return { label: 'Not a Fit', icon: '❌', classes: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30', calloutBg: 'bg-red-500/5 border-red-500/20' };
+    default:
+      return { label: 'Unknown', icon: '❓', classes: 'bg-gray-500/10 text-gray-500', calloutBg: 'bg-gray-500/5 border-gray-500/20' };
+  }
 }
 
 function SkillStatusBadge({ status }: { status: string }) {
@@ -66,7 +81,12 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
           <div className="flex items-center gap-3 flex-1 justify-end text-right">
             <div>
               <div className="font-semibold text-primary">{match.positionLabel}</div>
-              <div className="text-xs text-muted">{position.coe} · {position.practice}</div>
+              <div className="text-xs text-muted">
+                {position.stakeholder && <span className="text-secondary">{position.stakeholder}</span>}
+                {position.stakeholder && ' · '}
+                <span className="font-mono">OP#{match.positionUpstreamId}</span>
+                {' · '}{position.coe} · {position.practice}
+              </div>
             </div>
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
               {position.account.charAt(0)}
@@ -79,14 +99,54 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
         </div>
       </div>
 
+      {position.jobDescription && (
+        <div className="glass-card p-5">
+          <details>
+            <summary className="text-sm font-semibold text-primary cursor-pointer select-none">
+              Job Description
+            </summary>
+            <div className="mt-3 text-sm text-secondary leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+              {position.jobDescription}
+            </div>
+          </details>
+        </div>
+      )}
+
+      {match.analysis?.fitVerdict && (() => {
+        const config = getFitVerdictConfig(match.analysis!.fitVerdict);
+        return (
+          <div className="glass-card p-5 space-y-3">
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border font-semibold text-sm ${config.classes}`}>
+              <span className="text-base">{config.icon}</span>
+              {config.label}
+            </div>
+            {match.analysis!.fitSummary && (
+              <div className={`p-4 rounded-xl border ${config.calloutBg}`}>
+                <p className="text-sm text-primary font-medium">{match.analysis!.fitSummary}</p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {match.analysis?.whyNotFit && (match.analysis.fitVerdict === 'partial-fit' || match.analysis.fitVerdict === 'not-a-fit') && (
+        <div className="glass-card p-5 border-l-4 border-red-500">
+          <div className="flex items-center gap-2 mb-2">
+            <span>🚫</span>
+            <h3 className="text-sm font-semibold text-primary">Why This Employee Is NOT a Fit</h3>
+          </div>
+          <p className="text-sm text-secondary leading-relaxed">{match.analysis.whyNotFit}</p>
+        </div>
+      )}
+
       <div className="glass-card p-5">
         <h3 className="text-sm font-semibold text-primary mb-3">Score Breakdown</h3>
         <div className="space-y-2.5">
-          <CategoryBar label="Technical" value={match.scores.technical} tooltip="Technical skill alignment" />
-          <CategoryBar label="Domain" value={match.scores.domain} tooltip="Industry/domain experience" />
-          <CategoryBar label="Leadership" value={match.scores.leadership} tooltip="Leadership & management" />
-          <CategoryBar label="Soft Skills" value={match.scores.softSkills} tooltip="Communication & teamwork" />
-          <CategoryBar label="Availability" value={match.scores.availability} tooltip="Readiness to start" />
+          <CategoryBar label="Technical" value={match.scores.technical} description={match.scores.technicalReason} tooltip="Technical skill alignment" />
+          <CategoryBar label="Domain" value={match.scores.domain} description={match.scores.domainReason} tooltip="Industry/domain experience" />
+          <CategoryBar label="Leadership" value={match.scores.leadership} description={match.scores.leadershipReason} tooltip="Leadership & management" />
+          <CategoryBar label="Soft Skills" value={match.scores.softSkills} description={match.scores.softSkillsReason} tooltip="Communication & teamwork" />
+          <CategoryBar label="Availability" value={match.scores.availability} description={match.scores.availabilityReason} tooltip="Readiness to start" />
         </div>
       </div>
 
@@ -176,14 +236,17 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
                 </tr>
               </thead>
               <tbody>
-                {match.skills.map((skill, i) => (
-                  <tr key={i} className="border-b border-gray-100/10 dark:border-dark-border/10">
-                    <td className="py-2 px-2 text-primary">{skill.name}</td>
-                    <td className="py-2 px-2"><SkillStatusBadge status={skill.status} /></td>
-                    <td className="py-2 px-2 text-right font-mono text-muted">{skill.years}y</td>
-                    <td className="py-2 px-2 text-xs text-muted capitalize">{skill.priority}</td>
-                  </tr>
-                ))}
+                {match.skills.map((skill, i) => {
+                  const status = skill.years === -1 && skill.status !== 'missing' ? 'missing' : skill.status;
+                  return (
+                    <tr key={i} className="border-b border-gray-100/10 dark:border-dark-border/10">
+                      <td className="py-2 px-2 text-primary">{skill.name}</td>
+                      <td className="py-2 px-2"><SkillStatusBadge status={status} /></td>
+                      <td className="py-2 px-2 text-right font-mono text-muted">{skill.years === -1 ? '—' : `${skill.years}y`}</td>
+                      <td className="py-2 px-2 text-xs text-muted capitalize">{skill.priority}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
