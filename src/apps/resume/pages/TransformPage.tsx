@@ -12,6 +12,8 @@ import { templateFillService } from '../services/templateFillService';
 import { pdfExportService } from '../services/pdfExportService';
 import { transformSessionService } from '../services/transformSessionService';
 import { dataSyncService } from '../services/dataSyncService';
+import { sessionService } from '../services/sessionService';
+import SaveSessionModal from '../components/SaveSessionModal';
 import {
   StructuredResume,
   ATSCandidate,
@@ -333,6 +335,11 @@ export default function TransformPage() {
   const [uploadedToATS, setUploadedToATS] = useState<Set<string>>(new Set());
   const [savedSessionId, setSavedSessionId] = useState<number | null>(null);
   const [savingSession, setSavingSession] = useState(false);
+  const [showSaveSessionModal, setShowSaveSessionModal] = useState(false);
+  const [isSavingSession, setIsSavingSession] = useState(false);
+  const [sessionSaved, setSessionSaved] = useState(false);
+  const [savedSessionName, setSavedSessionName] = useState('');
+  const [pendingSessionName, setPendingSessionName] = useState<string | null>(null);
 
   const stepLabels = useMemo(() => {
     const base: { key: StepKey; title: string }[] = [
@@ -640,13 +647,67 @@ export default function TransformPage() {
     setIsTransforming(false);
   }, [sourceType, selectedCandidate, selectedPosition, selectedFiles, refinementMode, jobDescriptionSource, customJobDescription]);
 
+  const defaultSessionName = useMemo(() => {
+    const subject = sourceType === 'ats-candidates' && selectedCandidate
+      ? selectedCandidate.name
+      : selectedFiles[0]?.name?.replace(/\.[^/.]+$/, '') ?? 'Session';
+    const modeLabels: Record<RefinementMode, string> = {
+      'professional-polish': 'Professional Polish',
+      'impact-focused': 'Impact-Focused',
+      'ats-optimized': 'ATS-Optimized',
+      'job-tailoring': 'Job Description Tailoring',
+    };
+    return `${subject} — ${modeLabels[refinementMode]}`;
+  }, [sourceType, selectedCandidate, selectedFiles, refinementMode]);
+
   const handleTransform = useCallback(() => {
     if (claudeConnected === false) {
       setShowFallbackWarning(true);
     } else {
-      executeTransform();
+      setShowSaveSessionModal(true);
     }
-  }, [claudeConnected, executeTransform]);
+  }, [claudeConnected]);
+
+  const handleSaveAndEnhance = useCallback((sessionName: string) => {
+    setPendingSessionName(sessionName);
+    setSavedSessionName(sessionName);
+    setShowSaveSessionModal(false);
+    executeTransform();
+  }, [executeTransform]);
+
+  useEffect(() => {
+    if (!pendingSessionName || transformedResumes.length === 0 || isTransforming) return;
+
+    const saveSession = async () => {
+      setIsSavingSession(true);
+      try {
+        const contextType = sourceType === 'ats-candidates' ? 'candidate'
+          : sourceType === 'employees' ? 'employee' : 'upload';
+
+        await sessionService.createSession({
+          name: pendingSessionName,
+          contextType,
+          contextId: selectedCandidate ? Number(selectedCandidate.upstreamId) : null,
+          contextName: selectedCandidate?.name ?? selectedFiles[0]?.name ?? '',
+          processingMode,
+          refinementMode,
+          jobDescription: refinementMode === 'job-tailoring' ? customJobDescription : null,
+          jobDescriptionSource: refinementMode === 'job-tailoring' ? jobDescriptionSource : null,
+          selectedPositionId: selectedPosition?.id ?? null,
+          resumeContentJson: JSON.stringify(transformedResumes),
+          status: 'completed',
+        });
+        setSessionSaved(true);
+      } catch (err) {
+        console.error('Session save failed:', err);
+      } finally {
+        setIsSavingSession(false);
+        setPendingSessionName(null);
+      }
+    };
+
+    saveSession();
+  }, [pendingSessionName, transformedResumes, isTransforming, sourceType, selectedCandidate, selectedFiles, processingMode, refinementMode, customJobDescription, jobDescriptionSource, selectedPosition]);
 
   const handleUpdateResume = useCallback((updatedResume: StructuredResume) => {
     setEditedResumes((prev) => {
@@ -897,6 +958,11 @@ export default function TransformPage() {
     setUploadedToATS(new Set());
     sessionStorage.removeItem(SESSION_KEY);
     setSavedSessionId(null);
+    setShowSaveSessionModal(false);
+    setIsSavingSession(false);
+    setSessionSaved(false);
+    setSavedSessionName('');
+    setPendingSessionName(null);
   }, []);
 
   const handleSaveSession = useCallback(async () => {
@@ -1583,6 +1649,19 @@ export default function TransformPage() {
 
         {currentStepKey === 'review' && (
           <div className="mb-6">
+            {sessionSaved && (
+              <div className="glass-card p-3 mb-4 flex items-center gap-3 bg-emerald-50/80 dark:bg-emerald-500/10 border border-emerald-200/50 dark:border-emerald-500/20">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Session Saved</p>
+                  <p className="text-xs text-emerald-600/70 dark:text-emerald-400/60">"{savedSessionName}" saved successfully</p>
+                </div>
+              </div>
+            )}
             {isTransforming && transformProgress ? (
               <div className="glass-card p-6 text-center py-8">
                 <div className="relative w-16 h-16 mx-auto mb-6">
@@ -2236,7 +2315,7 @@ export default function TransformPage() {
                 Retry Connection
               </button>
               <button
-                onClick={() => { setShowFallbackWarning(false); executeTransform(); }}
+                onClick={() => { setShowFallbackWarning(false); setShowSaveSessionModal(true); }}
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-amber-500 rounded-xl hover:bg-amber-600 transition-colors"
               >
                 Continue Anyway
@@ -2343,6 +2422,15 @@ export default function TransformPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showSaveSessionModal && (
+        <SaveSessionModal
+          defaultName={defaultSessionName}
+          isSaving={isSavingSession}
+          onSave={handleSaveAndEnhance}
+          onCancel={() => setShowSaveSessionModal(false)}
+        />
       )}
     </div>
   );

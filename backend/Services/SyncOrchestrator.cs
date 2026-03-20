@@ -13,6 +13,7 @@ public class SyncOrchestrator : ISyncOrchestrator
     private readonly ICatalogService _catalogService;
     private readonly NexusDbContext _dbContext;
     private readonly ILogger<SyncOrchestrator> _logger;
+    private readonly IEmbeddingJobQueue _embeddingQueue;
 
     private static readonly HashSet<string> SupportedResumeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -45,12 +46,14 @@ public class SyncOrchestrator : ISyncOrchestrator
         IUpstreamApiService upstreamApi,
         ICatalogService catalogService,
         NexusDbContext dbContext,
-        ILogger<SyncOrchestrator> logger)
+        ILogger<SyncOrchestrator> logger,
+        IEmbeddingJobQueue embeddingQueue)
     {
         _upstreamApi = upstreamApi;
         _catalogService = catalogService;
         _dbContext = dbContext;
         _logger = logger;
+        _embeddingQueue = embeddingQueue;
     }
 
     public async IAsyncEnumerable<SyncEvent> SyncAsync(string source, string token, int? limit = null, int? skip = null, int? year = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -98,6 +101,9 @@ public class SyncOrchestrator : ISyncOrchestrator
         var pagedFallback = new EmployeeDetail { UserId = upstreamId };
         var entity = BuildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, pagedFallback);
         var (_, resumeChanged, syncDetail) = await UpsertEmployeeAsync(entity, ct);
+        await EnqueueEmbeddingIfEligible("employees", entity.Id, entity.UpstreamId,
+            entity.FullName, entity.ResumeNoteId, entity.ResumeFilename,
+            entity.IsBench, token, entity.HasResume, entity.Status);
 
         return MapEmployeeToDto(entity, resumeChanged, syncDetail);
     }
@@ -114,6 +120,9 @@ public class SyncOrchestrator : ISyncOrchestrator
         var pagedFallback = new CandidateDetail { CandidateId = upstreamId };
         var entity = BuildCandidateEntity(detail, notes, seniorities, mainSkills, countries, pagedFallback);
         var (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, ct);
+        await EnqueueEmbeddingIfEligible("candidates", entity.Id, entity.UpstreamId,
+            entity.FullName, entity.ResumeNoteId, entity.ResumeFilename,
+            false, token, entity.HasResume, entity.Status);
 
         return MapCandidateToDto(entity, resumeChanged, syncDetail);
     }
@@ -275,6 +284,9 @@ public class SyncOrchestrator : ISyncOrchestrator
 
                         entity = BuildEmployeeEntity(result.Detail!, result.Contracts!, result.Rates!, result.Notes!, seniorities, mainSkills, countries, result.Employee);
                         (_, resumeChanged, syncDetail) = await UpsertEmployeeAsync(entity, cancellationToken);
+                        await EnqueueEmbeddingIfEligible("employees", entity.Id, entity.UpstreamId,
+                            entity.FullName, entity.ResumeNoteId, entity.ResumeFilename,
+                            entity.IsBench, token, entity.HasResume, entity.Status);
                     }
                     catch (Exception ex)
                     {
@@ -505,6 +517,9 @@ public class SyncOrchestrator : ISyncOrchestrator
 
                         entity = BuildCandidateEntity(result.Detail!, result.Notes!, seniorities, mainSkills, countries, result.Candidate);
                         (_, resumeChanged, syncDetail) = await UpsertCandidateAsync(entity, cancellationToken);
+                        await EnqueueEmbeddingIfEligible("candidates", entity.Id, entity.UpstreamId,
+                            entity.FullName, entity.ResumeNoteId, entity.ResumeFilename,
+                            false, token, entity.HasResume, entity.Status);
                     }
                     catch (Exception ex)
                     {
@@ -967,6 +982,25 @@ public class SyncOrchestrator : ISyncOrchestrator
         return (true, false, "new");
     }
 
+    private async Task EnqueueEmbeddingIfEligible(
+        string source, int dbId, int upstreamId, string name,
+        int? resumeNoteId, string? resumeFilename, bool isBench,
+        string token, bool hasResume, string status)
+    {
+        if (!hasResume || status != "synced") return;
+
+        await _embeddingQueue.EnqueueAsync(new EmbeddingJob(
+            Source: source,
+            DbId: dbId,
+            UpstreamId: upstreamId,
+            Name: name,
+            ResumeNoteId: resumeNoteId,
+            ResumeFilename: resumeFilename,
+            IsBench: isBench,
+            Token: token
+        ));
+    }
+
     private static SyncRecordDto MapEmployeeToDto(SyncedEmployee entity, bool resumeChanged, string syncDetail) => new()
     {
         Id = $"emp-{entity.UpstreamId}",
@@ -1132,6 +1166,9 @@ public class SyncOrchestrator : ISyncOrchestrator
 
                             entity = BuildOpenPositionEntity(result.Position, result.Detail ?? new OpenPositionDetail(), result.Candidates ?? new List<PresentedCandidateItem>());
                             (_, syncDetail) = await UpsertOpenPositionAsync(entity, result.Candidates ?? new List<PresentedCandidateItem>(), cancellationToken);
+                            await EnqueueEmbeddingIfEligible("open-positions", entity.Id, entity.UpstreamId,
+                                $"{entity.Account} - {entity.MainSkill}", null, null,
+                                false, token, !string.IsNullOrEmpty(entity.JobDescription), entity.Status);
                         }
                         catch (Exception ex)
                         {
