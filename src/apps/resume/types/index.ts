@@ -774,3 +774,35 @@ export interface BenchBurnResult {
     searchCost: string;
   };
 }
+
+export type ResumeSessionStatus = 'active' | 'completed' | 'archived';
+export type ResumeUploadStatus = 'pending' | 'uploading' | 'uploaded' | 'failed';
+export type ResumeVectorizationStatus = 'pending' | 'vectorizing' | 'completed' | 'failed';
+export type ResumeStepKey = 'processing' | 'select' | 'refinement' | 'job-description' | 'review' | 'save';
+
+export interface ResumeSessionSummary {
+  id: number;
+  name: string;
+  sourceType: ResumeSourceType;
+  candidateUpstreamId: number | null;
+  employeeUpstreamId: number | null;
+  currentStepKey: ResumeStepKey;
+  processingMode: ProcessingMode;
+  uploadStatus: ResumeUploadStatus;
+  vectorizationStatus: ResumeVectorizationStatus;
+  version: number;
+  status: ResumeSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface ResumeSessionDetail extends ResumeSessionSummary {
+  completedSteps: ResumeStepKey[];
+  stepperContext: Record<string, unknown> | null;
+  resumeContent: StructuredResume | null;
+  originalResumeText: string | null;
+  originalFileName: string | null;
+  originalFileType: string | null;
+  refinementMode: RefinementMode | null;
+}
