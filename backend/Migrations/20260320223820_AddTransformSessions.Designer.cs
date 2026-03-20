@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OperationNexus.Api.Data;
@@ -12,9 +13,11 @@ using Pgvector;
 namespace OperationNexus.Api.Migrations
 {
     [DbContext(typeof(NexusDbContext))]
-    partial class NexusDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260320223820_AddTransformSessions")]
+    partial class AddTransformSessions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -229,9 +232,6 @@ namespace OperationNexus.Api.Migrations
                     b.Property<string>("ResumeContentJson")
                         .HasColumnType("text");
 
-                    b.Property<int?>("ResumeEmbeddingId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("SourceType")
                         .IsRequired()
                         .HasColumnType("text");
@@ -265,8 +265,6 @@ namespace OperationNexus.Api.Migrations
                         .IsDescending();
 
                     b.HasIndex("EmployeeUpstreamId");
-
-                    b.HasIndex("ResumeEmbeddingId");
 
                     b.ToTable("ResumeSessions");
                 });
@@ -601,16 +599,6 @@ namespace OperationNexus.Api.Migrations
                     b.HasIndex("ContextType", "ContextId");
 
                     b.ToTable("TransformSessions");
-                });
-
-            modelBuilder.Entity("OperationNexus.Api.Models.Entities.ResumeSession", b =>
-                {
-                    b.HasOne("OperationNexus.Api.Models.Entities.ResumeEmbedding", "ResumeEmbedding")
-                        .WithMany()
-                        .HasForeignKey("ResumeEmbeddingId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("ResumeEmbedding");
                 });
 #pragma warning restore 612, 618
         }

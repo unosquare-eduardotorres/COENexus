@@ -14,6 +14,7 @@ public class NexusDbContext : DbContext
     public DbSet<SyncedOpenPosition> SyncedOpenPositions => Set<SyncedOpenPosition>();
     public DbSet<OpenPositionCandidate> OpenPositionCandidates => Set<OpenPositionCandidate>();
     public DbSet<ResumeSession> ResumeSessions => Set<ResumeSession>();
+    public DbSet<TransformSession> TransformSessions => Set<TransformSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +66,18 @@ public class NexusDbContext : DbContext
             entity.HasIndex(e => e.CreatedAt).IsDescending();
             entity.HasIndex(e => e.CandidateUpstreamId);
             entity.HasIndex(e => e.EmployeeUpstreamId);
+
+            entity.HasOne(e => e.ResumeEmbedding)
+                  .WithMany()
+                  .HasForeignKey(e => e.ResumeEmbeddingId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TransformSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.CreatedAt).IsDescending();
+            entity.HasIndex(e => new { e.ContextType, e.ContextId });
         });
     }
 }

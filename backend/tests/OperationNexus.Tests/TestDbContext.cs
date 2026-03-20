@@ -30,5 +30,14 @@ public class TestDbContext : NexusDbContext
             entity.HasIndex(e => new { e.SourceType, e.SourceId }).IsUnique();
             entity.Ignore(e => e.Embedding);
         });
+
+        modelBuilder.Entity<ResumeSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.ResumeEmbedding)
+                  .WithMany()
+                  .HasForeignKey(e => e.ResumeEmbeddingId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
     }
 }

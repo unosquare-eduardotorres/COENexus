@@ -52,6 +52,7 @@ builder.Services.AddScoped<IVoyageEmbeddingService, VoyageEmbeddingService>();
 builder.Services.AddSingleton<IResumeTextExtractor, ResumeTextExtractor>();
 builder.Services.AddSingleton<MatchSearchCoordinator>();
 builder.Services.AddScoped<IProcessingOrchestrator, ProcessingOrchestrator>();
+builder.Services.AddSingleton<IResumeSessionVectorizer, ResumeSessionVectorizer>();
 
 builder.Services.Configure<ClaudeProxySettings>(builder.Configuration.GetSection("ClaudeProxy"));
 builder.Services.AddHttpClient<ClaudeProxyService>();

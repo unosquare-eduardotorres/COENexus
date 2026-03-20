@@ -23,4 +23,6 @@ public class ResumeSession
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public int? ResumeEmbeddingId { get; set; }
+    public ResumeEmbedding? ResumeEmbedding { get; set; }
 }
