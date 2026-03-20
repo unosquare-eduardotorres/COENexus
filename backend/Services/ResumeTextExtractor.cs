@@ -18,6 +18,7 @@ public class ResumeTextExtractor : IResumeTextExtractor
             ".pdf" => ExtractFromPdf(fileBytes),
             ".docx" => ExtractFromDocx(fileBytes),
             ".doc" => ExtractFromDoc(fileBytes),
+            ".jpg" or ".jpeg" or ".png" => ExtractFromImage(fileBytes, ext),
             _ => throw new NotSupportedException($"Unsupported resume format: {ext}")
         };
         return raw.Replace("\0", string.Empty);
@@ -183,6 +184,59 @@ public class ResumeTextExtractor : IResumeTextExtractor
     private static string ExtractFromDoc(byte[] fileBytes)
     {
         return ExtractWithTextutil(fileBytes, ".doc");
+    }
+
+    private string ExtractFromImage(byte[] imageBytes, string extension)
+    {
+        if (string.IsNullOrEmpty(TesseractPath))
+            throw new InvalidOperationException(
+                "Tesseract CLI not found. Install via 'brew install tesseract' on macOS.");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), $"ocr-img-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var inputPath = Path.Combine(tempDir, $"input{extension}");
+            var outputBase = Path.Combine(tempDir, "output");
+            File.WriteAllBytes(inputPath, imageBytes);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = TesseractPath,
+                ArgumentList = { inputPath, outputBase, "-l", "eng+spa" },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi)
+                ?? throw new InvalidOperationException("Failed to start Tesseract process");
+
+            process.WaitForExit(TimeSpan.FromSeconds(30));
+
+            if (!process.HasExited)
+            {
+                process.Kill(true);
+                throw new TimeoutException("Tesseract timed out on image OCR");
+            }
+
+            var outputFile = outputBase + ".txt";
+            if (process.ExitCode == 0 && File.Exists(outputFile))
+            {
+                var text = File.ReadAllText(outputFile);
+                Console.Error.WriteLine($"[TextExtractor] OCR extracted {text.Length} chars from image {extension}");
+                return text;
+            }
+
+            var stderr = process.StandardError.ReadToEnd().Trim();
+            throw new InvalidOperationException($"Tesseract failed on image (exit {process.ExitCode}): {stderr}");
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, true); } catch { }
+        }
     }
 
     private static string ExtractWithTextutil(byte[] fileBytes, string extension)

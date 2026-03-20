@@ -16,7 +16,7 @@ public class SyncOrchestrator : ISyncOrchestrator
 
     private static readonly HashSet<string> SupportedResumeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".pdf", ".docx", ".doc"
+        ".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"
     };
 
     private static readonly HashSet<string> ExcludedJobTitles = new(StringComparer.OrdinalIgnoreCase)
@@ -815,7 +815,7 @@ public class SyncOrchestrator : ISyncOrchestrator
 
             var resumeChanged = entity.HasResume &&
                 entity.ResumeDateCreated.HasValue &&
-                entity.ResumeDateCreated > existing.ResumeDateCreated;
+                (existing.ResumeDateCreated == null || entity.ResumeDateCreated > existing.ResumeDateCreated);
 
             if (!infoChanged && !resumeChanged)
             {
@@ -903,7 +903,7 @@ public class SyncOrchestrator : ISyncOrchestrator
 
             var resumeChanged = entity.HasResume &&
                 entity.ResumeDateCreated.HasValue &&
-                entity.ResumeDateCreated > existing.ResumeDateCreated;
+                (existing.ResumeDateCreated == null || entity.ResumeDateCreated > existing.ResumeDateCreated);
 
             if (!infoChanged && !resumeChanged)
             {

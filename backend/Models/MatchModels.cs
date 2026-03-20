@@ -323,6 +323,7 @@ public record HaikuConfirmRequest
 public record PromptConfig
 {
     public string PromptTemplate { get; init; } = string.Empty;
+    public string? ContextBlock { get; init; }
     public int MaxTokens { get; init; } = 256;
     public double Temperature { get; init; } = 0.1;
 }

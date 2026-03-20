@@ -25,17 +25,22 @@ public class ClaudeProxyService : IClaudeProxyService
         _httpClient.Timeout = TimeSpan.FromSeconds(settings.Value.TimeoutSeconds);
     }
 
-    public async Task<string> ChatAsync(string model, string prompt, int maxTokens = 4096, double temperature = 0.1, CancellationToken ct = default)
+    public async Task<string> ChatAsync(string model, string prompt, int maxTokens = 4096, double temperature = 0.1, string? systemPrompt = null, CancellationToken ct = default)
     {
         for (int attempt = 0; attempt <= MaxRetries; attempt++)
         {
+            var messages = new List<object>();
+            if (!string.IsNullOrEmpty(systemPrompt))
+                messages.Add(new { role = "system", content = systemPrompt });
+            messages.Add(new { role = "user", content = prompt });
+
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/v1/chat/completions");
             request.Content = JsonContent.Create(new
             {
                 model,
                 max_tokens = maxTokens,
                 temperature,
-                messages = new[] { new { role = "user", content = prompt } }
+                messages
             });
 
             var sw = Stopwatch.StartNew();

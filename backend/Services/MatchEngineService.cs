@@ -392,10 +392,27 @@ public class MatchEngineService : IMatchEngineService
         var triaged = new ConcurrentBag<(VectorSearchResult Candidate, int Score)>();
         var haikuCompleted = 0;
         var semaphore = new SemaphoreSlim(_claudeSettings.HaikuMaxConcurrency);
-        var haikuTemplate = request.HaikuPromptConfig?.PromptTemplate
-            ?? "You are a technical recruiter AI. Given this job description and resume, assess relevance.\n\nJob Description:\n{{jobDescription}}\n\nResume:\n{{resume}}\n\nRespond in JSON only: {\"relevant\": true/false, \"score\": 0-100, \"reason\": \"brief explanation\"}";
-        var haikuMaxTokens = request.HaikuPromptConfig?.MaxTokens ?? 256;
+        var haikuTemplate = request.HaikuPromptConfig?.PromptTemplate;
+        var haikuMaxTokens = request.HaikuPromptConfig?.MaxTokens ?? 100;
         var haikuTemp = request.HaikuPromptConfig?.Temperature ?? 0.1;
+
+        var haikuSystemPrompt = $@"Assess whether candidates are relevant for this role. Use ONLY the job description requirements — do not invent criteria.
+
+Job Description:
+{request.JobDescription}
+
+SCORING RULES:
+- 70-100: Core skills and experience level clearly match the JD requirements
+- 40-69: Some relevant skills but notable gaps in requirements or seniority
+- 0-39: Fundamentally different skill set, wrong domain, or wrong experience level
+- Set ""relevant"": true ONLY if score >= 40
+
+REJECT fast when:
+- Primary tech stack is completely different (e.g., JD needs Java backend, resume is pure frontend React)
+- Seniority mismatch > 2 levels (e.g., JD needs Senior/Lead, candidate is Junior)
+- Domain is unrelated with no transferable skills
+
+Respond in JSON only: {{""relevant"": true/false, ""score"": 0-100, ""reason"": ""one sentence""}}";
 
         var haikuTasks = afterConstraints.Select(async (candidate, i) =>
         {
@@ -403,19 +420,40 @@ public class MatchEngineService : IMatchEngineService
             try
             {
                 ct.ThrowIfCancellationRequested();
-                var resumeSnippet = (candidate.ResumeText ?? "").Length > 3000
-                    ? candidate.ResumeText![..3000]
+                var resumeSnippet = (candidate.ResumeText ?? "").Length > 2000
+                    ? candidate.ResumeText![..2000]
                     : candidate.ResumeText ?? "No resume text available";
 
-                var haikuPrompt = haikuTemplate
-                    .Replace("{{jobDescription}}", request.JobDescription)
-                    .Replace("{{resume}}", resumeSnippet);
+                string haikuUserPrompt;
+                if (haikuTemplate != null)
+                {
+                    haikuUserPrompt = haikuTemplate
+                        .Replace("{{jobDescription}}", request.JobDescription)
+                        .Replace("{{resume}}", resumeSnippet)
+                        .Replace("{{candidateName}}", candidate.Name ?? "Unknown")
+                        .Replace("{{jobTitle}}", candidate.JobTitle ?? "Unknown")
+                        .Replace("{{seniority}}", candidate.Seniority ?? "Unknown")
+                        .Replace("{{mainSkill}}", candidate.MainSkill ?? "Unknown")
+                        .Replace("{{country}}", candidate.Country ?? "Unknown");
+                }
+                else
+                {
+                    haikuUserPrompt = $@"Candidate: {candidate.Name ?? "Unknown"}
+Title: {candidate.JobTitle ?? "Unknown"}
+Seniority: {candidate.Seniority ?? "Unknown"}
+Main Skill: {candidate.MainSkill ?? "Unknown"}
+Country: {candidate.Country ?? "Unknown"}
+
+Resume:
+{resumeSnippet}";
+                }
 
                 var callTimer = Stopwatch.StartNew();
                 try
                 {
                     var haikuResponse = await _claudeProxy.ChatAsync(
-                        _claudeSettings.HaikuModel, haikuPrompt, haikuMaxTokens, haikuTemp, ct);
+                        _claudeSettings.HaikuModel, haikuUserPrompt, haikuMaxTokens, haikuTemp,
+                        systemPrompt: haikuTemplate == null ? haikuSystemPrompt : null, ct: ct);
                     callTimer.Stop();
 
                     candidateTimings.Add(new CandidateTimingDto
@@ -639,6 +677,8 @@ public class MatchEngineService : IMatchEngineService
         var sonnetCompleted = 0;
         var sonnetSemaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
         var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? DEFAULT_OPUS_TEMPLATE;
+        if (request.OpusPromptConfig?.ContextBlock != null)
+            opusTemplate = opusTemplate.Replace("{{contextBlock}}", request.OpusPromptConfig.ContextBlock);
         var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 5120;
         var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
         var model = request.SearchMode == "opus"
@@ -675,7 +715,7 @@ public class MatchEngineService : IMatchEngineService
                 try
                 {
                     var sonnetResponse = await _claudeProxy.ChatAsync(
-                        model, sonnetPrompt, opusMaxTokens, opusTemp, ct);
+                        model, sonnetPrompt, opusMaxTokens, opusTemp, ct: ct);
                     callTimer.Stop();
 
                     candidateTimings.Add(new CandidateTimingDto

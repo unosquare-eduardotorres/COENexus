@@ -119,6 +119,8 @@ public class BenchBurnService
         var semaphore = new SemaphoreSlim(_claudeSettings.MaxConcurrency);
 
         var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? CROSS_MATCH_PROMPT;
+        if (request.OpusPromptConfig?.ContextBlock != null)
+            opusTemplate = opusTemplate.Replace("{{contextBlock}}", request.OpusPromptConfig.ContextBlock);
         var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 5120;
         var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
         var model = _claudeSettings.OpusModel;
@@ -190,7 +192,7 @@ public class BenchBurnService
                 {
                     try
                     {
-                        var response = await _claudeProxy.ChatAsync(model, prompt, opusMaxTokens, opusTemp, ct);
+                        var response = await _claudeProxy.ChatAsync(model, prompt, opusMaxTokens, opusTemp, ct: ct);
                         var jsonStart = response.IndexOf('{');
                         var jsonEnd = response.LastIndexOf('}');
                         if (jsonStart >= 0 && jsonEnd > jsonStart)
@@ -401,6 +403,8 @@ public class BenchBurnService
         yield return new BenchBurnProgressEvent(new MatchSearchProgress(15, $"Re-analyzing {request.Pairs.Count} pairs..."));
 
         var opusTemplate = request.OpusPromptConfig?.PromptTemplate ?? CROSS_MATCH_PROMPT;
+        if (request.OpusPromptConfig?.ContextBlock != null)
+            opusTemplate = opusTemplate.Replace("{{contextBlock}}", request.OpusPromptConfig.ContextBlock);
         var opusMaxTokens = request.OpusPromptConfig?.MaxTokens ?? 5120;
         var opusTemp = request.OpusPromptConfig?.Temperature ?? 0.2;
         var model = _claudeSettings.OpusModel;
@@ -456,7 +460,7 @@ public class BenchBurnService
                 {
                     try
                     {
-                        var response = await _claudeProxy.ChatAsync(model, prompt, opusMaxTokens, opusTemp, ct);
+                        var response = await _claudeProxy.ChatAsync(model, prompt, opusMaxTokens, opusTemp, ct: ct);
                         var jsonStart = response.IndexOf('{');
                         var jsonEnd = response.LastIndexOf('}');
                         if (jsonStart >= 0 && jsonEnd > jsonStart)
@@ -663,6 +667,17 @@ public class BenchBurnService
         }
         var denom = Math.Sqrt(magA) * Math.Sqrt(magB);
         return denom == 0 ? 0 : dot / denom;
+    }
+
+    public async Task<BenchBurnResultDto?> GetSessionAsync(int id, CancellationToken ct = default)
+    {
+        var session = await _dbContext.MatchSessions.FindAsync([id], ct);
+        if (session == null) return null;
+
+        var result = JsonSerializer.Deserialize<BenchBurnResultDto>(session.ResultsJson ?? "{}", JsonOptions);
+        if (result == null) return null;
+
+        return result with { SessionId = session.Id };
     }
 
     private record CrossMatchParsed

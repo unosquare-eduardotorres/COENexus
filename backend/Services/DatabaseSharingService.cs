@@ -197,7 +197,7 @@ public class DatabaseSharingService : IDatabaseSharingService
         return new ImportResult
         {
             Success = true,
-            TablesRestored = tablesRestored,
+            TablesRestored = tablesRestored.Count,
             RecordCounts = recordCounts
         };
     }

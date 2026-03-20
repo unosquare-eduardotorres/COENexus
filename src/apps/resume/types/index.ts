@@ -300,6 +300,10 @@ export interface MatchEnginePromptConfig {
   name: string;
   description: string;
   promptTemplate: string;
+  contextBlocks?: {
+    matchEngine: string;
+    benchBurn: string;
+  };
   variables: string[];
   maxTokens: number;
   temperature: number;

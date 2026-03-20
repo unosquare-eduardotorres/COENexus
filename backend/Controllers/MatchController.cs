@@ -265,6 +265,14 @@ public class MatchController : ControllerBase
         return Ok(positions);
     }
 
+    [HttpGet("bench-burn/sessions/{id:int}")]
+    public async Task<IActionResult> GetBenchBurnSession(int id)
+    {
+        var result = await _benchBurnService.GetSessionAsync(id);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
     [HttpPost("bench-burn")]
     public async Task StreamBenchBurn([FromBody] BenchBurnRequest request)
     {

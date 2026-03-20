@@ -42,6 +42,12 @@ export const benchBurnService = {
     return res.json();
   },
 
+  async getSession(id: number): Promise<BenchBurnSearchResult> {
+    const res = await fetch(`${API_BASE}/bench-burn/sessions/${id}`);
+    if (!res.ok) throw new Error(`Get bench-burn session failed: ${res.status}`);
+    return res.json();
+  },
+
   async retryFallbacks(
     sessionId: number,
     pairs: { employeeUpstreamId: number; positionUpstreamId: number }[],

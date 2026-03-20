@@ -156,7 +156,9 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
             ? customPositions.map(cp => ({ name: cp.name, jobDescription: cp.jd }))
             : undefined,
           opusPromptConfig: opusConfig ? {
-            promptTemplate: opusConfig.promptTemplate,
+            promptTemplate: opusConfig.contextBlocks
+              ? opusConfig.promptTemplate.replace('{{contextBlock}}', opusConfig.contextBlocks.benchBurn)
+              : opusConfig.promptTemplate,
             maxTokens: opusConfig.maxTokens,
             temperature: opusConfig.temperature,
           } : undefined,

@@ -265,11 +265,12 @@ export default function MatchEnginePage() {
 
       setPendingDataSource({ source: dataSource, topN: selectedTopN as TopN });
       const now = new Date();
-      const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+      const flowLabel = matchFlow === 'match-to-positions' ? 'Match to Positions' : 'Candidates to OP';
+      const defaultName = `${flowLabel} — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
       setSessionName(defaultName);
       setShowSessionNamePrompt(true);
     },
-    [completeStep, dataSource]
+    [completeStep, dataSource, matchFlow]
   );
 
   const handleDataSourceNext = useCallback(
@@ -316,7 +317,9 @@ export default function MatchEnginePage() {
               temperature: haikuConfig.temperature,
             } : undefined,
             opusPromptConfig: opusConfig ? {
-              promptTemplate: opusConfig.promptTemplate,
+              promptTemplate: opusConfig.contextBlocks
+                ? opusConfig.promptTemplate.replace('{{contextBlock}}', opusConfig.contextBlocks.matchEngine)
+                : opusConfig.promptTemplate,
               maxTokens: opusConfig.maxTokens,
               temperature: opusConfig.temperature,
             } : undefined,
@@ -386,6 +389,15 @@ export default function MatchEnginePage() {
       const detail = await matchEngineService.getSession(id);
       setSessionId(detail.id);
       setMatchFlow(detail.matchFlowType);
+      setShowSessionHistory(false);
+
+      if (detail.matchFlowType === 'delivery-to-op' || detail.matchFlowType === 'bench-burn') {
+        setCompletedSteps(new Set<MatchStepKey>(['intent']));
+        navigateToStep(detail.matchFlowType);
+        setTimeout(() => setAnimateIn(true), 50);
+        return;
+      }
+
       setJobDescription(detail.jobDescription);
       setJdSource(detail.jdSource);
       setAdvancedConstraints(detail.constraints || { candidateFilters: [], employeeFilters: [] });
@@ -397,7 +409,6 @@ export default function MatchEnginePage() {
       setPipelineStages(detail.pipelineStages || null);
       setCompletedSteps(new Set<MatchStepKey>(['intent', 'job-description', 'data-source', 'filters', 'search-depth', 'searching']));
       navigateToStep('results');
-      setShowSessionHistory(false);
       setTimeout(() => setAnimateIn(true), 50);
     } catch (err) {
       console.error('Failed to load session:', err);
@@ -713,7 +724,7 @@ export default function MatchEnginePage() {
         )}
 
         {currentStepKey === 'delivery-to-op' && (
-          <DeliveryToOpPage onReset={handleReset} />
+          <DeliveryToOpPage onReset={handleReset} initialSessionId={sessionId} />
         )}
 
         {currentStepKey === 'data-source' && (
@@ -972,7 +983,8 @@ export default function MatchEnginePage() {
                     setCandidateUpstreamIds(candidates.map(c => c.id));
                     setPendingDataSource({ source: dataSource, topN: deeperTopN });
                     const now = new Date();
-                    const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                    const flowLabel = matchFlow === 'match-to-positions' ? 'Match to Positions' : 'Candidates to OP';
+                    const defaultName = `${flowLabel} — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                     setSessionName(defaultName);
                     setShowSessionNamePrompt(true);
                   }}
@@ -1003,7 +1015,8 @@ export default function MatchEnginePage() {
                   setCandidateUpstreamIds(candidates.map(c => c.id));
                   setPendingDataSource({ source: dataSource, topN: deeperTopN });
                   const now = new Date();
-                  const defaultName = `Search — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+                  const flowLabel = matchFlow === 'match-to-positions' ? 'Match to Positions' : 'Candidates to OP';
+                  const defaultName = `${flowLabel} — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
                   setSessionName(defaultName);
                   setShowSessionNamePrompt(true);
                 }}

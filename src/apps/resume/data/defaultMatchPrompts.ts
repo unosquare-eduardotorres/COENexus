@@ -8,17 +8,35 @@ export const defaultMatchPrompts: MatchEnginePromptConfig[] = [
     key: 'haiku-triage',
     name: 'Haiku Triage',
     description: 'Fast relevance triage to keep only the strongest profiles before deeper analysis.',
-    promptTemplate: `You are a technical recruiter AI. Given this job description and resume, assess relevance.
+    promptTemplate: `Assess whether this candidate is relevant for the role. Use ONLY the job description requirements — do not invent criteria.
 
 Job Description:
 {{jobDescription}}
 
-Resume:
+Candidate Profile:
+- Name: {{candidateName}}
+- Title: {{jobTitle}}
+- Seniority: {{seniority}}
+- Main Skill: {{mainSkill}}
+- Country: {{country}}
+
+Resume Excerpt:
 {{resume}}
 
-Respond in JSON only: {"relevant": true/false, "score": 0-100, "reason": "brief explanation"}`,
-    variables: ['jobDescription', 'resume'],
-    maxTokens: 256,
+SCORING RULES:
+- 70-100: Core skills and experience level clearly match the JD requirements
+- 40-69: Some relevant skills but notable gaps in requirements or seniority
+- 0-39: Fundamentally different skill set, wrong domain, or wrong experience level
+- Set "relevant": true ONLY if score >= 40
+
+REJECT fast when:
+- Primary tech stack is completely different (e.g., JD needs Java backend, resume is pure frontend React)
+- Seniority mismatch > 2 levels (e.g., JD needs Senior/Lead, candidate is Junior)
+- Domain is unrelated with no transferable skills
+
+Respond in JSON only: {"relevant": true/false, "score": 0-100, "reason": "one sentence"}`,
+    variables: ['jobDescription', 'resume', 'candidateName', 'jobTitle', 'seniority', 'mainSkill', 'country'],
+    maxTokens: 100,
     temperature: 0.1,
     isDefault: true,
     updatedAt: '2026-01-01T00:00:00Z',
@@ -30,17 +48,7 @@ Respond in JSON only: {"relevant": true/false, "score": 0-100, "reason": "brief 
     description: 'Deep structured candidate analysis with detailed scoring and executive-quality fit rationale.',
     promptTemplate: `You are a senior technical recruiter AI with deep expertise in technical hiring. You are known for being precise, honest, and never inflating candidate fit scores.
 
-Job Description:
-{{jobDescription}}
-
-Candidate Name: {{candidateName}}
-Current Title: {{jobTitle}}
-Seniority: {{seniority}}
-Main Skill: {{mainSkill}}
-Country: {{country}}
-Rate: {{rate}} {{currency}}
-On Bench: {{isBench}}
-Source: {{sourceType}}
+{{contextBlock}}
 
 Resume:
 {{resume}}
@@ -119,7 +127,33 @@ SCORING CALIBRATION:
 Leadership and softSkills must be returned as structured objects with label, priority, and status fields.
 
 Return ONLY valid JSON, no markdown or explanation.`,
+    contextBlocks: {
+      matchEngine: `Job Description:
+{{jobDescription}}
+
+Candidate Name: {{candidateName}}
+Current Title: {{jobTitle}}
+Seniority: {{seniority}}
+Main Skill: {{mainSkill}}
+Country: {{country}}
+Rate: {{rate}} {{currency}}
+On Bench: {{isBench}}
+Source: {{sourceType}}`,
+      benchBurn: `Open Position:
+Account: {{account}}
+Job Title: {{jobTitle}}
+Main Skill: {{positionMainSkill}}
+Job Description:
+{{jobDescription}}
+
+Employee Name: {{employeeName}}
+Current Title: {{employeeJobTitle}}
+Seniority: {{seniority}}
+Main Skill: {{employeeMainSkill}}
+Country: {{country}}`,
+    },
     variables: [
+      'contextBlock',
       'jobDescription',
       'candidateName',
       'jobTitle',
@@ -133,6 +167,11 @@ Return ONLY valid JSON, no markdown or explanation.`,
       'resume',
       'salaryDisplay',
       'availabilityDisplay',
+      'account',
+      'positionMainSkill',
+      'employeeName',
+      'employeeJobTitle',
+      'employeeMainSkill',
     ],
     maxTokens: 5120,
     temperature: 0.2,

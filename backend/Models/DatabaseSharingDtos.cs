@@ -29,7 +29,7 @@ public record ImportRequest
 public record ImportResult
 {
     public bool Success { get; init; }
-    public List<string> TablesRestored { get; init; } = [];
+    public int TablesRestored { get; init; }
     public Dictionary<string, int> RecordCounts { get; init; } = new();
 }
 

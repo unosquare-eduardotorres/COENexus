@@ -35,6 +35,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
   const [matchPrompts, setMatchPrompts] = useState<MatchEnginePromptConfig[]>(getMatchPrompts());
   const [expandedMatchPromptId, setExpandedMatchPromptId] = useState<string | null>(null);
   const [editingMatchPromptId, setEditingMatchPromptId] = useState<string | null>(null);
+  const [activeContextTab, setActiveContextTab] = useState<'matchEngine' | 'benchBurn'>('matchEngine');
   const [outputTemplateName, setOutputTemplateName] = useState<string>(
     localStorage.getItem('output_template_name') || 'USQ Resume Template.docx'
   );
@@ -689,23 +690,93 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
 
                     {expandedMatchPromptId === prompt.id && (
                       <div className="px-3 pb-3 space-y-3">
-                        <textarea
-                          value={prompt.promptTemplate}
-                          onChange={(e) => {
-                            if (editingMatchPromptId === prompt.id) {
-                              setMatchPrompts((prev) =>
-                                prev.map((p) =>
-                                  p.id === prompt.id ? { ...p, promptTemplate: e.target.value } : p
-                                )
-                              );
-                            }
-                          }}
-                          readOnly={editingMatchPromptId !== prompt.id}
-                          rows={10}
-                          className={`glass-input w-full px-3 py-2 font-mono text-xs resize-none ${
-                            editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
-                          }`}
-                        />
+                        {prompt.key === 'opus-analysis' && prompt.contextBlocks ? (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Base Prompt</label>
+                              <textarea
+                                value={prompt.promptTemplate}
+                                onChange={(e) => {
+                                  if (editingMatchPromptId === prompt.id) {
+                                    setMatchPrompts((prev) =>
+                                      prev.map((p) =>
+                                        p.id === prompt.id ? { ...p, promptTemplate: e.target.value } : p
+                                      )
+                                    );
+                                  }
+                                }}
+                                readOnly={editingMatchPromptId !== prompt.id}
+                                rows={10}
+                                className={`glass-input w-full px-3 py-2 font-mono text-xs resize-none ${
+                                  editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-medium text-muted mb-2 uppercase">Context Blocks</label>
+                              <div className="flex gap-1 mb-2">
+                                <button
+                                  onClick={() => setActiveContextTab('matchEngine')}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    activeContextTab === 'matchEngine'
+                                      ? 'bg-violet-500 text-white'
+                                      : 'text-secondary bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 hover:text-primary hover:bg-white/10 dark:hover:bg-white/10'
+                                  }`}
+                                >
+                                  🎯 Match Engine
+                                </button>
+                                <button
+                                  onClick={() => setActiveContextTab('benchBurn')}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    activeContextTab === 'benchBurn'
+                                      ? 'bg-violet-500 text-white'
+                                      : 'text-secondary bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 hover:text-primary hover:bg-white/10 dark:hover:bg-white/10'
+                                  }`}
+                                >
+                                  🔥 Bench Burn
+                                </button>
+                              </div>
+                              <textarea
+                                value={prompt.contextBlocks[activeContextTab]}
+                                onChange={(e) => {
+                                  if (editingMatchPromptId === prompt.id) {
+                                    setMatchPrompts((prev) =>
+                                      prev.map((p) =>
+                                        p.id === prompt.id && p.contextBlocks
+                                          ? { ...p, contextBlocks: { ...p.contextBlocks, [activeContextTab]: e.target.value } }
+                                          : p
+                                      )
+                                    );
+                                  }
+                                }}
+                                readOnly={editingMatchPromptId !== prompt.id}
+                                rows={6}
+                                className={`glass-input w-full px-3 py-2 font-mono text-xs resize-none ${
+                                  editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                                }`}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <textarea
+                            value={prompt.promptTemplate}
+                            onChange={(e) => {
+                              if (editingMatchPromptId === prompt.id) {
+                                setMatchPrompts((prev) =>
+                                  prev.map((p) =>
+                                    p.id === prompt.id ? { ...p, promptTemplate: e.target.value } : p
+                                  )
+                                );
+                              }
+                            }}
+                            readOnly={editingMatchPromptId !== prompt.id}
+                            rows={10}
+                            className={`glass-input w-full px-3 py-2 font-mono text-xs resize-none ${
+                              editingMatchPromptId !== prompt.id ? 'opacity-75 cursor-default' : ''
+                            }`}
+                          />
+                        )}
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
@@ -756,7 +827,13 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                         </div>
 
                         <div className="flex flex-wrap gap-1.5">
-                          {prompt.variables.map((variable) => (
+                          {(prompt.key === 'opus-analysis' && prompt.contextBlocks
+                            ? [...new Set(
+                                (prompt.contextBlocks[activeContextTab].match(/\{\{(\w+)\}\}/g) || [])
+                                  .map(m => m.replace(/\{\{|\}\}/g, ''))
+                              )]
+                            : prompt.variables
+                          ).map((variable) => (
                             <span
                               key={variable}
                               className="px-2 py-0.5 text-[10px] font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full"

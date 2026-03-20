@@ -35,7 +35,7 @@ public class DatabaseController : ControllerBase
         try
         {
             _databaseSharingService.SaveConfig(request);
-            return Ok();
+            return Ok(new { success = true });
         }
         catch (Exception ex)
         {

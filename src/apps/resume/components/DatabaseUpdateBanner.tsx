@@ -121,7 +121,6 @@ export default function DatabaseUpdateBanner() {
       });
 
       if (!response.ok) {
-        setIsImporting(false);
         return;
       }
 
@@ -130,6 +129,7 @@ export default function DatabaseUpdateBanner() {
         setDismissedSnapshotKey(snapshotKey);
       }
       await loadBannerState();
+    } catch {
     } finally {
       setIsImporting(false);
     }

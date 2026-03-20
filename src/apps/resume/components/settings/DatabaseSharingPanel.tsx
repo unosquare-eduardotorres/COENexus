@@ -108,7 +108,7 @@ export default function DatabaseSharingPanel() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      void loadSnapshots();
+      loadSnapshots().catch(() => {});
     }, 30000);
     return () => window.clearInterval(timer);
   }, [loadSnapshots]);

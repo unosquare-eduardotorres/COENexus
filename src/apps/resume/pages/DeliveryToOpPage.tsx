@@ -18,6 +18,7 @@ import { getMatchPrompts } from '../data/defaultMatchPrompts';
 
 interface DeliveryToOpPageProps {
   onReset: () => void;
+  initialSessionId?: number | null;
 }
 
 const STEP_LABELS: { key: DeliveryToOpStepKey; title: string; icon: ReactNode }[] = [
@@ -68,7 +69,7 @@ const STEP_LABELS: { key: DeliveryToOpStepKey; title: string; icon: ReactNode }[
   },
 ];
 
-export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpPageProps) {
+export default function DeliveryToOpPage({ onReset: parentReset, initialSessionId }: DeliveryToOpPageProps) {
   const [currentStep, setCurrentStep] = useState<DeliveryToOpStepKey>('employee');
   const [completedSteps, setCompletedSteps] = useState<Set<DeliveryToOpStepKey>>(new Set());
 
@@ -79,9 +80,52 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
   const [results, setResults] = useState<BenchBurnSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [showSessionNamePrompt, setShowSessionNamePrompt] = useState(false);
+  const [sessionName, setSessionName] = useState('');
+
   const [detailMatch, setDetailMatch] = useState<CrossMatchResult | null>(null);
   const [detailEmployee, setDetailEmployee] = useState<BenchEmployee | null>(null);
   const [detailPosition, setDetailPosition] = useState<BenchOpenPosition | null>(null);
+
+  useEffect(() => {
+    if (!initialSessionId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await benchBurnService.getSession(initialSessionId);
+        if (cancelled) return;
+
+        setResults(result);
+
+        const firstEmpId = Object.keys(result.employeeResults)[0];
+        const firstMatch = firstEmpId ? result.employeeResults[Number(firstEmpId)]?.[0] : null;
+        if (firstMatch) {
+          setSelectedEmployee({
+            upstreamId: firstMatch.employeeUpstreamId,
+            name: firstMatch.employeeName,
+            email: '',
+            seniority: '',
+            mainSkill: '',
+            country: '',
+            grossMonthlySalary: null,
+            salaryCurrency: null,
+            lastAccount: null,
+            isVectorized: true,
+          });
+        }
+
+        setCompletedSteps(new Set<DeliveryToOpStepKey>(['employee', 'positions', 'summary', 'analyzing']));
+        setCurrentStep('results');
+      } catch (err) {
+        console.error('Failed to load delivery-to-op session:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load session');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [initialSessionId]);
 
   const navigateStep = useCallback((step: DeliveryToOpStepKey) => {
     setCurrentStep(step);
@@ -123,8 +167,17 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
     navigateStep('summary');
   }, [completeStep, navigateStep]);
 
-  const handleSummaryNext = useCallback(async () => {
+  const handleSummaryNext = useCallback(() => {
     if (!selectedEmployee) return;
+    const now = new Date();
+    const defaultName = `Delivery Professional to OP — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    setSessionName(defaultName);
+    setShowSessionNamePrompt(true);
+  }, [selectedEmployee]);
+
+  const executeDeliveryToOp = useCallback(async () => {
+    if (!selectedEmployee) return;
+    setShowSessionNamePrompt(false);
     completeStep('summary');
     navigateStep('analyzing');
     setProgress({ percent: 0, stage: '' });
@@ -137,7 +190,7 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
 
       const result = await benchBurnService.executeBenchBurn(
         {
-          name: `Delivery-to-OP: ${selectedEmployee.name}`,
+          name: sessionName || `Delivery Professional to OP — ${selectedEmployee.name}`,
           matchFlowType: 'delivery-to-op',
           employeeUpstreamIds: [selectedEmployee.upstreamId],
           positionUpstreamIds: selectedPositions.map(p => p.upstreamId),
@@ -148,7 +201,9 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
             ? customPositions.map(cp => ({ name: cp.name, jobDescription: cp.jd }))
             : undefined,
           opusPromptConfig: opusConfig ? {
-            promptTemplate: opusConfig.promptTemplate,
+            promptTemplate: opusConfig.contextBlocks
+              ? opusConfig.promptTemplate.replace('{{contextBlock}}', opusConfig.contextBlocks.benchBurn)
+              : opusConfig.promptTemplate,
             maxTokens: opusConfig.maxTokens,
             temperature: opusConfig.temperature,
           } : undefined,
@@ -162,7 +217,7 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
       setError(err instanceof Error ? err.message : 'Analysis failed');
       navigateStep('summary');
     }
-  }, [selectedEmployee, selectedPositions, customPositions, completeStep, navigateStep]);
+  }, [selectedEmployee, selectedPositions, customPositions, sessionName, completeStep, navigateStep]);
 
   const handleRetryFallbacks = useCallback(async () => {
     if (!results?.stats.candidateTimings) return;
@@ -231,6 +286,7 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
     setResults(null);
     setError(null);
     setDetailMatch(null);
+    setSessionName('');
   }, []);
 
   const handleBackToIntents = useCallback(() => {
@@ -368,6 +424,38 @@ export default function DeliveryToOpPage({ onReset: parentReset }: DeliveryToOpP
           onSelectMatch={handleSelectMatch}
           onRetryFallbacks={handleRetryFallbacks}
         />
+      )}
+      {showSessionNamePrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowSessionNamePrompt(false)} />
+          <div className="relative glass-panel rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-primary mb-1">Name This Search</h3>
+            <p className="text-sm text-secondary mb-4">Give this delivery-to-OP session a name so you can find it later.</p>
+            <input
+              type="text"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && executeDeliveryToOp()}
+              className="w-full px-4 py-2.5 rounded-xl glass-input text-sm text-primary placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              placeholder="e.g., Delivery Professional to OP — March 2026"
+              autoFocus
+            />
+            <div className="flex items-center justify-end gap-3 mt-4">
+              <button
+                onClick={() => setShowSessionNamePrompt(false)}
+                className="px-4 py-2 text-sm text-muted hover:text-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeDeliveryToOp}
+                className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25 transition-all"
+              >
+                Start Analysis
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
