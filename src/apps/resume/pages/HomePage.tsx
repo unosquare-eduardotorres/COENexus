@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import VemLogo from '../../../components/VemLogo';
 
 const primaryActions = [
   {
@@ -158,6 +159,10 @@ const statsPills = [
   },
 ];
 
+function VemHeroGraphic() {
+  return <VemLogo size={128} className="text-accent-500 dark:text-accent-400 mx-auto block" />;
+}
+
 export default function HomePage() {
   const [activeWorkflow, setActiveWorkflow] = useState<'resume' | 'match'>('resume');
   const activeSteps = activeWorkflow === 'resume' ? resumeSteps : matchSteps;
@@ -197,6 +202,10 @@ export default function HomePage() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel-subtle border border-accent-500/20 dark:border-accent-400/20 backdrop-blur-sm text-xs font-medium text-muted mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
               Vectorize · Extract · Match
+            </div>
+
+            <div className="mb-6">
+              <VemHeroGraphic />
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary tracking-tight mb-4">

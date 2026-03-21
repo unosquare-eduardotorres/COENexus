@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../contexts/ThemeContext';
 import DatabaseUpdateBanner from './DatabaseUpdateBanner';
+import VemLogo from '../../../components/VemLogo';
 
 type SidebarMode = 'expanded' | 'collapsed' | 'top';
 
@@ -164,18 +165,11 @@ function Sidebar({
       >
         <div className={`flex items-center h-14 border-b border-gray-200/30 dark:border-dark-border/30 ${isExpanded ? 'px-4 gap-2.5' : 'justify-center px-2'}`}>
           <Link to="/resume" className="flex items-center gap-2.5 min-w-0" onClick={onMobileClose}>
-            <div className="w-8 h-8 rounded-lg bg-accent-500 flex-shrink-0 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
+            <div className="w-10 h-10 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex-shrink-0 flex items-center justify-center">
+              <VemLogo size={32} className="text-accent-500 dark:text-accent-400" />
             </div>
             {isExpanded && (
-              <span className="text-sm font-semibold text-primary tracking-tight truncate">
+              <span className="text-base font-bold text-primary tracking-tight truncate">
                 V.E.M.
               </span>
             )}
@@ -303,17 +297,10 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-10">
             <Link to="/resume" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-accent-500 flex items-center justify-center">
-                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+              <div className="w-10 h-10 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
+                <VemLogo size={32} className="text-accent-500 dark:text-accent-400" />
               </div>
-              <span className="text-sm font-semibold text-primary tracking-tight">
+              <span className="text-base font-bold text-primary tracking-tight">
                 V.E.M.
               </span>
             </Link>
@@ -421,17 +408,10 @@ export default function Layout({ children }: LayoutProps) {
             <div className="md:hidden glass-nav fixed top-0 left-0 right-0 z-30">
               <div className="flex items-center justify-between h-14 px-4">
                 <Link to="/resume" className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-accent-500 flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
+                  <div className="w-9 h-9 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
+                    <VemLogo size={28} className="text-accent-500 dark:text-accent-400" />
                   </div>
-                  <span className="text-sm font-semibold text-primary">V.E.M.</span>
+                  <span className="text-base font-bold text-primary">V.E.M.</span>
                 </Link>
                 <div className="flex items-center gap-2">
                   <button

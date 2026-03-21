@@ -36,14 +36,18 @@ function CardContent({ name, codename, tagline, description, icon, accentColor, 
         style={{ background: accentColor }}
       />
 
-      <div className="relative flex items-start justify-between mb-4">
-        <div
-          className="flex h-28 w-28 items-center justify-center rounded-xl"
-          style={{ backgroundColor: `${accentColor}26` }}
-        >
-          <div style={{ color: accentColor }}>{icon}</div>
+      <div className="relative mb-4">
+        <div className="absolute top-0 right-0">
+          <StatusBadge status={status} />
         </div>
-        <StatusBadge status={status} />
+        <div className="flex justify-center">
+          <div
+            className="flex h-20 w-20 items-center justify-center rounded-xl"
+            style={{ backgroundColor: `${accentColor}26` }}
+          >
+            <div style={{ color: accentColor }}>{icon}</div>
+          </div>
+        </div>
       </div>
 
       <div className="relative space-y-1.5">
