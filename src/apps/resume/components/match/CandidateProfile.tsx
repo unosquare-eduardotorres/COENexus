@@ -16,6 +16,7 @@ import {
   PRIORITY_LABELS,
   AI_ASSESSMENT_SECTIONS,
 } from './shared/matchDetailUtils';
+import FitVerdictSummary from './shared/FitVerdictSummary';
 
 function SkillRow({ skill }: { skill: SkillMatch }) {
   return (
@@ -167,7 +168,7 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
       {activeTab === 0 && (
         <div className="space-y-6">
           <div className="glass-card p-6">
-            <p className="text-sm text-secondary italic">{candidate.summary}</p>
+            <FitVerdictSummary summary={candidate.summary} fitVerdict={candidate.analysis?.fitVerdict} />
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

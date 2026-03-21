@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
-import { ATSPosition, JdSource } from '../../types';
-import { mockATSCandidates } from '../../data/mockATSCandidates';
-import { SAMPLE_JOB_DESCRIPTION } from '../../data/mockMatchCandidates';
+import { useState, useMemo, useEffect } from 'react';
+import { JdSource, BenchOpenPosition } from '../../types';
+import { SAMPLE_JOB_DESCRIPTION } from '../../data/sampleJobDescription';
+import { benchBurnService } from '../../services/benchBurnService';
 
 interface JobDescriptionStepProps {
   onNext: (jobDescription: string, source: JdSource) => void;
@@ -9,14 +9,8 @@ interface JobDescriptionStepProps {
   initialSource?: JdSource;
 }
 
-interface FlattenedPosition extends ATSPosition {
-  candidateName: string;
-}
-
-function generateJdFromPosition(position: ATSPosition): string {
-  const skills = position.requiredSkills.join(', ');
-  const seniorities = position.seniorities.join(' / ');
-  return `${position.title} – ${position.accountName}\n\nWe are looking for a ${seniorities} level professional to fill the ${position.title} role.\n\nVertical: ${position.vertical}\nStakeholder: ${position.stakeholder}\n\nRequired Skills:\n${position.requiredSkills.map((s) => `• ${s}`).join('\n')}\n\nSeniority: ${seniorities}\nRate Range: $${position.minRate}/hr - $${position.maxRate}/hr\n\nKey Technologies: ${skills}`;
+function generateJdFromPosition(position: BenchOpenPosition): string {
+  return `${position.jobTitle} – ${position.account}\n\nVertical: ${position.practice}\nStakeholder: ${position.stakeholder}\n\nMain Skill: ${position.mainSkill}${position.jobDescription ? `\n\n${position.jobDescription}` : ''}`;
 }
 
 export default function JobDescriptionStep({
@@ -26,34 +20,34 @@ export default function JobDescriptionStep({
 }: JobDescriptionStepProps) {
   const [activeTab, setActiveTab] = useState<JdSource>(initialSource);
   const [customJd, setCustomJd] = useState(initialJobDescription);
-  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null);
+  const [selectedPositionId, setSelectedPositionId] = useState<number | null>(null);
   const [positionSearch, setPositionSearch] = useState('');
+  const [positions, setPositions] = useState<BenchOpenPosition[]>([]);
+  const [loadingPositions, setLoadingPositions] = useState(false);
 
-  const allPositions = useMemo<FlattenedPosition[]>(() => {
-    const positions: FlattenedPosition[] = [];
-    mockATSCandidates.forEach((candidate) => {
-      candidate.positions.forEach((pos) => {
-        positions.push({ ...pos, candidateName: candidate.name });
-      });
-    });
-    return positions;
+  useEffect(() => {
+    setLoadingPositions(true);
+    benchBurnService.getOpenPositions()
+      .then(setPositions)
+      .catch(() => setPositions([]))
+      .finally(() => setLoadingPositions(false));
   }, []);
 
   const filteredPositions = useMemo(() => {
-    if (!positionSearch.trim()) return allPositions;
+    if (!positionSearch.trim()) return positions;
     const query = positionSearch.toLowerCase();
-    return allPositions.filter(
+    return positions.filter(
       (p) =>
-        p.title.toLowerCase().includes(query) ||
-        p.accountName.toLowerCase().includes(query) ||
-        p.requiredSkills.some((s) => s.toLowerCase().includes(query)) ||
-        p.vertical.toLowerCase().includes(query)
+        p.jobTitle.toLowerCase().includes(query) ||
+        p.account.toLowerCase().includes(query) ||
+        p.mainSkill.toLowerCase().includes(query) ||
+        p.practice.toLowerCase().includes(query)
     );
-  }, [allPositions, positionSearch]);
+  }, [positions, positionSearch]);
 
   const selectedPosition = useMemo(
-    () => allPositions.find((p) => p.id === selectedPositionId) ?? null,
-    [allPositions, selectedPositionId]
+    () => positions.find((p) => p.id === selectedPositionId) ?? null,
+    [positions, selectedPositionId]
   );
 
   const generatedJd = useMemo(
@@ -136,8 +130,10 @@ export default function JobDescriptionStep({
             </div>
 
             <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
-              {filteredPositions.length === 0 ? (
-                <div className="text-center py-8 text-sm text-muted">No positions found matching your search.</div>
+              {loadingPositions ? (
+                <div className="text-center py-8 text-sm text-muted">Loading positions...</div>
+              ) : filteredPositions.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted">No positions found.</div>
               ) : (
                 filteredPositions.map((position) => {
                   const isSelected = selectedPositionId === position.id;
@@ -153,25 +149,12 @@ export default function JobDescriptionStep({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm text-primary">{position.title}</div>
-                          <div className="text-xs text-muted mt-0.5">{position.accountName} · {position.vertical}</div>
+                          <div className="font-semibold text-sm text-primary">{position.jobTitle}</div>
+                          <div className="text-xs text-muted mt-0.5">{position.account} · {position.practice}</div>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {position.requiredSkills.map((skill) => (
-                              <span
-                                key={skill}
-                                className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-md"
-                              >
-                                {skill}
-                              </span>
-                            ))}
-                            {position.seniorities.map((s) => (
-                              <span
-                                key={s}
-                                className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100/50 dark:bg-dark-hover/50 text-secondary rounded-md"
-                              >
-                                {s}
-                              </span>
-                            ))}
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-md">
+                              {position.mainSkill}
+                            </span>
                           </div>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${

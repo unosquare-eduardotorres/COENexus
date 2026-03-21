@@ -67,15 +67,6 @@ const navigation = [
     ),
   },
   {
-    name: 'History',
-    href: '/resume/history',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
     name: 'Match Engine',
     href: '/resume/match',
     icon: (
@@ -382,7 +373,6 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const location = useLocation();
   const navigate = useNavigate();
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
     const saved = localStorage.getItem(SIDEBAR_MODE_KEY);
@@ -390,8 +380,6 @@ export default function Layout({ children }: LayoutProps) {
     return 'expanded';
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showContinueModal, setShowContinueModal] = useState(false);
-  const [continueTarget, setContinueTarget] = useState('');
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_MODE_KEY, sidebarMode);
@@ -406,26 +394,7 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const handleNavClick = (href: string) => {
-    const saved = sessionStorage.getItem('resume-enhance-state');
-    const isOnEnhance = location.pathname === '/resume/enhance';
-
-    let hasMeaningfulProgress = false;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        hasMeaningfulProgress = parsed.currentStepKey && parsed.currentStepKey !== 'processing';
-      } catch { /* ignore parse errors */ }
-    }
-
-    if (hasMeaningfulProgress && isOnEnhance && href !== '/resume/enhance') {
-      setContinueTarget(href);
-      setShowContinueModal(true);
-    } else if (hasMeaningfulProgress && !isOnEnhance && href === '/resume/enhance') {
-      setContinueTarget(href);
-      setShowContinueModal(true);
-    } else {
-      navigate(href);
-    }
+    navigate(href);
   };
 
   const mainMargin =
@@ -525,48 +494,6 @@ export default function Layout({ children }: LayoutProps) {
         </>
       )}
 
-      {showContinueModal && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="glass-card w-full max-w-md p-6">
-            <div className="w-12 h-12 rounded-xl bg-accent-500/10 flex items-center justify-center mb-4">
-              <svg className="w-6 h-6 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold text-primary mb-2">Resume Enhancement In Progress</h3>
-            <p className="text-sm text-muted mb-5">
-              {continueTarget === '/resume/enhance'
-                ? 'You have an enhancement in progress. Would you like to continue where you left off?'
-                : 'You have an enhancement in progress. Navigating away will keep your progress saved. Continue?'}
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  sessionStorage.removeItem('resume-enhance-state');
-                  setShowContinueModal(false);
-                  navigate(continueTarget);
-                }}
-                className="px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-xl hover:bg-white/80 dark:hover:bg-dark-hover transition-colors"
-              >
-                {continueTarget === '/resume/enhance' ? 'Start Fresh' : 'Discard & Navigate'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowContinueModal(false);
-                  if (continueTarget === '/resume/enhance') {
-                    navigate('/resume/enhance');
-                  } else {
-                    navigate(continueTarget);
-                  }
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-accent-500 rounded-xl hover:bg-accent-600 transition-colors"
-              >
-                {continueTarget === '/resume/enhance' ? 'Continue' : 'Keep & Navigate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

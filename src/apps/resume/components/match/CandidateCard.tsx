@@ -2,6 +2,7 @@ import { MatchCandidate } from '../../types';
 import { formatSalary, formatEmployeeRate } from '../../utils/formatSalary';
 import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
+import FitVerdictSummary from './shared/FitVerdictSummary';
 
 interface CandidateCardProps {
   candidate: MatchCandidate;
@@ -104,7 +105,7 @@ export default function CandidateCard({
               </span>
             )}
           </div>
-          <div className="text-xs text-muted truncate">{candidate.summary}</div>
+          <div className="text-xs text-muted truncate"><FitVerdictSummary summary={candidate.summary} fitVerdict={candidate.analysis?.fitVerdict} variant="inline" /></div>
         </div>
 
         <div className="hidden lg:flex flex-col items-end text-right gap-0.5 min-w-[140px]">

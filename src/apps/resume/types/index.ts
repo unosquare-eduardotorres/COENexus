@@ -724,6 +724,21 @@ export interface BenchEmployee {
   isBench?: boolean;
 }
 
+export interface SyncedCandidateListItem {
+  upstreamId: number;
+  name: string;
+  email: string;
+  seniority: string;
+  mainSkill: string;
+  country: string;
+  currentSalary: number | null;
+  salaryCurrency: string;
+  coeCertified: boolean;
+  candidateStatus: string;
+  hasResume: boolean;
+  isVectorized: boolean;
+}
+
 export interface BenchOpenPosition {
   upstreamId: number;
   id: number;

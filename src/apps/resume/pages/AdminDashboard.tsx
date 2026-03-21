@@ -13,7 +13,7 @@ import {
   getDefaultTemplate,
   saveTemplate,
   resetTemplate,
-} from '../data/mockTemplates';
+} from '../data/defaultTemplateConfig';
 import { getPrompts, savePrompt, resetPrompt, resetAllPrompts } from '../data/defaultPrompts';
 import { getMatchPrompts, saveMatchPrompt, resetMatchPrompt, resetAllMatchPrompts } from '../data/defaultMatchPrompts';
 import { aiService } from '../services/aiService';

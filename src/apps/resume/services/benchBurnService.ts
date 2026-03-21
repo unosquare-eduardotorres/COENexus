@@ -6,6 +6,7 @@ import {
   CrossMatchResult,
   CandidateTiming,
   SearchProgress,
+  SyncedCandidateListItem,
 } from '../types';
 
 const API_BASE = '/api/match';
@@ -90,6 +91,12 @@ export const benchBurnService = {
     return res.json();
   },
 
+  async getAllCandidates(): Promise<SyncedCandidateListItem[]> {
+    const res = await fetch(`${API_BASE}/all-candidates`);
+    if (!res.ok) throw new Error(`All candidates failed: ${res.status}`);
+    return res.json();
+  },
+
   async getOpenPositions(): Promise<BenchOpenPosition[]> {
     const res = await fetch(`${API_BASE}/open-positions`);
     if (!res.ok) throw new Error(`Open positions failed: ${res.status}`);
@@ -133,6 +140,13 @@ export const benchBurnService = {
     if (!res.body) throw new Error('No response body');
 
     return parseSSEStream(res, onProgress, 'Bench burn error', 'No result received from bench burn');
+  },
+
+  async getResumeText(sourceType: string, upstreamId: number): Promise<string> {
+    const res = await fetch(`${API_BASE}/resume-text/${sourceType}/${upstreamId}`);
+    if (!res.ok) throw new Error(`Resume text not available: ${res.status}`);
+    const data = await res.json();
+    return data.resumeText;
   },
 
   async executeExternalCandidateMatch(

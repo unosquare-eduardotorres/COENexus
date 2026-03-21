@@ -463,14 +463,11 @@ export const aiService = {
   },
 
   async generateSuggestions(
-    text: string,
-    sectionType: string,
+    _text: string,
+    _sectionType: string,
     _context?: string
   ): Promise<SuggestionOption[]> {
-    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 400));
-
-    const suggestions = generateMockSuggestions(text, sectionType);
-    return suggestions;
+    throw new Error('Suggestions require AI connection');
   },
 
   async transformResume(
@@ -506,95 +503,17 @@ export const aiService = {
     return { resume: enhanced, usage };
   },
 
-  async rephraseText(text: string, style: 'professional' | 'concise' | 'detailed'): Promise<string> {
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    const styleAdjustments: Record<string, (t: string) => string> = {
-      professional: (t) => t.replace(/helped/gi, 'facilitated').replace(/made/gi, 'developed'),
-      concise: (t) => t.split('.').slice(0, 2).join('.') + '.',
-      detailed: (t) => t + ' This initiative demonstrated strong leadership capabilities.',
-    };
-
-    return styleAdjustments[style]?.(text) || text;
+  async rephraseText(_text: string, _style: 'professional' | 'concise' | 'detailed'): Promise<string> {
+    throw new Error('Rephrase requires AI connection');
   },
 
-  async extendContent(text: string): Promise<string> {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-
-    const extensions = [
-      ' Implemented best practices that improved overall efficiency.',
-      ' Collaborated with cross-functional teams to achieve objectives.',
-      ' Delivered measurable results aligned with organizational goals.',
-    ];
-
-    return text + extensions[Math.floor(Math.random() * extensions.length)];
+  async extendContent(_text: string): Promise<string> {
+    throw new Error('Extend requires AI connection');
   },
 
-  async validateWithAI(resume: StructuredResume): Promise<AISuggestion[]> {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const suggestions: AISuggestion[] = [];
-
-    if (resume.summary && resume.summary.length > 0) {
-      suggestions.push({
-        id: `ai-sug-${Date.now()}-summary`,
-        sectionType: 'summary',
-        originalText: resume.summary,
-        suggestions: generateMockSuggestions(resume.summary, 'summary'),
-      });
-    }
-
-    resume.experience.forEach((exp, idx) => {
-      if (exp.description) {
-        suggestions.push({
-          id: `ai-sug-${Date.now()}-exp-${idx}`,
-          sectionType: 'experience',
-          sectionId: exp.id,
-          originalText: exp.description,
-          suggestions: generateMockSuggestions(exp.description, 'experience'),
-        });
-      }
-    });
-
-    return suggestions;
+  async validateWithAI(_resume: StructuredResume): Promise<AISuggestion[]> {
+    throw new Error('AI validation requires AI connection');
   },
 };
-
-function generateMockSuggestions(text: string, sectionType: string): SuggestionOption[] {
-  const actionVerbs = ['Spearheaded', 'Orchestrated', 'Pioneered', 'Championed', 'Architected'];
-  const metrics = ['resulting in 25% improvement', 'achieving 30% cost reduction', 'increasing efficiency by 40%'];
-
-  const baseVariations: SuggestionOption[] = [
-    {
-      id: `sug-${Date.now()}-1`,
-      text: text.replace(/^[A-Z][a-z]+/, actionVerbs[Math.floor(Math.random() * actionVerbs.length)]),
-      confidence: 0.92,
-      type: 'rephrase',
-    },
-    {
-      id: `sug-${Date.now()}-2`,
-      text: text + ', ' + metrics[Math.floor(Math.random() * metrics.length)],
-      confidence: 0.88,
-      type: 'extend',
-    },
-    {
-      id: `sug-${Date.now()}-3`,
-      text: text.split('.')[0] + '.',
-      confidence: 0.85,
-      type: 'condense',
-    },
-  ];
-
-  if (sectionType === 'summary') {
-    baseVariations.push({
-      id: `sug-${Date.now()}-4`,
-      text: `Results-driven professional with expertise in ${text.toLowerCase().includes('software') ? 'software development' : 'delivering strategic initiatives'}. ${text}`,
-      confidence: 0.9,
-      type: 'enhance',
-    });
-  }
-
-  return baseVariations;
-}
 
 export default aiService;

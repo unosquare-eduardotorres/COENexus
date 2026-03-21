@@ -241,6 +241,31 @@ public class MatchController : ControllerBase
         return Ok(employees);
     }
 
+    [HttpGet("all-candidates")]
+    public async Task<IActionResult> GetAllCandidates()
+    {
+        var candidates = await _dbContext.SyncedCandidates
+            .Select(c => new
+            {
+                c.UpstreamId,
+                Name = c.FullName,
+                Email = c.Email ?? "",
+                Seniority = c.Seniority ?? "",
+                MainSkill = c.MainSkill ?? "",
+                Country = c.Country ?? "",
+                CurrentSalary = c.CurrentSalary,
+                SalaryCurrency = c.SalaryCurrency ?? "",
+                c.CoeCertified,
+                CandidateStatus = c.CandidateStatus ?? "",
+                c.HasResume,
+                IsVectorized = _dbContext.ResumeEmbeddings
+                    .Any(re => re.SourceType == "candidates" && re.UpstreamId == c.UpstreamId && re.Embedding != null)
+            })
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+        return Ok(candidates);
+    }
+
     [HttpGet("open-positions")]
     public async Task<IActionResult> GetOpenPositions()
     {
@@ -339,6 +364,20 @@ public class MatchController : ControllerBase
             await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
             await Response.Body.FlushAsync();
         }
+    }
+
+    [HttpGet("resume-text/{sourceType}/{upstreamId:int}")]
+    public async Task<IActionResult> GetResumeText(string sourceType, int upstreamId)
+    {
+        var embedding = await _dbContext.ResumeEmbeddings
+            .Where(re => re.SourceType == sourceType && re.UpstreamId == upstreamId)
+            .Select(re => new { re.ResumeText })
+            .FirstOrDefaultAsync();
+
+        if (embedding?.ResumeText == null)
+            return NotFound(new { error = "No resume text available for this record" });
+
+        return Ok(new { resumeText = embedding.ResumeText });
     }
 
     [HttpPost("external-candidate")]

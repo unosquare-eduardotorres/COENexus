@@ -13,6 +13,7 @@ import { pdfExportService } from '../services/pdfExportService';
 import { transformSessionService } from '../services/transformSessionService';
 import { dataSyncService } from '../services/dataSyncService';
 import { sessionService } from '../services/sessionService';
+import { benchBurnService } from '../services/benchBurnService';
 import SaveSessionModal from '../components/SaveSessionModal';
 import {
   StructuredResume,
@@ -27,16 +28,18 @@ import {
   ResumeProcessingMetrics,
   CreateOrUpdateTransformSession,
   SessionContextType,
+  BenchEmployee,
+  SyncedCandidateListItem,
+  TransformSessionSummary,
 } from '../types';
-import { mockATSCandidates } from '../data/mockATSCandidates';
 
-type StepKey = 'processing' | 'select' | 'refinement' | 'job-description' | 'review' | 'save';
+type StepKey = 'intent' | 'select' | 'refinement' | 'job-description' | 'review' | 'save';
 type ReviewViewMode = 'editor' | 'resume' | 'split' | 'original';
 
 const STEP_ICONS: Record<StepKey, ReactNode> = {
-  processing: (
+  intent: (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
     </svg>
   ),
   select: (
@@ -67,8 +70,6 @@ const STEP_ICONS: Record<StepKey, ReactNode> = {
   ),
 };
 
-const SESSION_KEY = 'resume-enhance-state';
-
 interface PersistedWizardState {
   currentStepKey: StepKey;
   completedSteps: StepKey[];
@@ -81,7 +82,6 @@ interface PersistedWizardState {
   selectedPositionId: string | null;
   fileNames: string[];
 }
-
 
 function PositionDetailsModal({
   position,
@@ -288,7 +288,7 @@ export default function TransformPage() {
   const [searchParams] = useSearchParams();
   const sessionIdParam = searchParams.get('session');
 
-  const [currentStepKey, setCurrentStepKey] = useState<StepKey>('processing');
+  const [currentStepKey, setCurrentStepKey] = useState<StepKey>('intent');
   const [completedSteps, setCompletedSteps] = useState<Set<StepKey>>(new Set());
   const [processingMode, setProcessingMode] = useState<ProcessingMode>('single');
   const [sourceType, setSourceType] = useState<ResumeSourceType>('upload');
@@ -341,9 +341,20 @@ export default function TransformPage() {
   const [savedSessionName, setSavedSessionName] = useState('');
   const [pendingSessionName, setPendingSessionName] = useState<string | null>(null);
 
+  const [sessionCount, setSessionCount] = useState(0);
+  const [showHistoryPage, setShowHistoryPage] = useState(false);
+  const [historySessions, setHistorySessions] = useState<TransformSessionSummary[]>([]);
+
+  const [liveEmployees, setLiveEmployees] = useState<BenchEmployee[]>([]);
+  const [liveCandidates, setLiveCandidates] = useState<SyncedCandidateListItem[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState<BenchEmployee | null>(null);
+
   const stepLabels = useMemo(() => {
     const base: { key: StepKey; title: string }[] = [
-      { key: 'processing', title: 'Processing Mode' },
+      { key: 'intent', title: 'Get Started' },
       { key: 'select', title: 'Select Resume(s)' },
       { key: 'refinement', title: 'Enhancement Mode' },
     ];
@@ -356,38 +367,6 @@ export default function TransformPage() {
     );
     return base.map((s) => ({ ...s, icon: STEP_ICONS[s.key] }));
   }, [refinementMode]);
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem(SESSION_KEY);
-    if (!saved) return;
-    try {
-      const state: PersistedWizardState = JSON.parse(saved);
-      setProcessingMode(state.processingMode);
-      setSourceType(state.sourceType);
-      setRefinementMode(state.refinementMode);
-      setJobDescriptionSource(state.jobDescriptionSource);
-      setCustomJobDescription(state.customJobDescription);
-      setCompletedSteps(new Set(state.completedSteps));
-
-      if (state.selectedCandidateId) {
-        const candidate = mockATSCandidates.find((c) => c.id === state.selectedCandidateId);
-        if (candidate) {
-          setSelectedCandidate(candidate);
-          if (state.selectedPositionId) {
-            const position = candidate.positions.find((p) => p.id === state.selectedPositionId);
-            if (position) setSelectedPosition(position);
-          }
-        }
-      }
-
-      if (state.sourceType === 'upload' && state.fileNames.length > 0 && state.currentStepKey !== 'processing') {
-        setCurrentStepKey('select');
-      } else {
-        setCurrentStepKey(state.currentStepKey);
-      }
-    } catch { /* ignore parse errors */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!sessionIdParam) return;
@@ -406,16 +385,20 @@ export default function TransformPage() {
           setCustomJobDescription(state.customJobDescription);
           setCompletedSteps(new Set(state.completedSteps));
           if (state.selectedCandidateId) {
-            const candidate = mockATSCandidates.find((c) => c.id === state.selectedCandidateId);
-            if (candidate) {
-              setSelectedCandidate(candidate);
-              if (state.selectedPositionId) {
-                const position = candidate.positions.find((p) => p.id === state.selectedPositionId);
-                if (position) setSelectedPosition(position);
-              }
+            const liveCandidate = liveCandidates.find((c) => String(c.upstreamId) === state.selectedCandidateId);
+            if (liveCandidate) {
+              setSelectedCandidate({
+                id: String(liveCandidate.upstreamId),
+                upstreamId: liveCandidate.upstreamId,
+                name: liveCandidate.name,
+                email: liveCandidate.email,
+                phone: '',
+                skills: [liveCandidate.mainSkill, liveCandidate.seniority].filter(Boolean),
+                positions: [],
+              });
             }
           }
-          setCurrentStepKey(state.currentStepKey);
+          setCurrentStepKey(state.currentStepKey === ('processing' as StepKey) ? 'intent' : state.currentStepKey);
         } catch { /* ignore parse errors */ }
       }
       if (detail.resumeContentJson) {
@@ -432,24 +415,37 @@ export default function TransformPage() {
   }, [sessionIdParam]);
 
   useEffect(() => {
-    const state: PersistedWizardState = {
-      currentStepKey,
-      completedSteps: [...completedSteps],
-      processingMode,
-      sourceType,
-      refinementMode,
-      jobDescriptionSource,
-      customJobDescription,
-      selectedCandidateId: selectedCandidate?.id || null,
-      selectedPositionId: selectedPosition?.id || null,
-      fileNames: selectedFiles.map((f) => f.name),
-    };
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
-  }, [currentStepKey, completedSteps, processingMode, sourceType, refinementMode, jobDescriptionSource, customJobDescription, selectedCandidate, selectedPosition, selectedFiles]);
-
-  useEffect(() => {
     window.location.hash = currentStepKey;
   }, [currentStepKey]);
+
+  useEffect(() => {
+    if (sourceType === 'employees' && liveEmployees.length === 0 && !loadingEmployees) {
+      setLoadingEmployees(true);
+      benchBurnService.getAllEmployees()
+        .then(setLiveEmployees)
+        .catch(() => {})
+        .finally(() => setLoadingEmployees(false));
+    }
+    if (sourceType === 'ats-candidates' && liveCandidates.length === 0 && !loadingCandidates) {
+      setLoadingCandidates(true);
+      benchBurnService.getAllCandidates()
+        .then(setLiveCandidates)
+        .catch(() => {})
+        .finally(() => setLoadingCandidates(false));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceType]);
+
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearch.trim()) return liveEmployees;
+    const q = employeeSearch.toLowerCase();
+    return liveEmployees.filter(e =>
+      e.name.toLowerCase().includes(q) ||
+      e.email.toLowerCase().includes(q) ||
+      e.mainSkill.toLowerCase().includes(q) ||
+      e.country.toLowerCase().includes(q)
+    );
+  }, [liveEmployees, employeeSearch]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -465,6 +461,18 @@ export default function TransformPage() {
 
   useEffect(() => {
     aiService.checkConnection().then(setClaudeConnected);
+  }, []);
+
+  useEffect(() => {
+    transformSessionService.list()
+      .then((sessions) => {
+        setSessionCount(sessions.length);
+        setHistorySessions(sessions);
+      })
+      .catch(() => {
+        setSessionCount(0);
+        setHistorySessions([]);
+      });
   }, []);
 
   const activeResume = useMemo((): StructuredResume | null => {
@@ -495,15 +503,25 @@ export default function TransformPage() {
     return validationService.getCompleteness(activeResume);
   }, [activeResume]);
 
-  const filteredCandidates = useMemo(
-    () =>
-      mockATSCandidates.filter(
-        (candidate) =>
-          candidate.name.toLowerCase().includes(candidateSearch.toLowerCase()) ||
-          candidate.email?.toLowerCase().includes(candidateSearch.toLowerCase())
-      ),
-    [candidateSearch]
-  );
+  const filteredCandidates = useMemo(() => {
+    const mapped: ATSCandidate[] = liveCandidates.map(c => ({
+      id: String(c.upstreamId),
+      upstreamId: c.upstreamId,
+      name: c.name,
+      email: c.email,
+      phone: '',
+      skills: [c.mainSkill, c.seniority].filter(Boolean),
+      positions: [],
+      resumeUrl: '',
+      hasResume: c.hasResume,
+    }));
+    if (!candidateSearch.trim()) return mapped;
+    const q = candidateSearch.toLowerCase();
+    return mapped.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q)
+    );
+  }, [liveCandidates, candidateSearch]);
 
   const isCandidateAlreadyPresented = useCallback(
     (position: ATSPosition) => {
@@ -524,7 +542,8 @@ export default function TransformPage() {
 
   const canProceedFromStep2 =
     (sourceType === 'upload' && selectedFiles.length > 0) ||
-    (sourceType === 'ats-candidates' && selectedCandidate !== null);
+    (sourceType === 'ats-candidates' && selectedCandidate !== null) ||
+    (sourceType === 'employees' && selectedEmployee !== null);
 
   const getNextStepKey = useCallback(
     (current: StepKey): StepKey | null => {
@@ -570,8 +589,15 @@ export default function TransformPage() {
     setTransformedResumes([]);
   }, []);
 
+  const handleEmployeeSelect = useCallback((employee: BenchEmployee) => {
+    setSelectedEmployee(employee);
+    setError(null);
+    setTransformedResumes([]);
+  }, []);
+
   const executeTransform = useCallback(async () => {
     if (sourceType === 'ats-candidates' && !selectedCandidate) return;
+    if (sourceType === 'employees' && !selectedEmployee) return;
     if (sourceType === 'upload' && selectedFiles.length === 0) return;
 
     setIsTransforming(true);
@@ -589,6 +615,13 @@ export default function TransformPage() {
         : undefined;
 
     if (sourceType === 'ats-candidates' && selectedCandidate) {
+      const liveCandidate = liveCandidates.find(c => c.upstreamId === selectedCandidate.upstreamId);
+      if (liveCandidate && !liveCandidate.isVectorized) {
+        setError(`${selectedCandidate.name}'s resume has not been vectorized yet. Please vectorize their resume from the Data Sync page first.`);
+        setIsTransforming(false);
+        return;
+      }
+
       setTransformProgress({
         current: 1,
         total: 1,
@@ -596,9 +629,9 @@ export default function TransformPage() {
       });
 
       try {
-        const mockContent = `Resume for ${selectedCandidate.name}\nEmail: ${selectedCandidate.email}\nPhone: ${selectedCandidate.phone}`;
+        const resumeText = await benchBurnService.getResumeText('candidates', selectedCandidate.upstreamId!);
         const { resume, metrics } = await aiService.transformResume(
-          mockContent,
+          resumeText,
           `${selectedCandidate.name.replace(/\s+/g, '_')}_resume.pdf`,
           refinementMode,
           jobDescription
@@ -611,7 +644,33 @@ export default function TransformPage() {
 
         results.push(resume);
       } catch {
-        setError('Failed to enhance resume. Please try again.');
+        setError('Resume text not available for this candidate. Ensure their resume has been synced and vectorized.');
+      }
+    } else if (sourceType === 'employees' && selectedEmployee) {
+      if (!selectedEmployee.isVectorized) {
+        setError(`${selectedEmployee.name}'s resume has not been vectorized yet. Please vectorize their resume from the Data Sync page first.`);
+        setIsTransforming(false);
+        return;
+      }
+
+      setTransformProgress({
+        current: 1,
+        total: 1,
+        currentFile: `${selectedEmployee.name}'s resume`,
+      });
+
+      try {
+        const resumeText = await benchBurnService.getResumeText('employees', selectedEmployee.upstreamId);
+        const { resume, metrics } = await aiService.transformResume(
+          resumeText,
+          `${selectedEmployee.name.replace(/\s+/g, '_')}_resume.pdf`,
+          refinementMode,
+          jobDescription
+        );
+        allMetrics.push(metrics);
+        results.push(resume);
+      } catch {
+        setError('Resume text not available for this employee. Ensure their resume has been synced and vectorized.');
       }
     } else {
       for (let i = 0; i < selectedFiles.length; i++) {
@@ -645,11 +704,13 @@ export default function TransformPage() {
     }
     setTransformProgress(null);
     setIsTransforming(false);
-  }, [sourceType, selectedCandidate, selectedPosition, selectedFiles, refinementMode, jobDescriptionSource, customJobDescription]);
+  }, [sourceType, selectedCandidate, selectedEmployee, selectedPosition, selectedFiles, refinementMode, jobDescriptionSource, customJobDescription]);
 
   const defaultSessionName = useMemo(() => {
     const subject = sourceType === 'ats-candidates' && selectedCandidate
       ? selectedCandidate.name
+      : sourceType === 'employees' && selectedEmployee
+      ? selectedEmployee.name
       : selectedFiles[0]?.name?.replace(/\.[^/.]+$/, '') ?? 'Session';
     const modeLabels: Record<RefinementMode, string> = {
       'professional-polish': 'Professional Polish',
@@ -951,12 +1012,12 @@ export default function TransformPage() {
     setShowUnsavedWarning(false);
     setHasSaved(false);
     setActiveExportResume(null);
-    setCurrentStepKey('processing');
+    setCurrentStepKey('intent');
     setCompletedSteps(new Set());
+    setShowHistoryPage(false);
     setProcessingMetrics([]);
     setUploadingToATS(new Set());
     setUploadedToATS(new Set());
-    sessionStorage.removeItem(SESSION_KEY);
     setSavedSessionId(null);
     setShowSaveSessionModal(false);
     setIsSavingSession(false);
@@ -1050,14 +1111,14 @@ export default function TransformPage() {
   const stepSummaries = useMemo(() => {
     const map: Partial<Record<StepKey, { icon: ReactNode; label: string } | null>> = {};
 
-    if (completedSteps.has('processing')) {
-      map.processing = {
+    if (completedSteps.has('intent')) {
+      map.intent = {
         icon: (
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         ),
-        label: processingMode === 'single' ? 'Single Resume' : 'Batch Processing',
+        label: 'Enhance Resume',
       };
     }
 
@@ -1157,71 +1218,145 @@ export default function TransformPage() {
           </div>
         )}
 
-        <StepperBar
-          stepLabels={stepLabels}
-          currentStepKey={currentStepKey}
-          completedSteps={completedSteps}
-          onStepClick={handleStepClick}
-          stepSummaries={stepSummaries}
-        />
+        {currentStepKey !== 'intent' && (
+          <StepperBar
+            stepLabels={stepLabels}
+            currentStepKey={currentStepKey}
+            completedSteps={completedSteps}
+            onStepClick={handleStepClick}
+            stepSummaries={stepSummaries}
+          />
+        )}
 
-        {currentStepKey === 'processing' && (
-          <div className="glass-card p-6 mb-6">
-            <h2 className="text-base font-semibold text-primary mb-1">Choose Processing Mode</h2>
-            <p className="text-sm text-muted mb-5">Select how you want to process resumes in this session.</p>
+        {currentStepKey === 'intent' && !showHistoryPage && (
+          <div className="space-y-4">
+            <div className="text-center mb-2">
+              <h2 className="text-lg font-semibold text-primary">What would you like to do?</h2>
+              <p className="text-sm text-muted mt-1">Choose how to get started with resume enhancement</p>
+            </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid md:grid-cols-2 gap-4">
               <button
-                onClick={() => setProcessingMode('single')}
-                className={`relative glass-card-hover p-6 text-left transition-all rounded-xl ${
-                  processingMode === 'single'
-                    ? 'ring-2 ring-accent-500 ring-offset-2 ring-offset-white dark:ring-offset-dark-card bg-accent-50/80 dark:bg-accent-500/15'
-                    : 'border border-transparent'
-                }`}
+                onClick={() => {
+                  setCompletedSteps((prev) => new Set([...prev, 'intent']));
+                  setCurrentStepKey('select');
+                }}
+                className="text-left p-6 rounded-2xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-emerald-500/30 transition-all duration-200 group h-full"
               >
-                {processingMode === 'single' && (
-                  <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-accent-500 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                <div className="flex flex-col items-center text-center gap-4 h-full">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white flex-shrink-0">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
                   </div>
-                )}
-                <div className="w-10 h-10 rounded-xl bg-accent-500/10 flex items-center justify-center mb-4">
-                  <svg className="w-5 h-5 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <h3 className="text-base font-semibold text-primary">Enhance Resume</h3>
+                    <p className="text-sm text-muted mt-1.5 leading-relaxed">
+                      Upload or select a resume and enhance it with AI-powered formatting and content improvements.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
+                      <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        AI-Powered
+                      </span>
+                      <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        Single Resume
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-sm font-bold text-primary mb-1">Single Resume</h3>
-                <p className="text-xs text-muted">Enhance one resume at a time with full control</p>
               </button>
 
-              <div className="relative">
-                <div className="glass-card p-6 text-left rounded-xl border-2 border-transparent opacity-50 cursor-not-allowed select-none">
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-dark-hover flex items-center justify-center mb-4">
-                    <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              <button
+                onClick={() => setShowHistoryPage(true)}
+                className="text-left p-6 rounded-2xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-amber-500/30 transition-all duration-200 group h-full"
+              >
+                <div className="flex flex-col items-center text-center gap-4 h-full">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white flex-shrink-0">
+                    <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-bold text-primary mb-1">Batch Processing</h3>
-                  <p className="text-xs text-muted">Process multiple resumes simultaneously</p>
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <h3 className="text-base font-semibold text-primary">Session History</h3>
+                    <p className="text-sm text-muted mt-1.5 leading-relaxed">
+                      Resume previous enhancement sessions or review past results.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
+                      {sessionCount > 0 ? (
+                        <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          {sessionCount} session{sessionCount !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                          No sessions yet
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <span className="absolute top-3 right-3 px-2 py-0.5 text-[10px] font-semibold bg-gray-200 dark:bg-dark-border text-gray-500 dark:text-gray-400 rounded-full">
-                  Coming Soon
-                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStepKey === 'intent' && showHistoryPage && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowHistoryPage(false)}
+                className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back
+              </button>
+              <div>
+                <h2 className="text-2xl font-bold text-primary">Session History</h2>
+                <p className="text-sm text-secondary mt-0.5">
+                  <span className="font-mono font-semibold text-primary">{sessionCount}</span> session{sessionCount !== 1 ? 's' : ''} recorded
+                </p>
               </div>
             </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={handleNext}
-                className="flex items-center gap-2 px-5 py-2.5 bg-accent-500 text-white text-sm font-medium rounded-xl hover:bg-accent-600 transition-colors"
-              >
-                Next
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </button>
-            </div>
+            {historySessions.length === 0 ? (
+              <div className="glass-panel rounded-2xl p-12 text-center">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 dark:from-white/5 dark:to-white/10 flex items-center justify-center">
+                  <svg className="w-7 h-7 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-sm text-muted">No enhancement sessions yet</p>
+                <p className="text-xs text-muted/60 mt-1">Sessions will appear here after your first enhancement</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {historySessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => navigate(`/resume/enhance?session=${session.id}`)}
+                    className="w-full text-left glass-panel rounded-xl p-5 hover:bg-white/5 transition-all duration-200 group"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-semibold text-primary truncate group-hover:text-accent-500 transition-colors">
+                          {session.name}
+                        </h3>
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${
+                            session.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                            session.status === 'processing' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                            'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                          }`}>
+                            {session.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1277,8 +1412,12 @@ export default function TransformPage() {
               </button>
 
               <button
-                disabled
-                className="flex-1 px-6 py-3.5 text-sm font-medium transition-all relative text-gray-500 dark:text-gray-400 opacity-50 cursor-not-allowed"
+                onClick={() => setSourceType('ats-candidates')}
+                className={`flex-1 px-6 py-3.5 text-sm font-medium transition-all relative ${
+                  sourceType === 'ats-candidates'
+                    ? 'text-accent-600 dark:text-accent-400 bg-accent-50/50 dark:bg-accent-500/10'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-hover/50'
+                }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1290,10 +1429,10 @@ export default function TransformPage() {
                     />
                   </svg>
                   ATS / Candidates
-                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-200 dark:bg-dark-border text-gray-500 dark:text-gray-400 rounded-full">
-                    Coming Soon
-                  </span>
                 </div>
+                {sourceType === 'ats-candidates' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-500" />
+                )}
               </button>
             </div>
 
@@ -1309,21 +1448,116 @@ export default function TransformPage() {
               )}
 
               {sourceType === 'employees' && (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-dark-hover flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-primary mb-2">Select Employee</label>
+                    <div className="relative mb-3">
+                      <svg
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search employees by name, email, skill, or country..."
+                        value={employeeSearch}
+                        onChange={(e) => setEmployeeSearch(e.target.value)}
+                        className="glass-input w-full pl-10 pr-4 py-2.5 text-sm"
                       />
-                    </svg>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto space-y-2 rounded-xl border border-gray-200/50 dark:border-dark-border/50 p-2">
+                      {loadingEmployees ? (
+                        <p className="text-sm text-muted text-center py-4">Loading employees...</p>
+                      ) : filteredEmployees.length === 0 ? (
+                        <p className="text-sm text-muted text-center py-4">No employees found</p>
+                      ) : (
+                        filteredEmployees.map((employee) => (
+                          <button
+                            key={employee.upstreamId}
+                            onClick={() => handleEmployeeSelect(employee)}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${
+                              selectedEmployee?.upstreamId === employee.upstreamId
+                                ? 'bg-accent-50 dark:bg-accent-500/15 border-2 border-accent-500'
+                                : 'bg-white/50 dark:bg-dark-hover/30 border-2 border-transparent hover:bg-white/80 dark:hover:bg-dark-hover/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center text-accent-600 dark:text-accent-400 font-semibold text-sm">
+                                {employee.name
+                                  .split(' ')
+                                  .map((n) => n[0])
+                                  .join('')
+                                  .slice(0, 2)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-medium text-primary truncate">{employee.name}</h4>
+                                <p className="text-xs text-muted truncate">{employee.email}</p>
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {employee.mainSkill && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                      {employee.mainSkill}
+                                    </span>
+                                  )}
+                                  {employee.seniority && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                      {employee.seniority}
+                                    </span>
+                                  )}
+                                  {employee.country && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                      {employee.country}
+                                    </span>
+                                  )}
+                                  {employee.isVectorized && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded">
+                                      Vectorized
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <h3 className="text-sm font-medium text-primary mb-2">Internal Employee Directory</h3>
-                  <p className="text-xs text-muted max-w-xs">
-                    API integration required — Connect your HR system to browse and select employee resumes directly.
-                  </p>
+
+                  {selectedEmployee && (
+                    <div className="p-4 bg-accent-50/50 dark:bg-accent-500/10 rounded-xl border border-accent-200/50 dark:border-accent-500/20">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-accent-500/15 flex items-center justify-center text-accent-600 dark:text-accent-400 font-semibold">
+                          {selectedEmployee.name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .slice(0, 2)}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-primary">{selectedEmployee.name}</h4>
+                          <p className="text-xs text-muted">
+                            {selectedEmployee.email} {selectedEmployee.mainSkill && `• ${selectedEmployee.mainSkill}`} {selectedEmployee.country && `• ${selectedEmployee.country}`}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedEmployee(null)}
+                          className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1355,7 +1589,9 @@ export default function TransformPage() {
                     </div>
 
                     <div className="max-h-64 overflow-y-auto space-y-2 rounded-xl border border-gray-200/50 dark:border-dark-border/50 p-2">
-                      {filteredCandidates.length === 0 ? (
+                      {loadingCandidates ? (
+                        <p className="text-sm text-muted text-center py-4">Loading candidates...</p>
+                      ) : filteredCandidates.length === 0 ? (
                         <p className="text-sm text-muted text-center py-4">No candidates found</p>
                       ) : (
                         filteredCandidates.map((candidate) => (
@@ -1551,6 +1787,8 @@ export default function TransformPage() {
                     Enhance{' '}
                     {sourceType === 'ats-candidates' && selectedCandidate
                       ? `${selectedCandidate.name}'s Resume`
+                      : sourceType === 'employees' && selectedEmployee
+                      ? `${selectedEmployee.name}'s Resume`
                       : `${selectedFiles.length} Resume${selectedFiles.length !== 1 ? 's' : ''}`}
                   </>
                 )}
@@ -2134,7 +2372,6 @@ export default function TransformPage() {
                   if (!hasSaved) {
                     setShowUnsavedWarning(true);
                   } else {
-                    sessionStorage.removeItem(SESSION_KEY);
                     navigate('/resume');
                   }
                 }}
@@ -2191,7 +2428,7 @@ export default function TransformPage() {
                 Cancel
               </button>
               <button
-                onClick={() => { setShowUnsavedWarning(false); sessionStorage.removeItem(SESSION_KEY); navigate('/resume'); }}
+                onClick={() => { setShowUnsavedWarning(false); navigate('/resume'); }}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 transition-colors"
               >
                 Continue Anyway
@@ -2429,7 +2666,17 @@ export default function TransformPage() {
           defaultName={defaultSessionName}
           isSaving={isSavingSession}
           onSave={handleSaveAndEnhance}
-          onCancel={() => setShowSaveSessionModal(false)}
+          onCancel={() => {
+            setShowSaveSessionModal(false);
+            if (transformedResumes.length === 0) {
+              setCurrentStepKey('refinement');
+              setCompletedSteps((prev) => {
+                const next = new Set(prev);
+                next.delete('refinement');
+                return next;
+              });
+            }
+          }}
         />
       )}
     </div>

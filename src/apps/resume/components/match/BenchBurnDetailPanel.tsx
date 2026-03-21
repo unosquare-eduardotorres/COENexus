@@ -16,6 +16,7 @@ import {
   PRIORITY_LABELS,
   AI_ASSESSMENT_SECTIONS,
 } from './shared/matchDetailUtils';
+import FitVerdictSummary from './shared/FitVerdictSummary';
 
 interface BenchBurnDetailPanelProps {
   match: CrossMatchResult;
@@ -184,7 +185,7 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
         <div className="space-y-6">
           {match.summary && (
             <div className="glass-card p-6">
-              <p className="text-sm text-secondary italic">{match.summary}</p>
+              <FitVerdictSummary summary={match.summary} fitVerdict={match.analysis?.fitVerdict} />
             </div>
           )}
 

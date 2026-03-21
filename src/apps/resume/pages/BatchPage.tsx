@@ -1,5 +1,3 @@
-import inDevGif from '../files/InDevelopment.gif';
-
 export default function BatchPage() {
   return (
     <div className="min-h-screen py-8 relative">
@@ -65,11 +63,11 @@ export default function BatchPage() {
 
       <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
         <div className="flex flex-col items-center gap-6">
-          <img
-            src={inDevGif}
-            alt="In Development"
-            className="w-[40rem] h-[40rem] object-contain rounded-2xl"
-          />
+          <div className="w-48 h-48 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <svg className="w-24 h-24 text-amber-500/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+            </svg>
+          </div>
           <div className="px-6 py-3 rounded-2xl bg-amber-500/15 border border-amber-500/20 backdrop-blur-sm">
             <span className="text-lg font-bold text-amber-600 dark:text-amber-400 tracking-wide">
               In Development

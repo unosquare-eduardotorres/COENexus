@@ -5,6 +5,7 @@ import ScoreRing from './ScoreRing';
 import CategoryBar from './CategoryBar';
 import BenchBurnPipelineStats from './BenchBurnPipelineStats';
 import { getFitVerdictConfig, getInitials } from './shared/matchDetailUtils';
+import FitVerdictSummary from './shared/FitVerdictSummary';
 
 interface BenchBurnResultsProps {
   results: BenchBurnSearchResult;
@@ -181,7 +182,10 @@ export default function BenchBurnResults({
                                   Cosine Only
                                 </span>
                               )}
-                              {match.summary && ` — ${match.summary}`}
+                              {match.summary && !match.summary.includes('AI analysis unavailable') && (
+                                <> — <FitVerdictSummary summary={match.summary} fitVerdict={match.analysis?.fitVerdict} variant="inline" /></>
+                              )}
+                              {match.summary?.includes('AI analysis unavailable') && ` — ${match.summary}`}
                             </div>
                           </div>
                           <div className="hidden lg:flex flex-col gap-1 flex-shrink-0 w-28">
@@ -271,7 +275,10 @@ export default function BenchBurnResults({
                                   Cosine Only
                                 </span>
                               )}
-                              {match.summary && ` — ${match.summary}`}
+                              {match.summary && !match.summary.includes('AI analysis unavailable') && (
+                                <> — <FitVerdictSummary summary={match.summary} fitVerdict={match.analysis?.fitVerdict} variant="inline" /></>
+                              )}
+                              {match.summary?.includes('AI analysis unavailable') && ` — ${match.summary}`}
                             </div>
                           </div>
                           <div className="hidden lg:flex flex-col gap-1 flex-shrink-0 w-28">

@@ -2,13 +2,39 @@ import { useTheme } from '../contexts/ThemeContext';
 import AppCard from './AppCard';
 import ParticleNetwork from './ParticleNetwork';
 
-function SparkleDocumentIcon() {
+function VemIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 2v6h6" />
-      <path d="M10 13l-.5-1-.5 1-1 .5 1 .5.5 1 .5-1 1-.5-1-.5Z" fill="currentColor" />
-      <path d="M16 17H8" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="96"
+      height="96"
+      viewBox="0 0 48 48"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="24" y1="6" x2="24" y2="18" />
+      <polyline points="21,15 24,18 27,15" />
+      <circle cx="20" cy="6" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="28" cy="6" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="24" cy="3" r="1.5" fill="currentColor" stroke="none" />
+      <text x="24" y="11" textAnchor="middle" fontSize="6" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui">V</text>
+
+      <line x1="8" y1="40" x2="18" y2="30" />
+      <polyline points="15,32 18,30 16,27" />
+      <path d="M5,36 L3,36 L3,43 L5,43" strokeWidth="2" fill="none" />
+      <text x="8" y="42" textAnchor="middle" fontSize="6" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui">E</text>
+
+      <line x1="40" y1="40" x2="30" y2="30" />
+      <polyline points="32,27 30,30 33,32" />
+      <circle cx="40" cy="40" r="4" strokeWidth="1.5" fill="none" />
+      <circle cx="40" cy="40" r="1.5" fill="currentColor" stroke="none" />
+      <text x="40" y="38" textAnchor="middle" fontSize="6" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui">M</text>
+
+      <circle cx="24" cy="26" r="3" strokeWidth="1.5" />
+      <circle cx="24" cy="26" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -112,7 +138,7 @@ export default function NexusLanding() {
             accentColor={resumeColor}
             tagline=""
             description={<><AccentLetter color={resumeColor}>V</AccentLetter>ectorize. <AccentLetter color={resumeColor}>E</AccentLetter>xtract. <AccentLetter color={resumeColor}>M</AccentLetter>atch. Resumes, reimagined. Matches, made.</>}
-            icon={<SparkleDocumentIcon />}
+            icon={<VemIcon />}
           />
           <AppCard
             name="P.A.T.H."

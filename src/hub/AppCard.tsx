@@ -38,7 +38,7 @@ function CardContent({ name, codename, tagline, description, icon, accentColor, 
 
       <div className="relative flex items-start justify-between mb-4">
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-xl"
+          className="flex h-28 w-28 items-center justify-center rounded-xl"
           style={{ backgroundColor: `${accentColor}26` }}
         >
           <div style={{ color: accentColor }}>{icon}</div>

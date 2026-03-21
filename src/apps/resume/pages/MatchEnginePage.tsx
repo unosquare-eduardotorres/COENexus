@@ -21,7 +21,7 @@ import { matchEngineService } from '../services/matchEngineService';
 import { normalizeCandidate } from '../utils/normalizeCandidate';
 import { exportToExcel, ColumnDef } from '../utils/exportToExcel';
 import { formatSalary } from '../utils/formatSalary';
-import { SAMPLE_JOB_DESCRIPTION } from '../data/mockMatchCandidates';
+import { SAMPLE_JOB_DESCRIPTION } from '../data/sampleJobDescription';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import StepperBar from '../components/shared/StepperBar';
 import IntentSelector from '../components/match/IntentSelector';

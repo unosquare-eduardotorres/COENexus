@@ -267,7 +267,18 @@ export const templateFillService = {
       const binary = atob(stored);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      return bytes.buffer;
+      const buffer = bytes.buffer;
+
+      const zip = await JSZip.loadAsync(buffer);
+      const docFile = zip.file('word/document.xml');
+      if (docFile) {
+        const xml = await docFile.async('string');
+        if (xml.includes('{{PROFILE_SUMMARY}}')) {
+          return buffer;
+        }
+      }
+
+      localStorage.removeItem('output_template_docx');
     }
     const response = await fetch(BUNDLED_TEMPLATE_PATH);
     return response.arrayBuffer();

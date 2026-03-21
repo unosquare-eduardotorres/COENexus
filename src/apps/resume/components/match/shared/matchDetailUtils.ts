@@ -75,6 +75,23 @@ export const PRIORITY_ORDER: Record<string, number> = { required: 0, 'nice-to-ha
 export const STATUS_ORDER: Record<string, number> = { met: 0, surpassed: 1, partial: 2, missing: 3 };
 export const PRIORITY_LABELS: Record<string, string> = { required: 'Required', 'nice-to-have': 'Nice to Have', optional: 'Optional' };
 
+export function parseSummaryVerdict(summary: string): { verdict: FitVerdict | null; reasoning: string } {
+  const patterns: { match: RegExp; verdict: FitVerdict }[] = [
+    { match: /^NOT\s+A\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'not-a-fit' },
+    { match: /^PARTIAL\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'partial-fit' },
+    { match: /^GOOD\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'good-fit' },
+    { match: /^STRONG\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'strong-fit' },
+  ];
+
+  for (const { match, verdict } of patterns) {
+    if (match.test(summary)) {
+      return { verdict, reasoning: summary.replace(match, '').trim() };
+    }
+  }
+
+  return { verdict: null, reasoning: summary };
+}
+
 export const AI_ASSESSMENT_SECTIONS: { key: keyof SonnetAnalysis; title: string; icon: string; borderColor: string }[] = [
   { key: 'whyRightFit', title: 'Why This Candidate Is the Right Fit', icon: '🎯', borderColor: 'border-emerald-500' },
   { key: 'immediateValue', title: 'Immediate Value to the Team', icon: '⚡', borderColor: 'border-blue-500' },

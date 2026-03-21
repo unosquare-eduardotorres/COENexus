@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
-const quickActions = [
+const primaryActions = [
   {
     title: 'Resume',
-    description: 'Upload or select resumes and enhance them with AI',
+    description: 'Upload or select resumes and enhance them with AI-powered professional polish, impact-focused rewriting, and ATS optimization.',
     href: '/resume/enhance',
+    cta: 'Get Started',
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -16,26 +17,42 @@ const quickActions = [
         />
       </svg>
     ),
+    iconBg: 'from-accent-500/15 to-accent-600/10 dark:from-accent-500/20 dark:to-accent-600/15',
+    iconText: 'text-accent-600 dark:text-accent-400',
+    borderColor: 'border-accent-500 dark:border-accent-400',
+    gradientOverlay: 'from-accent-500/5 dark:from-accent-500/10',
+    hoverText: 'group-hover:text-accent-600 dark:group-hover:text-accent-400',
+    ctaText: 'text-accent-600 dark:text-accent-400',
   },
   {
     title: 'Match Engine',
-    description: 'Match candidates to positions with AI-powered scoring',
+    description: 'Match candidates to open positions with AI-powered scoring, skill gap analysis, and intelligent ranking across your talent pool.',
     href: '/resume/match',
+    cta: 'Get Started',
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="18" cy="18" r="3" strokeWidth={1.5} />
         <circle cx="6" cy="6" r="3" strokeWidth={1.5} />
         <circle cx="6" cy="18" r="3" strokeWidth={1.5} />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 9v6m9.35 1.35L8.65 8.65" />
       </svg>
     ),
+    iconBg: 'from-violet-500/15 to-purple-600/10 dark:from-violet-500/20 dark:to-purple-600/15',
+    iconText: 'text-violet-600 dark:text-violet-400',
+    borderColor: 'border-violet-500 dark:border-violet-400',
+    gradientOverlay: 'from-violet-500/5 dark:from-violet-500/10',
+    hoverText: 'group-hover:text-violet-600 dark:group-hover:text-violet-400',
+    ctaText: 'text-violet-600 dark:text-violet-400',
   },
+];
+
+const secondaryActions = [
   {
     title: 'Batch Processing',
     description: 'Process multiple resumes at once — enhance, extract, or validate in bulk',
     href: '/resume/batch',
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -44,13 +61,16 @@ const quickActions = [
         />
       </svg>
     ),
+    iconBg: 'bg-amber-500/10 dark:bg-amber-500/15',
+    iconText: 'text-amber-600 dark:text-amber-400',
+    hoverText: 'group-hover:text-amber-600 dark:group-hover:text-amber-400',
   },
   {
     title: 'Data Sync',
     description: 'Import and sync employee & candidate records from external sources',
     href: '/resume/data-sync',
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -59,28 +79,16 @@ const quickActions = [
         />
       </svg>
     ),
-  },
-  {
-    title: 'Session History',
-    description: 'View and resume past enhancement sessions',
-    href: '/resume/history',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    ),
+    iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+    iconText: 'text-emerald-600 dark:text-emerald-400',
+    hoverText: 'group-hover:text-emerald-600 dark:group-hover:text-emerald-400',
   },
   {
     title: 'Settings',
     description: 'Configure templates, validation rules, and AI settings',
     href: '/resume/settings',
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -95,173 +103,298 @@ const quickActions = [
         />
       </svg>
     ),
+    iconBg: 'bg-gray-500/10 dark:bg-gray-400/15',
+    iconText: 'text-gray-500 dark:text-gray-400',
+    hoverText: 'group-hover:text-gray-600 dark:group-hover:text-gray-300',
   },
 ];
 
-const steps = [
+const resumeSteps = [
   { number: '1', title: 'Processing Mode', description: 'Choose single resume processing for full control over each enhancement' },
   { number: '2', title: 'Select Resume', description: 'Upload resume files or pick candidates directly from your ATS' },
-  { number: '3', title: 'Enhancement Mode', description: 'Choose Professional Polish, Impact-Focused, ATS-Optimized, or Job Description Tailoring' },
+  { number: '3', title: 'Enhancement Mode', description: 'Choose Professional Polish, Impact-Focused, ATS-Optimized, or Job Tailoring' },
   { number: '3b', title: 'Job Description', description: 'Provide a job description or pick an open position', isConditional: true },
   { number: '4', title: 'Review & Refine', description: 'Preview the enhanced resume, compare original vs enhanced, and run AI enhancements' },
   { number: '5', title: 'Save / Export', description: 'Download as DOCX, sync to ATS, or present to a position' },
 ];
 
-export default function HomePage() {
-  const navigate = useNavigate();
-  const [showContinueModal, setShowContinueModal] = useState(false);
+const matchSteps = [
+  { number: '1', title: 'Choose Intent', description: 'Select your matching goal — fill a position, reduce bench, or explore talent' },
+  { number: '2', title: 'Data Source', description: 'Pick your talent pool — bench, all employees, external candidates, or all sources' },
+  { number: '3', title: 'Job Description', description: 'Paste a job description or select an open position to match against' },
+  { number: '4', title: 'Filters & Depth', description: 'Apply filters and choose search depth — Haiku (fast) or Opus (thorough)' },
+  { number: '5', title: 'AI Search', description: 'AI analyzes candidates and scores them against your requirements' },
+  { number: '6', title: 'Review Results', description: 'Explore ranked matches, compare candidates, and deep-dive into profiles' },
+];
 
-  useEffect(() => {
-    const saved = sessionStorage.getItem('resume-enhance-state');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.currentStepKey && parsed.currentStepKey !== 'processing') {
-          setShowContinueModal(true);
-        }
-      } catch { /* ignore parse errors */ }
-    }
-  }, []);
+const statsPills = [
+  {
+    label: 'AI-Powered Enhancement',
+    colorClass: 'text-accent-500 dark:text-accent-400',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Smart Matching',
+    colorClass: 'text-violet-500 dark:text-violet-400',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Batch Processing',
+    colorClass: 'text-amber-500 dark:text-amber-400',
+    icon: (
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6" />
+      </svg>
+    ),
+  },
+];
+
+export default function HomePage() {
+  const [activeWorkflow, setActiveWorkflow] = useState<'resume' | 'match'>('resume');
+  const activeSteps = activeWorkflow === 'resume' ? resumeSteps : matchSteps;
+  const isMatch = activeWorkflow === 'match';
 
   return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-4xl mx-auto px-6">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel-subtle text-xs font-medium text-muted mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
-            V.E.M.
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-primary tracking-tight">
-            Welcome to V.E.M.
-          </h1>
-          <p className="text-base text-secondary mt-3 max-w-xl mx-auto leading-relaxed">
-            Vectorize. Extract. Match.
-            <br />
-            <span className="text-muted">Resumes, reimagined. Matches, made.</span>
-          </p>
-        </div>
+    <div className="min-h-screen">
+      <div className="max-w-5xl mx-auto px-6 py-8 md:py-12">
 
-        <div className="flex flex-wrap justify-center gap-4 mb-16">
-          {quickActions.map((action) => (
-            <Link
-              key={action.title}
-              to={action.href}
-              className="glass-card-hover p-5 block group w-full md:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
-            >
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-11 h-11 rounded-xl bg-accent-500/10 dark:bg-accent-500/15 flex items-center justify-center text-accent-600 dark:text-accent-400">
-                  {action.icon}
-                </div>
-                <h3 className="text-sm font-semibold text-primary group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
-                  {action.title}
-                </h3>
-              </div>
-              <p className="text-xs text-muted leading-relaxed">{action.description}</p>
-              <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-muted group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
-                Launch
-                <svg className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <section className="relative overflow-hidden rounded-3xl mb-12 py-16 md:py-24">
+          <div
+            className="absolute top-[-10%] left-[15%] w-80 h-80 md:w-96 md:h-96 bg-accent-400/20 dark:bg-accent-500/10 rounded-full blur-3xl animate-pulse"
+            style={{ animationDuration: '5s' }}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute bottom-[-5%] right-[10%] w-64 h-64 md:w-80 md:h-80 bg-violet-400/15 dark:bg-violet-500/5 rounded-full blur-3xl animate-pulse"
+            style={{ animationDuration: '7s' }}
+            aria-hidden="true"
+          />
+          <div
+            className="absolute top-[30%] right-[40%] w-48 h-48 bg-emerald-400/10 dark:bg-emerald-500/5 rounded-full blur-3xl animate-pulse"
+            style={{ animationDuration: '6s' }}
+            aria-hidden="true"
+          />
 
-        <div>
-          <h2 className="text-sm font-semibold text-primary mb-8 text-center uppercase tracking-wider">
-            How it works
-          </h2>
+          <svg className="absolute inset-0 w-full h-full opacity-[0.04] dark:opacity-[0.03]" aria-hidden="true">
+            <defs>
+              <pattern id="hero-dot-grid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="1" fill="currentColor" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#hero-dot-grid)" />
+          </svg>
 
-          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-0 relative">
-            <div className="hidden md:block absolute top-8 left-[12.5%] right-[12.5%] h-px">
-              <div className="w-full h-full border-t-2 border-dashed border-gray-200 dark:border-dark-border" />
+          <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel-subtle border border-accent-500/20 dark:border-accent-400/20 backdrop-blur-sm text-xs font-medium text-muted mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" />
+              Vectorize · Extract · Match
             </div>
 
-            {steps.map((step, index) => (
-              <div key={step.number} className={`relative text-center px-3 ${(step as any).isConditional ? 'opacity-60' : ''}`}>
-                <div className="flex md:flex-col items-center md:items-center gap-4 md:gap-0">
-                  <div className={`relative z-10 w-16 h-16 md:mb-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    (step as any).isConditional
-                      ? 'bg-white dark:bg-dark-surface border-2 border-dashed border-gray-300 dark:border-dark-border'
-                      : 'bg-white dark:bg-dark-surface border-2 border-accent-200 dark:border-accent-500/30'
-                  }`}>
-                    <span className={`text-lg font-bold ${
-                      (step as any).isConditional
-                        ? 'text-gray-400 dark:text-gray-500 text-base'
-                        : 'text-accent-600 dark:text-accent-400'
-                    }`}>
-                      {step.number}
-                    </span>
-                  </div>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary tracking-tight mb-4">
+              <span className="text-accent-500 dark:text-accent-400">V</span>
+              <span className="text-primary/60 dark:text-primary/40">.</span>
+              <span className="text-accent-500 dark:text-accent-400">E</span>
+              <span className="text-primary/60 dark:text-primary/40">.</span>
+              <span className="text-accent-500 dark:text-accent-400">M</span>
+              <span className="text-primary/60 dark:text-primary/40">.</span>
+            </h1>
 
-                  <div className="text-left md:text-center flex-1 md:flex-initial">
-                    <h3 className="text-sm font-semibold text-primary mb-1">{step.title}</h3>
-                    <p className="text-xs text-muted leading-relaxed">{step.description}</p>
-                    {(step as any).isConditional && (
-                      <p className="text-[10px] text-gray-400 italic mt-1">(if Job Tailoring selected)</p>
-                    )}
+            <p className="text-lg md:text-xl text-secondary font-medium mb-2">
+              Vectorize. Extract. Match.
+            </p>
+            <p className="text-sm md:text-base text-muted mb-8">
+              Resumes, reimagined. Matches, made.
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {statsPills.map((pill) => (
+                <div
+                  key={pill.label}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel-subtle text-xs font-medium text-muted"
+                >
+                  <span className={pill.colorClass}>{pill.icon}</span>
+                  {pill.label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {primaryActions.map((action) => (
+              <Link
+                key={action.title}
+                to={action.href}
+                className={`glass-card-hover p-6 block group relative overflow-hidden border-l-4 ${action.borderColor}`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${action.gradientOverlay} to-transparent pointer-events-none`} aria-hidden="true" />
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${action.iconBg} flex items-center justify-center ${action.iconText}`}>
+                      {action.icon}
+                    </div>
+                    <h3 className={`text-base font-semibold text-primary ${action.hoverText} transition-colors`}>
+                      {action.title}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-muted leading-relaxed mb-4">{action.description}</p>
+                  <div className={`flex items-center gap-1.5 text-sm font-medium ${action.ctaText} group-hover:gap-2.5 transition-all`}>
+                    {action.cta}
+                    <svg className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
                   </div>
                 </div>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-                {index < steps.length - 1 && (
-                  <div className="md:hidden w-px h-6 bg-gray-200 dark:bg-dark-border ml-8 my-2" />
+        <section className="mb-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {secondaryActions.map((action) => (
+              <Link
+                key={action.title}
+                to={action.href}
+                className="glass-card-hover p-5 block group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-10 h-10 rounded-xl ${action.iconBg} flex items-center justify-center ${action.iconText}`}>
+                    {action.icon}
+                  </div>
+                  <h3 className={`text-sm font-semibold text-primary ${action.hoverText} transition-colors`}>
+                    {action.title}
+                  </h3>
+                </div>
+                <p className="text-xs text-muted leading-relaxed mb-3">{action.description}</p>
+                <div className={`flex items-center gap-1.5 text-xs font-medium text-muted ${action.hoverText} transition-colors`}>
+                  Launch
+                  <svg className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="mb-16">
+          <div className="flex items-center gap-4 mb-10">
+            <div className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
+            <h2 className="text-sm font-semibold text-primary uppercase tracking-wider whitespace-nowrap">
+              How It Works
+            </h2>
+            <div className="flex-1 h-px bg-gray-200 dark:bg-dark-border" />
+          </div>
+
+          <div className="flex items-center justify-center mb-8">
+            <div className="inline-flex items-center gap-1 p-1 rounded-2xl glass-panel-subtle border border-gray-200/60 dark:border-dark-border backdrop-blur-sm">
+              <button
+                onClick={() => setActiveWorkflow('resume')}
+                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeWorkflow === 'resume'
+                    ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400 border border-accent-500/30 shadow-sm'
+                    : 'text-muted hover:text-secondary hover:bg-gray-100/60 dark:hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                Resume Enhancement
+              </button>
+              <button
+                onClick={() => setActiveWorkflow('match')}
+                className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeWorkflow === 'match'
+                    ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-500/30 shadow-sm'
+                    : 'text-muted hover:text-secondary hover:bg-gray-100/60 dark:hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                Match Engine
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            {activeSteps.map((step, index) => (
+              <div
+                key={`${activeWorkflow}-${step.number}`}
+                className={`relative flex md:flex-col items-start md:items-center gap-4 ${step.isConditional ? 'opacity-60' : ''}`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${
+                  step.isConditional
+                    ? 'border-2 border-dashed border-gray-300 dark:border-dark-border text-gray-400 dark:text-gray-500 bg-white/50 dark:bg-dark-surface/50'
+                    : isMatch
+                      ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/20'
+                      : 'bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-lg shadow-accent-500/20'
+                }`}>
+                  {step.number}
+                </div>
+
+                <div className="md:text-center flex-1 md:flex-initial">
+                  <h3 className="text-sm font-semibold text-primary mb-1">{step.title}</h3>
+                  <p className="text-xs text-muted leading-relaxed">{step.description}</p>
+                  {step.isConditional && (
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 italic mt-1">(if Job Tailoring selected)</p>
+                  )}
+                </div>
+
+                {index < activeSteps.length - 1 && (
+                  <div className="md:hidden w-px h-6 bg-gray-200 dark:bg-dark-border ml-6 -my-1 absolute -bottom-7 left-0" aria-hidden="true" />
                 )}
               </div>
             ))}
           </div>
+        </section>
 
-          <div className="mt-10 text-center">
-            <Link
-              to="/resume/enhance"
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-accent-500 text-white text-sm font-medium rounded-xl hover:bg-accent-600 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                />
-              </svg>
-              Get Started
-            </Link>
+        <section className="relative mb-8">
+          <div className="absolute inset-0 bg-accent-500/5 dark:bg-accent-500/10 rounded-3xl blur-xl" aria-hidden="true" />
+          <div className="relative glass-card p-8 md:p-10 text-center">
+            <h2 className="text-lg md:text-xl font-semibold text-primary mb-2">
+              Ready to enhance your next resume?
+            </h2>
+            <p className="text-sm text-muted mb-6 max-w-md mx-auto">
+              Start transforming resumes with AI-powered enhancement or find the perfect candidate match for your open positions.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                to="/resume/enhance"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-accent-500 text-white rounded-xl hover:bg-accent-600 transition-colors font-medium text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                  />
+                </svg>
+                Enhance a Resume
+              </Link>
+              <Link
+                to="/resume/match"
+                className="inline-flex items-center gap-2 px-6 py-3 glass-card rounded-xl text-secondary font-medium text-sm hover:text-violet-600 dark:hover:text-violet-400 transition-colors border border-gray-200 dark:border-dark-border hover:border-violet-500/30 dark:hover:border-violet-400/30"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="18" cy="18" r="3" strokeWidth={1.5} />
+                  <circle cx="6" cy="6" r="3" strokeWidth={1.5} />
+                  <circle cx="6" cy="18" r="3" strokeWidth={1.5} />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 9v6m9.35 1.35L8.65 8.65" />
+                </svg>
+                Try Match Engine
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
+
       </div>
-
-      {showContinueModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="glass-card w-full max-w-md p-6">
-            <div className="w-12 h-12 rounded-xl bg-accent-500/10 flex items-center justify-center mb-4">
-              <svg className="w-6 h-6 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold text-primary mb-2">Resume Enhancement In Progress</h3>
-            <p className="text-sm text-muted mb-5">You had a resume enhancement in progress. Would you like to continue where you left off?</p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  sessionStorage.removeItem('resume-enhance-state');
-                  setShowContinueModal(false);
-                }}
-                className="px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-xl hover:bg-white/80 dark:hover:bg-dark-hover transition-colors"
-              >
-                Start Fresh
-              </button>
-              <button
-                onClick={() => {
-                  setShowContinueModal(false);
-                  navigate('/resume/enhance');
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-accent-500 rounded-xl hover:bg-accent-600 transition-colors"
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

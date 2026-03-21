@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
 import { StructuredResume, AISuggestion, ValidationResult } from '../types';
-import { sampleResumes } from '../data/mockResumes';
 import ResumeEditor from '../components/ResumeEditor';
 import OriginalResumeDrawer from '../components/OriginalResumeDrawer';
 import ValidationPanel from '../components/ValidationPanel';
@@ -10,8 +9,8 @@ import { aiService } from '../services/aiService';
 import { pdfExportService } from '../services/pdfExportService';
 
 export default function RecruiterDashboard() {
-  const [resumes] = useState<StructuredResume[]>(sampleResumes);
-  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(resumes[0]?.id || null);
+  const [resumes] = useState<StructuredResume[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [editedResumes, setEditedResumes] = useState<Map<string, StructuredResume>>(new Map());
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
@@ -300,7 +299,8 @@ export default function RecruiterDashboard() {
                     <svg className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <p className="text-sm text-muted">No resumes found</p>
+                    <p className="text-sm text-muted">No resumes loaded</p>
+                    <p className="text-xs text-muted mt-1">Use the Transform page to process resumes.</p>
                   </div>
                 )}
               </div>
@@ -417,10 +417,10 @@ export default function RecruiterDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <h3 className="text-sm font-medium text-secondary mb-1">
-                    No Resume Selected
+                    No Resumes Loaded
                   </h3>
                   <p className="text-xs text-muted">
-                    Select a resume from the list to start reviewing
+                    Use the Transform page to process resumes.
                   </p>
                 </div>
               </div>

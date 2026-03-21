@@ -5,7 +5,7 @@ import {
   ValidationRule,
   ResumeTemplate,
 } from '../types';
-import { getDefaultTemplate } from '../data/mockTemplates';
+import { getDefaultTemplate } from '../data/defaultTemplateConfig';
 
 const ACTION_VERBS = [
   'Achieved', 'Administered', 'Analyzed', 'Architected', 'Automated',
