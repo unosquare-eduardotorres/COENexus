@@ -60,7 +60,7 @@ export default function StepperBar<K extends string>({
                   )}
                 </div>
                 <span
-                  className={`text-[11px] font-medium text-center leading-tight hidden sm:block ${
+                  className={`text-xs font-medium text-center leading-tight hidden sm:block ${
                     isActive
                       ? 'text-primary'
                       : isCompleted
@@ -75,7 +75,7 @@ export default function StepperBar<K extends string>({
                     <span className="w-3 h-3 text-accent-500 flex-shrink-0">
                       {summary.icon}
                     </span>
-                    <span className="text-[10px] font-medium text-primary truncate">
+                    <span className="text-xs font-medium text-primary truncate" title={summary.label}>
                       {summary.label}
                     </span>
                   </div>

@@ -41,11 +41,11 @@ export default function VectorizingAnimation({
           Vectorizing {processedCount} / {totalCount}
         </p>
         {currentRecord && (
-          <p className="text-xs text-muted animate-pulse truncate max-w-xs">
+          <p className="text-xs text-muted animate-pulse truncate max-w-xs" title={currentRecord}>
             Processing: {currentRecord}
           </p>
         )}
-        <p className="text-[10px] text-muted mt-2">
+        <p className="text-xs text-muted mt-2">
           Voyage AI · 1536-dim embeddings
         </p>
       </div>

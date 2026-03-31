@@ -240,7 +240,7 @@ export default function ExternalResumeUploader({ onNext, initialResumes = [] }: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-primary truncate">{resume.name}</p>
+                        <p className="text-sm font-medium text-primary truncate" title={resume.name}>{resume.name}</p>
                         <p className="text-xs text-muted">{formatFileSize(resume.file.size)}</p>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">

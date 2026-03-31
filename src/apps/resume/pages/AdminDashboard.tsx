@@ -19,6 +19,8 @@ import { getMatchPrompts, saveMatchPrompt, resetMatchPrompt, resetAllMatchPrompt
 import { aiService } from '../services/aiService';
 import { vectorizationConfigService } from '../services/vectorizationConfigService';
 import DatabaseSharingPanel from '../components/settings/DatabaseSharingPanel';
+import ConfirmModal from '../components/datasync/ConfirmModal';
+import { ChevronIcon } from '../components/shared/icons';
 
 interface AdminDashboardProps {
   onNavigateToResume: (resumeId: string) => void;
@@ -45,6 +47,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
   const [voyageKeyConfigured, setVoyageKeyConfigured] = useState(false);
   const [voyageKeyMasked, setVoyageKeyMasked] = useState('');
   const [voyageKeySource, setVoyageKeySource] = useState('');
+  const [confirmAction, setConfirmAction] = useState<'reset-template' | 'reset-prompts' | null>(null);
 
   const handleSaveTemplate = useCallback(() => {
     setSaveStatus('saving');
@@ -56,11 +59,26 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
   }, [template]);
 
   const handleResetTemplate = useCallback(() => {
-    if (confirm('Are you sure you want to reset to the default template? This cannot be undone.')) {
+    setConfirmAction('reset-template');
+  }, []);
+
+  const handleConfirmAction = useCallback(() => {
+    if (confirmAction === 'reset-template') {
       const defaultTemplate = resetTemplate();
       setTemplate(defaultTemplate);
     }
-  }, []);
+    if (confirmAction === 'reset-prompts') {
+      const defaults = resetAllPrompts();
+      setPrompts(defaults);
+      setExpandedPromptId(null);
+      setEditingPromptId(null);
+      const defaultMatchPrompts = resetAllMatchPrompts();
+      setMatchPrompts(defaultMatchPrompts);
+      setExpandedMatchPromptId(null);
+      setEditingMatchPromptId(null);
+    }
+    setConfirmAction(null);
+  }, [confirmAction]);
 
   const updateValidationRule = useCallback(
     (ruleId: string, updates: Partial<ValidationRule>) => {
@@ -157,13 +175,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
   }, []);
 
   const handleResetAllPrompts = useCallback(() => {
-    if (confirm('Are you sure you want to reset all prompts to defaults? Custom changes will be lost.')) {
-      const defaults = resetAllPrompts();
-      setPrompts(defaults);
-      setExpandedPromptId(null);
-      setEditingPromptId(null);
-      handleResetAllMatchPrompts();
-    }
+    setConfirmAction('reset-prompts');
   }, []);
 
   const handleToggleMatchPromptExpand = useCallback((promptId: string) => {
@@ -196,13 +208,6 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
         setTimeout(() => setSaveStatus('idle'), 2000);
       }, 500);
     }
-  }, []);
-
-  const handleResetAllMatchPrompts = useCallback(() => {
-    const defaults = resetAllMatchPrompts();
-    setMatchPrompts(defaults);
-    setExpandedMatchPromptId(null);
-    setEditingMatchPromptId(null);
   }, []);
 
   const handleTemplateUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,7 +421,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span
-                        className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                        className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                           rule.severity === 'error'
                             ? 'bg-red-100/80 dark:bg-red-500/20 text-red-600 dark:text-red-400'
                             : 'bg-amber-100/80 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
@@ -424,7 +429,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       >
                         {rule.severity}
                       </span>
-                      <span className="px-2 py-0.5 text-[10px] font-medium bg-gray-100/80 dark:bg-dark-muted/30 text-gray-600 dark:text-gray-400 rounded-full">
+                      <span className="px-2 py-0.5 text-xs font-medium bg-gray-100/80 dark:bg-dark-muted/30 text-gray-700 dark:text-gray-300 rounded-full">
                         {rule.type}
                       </span>
                     </div>
@@ -498,7 +503,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
                         <h4 className="text-sm font-medium text-primary">{guideline.name}</h4>
-                        <span className="px-2 py-0.5 text-[10px] font-medium bg-gray-100/80 dark:bg-dark-muted/30 text-muted rounded-full">
+                        <span className="px-2 py-0.5 text-xs font-medium bg-gray-100/80 dark:bg-dark-muted/30 text-muted rounded-full">
                           {guideline.category}
                         </span>
                       </div>
@@ -513,7 +518,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                             >
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <span className="text-[10px] font-medium text-red-500 dark:text-red-400 uppercase">
+                                  <span className="text-xs font-medium text-red-500 dark:text-red-400 uppercase">
                                     Avoid
                                   </span>
                                   <p className="text-xs text-secondary mt-0.5 line-through">
@@ -521,13 +526,13 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                                   </p>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] font-medium text-emerald-500 dark:text-emerald-400 uppercase">
+                                  <span className="text-xs font-medium text-emerald-500 dark:text-emerald-400 uppercase">
                                     Preferred
                                   </span>
                                   <p className="text-xs text-secondary mt-0.5">{example.good}</p>
                                 </div>
                               </div>
-                              <p className="text-[10px] text-muted mt-1.5 italic">
+                              <p className="text-xs text-muted mt-1.5 italic">
                                 {example.explanation}
                               </p>
                             </div>
@@ -569,14 +574,13 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-primary">{prompt.name}</h4>
-                        <p className="text-xs text-muted truncate">{prompt.description}</p>
+                        <p className="text-xs text-muted truncate" title={prompt.description}>{prompt.description}</p>
                       </div>
-                      <svg
-                        className={`w-4 h-4 text-muted transition-transform ${expandedPromptId === prompt.id ? 'rotate-180' : ''}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ChevronIcon
+                        size="sm"
+                        direction={expandedPromptId === prompt.id ? 'up' : 'down'}
+                        className="text-muted transition-transform"
+                      />
                     </button>
 
                     {expandedPromptId === prompt.id && (
@@ -603,7 +607,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                           {prompt.variables.map((variable) => (
                             <span
                               key={variable}
-                              className="px-2 py-0.5 text-[10px] font-medium bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400 rounded-full"
+                              className="px-2 py-0.5 text-xs font-medium bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400 rounded-full"
                             >
                               {`{{${variable}}}`}
                             </span>
@@ -675,17 +679,16 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-primary">{prompt.name}</h4>
-                        <p className="text-xs text-muted truncate">{prompt.description}</p>
+                        <p className="text-xs text-muted truncate" title={prompt.description}>{prompt.description}</p>
                       </div>
-                      <span className="px-2 py-0.5 text-[10px] font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full">
+                      <span className="px-2 py-0.5 text-xs font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full">
                         {`${prompt.maxTokens} tok • ${prompt.temperature} temp`}
                       </span>
-                      <svg
-                        className={`w-4 h-4 text-muted transition-transform ${expandedMatchPromptId === prompt.id ? 'rotate-180' : ''}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ChevronIcon
+                        size="sm"
+                        direction={expandedMatchPromptId === prompt.id ? 'up' : 'down'}
+                        className="text-muted transition-transform"
+                      />
                     </button>
 
                     {expandedMatchPromptId === prompt.id && (
@@ -693,7 +696,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                         {prompt.key === 'opus-analysis' && prompt.contextBlocks ? (
                           <>
                             <div>
-                              <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Base Prompt</label>
+                              <label className="block text-xs font-medium text-muted mb-1 uppercase">Base Prompt</label>
                               <textarea
                                 value={prompt.promptTemplate}
                                 onChange={(e) => {
@@ -714,7 +717,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-medium text-muted mb-2 uppercase">Context Blocks</label>
+                              <label className="block text-xs font-medium text-muted mb-2 uppercase">Context Blocks</label>
                               <div className="flex gap-1 mb-2">
                                 <button
                                   onClick={() => setActiveContextTab('matchEngine')}
@@ -780,7 +783,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Max Tokens</label>
+                            <label className="block text-xs font-medium text-muted mb-1 uppercase">Max Tokens</label>
                             <input
                               type="number"
                               value={prompt.maxTokens}
@@ -802,7 +805,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-medium text-muted mb-1 uppercase">Temperature</label>
+                            <label className="block text-xs font-medium text-muted mb-1 uppercase">Temperature</label>
                             <input
                               type="number"
                               value={prompt.temperature}
@@ -836,7 +839,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                           ).map((variable) => (
                             <span
                               key={variable}
-                              className="px-2 py-0.5 text-[10px] font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full"
+                              className="px-2 py-0.5 text-xs font-medium bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 rounded-full"
                             >
                               {`{{${variable}}}`}
                             </span>
@@ -932,7 +935,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-primary">Cloud API</span>
-                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">In Development</span>
+                        <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">In Development</span>
                       </div>
                       <p className="text-xs text-muted">Connect to Anthropic's API</p>
                     </div>
@@ -1013,10 +1016,10 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       description: 'Highest quality and deepest reasoning. Best for complex analysis tasks.',
                       strengths: ['Deepest reasoning', 'Highest accuracy', 'Complex tasks'],
                       isRecommended: false,
-                      selectedBorder: 'border-purple-500 bg-purple-50/40 dark:bg-purple-500/10',
-                      badgeStyle: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400',
-                      iconSelectedColor: 'text-purple-500',
-                      checkColor: 'text-purple-500',
+                      selectedBorder: 'border-violet-500 bg-violet-50/40 dark:bg-violet-500/10',
+                      badgeStyle: 'bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400',
+                      iconSelectedColor: 'text-violet-500',
+                      checkColor: 'text-violet-500',
                     },
                     {
                       id: 'claude-haiku-4-20250414',
@@ -1055,13 +1058,13 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                           )}
                           <span className="text-sm font-semibold text-primary">{model.name}</span>
                         </div>
-                        <span className={`inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded-full mb-2 ${model.badgeStyle}`}>
+                        <span className={`inline-block px-1.5 py-0.5 text-xs font-semibold rounded-full mb-2 ${model.badgeStyle}`}>
                           {model.badge}
                         </span>
-                        <p className="text-[11px] text-muted leading-relaxed mb-2.5">{model.description}</p>
+                        <p className="text-xs text-muted leading-relaxed mb-2.5">{model.description}</p>
                         <div className="flex flex-wrap gap-1">
                           {model.strengths.map((s) => (
-                            <span key={s} className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
+                            <span key={s} className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
                               {s}
                             </span>
                           ))}
@@ -1098,7 +1101,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                     }
                     className="w-full accent-accent-500"
                   />
-                  <div className="flex justify-between text-[10px] text-muted mt-1">
+                  <div className="flex justify-between text-xs text-muted mt-1">
                     <span>Precise</span>
                     <span>Creative</span>
                   </div>
@@ -1147,7 +1150,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-primary truncate">{outputTemplateName}</p>
+                  <p className="text-sm font-medium text-primary truncate" title={outputTemplateName}>{outputTemplateName}</p>
                   <p className="text-xs text-muted">Active template</p>
                 </div>
               </div>
@@ -1196,7 +1199,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       Configured: <span className="font-mono">{voyageKeyMasked}</span>
                     </span>
                     {voyageKeySource && (
-                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-200/60 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                      <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-200/60 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
                         via {voyageKeySource}
                       </span>
                     )}
@@ -1209,14 +1212,14 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                   </svg>
                   <div>
                     <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Not configured</p>
-                    <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-0.5">
+                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5">
                       Set the <code className="font-mono bg-amber-100 dark:bg-amber-500/10 px-1 rounded">Voyage__ApiKey</code> environment variable
                     </p>
                   </div>
                 </div>
               )}
 
-              <p className="text-[11px] text-muted mt-3 flex items-center gap-1.5">
+              <p className="text-xs text-muted mt-3 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
@@ -1300,13 +1303,13 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                         )}
                         <span className="text-sm font-semibold text-primary">{model.name}</span>
                       </div>
-                      <span className={`inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded-full mb-2 ${model.badgeStyle}`}>
+                      <span className={`inline-block px-1.5 py-0.5 text-xs font-semibold rounded-full mb-2 ${model.badgeStyle}`}>
                         {model.badge}
                       </span>
-                      <p className="text-[11px] text-muted leading-relaxed mb-2.5">{model.description}</p>
+                      <p className="text-xs text-muted leading-relaxed mb-2.5">{model.description}</p>
                       <div className="flex flex-wrap gap-1">
                         {model.strengths.map((s) => (
-                          <span key={s} className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
+                          <span key={s} className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
                             {s}
                           </span>
                         ))}
@@ -1329,7 +1332,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                 <svg className="w-4 h-4 text-violet-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-[11px] text-muted leading-relaxed">
+                <p className="text-xs text-muted leading-relaxed">
                   All Voyage 4 models produce compatible embeddings in a shared space. You can embed resumes with
                   voyage-4-large for quality, then swap JD-side to voyage-4-lite for speed — without re-embedding
                   any profiles.
@@ -1386,13 +1389,20 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
               </button>
             </div>
           </div>
+          <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {saveStatus === 'saving'
+              ? 'Saving settings.'
+              : saveStatus === 'saved'
+              ? 'Settings saved.'
+              : `Viewing ${activeTab.replace('-', ' ')} settings.`}
+          </div>
         </div>
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-6">
         <div className="flex gap-5">
-          <nav className="w-56 flex-shrink-0">
-            <div className="glass-card overflow-hidden">
+          <nav className="w-56 flex-shrink-0" aria-label="Settings sections">
+            <div className="glass-card overflow-hidden" role="tablist" aria-orientation="vertical">
               {[
                 { id: 'template', label: 'Template Structure', icon: (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1437,6 +1447,12 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
               ].map((tab) => (
                 <button
                   key={tab.id}
+                  id={`admin-tab-${tab.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`admin-tabpanel-${tab.id}`}
+                  tabIndex={0}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all text-sm ${
                     activeTab === tab.id
@@ -1451,9 +1467,38 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
             </div>
           </nav>
 
-          <main className="flex-1">{renderTabContent()}</main>
+          <main
+            className="flex-1"
+            id={`admin-tabpanel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`admin-tab-${activeTab}`}
+          >
+            {renderTabContent()}
+          </main>
         </div>
       </div>
+      {confirmAction === 'reset-template' && (
+        <ConfirmModal
+          title="Reset Template?"
+          message="Are you sure you want to reset to the default template? This cannot be undone."
+          confirmLabel="Reset Template"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+      {confirmAction === 'reset-prompts' && (
+        <ConfirmModal
+          title="Reset All Prompts?"
+          message="Are you sure you want to reset all prompts to defaults? Custom changes will be lost."
+          confirmLabel="Reset Prompts"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }

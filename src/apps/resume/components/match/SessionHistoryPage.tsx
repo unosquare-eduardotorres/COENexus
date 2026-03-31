@@ -139,10 +139,10 @@ export default function SessionHistoryPage({ sessions, onLoadSession, onBack }: 
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2.5">
-                      <h3 className="text-sm font-semibold text-primary truncate group-hover:text-accent-500 transition-colors">
+                      <h3 className="text-sm font-semibold text-primary truncate group-hover:text-accent-500 transition-colors" title={session.name}>
                         {session.name}
                       </h3>
-                      <span className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${statusStyle.bg}`}>
+                      <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md ${statusStyle.bg}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
                         {session.status}
                       </span>
@@ -175,7 +175,7 @@ export default function SessionHistoryPage({ sessions, onLoadSession, onBack }: 
                         )}
                       </div>
                     )}
-                    <span className="text-[10px] text-muted/60">{formatFullDate(session.createdAt)}</span>
+                    <span className="text-xs text-muted/60">{formatFullDate(session.createdAt)}</span>
                   </div>
                 </div>
               </button>

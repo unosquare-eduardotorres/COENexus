@@ -84,7 +84,7 @@ const MODES: ModeOption[] = [
     description: 'The complete pipeline. Vector search → Haiku triage → Claude Sonnet deep analysis with fit narratives, skill gaps, leadership assessment, and risk factors.',
     defaultTopN: 10,
     topNEditable: false,
-    gradient: 'from-violet-500 to-purple-500',
+    gradient: 'from-violet-500 to-violet-500',
     stages: ['Vector DB', 'Haiku AI', 'Sonnet Deep Analysis'],
     icon: (
       <svg className="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -153,7 +153,7 @@ export default function SearchDepthStep({ onNext, initialMode }: SearchDepthStep
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base font-semibold text-primary">{mode.title}</h3>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${mode.badgeClass}`}>
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-md ${mode.badgeClass}`}>
                       {mode.badge}
                     </span>
                     {isSelected && (
@@ -168,7 +168,7 @@ export default function SearchDepthStep({ onNext, initialMode }: SearchDepthStep
 
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {mode.stages.map((stage) => (
-                      <span key={stage} className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      <span key={stage} className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         isSelected
                           ? 'bg-accent-500/15 text-accent-500'
                           : 'bg-gray-200/20 dark:bg-dark-border/20 text-muted'
@@ -225,7 +225,7 @@ export default function SearchDepthStep({ onNext, initialMode }: SearchDepthStep
                     {option.tier}
                   </div>
                   <div className="text-lg font-bold text-primary mt-1">{option.label}</div>
-                  <div className="text-[11px] text-muted mt-0.5">{option.description}</div>
+                  <div className="text-xs text-muted mt-0.5">{option.description}</div>
                 </button>
               );
             })}

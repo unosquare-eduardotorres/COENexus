@@ -38,7 +38,7 @@ const primaryActions = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 9v6m9.35 1.35L8.65 8.65" />
       </svg>
     ),
-    iconBg: 'from-violet-500/15 to-purple-600/10 dark:from-violet-500/20 dark:to-purple-600/15',
+    iconBg: 'from-violet-500/15 to-violet-600/10 dark:from-violet-500/20 dark:to-violet-600/15',
     iconText: 'text-violet-600 dark:text-violet-400',
     borderColor: 'border-violet-500 dark:border-violet-400',
     gradientOverlay: 'from-violet-500/5 dark:from-violet-500/10',
@@ -335,13 +335,13 @@ export default function HomePage() {
             {activeSteps.map((step, index) => (
               <div
                 key={`${activeWorkflow}-${step.number}`}
-                className={`relative flex md:flex-col items-start md:items-center gap-4 ${step.isConditional ? 'opacity-60' : ''}`}
+                className={`relative flex md:flex-col items-start md:items-center gap-4 ${step.isConditional ? 'opacity-75' : ''}`}
               >
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${
                   step.isConditional
                     ? 'border-2 border-dashed border-gray-300 dark:border-dark-border text-gray-400 dark:text-gray-500 bg-white/50 dark:bg-dark-surface/50'
                     : isMatch
-                      ? 'bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/20'
+                      ? 'bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-lg shadow-violet-500/20'
                       : 'bg-gradient-to-br from-accent-500 to-accent-600 text-white shadow-lg shadow-accent-500/20'
                 }`}>
                   {step.number}
@@ -351,7 +351,7 @@ export default function HomePage() {
                   <h3 className="text-sm font-semibold text-primary mb-1">{step.title}</h3>
                   <p className="text-xs text-muted leading-relaxed">{step.description}</p>
                   {step.isConditional && (
-                    <p className="text-[10px] text-gray-400 dark:text-gray-500 italic mt-1">(if Job Tailoring selected)</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-1">(if Job Tailoring selected)</p>
                   )}
                 </div>
 

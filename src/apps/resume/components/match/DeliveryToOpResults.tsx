@@ -75,12 +75,12 @@ export default function DeliveryToOpResults({
           <div className="text-xs text-muted">
             {employee.seniority} · {employee.mainSkill} · {employee.country}
             {employee.isBench && (
-              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
+              <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
                 Bench
               </span>
             )}
             {employee.isBench === false && (
-              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 Active
               </span>
             )}
@@ -103,14 +103,14 @@ export default function DeliveryToOpResults({
             >
               <span className="text-sm font-mono text-muted w-6">#{idx + 1}</span>
               <ScoreRing score={match.matchScore} size={48} />
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                 {pos.account.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-primary truncate">{match.positionLabel}</span>
+                  <span className="text-sm font-medium text-primary truncate" title={match.positionLabel}>{match.positionLabel}</span>
                   {verdictConfig && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
                       {verdictConfig.icon} {verdictConfig.label}
                     </span>
                   )}
@@ -118,9 +118,9 @@ export default function DeliveryToOpResults({
                 <div className="text-xs text-muted mt-0.5">
                   {pos.account} · {pos.coe} · {pos.mainSkill}
                 </div>
-                <div className="text-xs text-muted mt-1 truncate">
+                <div className="text-xs text-muted mt-1 truncate" title={match.summary || undefined}>
                   {match.summary?.includes('AI analysis unavailable') && (
-                    <span className="mr-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <span className="mr-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                       Cosine Only
                     </span>
                   )}

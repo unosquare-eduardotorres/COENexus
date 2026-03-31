@@ -24,7 +24,7 @@ function SkillRow({ skill }: { skill: SkillMatch }) {
       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusDotColor(skill.status)}`} />
       <span className="text-sm text-primary flex-1">{skill.name}</span>
       <span className="text-xs font-mono text-muted">{skill.years}y</span>
-      <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(skill.status)}`}>
+      <span className={`text-xs font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(skill.status)}`}>
         {getStatusLabel(skill.status)}
       </span>
     </div>
@@ -100,7 +100,7 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-xl font-bold text-primary">{candidate.name}</h2>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${typeBadge}`}>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${typeBadge}`}>
                 {candidate.type}
               </span>
             </div>
@@ -313,13 +313,13 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
                             if (!tierItems.length) return null;
                             return (
                               <div key={tier} className="mb-3 last:mb-0">
-                                <span className="text-[10px] uppercase tracking-wide text-muted">{PRIORITY_LABELS[tier]}</span>
+                                <span className="text-xs uppercase tracking-wide text-muted">{PRIORITY_LABELS[tier]}</span>
                                 <ul className="space-y-1.5 mt-1">
                                   {tierItems.map((item, idx) => (
                                     <li key={idx} className="flex items-center gap-2">
                                       <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotColor(item.status)}`} />
                                       <span className="text-xs text-muted flex-1">{item.label}</span>
-                                      <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
+                                      <span className={`text-xs font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
                                         {getStatusLabel(item.status)}
                                       </span>
                                     </li>
@@ -341,7 +341,7 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
                             <li key={idx} className="flex items-center gap-2">
                               <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotColor(item.status)}`} />
                               <span className="text-xs text-muted flex-1">{item.label}</span>
-                              <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
+                              <span className={`text-xs font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(item.status)}`}>
                                 {getStatusLabel(item.status)}
                               </span>
                             </li>
@@ -398,7 +398,7 @@ export default function CandidateProfile({ candidate, onBack }: CandidateProfile
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="font-semibold text-primary">{gap.skill}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                    className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
                       gap.severity === 'high'
                         ? 'bg-red-500/10 text-red-500'
                         : gap.severity === 'medium'

@@ -80,8 +80,13 @@ export default function AppCard(props: AppCardProps) {
   }
 
   return (
-    <div className="glass-card p-6 relative overflow-hidden opacity-60 cursor-not-allowed">
+    <button
+      type="button"
+      disabled
+      aria-disabled="true"
+      className="glass-card p-6 relative overflow-hidden opacity-60 cursor-not-allowed appearance-none bg-transparent border-none text-left w-full"
+    >
       <CardContent {...props} />
-    </div>
+    </button>
   );
 }

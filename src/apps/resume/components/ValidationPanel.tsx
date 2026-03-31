@@ -1,5 +1,7 @@
 import { ValidationResult, ValidationStatus } from '../types';
 
+type ValidationFilterType = 'warning' | 'improvement' | 'valid' | null;
+
 interface ValidationPanelProps {
   results: ValidationResult[];
   completeness: {
@@ -9,17 +11,28 @@ interface ValidationPanelProps {
     missingFields: string[];
   };
   onFieldClick?: (field: string) => void;
+  activeFilter: ValidationFilterType;
+  onFilterChange: (filter: ValidationFilterType) => void;
 }
 
 export default function ValidationPanel({
   results,
   completeness,
   onFieldClick,
+  activeFilter,
+  onFilterChange,
 }: ValidationPanelProps) {
-  const errors = results.filter((r) => r.status === 'error');
-  const warnings = results.filter((r) => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning');
-  const improvements = results.filter((r) => r.status !== 'valid' && r.status !== 'error' && r.category === 'improvement');
+  const allWarnings = results.filter(
+    (r) => r.status !== 'valid' && r.category === 'warning'
+  );
+  const improvements = results.filter(
+    (r) => r.status !== 'valid' && r.category === 'improvement'
+  );
   const valid = results.filter((r) => r.status === 'valid');
+
+  const filteredWarnings = activeFilter === null || activeFilter === 'warning' ? allWarnings : [];
+  const filteredImprovements = activeFilter === null || activeFilter === 'improvement' ? improvements : [];
+  const filteredValid = activeFilter === null || activeFilter === 'valid' ? valid : [];
 
   const getStatusIcon = (status: ValidationStatus, category?: 'warning' | 'improvement') => {
     switch (status) {
@@ -90,12 +103,12 @@ export default function ValidationPanel({
   return (
     <div className="glass-card overflow-hidden">
       <div className="p-4 border-b border-gray-200/30 dark:border-dark-border/30">
-        <h3 className="text-sm font-semibold text-primary mb-4">Validation & Completeness</h3>
+        <h3 className="text-base font-semibold text-primary mb-4">Validation & Completeness</h3>
 
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-medium text-muted">Completeness</span>
-            <span className="text-xs font-semibold text-primary">{completeness.percentage}%</span>
+            <span className="text-sm font-medium text-muted">Completeness</span>
+            <span className="text-sm font-semibold text-primary">{completeness.percentage}%</span>
           </div>
           <div className="w-full h-2 bg-gray-100/50 dark:bg-dark-hover/50 rounded-full overflow-hidden">
             <div
@@ -103,30 +116,51 @@ export default function ValidationPanel({
               style={{ width: `${completeness.percentage}%` }}
             />
           </div>
-          <p className="text-[10px] text-muted mt-1">
+          <p className="text-xs text-muted mt-1">
             {completeness.filledFields} of {completeness.totalFields} required fields filled
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2.5 bg-amber-50/50 dark:bg-amber-500/10 rounded-xl">
-            <span className="text-xl font-semibold text-amber-600 dark:text-amber-400">{errors.length + warnings.length}</span>
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">Warnings</p>
-          </div>
-          <div className="text-center p-2.5 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-xl">
-            <span className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">{improvements.length}</span>
-            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">Improvements</p>
-          </div>
-          <div className="text-center p-2.5 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-xl">
-            <span className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{valid.length}</span>
-            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Valid</p>
-          </div>
+        <div className="grid grid-cols-3 gap-3">
+          <button
+            onClick={() => onFilterChange(activeFilter === 'warning' ? null : 'warning')}
+            className={`text-center p-3 rounded-xl transition-all cursor-pointer ${
+              activeFilter === 'warning'
+                ? 'ring-2 ring-amber-500 bg-amber-100/70 dark:bg-amber-500/20'
+                : 'bg-amber-50/50 dark:bg-amber-500/10 hover:bg-amber-100/50 dark:hover:bg-amber-500/15'
+            }`}
+          >
+            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{allWarnings.length}</span>
+            <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mt-1">Warnings</p>
+          </button>
+          <button
+            onClick={() => onFilterChange(activeFilter === 'improvement' ? null : 'improvement')}
+            className={`text-center p-3 rounded-xl transition-all cursor-pointer ${
+              activeFilter === 'improvement'
+                ? 'ring-2 ring-indigo-500 bg-indigo-100/70 dark:bg-indigo-500/20'
+                : 'bg-indigo-50/50 dark:bg-indigo-500/10 hover:bg-indigo-100/50 dark:hover:bg-indigo-500/15'
+            }`}
+          >
+            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{improvements.length}</span>
+            <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mt-1">Improvements</p>
+          </button>
+          <button
+            onClick={() => onFilterChange(activeFilter === 'valid' ? null : 'valid')}
+            className={`text-center p-3 rounded-xl transition-all cursor-pointer ${
+              activeFilter === 'valid'
+                ? 'ring-2 ring-emerald-500 bg-emerald-100/70 dark:bg-emerald-500/20'
+                : 'bg-emerald-50/50 dark:bg-emerald-500/10 hover:bg-emerald-100/50 dark:hover:bg-emerald-500/15'
+            }`}
+          >
+            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{valid.length}</span>
+            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mt-1">Valid</p>
+          </button>
         </div>
       </div>
 
       {completeness.missingFields.length > 0 && (
         <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30 bg-red-50/30 dark:bg-red-500/5">
-          <h4 className="text-xs font-medium text-red-600 dark:text-red-400 mb-1.5 flex items-center gap-1.5">
+          <h4 className="text-sm font-medium text-red-600 dark:text-red-400 mb-1.5 flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
@@ -138,7 +172,7 @@ export default function ValidationPanel({
           </h4>
           <ul className="space-y-0.5">
             {completeness.missingFields.map((field, index) => (
-              <li key={index} className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5">
+              <li key={index} className="text-sm text-red-600 dark:text-red-400 flex items-center gap-1.5">
                 <span className="w-1 h-1 rounded-full bg-red-400" />
                 {field}
               </li>
@@ -148,32 +182,9 @@ export default function ValidationPanel({
       )}
 
       <div className="max-h-80 overflow-y-auto">
-        {errors.length > 0 && (
+        {filteredWarnings.length > 0 && (
           <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30">
-            <h4 className="text-xs font-medium text-red-600 dark:text-red-400 mb-2">Errors</h4>
-            <div className="space-y-1.5">
-              {errors.map((result, index) => (
-                <div
-                  key={`error-${index}`}
-                  onClick={() => onFieldClick?.(result.field)}
-                  className="flex items-start gap-2 p-2 bg-red-50/50 dark:bg-red-500/10 rounded-lg cursor-pointer hover:bg-red-100/50 dark:hover:bg-red-500/15 transition-colors"
-                >
-                  {getStatusIcon(result.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-red-700 dark:text-red-300">
-                      {formatFieldName(result.field)}
-                    </p>
-                    <p className="text-[10px] text-red-600 dark:text-red-400 mt-0.5">{result.message}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {warnings.length > 0 && (
-          <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30">
-            <h4 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
+            <h4 className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
@@ -184,7 +195,7 @@ export default function ValidationPanel({
               Warnings
             </h4>
             <div className="space-y-1.5">
-              {warnings.map((result, index) => (
+              {filteredWarnings.map((result, index) => (
                 <div
                   key={`warning-${index}`}
                   onClick={() => onFieldClick?.(result.field)}
@@ -192,10 +203,10 @@ export default function ValidationPanel({
                 >
                   {getStatusIcon(result.status, 'warning')}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                       {formatFieldName(result.field)}
                     </p>
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">{result.message}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{result.message}</p>
                   </div>
                 </div>
               ))}
@@ -203,16 +214,16 @@ export default function ValidationPanel({
           </div>
         )}
 
-        {improvements.length > 0 && (
+        {filteredImprovements.length > 0 && (
           <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30">
-            <h4 className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5">
+            <h4 className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5">
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
               </svg>
               Improvements
             </h4>
             <div className="space-y-1.5">
-              {improvements.map((result, index) => (
+              {filteredImprovements.map((result, index) => (
                 <div
                   key={`improvement-${index}`}
                   onClick={() => onFieldClick?.(result.field)}
@@ -220,10 +231,10 @@ export default function ValidationPanel({
                 >
                   {getStatusIcon(result.status, 'improvement')}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                    <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
                       {formatFieldName(result.field)}
                     </p>
-                    <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">{result.message}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">{result.message}</p>
                   </div>
                 </div>
               ))}
@@ -231,21 +242,21 @@ export default function ValidationPanel({
           </div>
         )}
 
-        {valid.length > 0 && (
+        {filteredValid.length > 0 && (
           <div className="p-3">
-            <h4 className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-2">Valid Sections</h4>
+            <h4 className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-2">Valid Sections</h4>
             <div className="space-y-1.5">
-              {valid.map((result, index) => (
+              {filteredValid.map((result, index) => (
                 <div
                   key={`valid-${index}`}
                   className="flex items-center gap-2 p-2 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-lg"
                 >
                   {getStatusIcon(result.status)}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
                       {formatFieldName(result.field)}
                     </p>
-                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">{result.message}</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{result.message}</p>
                   </div>
                 </div>
               ))}

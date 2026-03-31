@@ -21,10 +21,10 @@ export default function FitVerdictSummary({ summary, fitVerdict, variant = 'bloc
   if (variant === 'inline') {
     return (
       <span className="inline-flex items-center gap-1.5">
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide ${config.classes}`}>
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide ${config.classes}`}>
           {config.icon} {config.label}
         </span>
-        <span className="truncate">{reasoning}</span>
+        <span className="truncate" title={reasoning}>{reasoning}</span>
       </span>
     );
   }

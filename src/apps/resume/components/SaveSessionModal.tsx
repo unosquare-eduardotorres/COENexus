@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useId } from 'react';
 
 interface SaveSessionModalProps {
   defaultName: string;
@@ -15,6 +15,9 @@ export default function SaveSessionModal({
 }: SaveSessionModalProps) {
   const [sessionName, setSessionName] = useState(defaultName);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const inputId = useId();
 
   useEffect(() => {
     if (inputRef.current) {
@@ -38,14 +41,25 @@ export default function SaveSessionModal({
     }
   };
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && !isSaving) {
+      onCancel();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
-      onClick={() => !isSaving && onCancel()}
+      onClick={handleBackdropClick}
+      role="presentation"
     >
       <div
         className="glass-card w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
       >
         <form onSubmit={handleSubmit}>
           <div className="flex items-start gap-4">
@@ -55,20 +69,20 @@ export default function SaveSessionModal({
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold text-primary">Save Session</h3>
-              <p className="text-sm text-secondary mt-1.5 leading-relaxed">
+              <h3 id={titleId} className="text-lg font-semibold text-primary">Save Session</h3>
+              <p id={descriptionId} className="text-sm text-secondary mt-1.5 leading-relaxed">
                 Name this session before enhancing. The enhanced resume will be saved automatically.
               </p>
             </div>
           </div>
 
           <div className="mt-5">
-            <label htmlFor="session-name" className="block text-sm font-medium text-secondary mb-1.5">
+            <label htmlFor={inputId} className="block text-sm font-medium text-secondary mb-1.5">
               Session Name
             </label>
             <input
               ref={inputRef}
-              id="session-name"
+              id={inputId}
               type="text"
               value={sessionName}
               onChange={(e) => setSessionName(e.target.value)}

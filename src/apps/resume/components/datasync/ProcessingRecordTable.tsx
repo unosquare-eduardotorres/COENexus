@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ProcessingRecord, ProcessingRecordStatus } from '../../types';
+import { SearchIcon } from '../shared/icons';
 
 interface ProcessingRecordTableProps {
   records: ProcessingRecord[];
@@ -15,7 +16,7 @@ const STATUS_LABELS: Record<ProcessingRecordStatus, string> = {
 };
 
 const STATUS_CLASSES: Record<ProcessingRecordStatus, string> = {
-  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-400',
+  pending: 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-300',
   downloading: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 animate-pulse',
   extracting: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400 animate-pulse',
   vectorizing: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400 animate-pulse',
@@ -38,14 +39,7 @@ export default function ProcessingRecordTable({ records }: ProcessingRecordTable
     <div className="glass-card overflow-x-auto">
       <div className="p-4 border-b border-gray-100 dark:border-dark-border/30 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <SearchIcon size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             value={searchQuery}
@@ -108,7 +102,10 @@ export default function ProcessingRecordTable({ records }: ProcessingRecordTable
                 </td>
                 <td className="hidden md:table-cell px-4 py-3">
                   {record.error ? (
-                    <span className="inline-flex items-center px-2 py-0.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full text-xs font-medium max-w-[200px] truncate">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-full text-xs font-medium max-w-[200px] truncate"
+                      title={record.error}
+                    >
                       {record.error}
                     </span>
                   ) : (

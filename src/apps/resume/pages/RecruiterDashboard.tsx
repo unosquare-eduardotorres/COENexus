@@ -7,19 +7,85 @@ import PdfPreviewPanel from '../components/PdfPreviewPanel';
 import { validationService } from '../services/validationService';
 import { aiService } from '../services/aiService';
 import { pdfExportService } from '../services/pdfExportService';
+import { useToast } from '../components/shared/ToastContext';
+import { DocumentIcon, SearchIcon, SpinnerIcon } from '../components/shared/icons';
+
+interface RejectResumeModalProps {
+  candidateName: string;
+  reason: string;
+  onReasonChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function RejectResumeModal({
+  candidateName,
+  reason,
+  onReasonChange,
+  onCancel,
+  onConfirm,
+}: RejectResumeModalProps) {
+  const canConfirm = reason.trim().length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" role="presentation">
+      <div
+        className="glass-card w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reject-resume-title"
+      >
+        <h3 id="reject-resume-title" className="text-base font-semibold text-primary">
+          Reject Resume
+        </h3>
+        <p className="text-sm text-muted mt-1.5">
+          Provide a reason for rejecting {candidateName}&apos;s resume.
+        </p>
+        <textarea
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          rows={4}
+          className="glass-input w-full mt-4 resize-none text-sm"
+          placeholder="Add rejection reason"
+        />
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!canConfirm}
+            className="px-4 py-2 text-sm font-semibold rounded-xl bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Reject Resume
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function RecruiterDashboard() {
+  const { showToast } = useToast();
   const [resumes] = useState<StructuredResume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
   const [editedResumes, setEditedResumes] = useState<Map<string, StructuredResume>>(new Map());
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [validationFilter, setValidationFilter] = useState<'warning' | 'improvement' | 'valid' | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState(true);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const selectedResume = useMemo(() => {
     if (!selectedResumeId) return null;
@@ -43,6 +109,13 @@ export default function RecruiterDashboard() {
     }
     return validationService.getCompleteness(selectedResume);
   }, [selectedResume]);
+  const recruiterLiveMessage = isGeneratingSuggestions
+    ? 'Generating AI suggestions for the selected resume.'
+    : isValidating
+    ? 'Validating selected resume.'
+    : validationResults.length > 0
+    ? `Validation complete. ${validationResults.length} checks available.`
+    : '';
 
   const handleUpdateResume = useCallback(
     (updatedResume: StructuredResume) => {
@@ -133,25 +206,30 @@ export default function RecruiterDashboard() {
     if (!selectedResume) return;
     const updated = { ...selectedResume, status: 'approved' as const };
     handleUpdateResume(updated);
-    alert('Resume approved successfully!');
-  }, [selectedResume, handleUpdateResume]);
+    showToast('Resume approved successfully!', 'success');
+  }, [selectedResume, handleUpdateResume, showToast]);
 
   const handleReject = useCallback(() => {
     if (!selectedResume) return;
-    const reason = prompt('Please provide a reason for rejection:');
-    if (reason) {
-      const updated = { ...selectedResume, status: 'rejected' as const };
-      handleUpdateResume(updated);
-      alert('Resume rejected.');
-    }
-  }, [selectedResume, handleUpdateResume]);
+    setRejectReason('');
+    setShowRejectModal(true);
+  }, [selectedResume]);
+
+  const handleConfirmReject = useCallback(() => {
+    if (!selectedResume || !rejectReason.trim()) return;
+    const updated = { ...selectedResume, status: 'rejected' as const };
+    handleUpdateResume(updated);
+    setShowRejectModal(false);
+    setRejectReason('');
+    showToast('Resume rejected.', 'warning');
+  }, [selectedResume, rejectReason, handleUpdateResume, showToast]);
 
   const getStatusBadge = (status: StructuredResume['status']) => {
     const styles: Record<string, string> = {
-      pending: 'bg-gray-100/80 dark:bg-dark-muted/30 text-gray-600 dark:text-gray-400',
+      pending: 'bg-gray-100/80 dark:bg-dark-muted/30 text-gray-700 dark:text-gray-300',
       transforming: 'bg-accent-100/80 dark:bg-accent-500/20 text-accent-700 dark:text-accent-400',
       transformed: 'bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-      reviewing: 'bg-purple-100/80 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
+      reviewing: 'bg-violet-100/80 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400',
       approved: 'bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
       rejected: 'bg-red-100/80 dark:bg-red-500/20 text-red-700 dark:text-red-400',
       exported: 'bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400',
@@ -169,6 +247,9 @@ export default function RecruiterDashboard() {
 
   return (
     <div className="min-h-screen">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {recruiterLiveMessage}
+      </div>
       <header className="glass-nav sticky top-0 z-30">
         <div className="max-w-[1400px] mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
@@ -197,10 +278,7 @@ export default function RecruiterDashboard() {
                   className="glass-button flex items-center gap-2 px-3 py-1.5 text-sm text-secondary disabled:opacity-50"
                 >
                   {isValidating ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
+                    <SpinnerIcon size="sm" />
                   ) : (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -237,16 +315,10 @@ export default function RecruiterDashboard() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search..."
+                    aria-label="Search resumes by candidate name or file name"
                     className="glass-input w-full pl-9 pr-3 py-2 text-sm"
                   />
-                  <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <SearchIcon size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
                 <select
                   value={filterStatus}
@@ -264,14 +336,15 @@ export default function RecruiterDashboard() {
 
               <div className="max-h-[calc(100vh-340px)] overflow-y-auto">
                 {filteredResumes.map((resume) => (
-                  <div
+                  <button
                     key={resume.id}
+                    type="button"
                     onClick={() => {
                       setSelectedResumeId(resume.id);
                       setValidationResults([]);
                       setAiSuggestions([]);
                     }}
-                    className={`p-3 border-b border-gray-100/30 dark:border-dark-border/20 cursor-pointer transition-all ${
+                    className={`appearance-none bg-transparent border-none p-3 text-left w-full border-b border-gray-100/30 dark:border-dark-border/20 transition-all ${
                       selectedResumeId === resume.id
                         ? 'bg-accent-50/50 dark:bg-accent-500/10 border-l-2 border-l-accent-500'
                         : 'hover:bg-white/50 dark:hover:bg-dark-hover/30'
@@ -282,16 +355,16 @@ export default function RecruiterDashboard() {
                         {resume.candidateName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-primary truncate">
+                        <h4 className="text-sm font-medium text-primary truncate" title={resume.candidateName}>
                           {resume.candidateName}
                         </h4>
-                        <p className="text-xs text-muted truncate">
+                        <p className="text-xs text-muted truncate" title={resume.originalFileName}>
                           {resume.originalFileName}
                         </p>
                         <div className="mt-1">{getStatusBadge(resume.status)}</div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
 
                 {filteredResumes.length === 0 && (
@@ -314,12 +387,14 @@ export default function RecruiterDashboard() {
                   <div className="flex gap-6">
                     <div className="flex-1 min-w-0">
                       {isGeneratingSuggestions && (
-                        <div className="mb-4 p-3 bg-purple-50/50 dark:bg-purple-900/10 border border-purple-200/50 dark:border-purple-800/30 rounded-xl flex items-center gap-3">
-                          <svg className="w-4 h-4 text-purple-500 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                        <div
+                          className="mb-4 p-3 bg-violet-50/50 dark:bg-violet-900/10 border border-violet-200/50 dark:border-violet-800/30 rounded-xl flex items-center gap-3"
+                          role="status"
+                          aria-live="polite"
+                          aria-atomic="true"
+                        >
+                          <SpinnerIcon size="sm" className="text-violet-500" />
+                          <span className="text-sm text-violet-600 dark:text-violet-400 font-medium">
                             Generating AI suggestions...
                           </span>
                         </div>
@@ -339,15 +414,15 @@ export default function RecruiterDashboard() {
                           <ValidationPanel
                             results={validationResults}
                             completeness={completeness}
+                            activeFilter={validationFilter}
+                            onFilterChange={setValidationFilter}
                           />
                           <div className="mt-4">
                             <button
                               onClick={() => setIsDrawerOpen(true)}
                               className="glass-card-hover w-full flex items-center justify-center gap-2 p-3 text-sm text-secondary"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
+                              <DocumentIcon size="sm" />
                               View Original
                             </button>
                           </div>
@@ -436,6 +511,18 @@ export default function RecruiterDashboard() {
           originalContent={selectedResume.originalContent}
           originalFileName={selectedResume.originalFileName}
           originalFileType={selectedResume.originalFileType}
+        />
+      )}
+      {showRejectModal && selectedResume && (
+        <RejectResumeModal
+          candidateName={selectedResume.candidateName}
+          reason={rejectReason}
+          onReasonChange={setRejectReason}
+          onCancel={() => {
+            setShowRejectModal(false);
+            setRejectReason('');
+          }}
+          onConfirm={handleConfirmReject}
         />
       )}
     </div>

@@ -262,7 +262,7 @@ export default function BatchProcessing({
                     <p className="text-xs text-muted">{formatDate(job.createdAt)}</p>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
                       job.status
                     )}`}
                   >
@@ -345,14 +345,14 @@ export default function BatchProcessing({
                           >
                             <div className="flex items-center gap-1.5">
                               {getItemStatusIcon(item.status)}
-                              <span className="text-xs text-secondary truncate max-w-[180px]">
+                              <span className="text-xs text-secondary truncate max-w-[180px]" title={item.fileName}>
                                 {item.fileName}
                               </span>
                             </div>
                             {item.resumeId && (
                               <button
                                 onClick={() => onViewResume(item.resumeId!)}
-                                className="text-[10px] text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
+                                className="text-xs text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                               >
                                 View
                               </button>
@@ -360,7 +360,7 @@ export default function BatchProcessing({
                           </div>
                         ))}
                         {job.resumes.length > 5 && (
-                          <p className="text-[10px] text-muted">
+                          <p className="text-xs text-muted">
                             +{job.resumes.length - 5} more files
                           </p>
                         )}

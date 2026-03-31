@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useId } from 'react';
 
 interface DangerConfirmModalProps {
   title: string;
@@ -25,6 +25,10 @@ export default function DangerConfirmModal({
 }: DangerConfirmModalProps) {
   const [typed, setTyped] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const challengeId = useId();
+  const inputId = useId();
 
   const challengeWord = useMemo(
     () => CHALLENGE_WORDS[Math.floor(Math.random() * CHALLENGE_WORDS.length)],
@@ -45,11 +49,25 @@ export default function DangerConfirmModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onCancel();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6" onClick={onCancel}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+      onClick={handleBackdropClick}
+      role="presentation"
+    >
       <div
         className="glass-card w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-200 border border-red-200 dark:border-red-500/20"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={`${descriptionId} ${challengeId}`}
       >
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center flex-shrink-0">
@@ -58,17 +76,18 @@ export default function DangerConfirmModal({
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">{title}</h3>
-            <p className="text-sm text-secondary mt-1.5 leading-relaxed">{message}</p>
+            <h3 id={titleId} className="text-lg font-semibold text-red-600 dark:text-red-400">{title}</h3>
+            <p id={descriptionId} className="text-sm text-secondary mt-1.5 leading-relaxed">{message}</p>
           </div>
         </div>
 
         <div className="mt-5 space-y-2">
-          <label className="block text-sm font-medium text-secondary">
+          <label htmlFor={inputId} id={challengeId} className="block text-sm font-medium text-secondary">
             Type "<span className="font-bold text-red-600 dark:text-red-400 select-all">{challengeWord}</span>" to confirm
           </label>
           <input
             ref={inputRef}
+            id={inputId}
             type="text"
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
@@ -84,12 +103,14 @@ export default function DangerConfirmModal({
 
         <div className="flex items-center justify-end gap-3 mt-6">
           <button
+            type="button"
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors"
           >
             {cancelLabel}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={!isMatch}
             className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${

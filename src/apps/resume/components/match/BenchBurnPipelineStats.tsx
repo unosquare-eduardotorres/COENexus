@@ -122,16 +122,16 @@ export default function BenchBurnPipelineStats({ stats, onRetryFallbacks }: Benc
                     <div key={p.key} className="space-y-1">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-secondary w-40 truncate">{p.label}</span>
+                          <span className="text-xs text-secondary w-40 truncate" title={p.label}>{p.label}</span>
                           {hasFallbacks && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">
+                            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">
                               {timings?.['opusFallbackCount']} fb
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
                           {p.detail && (
-                            <span className="text-[10px] text-muted font-mono hidden sm:inline">{p.detail}</span>
+                            <span className="text-xs text-muted font-mono hidden sm:inline">{p.detail}</span>
                           )}
                           <span className={`text-xs font-mono font-semibold ${isLongest ? 'text-amber-500' : 'text-primary'}`}>
                             {formatMs(p.durationMs)}
@@ -177,9 +177,9 @@ export default function BenchBurnPipelineStats({ stats, onRetryFallbacks }: Benc
                             }`}
                             title={ct.error || undefined}
                           >
-                            <td className="py-1.5 pr-4 text-primary font-mono truncate max-w-[240px]">{ct.name}</td>
+                            <td className="py-1.5 pr-4 text-primary font-mono truncate max-w-[240px]" title={ct.name}>{ct.name}</td>
                             <td className="py-1.5 pr-4">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/10 text-orange-600 dark:text-orange-400">
                                 {ct.phase}
                               </span>
                             </td>

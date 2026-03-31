@@ -136,7 +136,7 @@ export default function PipelineStageDrawer({ stage, stageLabel, candidates, onC
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isEliminated ? 'bg-red-400' : 'bg-emerald-500'}`} />
-                        <span className={`font-medium truncate max-w-[140px] ${isEliminated ? 'text-muted line-through' : 'text-primary'}`}>
+                        <span className={`font-medium truncate max-w-[140px] ${isEliminated ? 'text-muted line-through' : 'text-primary'}`} title={candidate.name}>
                           {candidate.name}
                         </span>
                       </div>
@@ -145,7 +145,7 @@ export default function PipelineStageDrawer({ stage, stageLabel, candidates, onC
                       <span className={`text-xs px-1.5 py-0.5 rounded-md font-mono ${
                         candidate.sourceType === 'employees'
                           ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                          : 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
+                          : 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
                       }`}>
                         {candidate.sourceType === 'employees' ? 'EMP' : 'CAND'}
                       </span>
@@ -180,15 +180,15 @@ export default function PipelineStageDrawer({ stage, stageLabel, candidates, onC
                         )}
                       </td>
                     )}
-                    <td className="px-3 py-2.5 text-xs text-secondary truncate max-w-[80px]">
+                    <td className="px-3 py-2.5 text-xs text-secondary truncate max-w-[80px]" title={candidate.seniority || '—'}>
                       {candidate.seniority || '—'}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-secondary truncate max-w-[100px]">
+                    <td className="px-3 py-2.5 text-xs text-secondary truncate max-w-[100px]" title={candidate.mainSkill || '—'}>
                       {candidate.mainSkill || '—'}
                     </td>
                     <td className="px-3 py-2.5">
                       {isEliminated ? (
-                        <span className="text-xs text-red-400 truncate max-w-[140px] block">
+                        <span className="text-xs text-red-400 truncate max-w-[140px] block" title={candidate.eliminationReason}>
                           {candidate.eliminationReason}
                         </span>
                       ) : (

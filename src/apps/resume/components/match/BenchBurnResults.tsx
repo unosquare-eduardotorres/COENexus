@@ -161,24 +161,24 @@ export default function BenchBurnResults({
                         >
                           <span className="text-xs font-mono text-muted w-5">#{idx + 1}</span>
                           <ScoreRing score={match.matchScore} size={40} />
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {pos.account.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-primary truncate">{match.positionLabel}</span>
+                              <span className="text-sm font-medium text-primary truncate" title={match.positionLabel}>{match.positionLabel}</span>
                               {verdictConfig && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
                                   {verdictConfig.icon} {verdictConfig.label}
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-muted truncate">
+                            <div className="text-xs text-muted truncate" title={match.summary || `${pos.stakeholder ? `${pos.stakeholder} · ` : ''}OP#${match.positionUpstreamId}`}>
                               {pos.stakeholder && <span className="text-secondary">{pos.stakeholder}</span>}
                               {pos.stakeholder && ' · '}
                               <span className="font-mono">OP#{match.positionUpstreamId}</span>
                               {match.summary?.includes('AI analysis unavailable') && (
-                                <span className="ml-1 mr-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                <span className="ml-1 mr-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                                   Cosine Only
                                 </span>
                               )}
@@ -219,7 +219,7 @@ export default function BenchBurnResults({
                   className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold">
                       {pos.account.charAt(0)}
                     </div>
                     <div>
@@ -259,19 +259,19 @@ export default function BenchBurnResults({
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-primary truncate">{match.employeeName}</span>
+                              <span className="text-sm font-medium text-primary truncate" title={match.employeeName}>{match.employeeName}</span>
                               {verdictConfig && (
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
                                   {verdictConfig.icon} {verdictConfig.label}
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-muted truncate">
+                            <div className="text-xs text-muted truncate" title={match.summary || `${emp.seniority ? `${emp.seniority} · ` : ''}${emp.mainSkill || ''}`}>
                               {emp.seniority && <span className="text-secondary">{emp.seniority}</span>}
                               {emp.seniority && emp.mainSkill && ' · '}
                               {emp.mainSkill && <span className="text-secondary">{emp.mainSkill}</span>}
                               {match.summary?.includes('AI analysis unavailable') && (
-                                <span className="ml-1 mr-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                <span className="ml-1 mr-1 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                                   Cosine Only
                                 </span>
                               )}

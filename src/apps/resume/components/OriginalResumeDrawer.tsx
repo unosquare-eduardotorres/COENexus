@@ -98,7 +98,7 @@ export default function OriginalResumeDrawer({
             />
           </svg>
           <span
-            className="text-[10px] font-medium tracking-wider"
+            className="text-xs font-medium tracking-wider"
             style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
           >
             ORIGINAL
@@ -121,7 +121,7 @@ export default function OriginalResumeDrawer({
                 {getFileIcon()}
                 <div>
                   <h3 className="text-sm font-semibold text-primary">Original Resume</h3>
-                  <p className="text-xs text-muted truncate max-w-[200px]">{originalFileName}</p>
+                  <p className="text-xs text-muted truncate max-w-[200px]" title={originalFileName}>{originalFileName}</p>
                 </div>
               </div>
               <button

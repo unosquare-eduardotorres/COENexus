@@ -3,6 +3,7 @@ import { SyncRecord, SyncSourceType, PipelineStatus } from '../../types';
 import { formatSalary } from '../../utils/formatSalary';
 import { exportToExcel, ColumnDef } from '../../utils/exportToExcel';
 import ErrorDetailModal from './ErrorDetailModal';
+import { CheckIcon, ChevronIcon, CloseIcon, DocumentIcon, SearchIcon, SpinnerIcon } from '../shared/icons';
 
 const PAGE_SIZE = 50;
 
@@ -33,31 +34,6 @@ const PIPELINE_CLASSES: Record<PipelineStatus, string> = {
   extracted: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
   vectorized: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400',
 };
-
-function CheckIcon() {
-  return (
-    <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  );
-}
-
-function SpinnerIcon({ color }: { color: string }) {
-  return (
-    <svg className={`w-4 h-4 animate-spin ${color}`} fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
-  );
-}
 
 function RefreshIcon({ spinning }: { spinning?: boolean }) {
   return (
@@ -92,13 +68,11 @@ function SortIcon({ direction }: { direction?: SortDirection }) {
     );
   }
   return (
-    <svg className="w-3 h-3 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      {direction === 'asc' ? (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-      ) : (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      )}
-    </svg>
+    <ChevronIcon
+      size="sm"
+      direction={direction === 'asc' ? 'up' : 'down'}
+      className="w-3 h-3 text-accent-500"
+    />
   );
 }
 
@@ -341,19 +315,13 @@ export default function SyncRecordTable({
       <div className="p-4 border-b border-gray-100 dark:border-dark-border/30">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <SearchIcon size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={source === 'open-positions' ? 'Search by position or account...' : 'Search by name or email...'}
+              aria-label={source === 'open-positions' ? 'Search records by position or account' : 'Search records by name or email'}
               className="w-full pl-9 pr-4 py-2 bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl text-sm text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-400/60 dark:focus:border-accent-500/40 transition-all duration-200"
             />
           </div>
@@ -364,14 +332,9 @@ export default function SyncRecordTable({
             title={`Export ${filtered.length} records to Excel`}
           >
             {exporting ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <SpinnerIcon size="sm" />
             ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <DocumentIcon size="sm" />
             )}
             Export
           </button>
@@ -485,14 +448,22 @@ export default function SyncRecordTable({
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.countries || '—'}</td>
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniorities || '—'}</td>
                       <td className="px-4 py-3">
-                        {record.hasJobDescription ? <CheckIcon /> : <XIcon />}
+                        {record.hasJobDescription ? (
+                          <CheckIcon size="sm" className="text-emerald-500" />
+                        ) : (
+                          <CloseIcon size="sm" className="text-gray-400 dark:text-gray-500" />
+                        )}
                       </td>
                       <td className="px-4 py-3 text-secondary">{record.candidatesCount ?? 0}</td>
                     </>
                   ) : source === 'candidates' ? (
                     <>
                       <td className="hidden md:table-cell px-4 py-3">
-                        {record.coeCertified ? <CheckIcon /> : <XIcon />}
+                        {record.coeCertified ? (
+                          <CheckIcon size="sm" className="text-emerald-500" />
+                        ) : (
+                          <CloseIcon size="sm" className="text-gray-400 dark:text-gray-500" />
+                        )}
                       </td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.email || '—'}</td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
@@ -532,21 +503,23 @@ export default function SyncRecordTable({
                     <td className="px-4 py-3">
                       {record.hasResume ? (
                         <span className="inline-flex items-center gap-1.5">
-                          <CheckIcon />
+                          <CheckIcon size="sm" className="text-emerald-500" />
                           {record.resumeFilename && (
                             <span className="text-xs text-accent-500 truncate max-w-[120px]" title={record.resumeFilename}>
                               {record.resumeFilename}
                             </span>
                           )}
                         </span>
-                      ) : <XIcon />}
+                      ) : (
+                        <CloseIcon size="sm" className="text-gray-400 dark:text-gray-500" />
+                      )}
                     </td>
                   )}
                   <td className="hidden md:table-cell px-4 py-3">
                     {extractingUpstreamId === record.upstreamId ? (
-                      <SpinnerIcon color="text-blue-500" />
+                      <SpinnerIcon size="sm" className="text-blue-500" />
                     ) : vectorizingUpstreamId === record.upstreamId ? (
-                      <SpinnerIcon color="text-violet-500" />
+                      <SpinnerIcon size="sm" className="text-violet-500" />
                     ) : record.pipelineStatus === 'extracted' && !record.failed && onVectorizeRecord ? (
                       <button
                         onClick={() => onVectorizeRecord(record.upstreamId)}
@@ -555,7 +528,7 @@ export default function SyncRecordTable({
                         title="Vectorize this resume"
                       >
                         {vectorizingId === record.upstreamId ? (
-                          <SpinnerIcon color="text-violet-500" />
+                          <SpinnerIcon size="sm" className="text-violet-500" />
                         ) : (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -576,7 +549,7 @@ export default function SyncRecordTable({
                           error: record.syncDetail || record.reason || '',
                         })}
                         className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 max-w-[200px] truncate hover:text-red-500 dark:hover:text-red-400 transition-colors group"
-                        title="Click to view full error"
+                        title={record.syncDetail || record.reason || 'Click to view full error'}
                       >
                         <svg className="w-3.5 h-3.5 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

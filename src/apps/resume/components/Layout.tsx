@@ -7,6 +7,7 @@ import VemLogo from '../../../components/VemLogo';
 type SidebarMode = 'expanded' | 'collapsed' | 'top';
 
 const SIDEBAR_MODE_KEY = 'resume-sidebar-mode';
+const MAIN_CONTENT_ID = 'main-content';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -155,10 +156,13 @@ function Sidebar({
         <div
           className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm md:hidden"
           onClick={onMobileClose}
+          aria-hidden="true"
         />
       )}
 
       <aside
+        id="primary-sidebar"
+        aria-label="Primary navigation"
         className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl transition-all duration-300 ${sidebarWidth} ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
@@ -169,7 +173,7 @@ function Sidebar({
               <VemLogo size={32} className="text-accent-500 dark:text-accent-400" />
             </div>
             {isExpanded && (
-              <span className="text-base font-bold text-primary tracking-tight truncate">
+              <span className="text-base font-bold text-primary tracking-tight truncate" title="V.E.M.">
                 V.E.M.
               </span>
             )}
@@ -200,7 +204,7 @@ function Sidebar({
           </Link>
         )}
 
-        <nav className="flex-1 py-2 overflow-y-auto">
+        <nav className="flex-1 py-2 overflow-y-auto" aria-label="Resume app sections">
           {navigation.map((item) => {
             const isActive =
               location.pathname === item.href ||
@@ -209,10 +213,13 @@ function Sidebar({
             return (
               <button
                 key={item.name}
+                type="button"
                 onClick={() => { onMobileClose(); onNavClick(item.href); }}
                 title={!isExpanded ? item.name : undefined}
+                aria-label={item.name}
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center gap-3 mx-2 my-0.5 rounded-lg transition-all duration-200 ${
-                  isExpanded ? 'px-3 py-2.5' : 'justify-center px-2 py-2.5'
+                  isExpanded ? 'px-3 py-2.5 min-h-[44px]' : 'justify-center px-2 py-2.5 min-h-[44px] min-w-[44px]'
                 } ${
                   isActive
                     ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
@@ -221,7 +228,7 @@ function Sidebar({
               >
                 <span className="flex-shrink-0">{item.icon}</span>
                 {isExpanded && (
-                  <span className="text-sm font-medium truncate">{item.name}</span>
+                  <span className="text-sm font-medium truncate" title={item.name}>{item.name}</span>
                 )}
               </button>
             );
@@ -230,10 +237,12 @@ function Sidebar({
 
         <div className={`border-t border-gray-200/30 dark:border-dark-border/30 py-2 ${isExpanded ? 'px-2' : 'px-1'}`}>
           <button
+            type="button"
             onClick={toggleTheme}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             className={`flex items-center gap-3 w-full rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-dark-hover/50 transition-colors ${
-              isExpanded ? 'px-3 py-2.5' : 'justify-center px-2 py-2.5'
+              isExpanded ? 'px-3 py-2.5 min-h-[44px]' : 'justify-center px-2 py-2.5 min-h-[44px] min-w-[44px]'
             }`}
           >
             {theme === 'dark' ? (
@@ -249,10 +258,12 @@ function Sidebar({
           </button>
 
           <button
+            type="button"
             onClick={onToggleMode}
             title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             className={`flex items-center gap-3 w-full rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-dark-hover/50 transition-colors ${
-              isExpanded ? 'px-3 py-2.5' : 'justify-center px-2 py-2.5'
+              isExpanded ? 'px-3 py-2.5 min-h-[44px]' : 'justify-center px-2 py-2.5 min-h-[44px] min-w-[44px]'
             }`}
           >
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,10 +279,12 @@ function Sidebar({
           </button>
 
           <button
+            type="button"
             onClick={onSwitchToTop}
             title="Switch to top navigation"
+            aria-label="Switch to top navigation"
             className={`flex items-center gap-3 w-full rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-dark-hover/50 transition-colors ${
-              isExpanded ? 'px-3 py-2.5' : 'justify-center px-2 py-2.5'
+              isExpanded ? 'px-3 py-2.5 min-h-[44px]' : 'justify-center px-2 py-2.5 min-h-[44px] min-w-[44px]'
             }`}
           >
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,7 +305,7 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="glass-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300">
+    <nav className="glass-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300" aria-label="Top navigation">
       <div className="max-w-[1400px] mx-auto px-6">
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-10">
@@ -316,7 +329,10 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
                 return (
                   <button
                     key={item.name}
+                    type="button"
                     onClick={() => onNavClick(item.href)}
+                    aria-label={item.name}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                       isActive
                         ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
@@ -333,8 +349,9 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
 
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={toggleTheme}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+              className="h-11 w-11 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
               aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {theme === 'dark' ? (
@@ -344,9 +361,11 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
               )}
             </button>
             <button
+              type="button"
               onClick={onSwitchMode}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+              className="h-11 w-11 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
               title="Switch to sidebar navigation"
+              aria-label="Switch to sidebar navigation"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
@@ -393,6 +412,12 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen gradient-subtle transition-colors duration-300">
+      <a
+        href={`#${MAIN_CONTENT_ID}`}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[70] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-accent-600 focus:text-white focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       {sidebarMode !== 'top' ? (
         <>
           <Sidebar
@@ -415,17 +440,23 @@ export default function Layout({ children }: LayoutProps) {
                 </Link>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setSidebarMode('top')}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+                    className="h-11 w-11 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
                     title="Switch to top navigation"
+                    aria-label="Switch to top navigation"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h8m-8 6h16" />
                     </svg>
                   </button>
                   <button
+                    type="button"
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+                    className="h-11 w-11 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+                    aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                    aria-expanded={isMobileMenuOpen}
+                    aria-controls="primary-sidebar"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       {isMobileMenuOpen ? (
@@ -439,7 +470,7 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            <main className="flex-1 md:pt-0 pt-14">
+            <main id={MAIN_CONTENT_ID} className="flex-1 md:pt-0 pt-14">
               <DatabaseUpdateBanner />
               {children}
             </main>
@@ -458,7 +489,7 @@ export default function Layout({ children }: LayoutProps) {
         <>
           <TopBar onSwitchMode={handleSwitchToSidebar} onNavClick={handleNavClick} />
 
-          <main className="pt-14">
+          <main id={MAIN_CONTENT_ID} className="pt-14">
             <DatabaseUpdateBanner />
             {children}
           </main>

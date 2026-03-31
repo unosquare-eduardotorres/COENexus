@@ -103,7 +103,7 @@ export default function FlowSelector({ onSelect, selectedFlow }: FlowSelectorPro
                   <p className="text-sm text-muted mt-1.5 leading-relaxed">{flow.description}</p>
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {flow.tags.map((tag) => (
-                      <span key={tag} className={`px-2 py-0.5 text-[11px] font-medium rounded-md ${flow.tagColor}`}>
+                      <span key={tag} className={`px-2 py-0.5 text-xs font-medium rounded-md ${flow.tagColor}`}>
                         {tag}
                       </span>
                     ))}
@@ -130,7 +130,7 @@ export default function FlowSelector({ onSelect, selectedFlow }: FlowSelectorPro
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-semibold text-gray-400 dark:text-gray-500">{name}</h3>
-                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-gray-100 dark:bg-dark-hover text-gray-400 dark:text-gray-500 rounded-full uppercase tracking-wider">
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 dark:bg-dark-hover text-gray-400 dark:text-gray-500 rounded-full uppercase tracking-wider">
                     Coming Soon
                   </span>
                 </div>

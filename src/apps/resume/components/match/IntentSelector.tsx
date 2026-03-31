@@ -112,7 +112,7 @@ const INTENTS: IntentOption[] = [
       'Select a candidate and discover the best-fitting open positions based on their profile.',
     tags: ['Profile Analysis', 'Position Matching', 'Fit Score'],
     icon: <GitCompareArrowsIcon />,
-    gradient: 'from-indigo-500 to-purple-500',
+    gradient: 'from-indigo-500 to-violet-500',
     tagColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
     enabled: false,
   },
@@ -153,6 +153,7 @@ export default function IntentSelector({ onSelect, onViewHistory, sessionCount =
           intent.enabled ? (
             <button
               key={intent.id}
+              type="button"
               onClick={() => onSelect(intent.id)}
               className="text-left p-6 rounded-2xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-emerald-500/30 transition-all duration-200 group h-full"
             >
@@ -167,7 +168,7 @@ export default function IntentSelector({ onSelect, onViewHistory, sessionCount =
                   <p className="text-sm text-muted mt-1.5 leading-relaxed">{intent.description}</p>
                   <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
                     {intent.tags.map((tag) => (
-                      <span key={tag} className={`px-2 py-0.5 text-[11px] font-medium rounded-md ${intent.tagColor}`}>
+                      <span key={tag} className={`px-2 py-0.5 text-xs font-medium rounded-md ${intent.tagColor}`}>
                         {tag}
                       </span>
                     ))}
@@ -176,9 +177,12 @@ export default function IntentSelector({ onSelect, onViewHistory, sessionCount =
               </div>
             </button>
           ) : (
-            <div
+            <button
               key={intent.id}
-              className="p-6 rounded-2xl border-2 border-dashed border-gray-200/30 dark:border-dark-border/30 opacity-50 cursor-not-allowed h-full"
+              type="button"
+              disabled
+              aria-disabled="true"
+              className="appearance-none bg-transparent border-none p-6 text-left w-full rounded-2xl border-2 border-dashed border-gray-200/30 dark:border-dark-border/30 opacity-50 cursor-not-allowed h-full"
             >
               <div className="flex flex-col items-center text-center gap-4 h-full">
                 <div className="w-20 h-20 rounded-2xl bg-gray-200/50 dark:bg-dark-hover flex items-center justify-center text-gray-400 flex-shrink-0">
@@ -187,18 +191,19 @@ export default function IntentSelector({ onSelect, onViewHistory, sessionCount =
                 <div className="flex-1 min-w-0 flex flex-col">
                   <div className="flex items-center justify-center gap-2">
                     <h3 className="text-base font-semibold text-gray-400 dark:text-gray-500">{intent.title}</h3>
-                    <span className="px-2 py-0.5 text-[10px] font-semibold bg-gray-100 dark:bg-dark-hover text-gray-400 dark:text-gray-500 rounded-full uppercase tracking-wider">
+                    <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 dark:bg-dark-hover text-gray-400 dark:text-gray-500 rounded-full uppercase tracking-wider">
                       Soon
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 dark:text-gray-600 mt-1.5 leading-relaxed">{intent.description}</p>
                 </div>
               </div>
-            </div>
+            </button>
           )
         )}
 
         <button
+          type="button"
           onClick={onViewHistory}
           className="text-left p-6 rounded-2xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-amber-500/30 transition-all duration-200 group h-full"
         >
@@ -213,11 +218,11 @@ export default function IntentSelector({ onSelect, onViewHistory, sessionCount =
               </p>
               <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
                 {sessionCount > 0 ? (
-                  <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
                     {sessionCount} session{sessionCount !== 1 ? 's' : ''}
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
                     No sessions yet
                   </span>
                 )}

@@ -21,13 +21,13 @@ export default function CategoryBar({ label, value, description, tooltip }: Cate
           <span className="text-xs text-secondary relative group cursor-default">
             {label}
             {tooltip && !description && (
-              <span className="invisible group-hover:visible absolute left-0 -top-8 z-10 px-2 py-1 text-[10px] text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg whitespace-nowrap">
+              <span className="invisible group-hover:visible absolute left-0 -top-8 z-10 px-2 py-1 text-xs text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg whitespace-nowrap">
                 {tooltip}
               </span>
             )}
           </span>
           {description && (
-            <span className="text-[10px] text-muted leading-tight">{description}</span>
+            <span className="text-xs text-muted leading-tight">{description}</span>
           )}
         </div>
         <span className="text-xs font-mono text-secondary">{value}%</span>

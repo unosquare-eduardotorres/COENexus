@@ -152,7 +152,7 @@ export default function JobDescriptionStep({
                           <div className="font-semibold text-sm text-primary">{position.jobTitle}</div>
                           <div className="text-xs text-muted mt-0.5">{position.account} · {position.practice}</div>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-md">
+                            <span className="px-1.5 py-0.5 text-xs font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-md">
                               {position.mainSkill}
                             </span>
                           </div>

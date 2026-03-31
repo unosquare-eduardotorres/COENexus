@@ -94,7 +94,7 @@ export default function SessionHistory({ sessions, onLoadSession, currentSession
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium truncate ${isActive ? 'text-accent-500' : 'text-primary'}`}>
+                    <span className={`text-sm font-medium truncate ${isActive ? 'text-accent-500' : 'text-primary'}`} title={session.name}>
                       {session.name}
                     </span>
                     {isActive && (

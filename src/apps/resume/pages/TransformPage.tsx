@@ -15,6 +15,7 @@ import { dataSyncService } from '../services/dataSyncService';
 import { sessionService } from '../services/sessionService';
 import { benchBurnService } from '../services/benchBurnService';
 import SaveSessionModal from '../components/SaveSessionModal';
+import { useToast } from '../components/shared/ToastContext';
 import {
   StructuredResume,
   ATSCandidate,
@@ -34,7 +35,7 @@ import {
 } from '../types';
 
 type StepKey = 'intent' | 'select' | 'refinement' | 'job-description' | 'review' | 'save';
-type ReviewViewMode = 'editor' | 'resume' | 'split' | 'original';
+type ReviewViewMode = 'editor' | 'resume' | 'split' | 'original' | 'checks';
 
 const STEP_ICONS: Record<StepKey, ReactNode> = {
   intent: (
@@ -99,7 +100,7 @@ function PositionDetailsModal({
       case 'reviewing':
         return 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400';
       default:
-        return 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-300';
     }
   };
 
@@ -137,7 +138,7 @@ function PositionDetailsModal({
                     ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
                     : position.status === 'active'
                     ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400'
+                    : 'bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-300'
                 }`}
               >
                 {position.status.charAt(0).toUpperCase() + position.status.slice(1)}
@@ -181,7 +182,7 @@ function PositionDetailsModal({
               {position.requiredSkills.map((skill) => (
                 <span
                   key={skill}
-                  className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded-lg"
+                  className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-gray-300 rounded-lg"
                 >
                   {skill}
                 </span>
@@ -285,6 +286,7 @@ function OriginalDocxViewer({ fileUrl }: { fileUrl: string }) {
 
 export default function TransformPage() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [searchParams] = useSearchParams();
   const sessionIdParam = searchParams.get('session');
 
@@ -323,6 +325,9 @@ export default function TransformPage() {
   const [processingMetrics, setProcessingMetrics] = useState<ResumeProcessingMetrics[]>([]);
   const [reviewViewMode, setReviewViewMode] = useState<ReviewViewMode>('editor');
   const [validationCollapsed, setValidationCollapsed] = useState(true);
+  const [validationFilter, setValidationFilter] = useState<'warning' | 'improvement' | 'valid' | null>(null);
+  const [showValidationNotice, setShowValidationNotice] = useState(false);
+  const [validationHighlight, setValidationHighlight] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [generatedDocx, setGeneratedDocx] = useState<Blob | null>(null);
   const [showEnhancerModal, setShowEnhancerModal] = useState(false);
@@ -515,8 +520,20 @@ export default function TransformPage() {
     if (currentStepKey === 'review' && activeResume) {
       const results = validationService.validateResume(activeResume);
       setValidationResults(results);
+      const hasIssues = results.some(r => r.status !== 'valid');
+      if (hasIssues) {
+        setShowValidationNotice(true);
+        setValidationHighlight(true);
+      }
     }
   }, [currentStepKey, activeResume]);
+
+  useEffect(() => {
+    if (validationHighlight) {
+      const timer = setTimeout(() => setValidationHighlight(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [validationHighlight]);
 
   const filteredCandidates = useMemo(() => {
     return liveCandidates.map(c => ({
@@ -907,14 +924,15 @@ export default function TransformPage() {
   const handlePresentToPosition = useCallback(
     (resume: StructuredResume) => {
       if (selectedPosition && isCandidateAlreadyPresented(selectedPosition)) {
-        alert('This candidate was already presented for this position.');
+        showToast('This candidate was already presented for this position.', 'warning');
         return;
       }
-      alert(
-        `Resume for ${resume.candidateName} would be presented to ${selectedPosition?.title || 'the position'}. (Demo feature)`
+      showToast(
+        `Resume for ${resume.candidateName} would be presented to ${selectedPosition?.title || 'the position'}. (Demo feature)`,
+        'info'
       );
     },
-    [selectedPosition, isCandidateAlreadyPresented]
+    [selectedPosition, isCandidateAlreadyPresented, showToast]
   );
 
   const handleEnhanceResume = useCallback(async () => {
@@ -1267,10 +1285,10 @@ export default function TransformPage() {
                       Upload or select a resume and enhance it with AI-powered formatting and content improvements.
                     </p>
                     <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
-                      <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                         AI-Powered
                       </span>
-                      <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                         Single Resume
                       </span>
                     </div>
@@ -1296,11 +1314,11 @@ export default function TransformPage() {
                     </p>
                     <div className="flex flex-wrap justify-center gap-1.5 mt-auto pt-3">
                       {sessionCount > 0 ? (
-                        <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
                           {sessionCount} session{sessionCount !== 1 ? 's' : ''}
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 text-[11px] font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
                           No sessions yet
                         </span>
                       )}
@@ -1351,11 +1369,11 @@ export default function TransformPage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold text-primary truncate group-hover:text-accent-500 transition-colors">
+                        <h3 className="text-sm font-semibold text-primary truncate group-hover:text-accent-500 transition-colors" title={session.name}>
                           {session.name}
                         </h3>
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
-                          <span className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${
+                          <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md ${
                             session.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                             session.status === 'processing' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
                             'bg-amber-500/10 text-amber-600 dark:text-amber-400'
@@ -1512,31 +1530,31 @@ export default function TransformPage() {
                                   .slice(0, 2)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-medium text-primary truncate">{employee.name}</h4>
-                                <p className="text-xs text-muted truncate">{employee.email}</p>
+                                <h4 className="text-sm font-medium text-primary truncate" title={employee.name}>{employee.name}</h4>
+                                <p className="text-xs text-muted truncate" title={employee.email}>{employee.email}</p>
                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                   {employee.mainSkill && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-gray-300 rounded">
                                       {employee.mainSkill}
                                     </span>
                                   )}
                                   {employee.seniority && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-gray-300 rounded">
                                       {employee.seniority}
                                     </span>
                                   )}
                                   {employee.country && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-gray-300 rounded">
                                       {employee.country}
                                     </span>
                                   )}
                                   {employee.isVectorized && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded">
                                       Vectorized
                                     </span>
                                   )}
                                   {!employee.isVectorized && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
                                       Not Vectorized
                                     </span>
                                   )}
@@ -1632,19 +1650,19 @@ export default function TransformPage() {
                                   .slice(0, 2)}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-medium text-primary truncate">{candidate.name}</h4>
-                                <p className="text-xs text-muted truncate">{candidate.email}</p>
+                                <h4 className="text-sm font-medium text-primary truncate" title={candidate.name}>{candidate.name}</h4>
+                                <p className="text-xs text-muted truncate" title={candidate.email}>{candidate.email}</p>
                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                   {candidate.skills.map((skill) => (
                                     <span
                                       key={skill}
-                                      className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 dark:bg-dark-hover text-gray-600 dark:text-gray-400 rounded"
+                                      className="px-1.5 py-0.5 text-xs font-medium bg-gray-100 dark:bg-dark-hover text-gray-700 dark:text-gray-300 rounded"
                                     >
                                       {skill}
                                     </span>
                                   ))}
                                   {!candidate.isVectorized && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
                                       Not Vectorized
                                     </span>
                                   )}
@@ -1861,7 +1879,7 @@ export default function TransformPage() {
                   <h3 className="text-sm font-bold text-primary mb-1">From Open Positions</h3>
                   <p className="text-xs text-muted leading-relaxed">Select from active open positions in your ATS pipeline.</p>
                 </div>
-                <span className="absolute top-3 right-3 px-2 py-0.5 text-[10px] font-semibold bg-gray-200 dark:bg-dark-border text-gray-500 dark:text-gray-400 rounded-full">
+                <span className="absolute top-3 right-3 px-2 py-0.5 text-xs font-semibold bg-gray-200 dark:bg-dark-border text-gray-600 dark:text-gray-300 rounded-full">
                   Coming Soon
                 </span>
               </div>
@@ -1988,11 +2006,11 @@ export default function TransformPage() {
                               {resume.candidateName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-primary truncate">{resume.candidateName}</p>
-                              <p className="text-[10px] text-muted truncate">{resume.originalFileName}</p>
+                              <p className="text-xs font-medium text-primary truncate" title={resume.candidateName}>{resume.candidateName}</p>
+                              <p className="text-xs text-muted truncate" title={resume.originalFileName}>{resume.originalFileName}</p>
                             </div>
                           </div>
-                          <span className="mt-2 inline-block px-2 py-0.5 bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[10px] font-medium rounded-full">Ready</span>
+                          <span className="mt-2 inline-block px-2 py-0.5 bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full">Ready</span>
                         </button>
                       ))}
                     </div>
@@ -2022,6 +2040,11 @@ export default function TransformPage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                           )},
+                          { key: 'checks' as const, label: 'Checks', icon: (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                            </svg>
+                          )},
                         ]).map((mode) => (
                           <button
                             key={mode.key}
@@ -2034,6 +2057,15 @@ export default function TransformPage() {
                           >
                             {mode.icon}
                             {mode.label}
+                            {mode.key === 'checks' && validationResults.length > 0 && (
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                validationResults.every(r => r.status === 'valid')
+                                  ? 'bg-emerald-500'
+                                  : validationResults.some(r => r.status === 'error')
+                                    ? 'bg-red-500'
+                                    : 'bg-amber-500'
+                              }`} />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -2062,7 +2094,7 @@ export default function TransformPage() {
                         <button
                           onClick={handleEnhanceClick}
                           disabled={isEnhancing}
-                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-violet-500 rounded-lg hover:bg-violet-600 transition-colors disabled:opacity-50"
                         >
                           {isEnhancing ? (
                             <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -2080,7 +2112,9 @@ export default function TransformPage() {
                     </div>
 
                     {validationResults.length > 0 && (
-                      <div className="glass-card mb-4 overflow-hidden">
+                      <div className={`glass-card mb-4 overflow-hidden transition-all duration-300 ${
+                        validationHighlight ? 'ring-2 ring-amber-500/70 shadow-lg shadow-amber-500/10' : ''
+                      }`}>
                         <button
                           onClick={() => setValidationCollapsed(!validationCollapsed)}
                           className="w-full flex items-center justify-between p-3 hover:bg-white/30 dark:hover:bg-dark-hover/30 transition-colors"
@@ -2089,28 +2123,28 @@ export default function TransformPage() {
                             <svg className={`w-4 h-4 text-muted transition-transform ${validationCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
-                            <span className="text-xs font-semibold text-primary">Validation & Completeness</span>
+                            <span className="text-sm font-semibold text-primary">Validation & Completeness</span>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            {validationResults.filter(r => r.status === 'error').length > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-red-100/80 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full">
-                                {validationResults.filter(r => r.status === 'error').length} errors
-                              </span>
-                            )}
-                            {validationResults.filter(r => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning').length > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full">
-                                {validationResults.filter(r => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning').length} warnings
+                            {validationResults.filter(r => r.status !== 'valid' && r.category === 'warning').length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full">
+                                {validationResults.filter(r => r.status !== 'valid' && r.category === 'warning').length} warnings
                               </span>
                             )}
                             {validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement').length > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 rounded-full">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 rounded-full">
                                 {validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement').length} improvements
                               </span>
                             )}
                           </div>
                         </button>
                         {!validationCollapsed && (
-                          <ValidationPanel results={validationResults} completeness={completeness} />
+                          <ValidationPanel
+                            results={validationResults}
+                            completeness={completeness}
+                            activeFilter={validationFilter}
+                            onFilterChange={setValidationFilter}
+                          />
                         )}
                       </div>
                     )}
@@ -2165,6 +2199,137 @@ export default function TransformPage() {
                           </div>
                         </div>
                       )}
+
+                      {reviewViewMode === 'checks' && activeResume && (() => {
+                        const { hardRules, tips } = validationService.getRuleCatalog(activeResume);
+                        const sections = [...new Set(hardRules.map(r => r.section))];
+                        const applicableRules = hardRules.filter(r => r.status !== 'not-applicable');
+                        const passedCount = applicableRules.filter(r => r.status === 'pass').length;
+                        const totalCount = applicableRules.length;
+                        const allPassed = passedCount === totalCount;
+
+                        return (
+                          <div className="w-full space-y-4">
+                            <div className="glass-card overflow-hidden">
+                              <div className="flex items-center justify-between p-4 bg-white/50 dark:bg-dark-hover/30 border-b border-gray-200/30 dark:border-dark-border/30">
+                                <div className="flex items-center gap-2.5">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                    allPassed
+                                      ? 'bg-emerald-100/80 dark:bg-emerald-500/20'
+                                      : 'bg-red-100/80 dark:bg-red-500/20'
+                                  }`}>
+                                    <svg className={`w-4 h-4 ${
+                                      allPassed
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : 'text-red-600 dark:text-red-400'
+                                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <h3 className="text-sm font-semibold text-primary">Validation Rules</h3>
+                                    <p className="text-xs text-muted">{passedCount} of {totalCount} passed</p>
+                                  </div>
+                                </div>
+                                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                  allPassed
+                                    ? 'bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                    : 'bg-red-100/80 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                                }`}>
+                                  {allPassed ? 'ALL PASSED' : 'NEEDS REVIEW'}
+                                </span>
+                              </div>
+                              <div>
+                                {sections.map((section) => {
+                                  const sectionRules = hardRules.filter(r => r.section === section);
+                                  return (
+                                    <div key={section}>
+                                      <div className="px-4 py-2 bg-gray-50/60 dark:bg-dark-surface/40 border-b border-gray-200/30 dark:border-dark-border/30">
+                                        <span className="text-xs font-semibold text-muted uppercase tracking-wider">{section}</span>
+                                      </div>
+                                      <div className="divide-y divide-gray-200/20 dark:divide-dark-border/20">
+                                        {sectionRules.map((rule) => (
+                                          <div key={rule.rule} className="px-4 py-3 hover:bg-white/30 dark:hover:bg-dark-hover/20 transition-colors">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-3">
+                                                {rule.status === 'pass' ? (
+                                                  <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                  </svg>
+                                                ) : rule.status === 'not-applicable' ? (
+                                                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                                  </svg>
+                                                ) : rule.severity === 'warning' ? (
+                                                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                                  </svg>
+                                                ) : (
+                                                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                  </svg>
+                                                )}
+                                                <span className="text-sm font-medium text-primary">{rule.description}</span>
+                                              </div>
+                                              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${
+                                                rule.status === 'pass'
+                                                  ? 'bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                                  : rule.status === 'not-applicable'
+                                                    ? 'bg-gray-100/80 dark:bg-gray-500/20 text-gray-600 dark:text-gray-300'
+                                                    : rule.severity === 'warning'
+                                                      ? 'bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                                                      : 'bg-red-100/80 dark:bg-red-500/20 text-red-700 dark:text-red-400'
+                                              }`}>
+                                                {rule.status === 'pass' ? 'Pass' : rule.status === 'not-applicable' ? 'N/A' : rule.severity === 'warning' ? 'Warning' : 'Fail'}
+                                              </span>
+                                            </div>
+                                            {rule.status === 'fail' && rule.message && (
+                                              <p className="text-xs text-muted mt-1 ml-7">{rule.message}</p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {tips.length > 0 && (
+                              <div className="glass-card overflow-hidden">
+                                <div className="flex items-center justify-between p-4 bg-indigo-50/40 dark:bg-indigo-500/10 border-b border-indigo-200/30 dark:border-indigo-500/20">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-indigo-100/80 dark:bg-indigo-500/20">
+                                      <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                      </svg>
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-primary">Tips & Improvements</h3>
+                                  </div>
+                                  <span className="px-3 py-1 text-xs font-semibold rounded-full bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400">
+                                    {tips.length} {tips.length === 1 ? 'tip' : 'tips'}
+                                  </span>
+                                </div>
+                                <div className="divide-y divide-indigo-200/20 dark:divide-indigo-500/10">
+                                  {tips.map((tip, i) => (
+                                    <div key={i} className="flex items-center justify-between px-4 py-3 hover:bg-indigo-50/20 dark:hover:bg-indigo-500/5 transition-colors">
+                                      <div className="flex items-center gap-3">
+                                        <svg className="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-sm text-primary">{tip.message}</span>
+                                      </div>
+                                      <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400">
+                                        Tip
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -2226,15 +2391,15 @@ export default function TransformPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white/50 dark:bg-dark-hover/30 rounded-xl p-3 text-center">
                       <p className="text-lg font-bold text-primary">{aggregated.promptTokens.toLocaleString()}</p>
-                      <p className="text-[11px] text-muted">Prompt Tokens</p>
+                      <p className="text-xs text-muted">Prompt Tokens</p>
                     </div>
                     <div className="bg-white/50 dark:bg-dark-hover/30 rounded-xl p-3 text-center">
                       <p className="text-lg font-bold text-primary">{aggregated.completionTokens.toLocaleString()}</p>
-                      <p className="text-[11px] text-muted">Completion Tokens</p>
+                      <p className="text-xs text-muted">Completion Tokens</p>
                     </div>
                     <div className="bg-white/50 dark:bg-dark-hover/30 rounded-xl p-3 text-center">
                       <p className="text-lg font-bold text-primary">{aggregated.totalTokens.toLocaleString()}</p>
-                      <p className="text-[11px] text-muted">Total Tokens</p>
+                      <p className="text-xs text-muted">Total Tokens</p>
                     </div>
                   </div>
                   {!anyAi && (
@@ -2251,12 +2416,12 @@ export default function TransformPage() {
                 return (
                 <div key={resume.id} className="glass-card p-5 col-span-2">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-violet-600 flex items-center justify-center text-white text-sm font-semibold">
                       {resume.candidateName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-primary truncate">{resume.candidateName}</p>
-                      <p className="text-xs text-muted truncate">{resume.originalFileName}</p>
+                      <p className="text-sm font-semibold text-primary truncate" title={resume.candidateName}>{resume.candidateName}</p>
+                      <p className="text-xs text-muted truncate" title={resume.originalFileName}>{resume.originalFileName}</p>
                     </div>
                     <span className="px-2.5 py-1 bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium rounded-full">
                       Ready
@@ -2583,7 +2748,7 @@ export default function TransformPage() {
               The Claude Max proxy is not running. Processing will use fallback methods (regex-based extraction) which may produce less accurate results.
             </p>
             <p className="text-xs text-muted mb-5">
-              To enable AI extraction, start your Claude Max proxy (e.g. <code className="px-1 py-0.5 bg-gray-100 dark:bg-dark-hover rounded text-[11px]">claude-max-api-proxy</code>) and click Retry.
+              To enable AI extraction, start your Claude Max proxy (e.g. <code className="px-1 py-0.5 bg-gray-100 dark:bg-dark-hover rounded text-xs">claude-max-api-proxy</code>) and click Retry.
             </p>
             <div className="flex gap-3">
               <button
@@ -2611,6 +2776,46 @@ export default function TransformPage() {
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-amber-500 rounded-xl hover:bg-amber-600 transition-colors"
               >
                 Continue Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showValidationNotice && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="glass-card w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100/80 dark:bg-amber-500/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-primary">Validation Results</h3>
+            </div>
+            <p className="text-sm text-secondary mb-4">
+              We found{' '}
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {validationResults.filter(r => r.status !== 'valid' && r.category === 'warning').length} warnings
+              </span>
+              {' '}and{' '}
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                {validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement').length} improvements
+              </span>
+              {' '}&mdash; please make sure to review them.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowValidationNotice(false); setValidationCollapsed(false); }}
+                className="flex-1 px-4 py-2 text-sm font-medium bg-accent-500 text-white rounded-xl hover:bg-accent-600 transition-colors"
+              >
+                Review Now
+              </button>
+              <button
+                onClick={() => setShowValidationNotice(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-xl hover:bg-white/80 dark:hover:bg-dark-hover transition-colors"
+              >
+                Dismiss
               </button>
             </div>
           </div>
@@ -2655,7 +2860,7 @@ export default function TransformPage() {
               <button onClick={() => setShowEnhanceWarningModal(false)} className="px-4 py-2 text-sm font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-xl hover:bg-white/80 dark:hover:bg-dark-hover transition-colors">
                 Cancel
               </button>
-              <button onClick={() => { setShowEnhanceWarningModal(false); handleEnhanceResume(); }} className="px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-xl hover:bg-purple-600 transition-colors">
+              <button onClick={() => { setShowEnhanceWarningModal(false); handleEnhanceResume(); }} className="px-4 py-2 text-sm font-medium text-white bg-violet-500 rounded-xl hover:bg-violet-600 transition-colors">
                 Enhance Anyway
               </button>
             </div>
@@ -2684,7 +2889,7 @@ export default function TransformPage() {
                   </svg>
                 </div>
                 <p className="text-sm font-semibold text-primary mb-0.5">DOCX</p>
-                <p className="text-[11px] text-muted">Word document using Unosquare template</p>
+                <p className="text-xs text-muted">Word document using Unosquare template</p>
               </button>
               <button
                 onClick={() => {
@@ -2701,7 +2906,7 @@ export default function TransformPage() {
                   </svg>
                 </div>
                 <p className="text-sm font-semibold text-primary mb-0.5">PDF</p>
-                <p className="text-[11px] text-muted">Print-ready format via browser</p>
+                <p className="text-xs text-muted">Print-ready format via browser</p>
               </button>
             </div>
             <div className="flex justify-end mt-4">

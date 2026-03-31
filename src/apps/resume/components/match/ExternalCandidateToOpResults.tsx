@@ -54,12 +54,12 @@ export default function ExternalCandidateToOpResults({
           {position.jobTitle.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-primary truncate">{position.jobTitle}</div>
-          <div className="text-xs text-muted truncate">
+          <div className="font-semibold text-primary truncate" title={position.jobTitle}>{position.jobTitle}</div>
+          <div className="text-xs text-muted truncate" title={`${position.account} · ${position.coe} · ${position.mainSkill}`}>
             {position.account} · {position.coe} · {position.mainSkill}
           </div>
         </div>
-        <span className="text-[10px] px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium flex-shrink-0">
+        <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium flex-shrink-0">
           {resumes.length} Resume{resumes.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -83,9 +83,9 @@ export default function ExternalCandidateToOpResults({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-primary truncate">{match.employeeName}</span>
+                  <span className="text-sm font-medium text-primary truncate" title={match.employeeName}>{match.employeeName}</span>
                   {verdictConfig && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 border ${verdictConfig.classes}`}>
                       {verdictConfig.icon} {verdictConfig.label}
                     </span>
                   )}
@@ -93,9 +93,9 @@ export default function ExternalCandidateToOpResults({
                 <div className="text-xs text-muted mt-0.5">
                   {position.account} · {position.jobTitle} · {position.mainSkill}
                 </div>
-                <div className="text-xs text-muted mt-1 truncate">
+                <div className="text-xs text-muted mt-1 truncate" title={match.summary || undefined}>
                   {match.summary?.includes('AI analysis unavailable') && (
-                    <span className="mr-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <span className="mr-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                       Cosine Only
                     </span>
                   )}

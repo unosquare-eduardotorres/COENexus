@@ -300,7 +300,7 @@ export default function FilterStep({
             >
               Candidate Filters
               {candidateFilters.length > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
+                <span className="ml-1.5 px-1.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
                   {candidateFilters.length}
                 </span>
               )}
@@ -315,7 +315,7 @@ export default function FilterStep({
             >
               Employee Filters
               {employeeFilters.length > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
+                <span className="ml-1.5 px-1.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-full">
                   {employeeFilters.length}
                 </span>
               )}
@@ -343,7 +343,7 @@ export default function FilterStep({
             <svg className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-[11px] text-blue-600 dark:text-blue-400">
+            <p className="text-xs text-blue-600 dark:text-blue-400">
               Contractor hourly rates (≤100 USD) are auto-converted to monthly (×160) for salary filter comparisons.
             </p>
           </div>
@@ -360,14 +360,14 @@ export default function FilterStep({
             <div key={group.field}>
               {groupIndex > 0 && (
                 <div className="flex items-center justify-center py-1.5">
-                  <span className="px-3 py-0.5 text-[10px] font-bold rounded-full bg-indigo-500/15 text-indigo-500">
+                  <span className="px-3 py-0.5 text-xs font-bold rounded-full bg-indigo-500/15 text-indigo-500">
                     AND
                   </span>
                 </div>
               )}
               <div className="rounded-xl border border-indigo-500/10 bg-indigo-500/[0.02] overflow-hidden">
                 <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
-                  <span className="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 text-[11px] font-semibold rounded-md">
+                  <span className="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 text-xs font-semibold rounded-md">
                     {group.fieldConfig.label}
                   </span>
                   <button
@@ -392,7 +392,7 @@ export default function FilterStep({
                                 connector: prevRule.connector === 'or' ? 'and' : 'or',
                               });
                             }}
-                            className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full cursor-pointer transition-all ${
+                            className={`px-2.5 py-0.5 text-xs font-bold rounded-full cursor-pointer transition-all ${
                               group.rules[ruleIndex - 1].connector === 'and'
                                 ? 'bg-indigo-500/15 text-indigo-500 hover:bg-indigo-500/25'
                                 : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'

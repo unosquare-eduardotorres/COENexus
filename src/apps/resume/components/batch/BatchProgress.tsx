@@ -71,7 +71,7 @@ export default function BatchProgress({ files, config, onComplete }: BatchProgre
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-secondary truncate mr-4">
+          <span className="text-sm text-secondary truncate mr-4" title={currentFileName || 'Initializing...'}>
             {currentFileName || 'Initializing...'}
           </span>
           <span className="text-sm font-mono text-accent-500 flex-shrink-0">{progressPercent}%</span>
@@ -121,14 +121,15 @@ export default function BatchProgress({ files, config, onComplete }: BatchProgre
                     ? 'text-red-600 dark:text-red-400'
                     : 'text-muted'
                 }`}
+                title={file.name}
               >
                 {file.name}
               </span>
               {file.status === 'processing' && (
-                <span className="text-[10px] font-mono text-accent-500">Processing…</span>
+                <span className="text-xs font-mono text-accent-500">Processing…</span>
               )}
               {file.status === 'error' && file.error && (
-                <span className="text-[10px] text-red-500 truncate max-w-[120px]" title={file.error}>
+                <span className="text-xs text-red-500 truncate max-w-[120px]" title={file.error}>
                   {file.error}
                 </span>
               )}

@@ -356,7 +356,7 @@ export default function DatabaseSharingPanel() {
                     <div className="flex items-center gap-2">
                       <span>{formatDate(snapshot.exportedAt)}</span>
                       {snapshot.isNew && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50/60 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/20">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50/60 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-500/20">
                           New
                         </span>
                       )}

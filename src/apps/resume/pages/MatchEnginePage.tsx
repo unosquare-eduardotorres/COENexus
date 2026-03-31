@@ -795,7 +795,7 @@ export default function MatchEnginePage() {
                 {searchMode !== 'opus' && (
                   <button
                     onClick={() => setShowAnalyzeDeeper(true)}
-                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-violet-500/20"
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 transition-all duration-200 shadow-lg shadow-violet-500/20"
                   >
                     🔬 Analyze Deeper
                   </button>
@@ -1010,7 +1010,7 @@ export default function MatchEnginePage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-semibold text-primary">Haiku Pre-filter</h4>
-                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400">🎯 Balanced</span>
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-400">🎯 Balanced</span>
                       </div>
                       <p className="text-xs text-muted mt-1">AI triage with Haiku to score and filter candidates. Returns top 50.</p>
                     </div>
@@ -1034,7 +1034,7 @@ export default function MatchEnginePage() {
                 className="w-full text-left p-4 rounded-xl border-2 border-gray-200/30 dark:border-dark-border/30 glass-panel-subtle hover:border-violet-500/30 transition-all"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center text-white flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-violet-500 flex items-center justify-center text-white flex-shrink-0">
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 2a7 7 0 017 7c0 2.5-1.5 4.5-3 6l-1 3H9l-1-3c-1.5-1.5-3-3.5-3-6a7 7 0 017-7z" />
                       <path d="M9 18h6M10 21h4" />
@@ -1043,7 +1043,7 @@ export default function MatchEnginePage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-semibold text-primary">Full Opus Analysis</h4>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400">🔬 Deepest</span>
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-400">🔬 Deepest</span>
                     </div>
                     <p className="text-xs text-muted mt-1">Complete pipeline with deep Opus analysis — fit narratives, skill gaps, leadership assessment. Top 10 candidates.</p>
                   </div>

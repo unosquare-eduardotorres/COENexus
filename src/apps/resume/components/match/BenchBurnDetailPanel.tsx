@@ -32,7 +32,7 @@ function SkillRow({ skill }: { skill: SkillMatch }) {
       <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusDotColor(status)}`} />
       <span className="text-sm text-primary flex-1">{skill.name}</span>
       <span className="text-xs font-mono text-muted">{skill.years === -1 ? '—' : `${skill.years}y`}</span>
-      <span className={`text-[10px] font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(status)}`}>
+      <span className={`text-xs font-medium w-16 text-center py-0.5 rounded-full ${getStatusChipClasses(status)}`}>
         {getStatusLabel(status)}
       </span>
     </div>
@@ -95,7 +95,7 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-xl font-bold text-primary">{employee.name}</h2>
               {employee.isBench !== undefined && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
                   employee.isBench
                     ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
                     : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
@@ -145,7 +145,7 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
 
         <div className="mt-4 pt-4 border-t border-gray-200/20 dark:border-dark-border/20">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
               {position.account.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
@@ -341,7 +341,7 @@ export default function BenchBurnDetailPanel({ match, employee, position, onBack
                   <div key={index} className="glass-card p-4">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="font-semibold text-primary">{gap.skill}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${getSeverityBadgeClasses(gap.severity)}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${getSeverityBadgeClasses(gap.severity)}`}>
                         {gap.severity}
                       </span>
                     </div>

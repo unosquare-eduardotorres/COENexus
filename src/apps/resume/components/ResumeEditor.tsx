@@ -19,6 +19,22 @@ interface ResumeEditorProps {
   originalResume?: StructuredResume | null;
 }
 
+interface SkillEditState {
+  categoryIndex: number;
+  skillIndex: number;
+  value: string;
+}
+
+interface SkillAddState {
+  categoryIndex: number;
+  value: string;
+}
+
+interface TechnologyAddState {
+  experienceIndex: number;
+  value: string;
+}
+
 export default function ResumeEditor({
   resume,
   onUpdate,
@@ -34,6 +50,9 @@ export default function ResumeEditor({
   );
   const [skillView, setSkillView] = useState<'template' | 'all'>('template');
   const [expandedOriginals, setExpandedOriginals] = useState<Set<string>>(new Set());
+  const [editingSkill, setEditingSkill] = useState<SkillEditState | null>(null);
+  const [addingSkill, setAddingSkill] = useState<SkillAddState | null>(null);
+  const [addingTechnology, setAddingTechnology] = useState<TechnologyAddState | null>(null);
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections((prev) => {
@@ -126,6 +145,46 @@ export default function ResumeEditor({
     onUpdate({ ...resume, cloudSkills: newSkills });
   };
 
+  const saveEditedSkill = useCallback(() => {
+    if (!editingSkill) return;
+    const { categoryIndex, skillIndex, value } = editingSkill;
+    const category = resume.skills[categoryIndex];
+    if (!category) {
+      setEditingSkill(null);
+      return;
+    }
+    const newSkills = [...category.skills];
+    newSkills[skillIndex] = value;
+    updateSkillCategory(categoryIndex, newSkills);
+    setEditingSkill(null);
+  }, [editingSkill, resume.skills, updateSkillCategory]);
+
+  const saveAddedSkill = useCallback(() => {
+    if (!addingSkill) return;
+    if (addingSkill.value) {
+      const category = resume.skills[addingSkill.categoryIndex];
+      if (category) {
+        updateSkillCategory(addingSkill.categoryIndex, [...category.skills, addingSkill.value]);
+      }
+    }
+    setAddingSkill(null);
+  }, [addingSkill, resume.skills, updateSkillCategory]);
+
+  const saveAddedTechnology = useCallback(() => {
+    if (!addingTechnology) return;
+    if (addingTechnology.value) {
+      const experience = resume.experience[addingTechnology.experienceIndex];
+      if (experience) {
+        updateExperience(
+          addingTechnology.experienceIndex,
+          'technologies' as any,
+          [...(experience.technologies || []), addingTechnology.value]
+        );
+      }
+    }
+    setAddingTechnology(null);
+  }, [addingTechnology, resume.experience, updateExperience]);
+
   const getSuggestionForSection = (sectionType: string, sectionId?: string) => {
     return aiSuggestions.find(
       (s) => s.sectionType === sectionType && (!sectionId || s.sectionId === sectionId)
@@ -215,7 +274,7 @@ export default function ResumeEditor({
           onClick={() => toggleOriginalExpanded(section)}
           className="w-full flex items-center justify-between px-3 py-2 bg-amber-50/60 dark:bg-amber-500/10 hover:bg-amber-50/80 dark:hover:bg-amber-500/15 transition-colors"
         >
-          <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -241,13 +300,13 @@ export default function ResumeEditor({
     if (!suggestion) return null;
 
     return (
-      <div className="mt-2.5 p-2.5 bg-purple-50/50 dark:bg-purple-500/10 border border-purple-200/50 dark:border-purple-500/30 rounded-xl">
+      <div className="mt-2.5 p-2.5 bg-violet-50/50 dark:bg-violet-500/10 border border-violet-200/50 dark:border-violet-500/30 rounded-xl">
         <div className="flex items-center gap-1.5 mb-2">
-          <svg className="w-3.5 h-3.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-3.5 h-3.5 text-violet-500" fill="currentColor" viewBox="0 0 20 20">
             <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
             <path d="M10 5a1 1 0 011 1v3.586l2.707 2.707a1 1 0 01-1.414 1.414l-3-3A1 1 0 019 10V6a1 1 0 011-1z" />
           </svg>
-          <span className="text-xs font-medium text-purple-600 dark:text-purple-400">AI Suggestions</span>
+          <span className="text-xs font-medium text-violet-600 dark:text-violet-400">AI Suggestions</span>
         </div>
         <div className="space-y-1.5">
           {suggestion.suggestions.map((option, index) => (
@@ -256,27 +315,27 @@ export default function ResumeEditor({
               onClick={() => onSelectSuggestion(suggestion.id, index)}
               className={`p-2 rounded-lg border cursor-pointer transition-all ${
                 suggestion.selectedIndex === index
-                  ? 'border-purple-400/50 bg-purple-100/50 dark:bg-purple-500/20'
-                  : 'border-gray-200/50 dark:border-dark-border/50 bg-white/60 dark:bg-dark-surface/60 hover:border-purple-300/50 dark:hover:border-purple-500/30'
+                  ? 'border-violet-400/50 bg-violet-100/50 dark:bg-violet-500/20'
+                  : 'border-gray-200/50 dark:border-dark-border/50 bg-white/60 dark:bg-dark-surface/60 hover:border-violet-300/50 dark:hover:border-violet-500/30'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs text-secondary flex-1">{option.text}</p>
                 <div className="flex items-center gap-1">
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    className={`text-xs px-1.5 py-0.5 rounded-full ${
                       option.type === 'rephrase'
                         ? 'bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400'
                         : option.type === 'extend'
                         ? 'bg-emerald-100/80 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                         : option.type === 'condense'
                         ? 'bg-amber-100/80 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                        : 'bg-purple-100/80 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'
+                        : 'bg-violet-100/80 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400'
                     }`}
                   >
                     {option.type}
                   </span>
-                  <span className="text-[10px] text-muted">{Math.round(option.confidence * 100)}%</span>
+                  <span className="text-xs text-muted">{Math.round(option.confidence * 100)}%</span>
                 </div>
               </div>
             </div>
@@ -290,7 +349,7 @@ export default function ResumeEditor({
     <div className="space-y-3">
       <div className="glass-card p-5">
         <div className="flex items-start gap-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-500 to-purple-600 flex items-center justify-center text-white text-xl font-semibold">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-500 to-violet-600 flex items-center justify-center text-white text-xl font-semibold">
             {resume.candidateName
               .split(' ')
               .map((n) => n[0])
@@ -348,7 +407,7 @@ export default function ResumeEditor({
           {!readOnly && (
             <button
               onClick={() => onRequestAISuggestion('header')}
-              className="p-2 text-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
+              className="p-2 text-violet-500 hover:bg-violet-50/50 dark:hover:bg-violet-500/10 rounded-lg transition-colors"
               title="Get AI suggestions"
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -384,7 +443,7 @@ export default function ResumeEditor({
                 {!readOnly && (
                   <button
                     onClick={() => onRequestAISuggestion('summary', undefined, resume.summary)}
-                    className="absolute top-0 right-0 p-1.5 text-purple-500 hover:bg-purple-50/50 dark:hover:bg-purple-500/10 rounded-lg transition-colors"
+                    className="absolute top-0 right-0 p-1.5 text-violet-500 hover:bg-violet-50/50 dark:hover:bg-violet-500/10 rounded-lg transition-colors"
                     title="Get AI suggestions"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -459,26 +518,61 @@ export default function ResumeEditor({
 
                   {(exp.technologies && exp.technologies.length > 0) && (
                     <div className="flex items-start gap-1.5 flex-wrap">
-                      <span className="text-[11px] font-semibold text-primary whitespace-nowrap mt-0.5">
+                      <span className="text-xs font-semibold text-primary whitespace-nowrap mt-0.5">
                         Technologies & Tools:
                       </span>
                       {exp.technologies.map((tech, techIdx) => (
-                        <span key={techIdx} className="px-2 py-0.5 text-[11px] bg-gray-100/80 dark:bg-dark-hover/50 text-muted rounded-md">
+                        <span key={techIdx} className="px-2 py-0.5 text-xs bg-gray-100/80 dark:bg-dark-hover/50 text-muted rounded-md">
                           {tech}
                         </span>
                       ))}
                       {!readOnly && (
-                        <button
-                          onClick={() => {
-                            const newTech = prompt('Add technology:');
-                            if (newTech) {
-                              updateExperience(index, 'technologies' as any, [...(exp.technologies || []), newTech]);
-                            }
-                          }}
-                          className="px-2 py-0.5 text-[11px] border border-dashed border-gray-300/50 dark:border-dark-border/50 text-muted rounded-md hover:border-accent-400/50 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
-                        >
-                          + Add
-                        </button>
+                        <>
+                          {addingTechnology?.experienceIndex === index ? (
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={addingTechnology.value}
+                                onChange={(e) => setAddingTechnology({ ...addingTechnology, value: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    saveAddedTechnology();
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setAddingTechnology(null);
+                                  }
+                                }}
+                                autoFocus
+                                className="px-2 py-0.5 text-xs glass-input rounded-md min-w-[140px]"
+                                placeholder="Add technology..."
+                              />
+                              <button
+                                onClick={saveAddedTechnology}
+                                className="px-2 py-0.5 text-xs rounded-md bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400 hover:bg-accent-200/80 dark:hover:bg-accent-500/30 transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setAddingTechnology(null)}
+                                className="px-2 py-0.5 text-xs rounded-md text-muted hover:text-secondary transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setAddingTechnology({ experienceIndex: index, value: '' });
+                                setEditingSkill(null);
+                                setAddingSkill(null);
+                              }}
+                              className="px-2 py-0.5 text-xs border border-dashed border-gray-300/50 dark:border-dark-border/50 text-muted rounded-md hover:border-accent-400/50 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
+                            >
+                              + Add
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
@@ -539,7 +633,7 @@ export default function ResumeEditor({
               <div className="flex items-center gap-2 mb-3">
                 <button
                   onClick={() => setSkillView('template')}
-                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
                     skillView === 'template'
                       ? 'bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400'
                       : 'text-muted hover:text-secondary'
@@ -549,7 +643,7 @@ export default function ResumeEditor({
                 </button>
                 <button
                   onClick={() => setSkillView('all')}
-                  className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-colors ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
                     skillView === 'all'
                       ? 'bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400'
                       : 'text-muted hover:text-secondary'
@@ -565,7 +659,7 @@ export default function ResumeEditor({
                     <h4 className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-accent-500" />
                       Technical Skills
-                      <span className="text-[10px] font-normal text-gray-400">{(resume.templateSkills || []).filter(Boolean).length}/{TECH_SKILL_SLOTS}</span>
+                      <span className="text-xs font-normal text-gray-400">{(resume.templateSkills || []).filter(Boolean).length}/{TECH_SKILL_SLOTS}</span>
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
                       {Array.from({ length: TECH_SKILL_SLOTS }, (_, i) => {
@@ -578,12 +672,12 @@ export default function ResumeEditor({
                             title={readOnly ? skill : 'Click to remove'}
                           >
                             {skill}
-                            {!readOnly && <span className="text-[10px] opacity-50">×</span>}
+                            {!readOnly && <span className="text-xs opacity-50">×</span>}
                           </div>
                         ) : null;
                       })}
                       {(resume.templateSkills || []).filter(Boolean).length < TECH_SKILL_SLOTS && (
-                        <span className="px-2.5 py-1.5 text-[11px] text-muted border border-dashed border-gray-300/50 dark:border-dark-border/50 rounded-lg">
+                        <span className="px-2.5 py-1.5 text-xs text-muted border border-dashed border-gray-300/50 dark:border-dark-border/50 rounded-lg">
                           +{TECH_SKILL_SLOTS - (resume.templateSkills || []).filter(Boolean).length} slots available
                         </span>
                       )}
@@ -592,26 +686,26 @@ export default function ResumeEditor({
 
                   <div className="border-t border-gray-200/50 dark:border-dark-border/30 my-1" />
 
-                  <div className="p-3 bg-purple-50/30 dark:bg-purple-500/5 rounded-xl border border-purple-200/30 dark:border-purple-500/10">
+                  <div className="p-3 bg-violet-50/30 dark:bg-violet-500/5 rounded-xl border border-violet-200/30 dark:border-violet-500/10">
                     <h4 className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
                       AI Cloud Skills and Tools
-                      <span className="text-[10px] font-normal text-gray-400">{(resume.cloudSkills || []).filter(Boolean).length}</span>
+                      <span className="text-xs font-normal text-gray-400">{(resume.cloudSkills || []).filter(Boolean).length}</span>
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
                       {(resume.cloudSkills || []).map((skill, i) => (
                         <div
                           key={i}
-                          className="px-2.5 py-1.5 rounded-lg border border-purple-300/50 bg-purple-50/80 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 text-xs cursor-pointer hover:border-red-300 hover:bg-red-50/50 transition-all flex items-center gap-1.5"
+                          className="px-2.5 py-1.5 rounded-lg border border-violet-300/50 bg-violet-50/80 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400 text-xs cursor-pointer hover:border-red-300 hover:bg-red-50/50 transition-all flex items-center gap-1.5"
                           onClick={() => !readOnly && removeCloudSkill(i)}
                           title={readOnly ? skill : 'Click to remove'}
                         >
                           {skill}
-                          {!readOnly && <span className="text-[10px] opacity-50">×</span>}
+                          {!readOnly && <span className="text-xs opacity-50">×</span>}
                         </div>
                       ))}
                       {(resume.cloudSkills || []).length === 0 && (
-                        <span className="px-2.5 py-1.5 text-[11px] text-muted italic">
+                        <span className="px-2.5 py-1.5 text-xs text-muted italic">
                           No cloud skills assigned
                         </span>
                       )}
@@ -629,7 +723,7 @@ export default function ResumeEditor({
                               key={idx}
                               disabled={isAssigned}
                               onClick={() => assignSkillToNextSlot(skill)}
-                              className={`px-2 py-1 text-[11px] rounded-md transition-all ${
+                              className={`px-2 py-1 text-xs rounded-md transition-all ${
                                 isAssigned
                                   ? 'opacity-40 line-through text-muted cursor-not-allowed'
                                   : 'text-secondary hover:bg-accent-100/80 dark:hover:bg-accent-500/15 hover:text-accent-600 dark:hover:text-accent-400 cursor-pointer'
@@ -650,35 +744,101 @@ export default function ResumeEditor({
                       <h4 className="text-xs font-medium text-muted mb-1.5">{category.name}</h4>
                       <div className="flex flex-wrap gap-1.5">
                         {category.skills.map((skill, skillIndex) => (
-                          <span
-                            key={skillIndex}
-                            className="px-2.5 py-1 bg-accent-50/80 dark:bg-accent-500/15 text-accent-600 dark:text-accent-400 rounded-lg text-xs cursor-pointer hover:bg-accent-100/80 dark:hover:bg-accent-500/25 transition-colors"
-                            onClick={() => {
-                              if (!readOnly) {
-                                const newSkill = prompt('Edit skill:', skill);
-                                if (newSkill !== null) {
-                                  const newSkills = [...category.skills];
-                                  newSkills[skillIndex] = newSkill;
-                                  updateSkillCategory(index, newSkills);
+                          editingSkill?.categoryIndex === index &&
+                          editingSkill.skillIndex === skillIndex ? (
+                            <div key={skillIndex} className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={editingSkill.value}
+                                onChange={(e) => setEditingSkill({ ...editingSkill, value: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    saveEditedSkill();
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingSkill(null);
+                                  }
+                                }}
+                                autoFocus
+                                className="px-2.5 py-1 text-xs glass-input rounded-lg min-w-[140px]"
+                              />
+                              <button
+                                onClick={saveEditedSkill}
+                                className="px-2 py-1 text-xs rounded-md bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400 hover:bg-accent-200/80 dark:hover:bg-accent-500/30 transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingSkill(null)}
+                                className="px-2 py-1 text-xs rounded-md text-muted hover:text-secondary transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              key={skillIndex}
+                              className="px-2.5 py-1 bg-accent-50/80 dark:bg-accent-500/15 text-accent-600 dark:text-accent-400 rounded-lg text-xs cursor-pointer hover:bg-accent-100/80 dark:hover:bg-accent-500/25 transition-colors"
+                              onClick={() => {
+                                if (!readOnly) {
+                                  setEditingSkill({ categoryIndex: index, skillIndex, value: skill });
+                                  setAddingSkill(null);
+                                  setAddingTechnology(null);
                                 }
-                              }
-                            }}
-                          >
-                            {skill}
-                          </span>
+                              }}
+                            >
+                              {skill}
+                            </span>
+                          )
                         ))}
                         {!readOnly && (
-                          <button
-                            onClick={() => {
-                              const newSkill = prompt('Add new skill:');
-                              if (newSkill) {
-                                updateSkillCategory(index, [...category.skills, newSkill]);
-                              }
-                            }}
-                            className="px-2.5 py-1 border border-dashed border-gray-300/50 dark:border-dark-border/50 text-muted rounded-lg text-xs hover:border-accent-400/50 dark:hover:border-accent-500/50 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
-                          >
-                            + Add
-                          </button>
+                          <>
+                            {addingSkill?.categoryIndex === index ? (
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  value={addingSkill.value}
+                                  onChange={(e) => setAddingSkill({ ...addingSkill, value: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      saveAddedSkill();
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setAddingSkill(null);
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="px-2.5 py-1 text-xs glass-input rounded-lg min-w-[140px]"
+                                  placeholder="Add new skill..."
+                                />
+                                <button
+                                  onClick={saveAddedSkill}
+                                  className="px-2 py-1 text-xs rounded-md bg-accent-100/80 dark:bg-accent-500/20 text-accent-600 dark:text-accent-400 hover:bg-accent-200/80 dark:hover:bg-accent-500/30 transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setAddingSkill(null)}
+                                  className="px-2 py-1 text-xs rounded-md text-muted hover:text-secondary transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setAddingSkill({ categoryIndex: index, value: '' });
+                                  setEditingSkill(null);
+                                  setAddingTechnology(null);
+                                }}
+                                className="px-2.5 py-1 border border-dashed border-gray-300/50 dark:border-dark-border/50 text-muted rounded-lg text-xs hover:border-accent-400/50 dark:hover:border-accent-500/50 hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
+                              >
+                                + Add
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

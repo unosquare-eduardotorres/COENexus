@@ -68,7 +68,7 @@ export default function ExternalCandidateToOpSummary({ resumes, position, onNext
             <div className="text-xs font-semibold text-secondary mb-2">Uploaded Resume Files</div>
             <div className="space-y-1.5">
               {resumes.map(resume => (
-                <div key={resume.id} className="text-xs text-primary truncate">
+                <div key={resume.id} className="text-xs text-primary truncate" title={resume.name}>
                   {resume.name}
                 </div>
               ))}
@@ -84,11 +84,11 @@ export default function ExternalCandidateToOpSummary({ resumes, position, onNext
             <div>
               <h4 className="text-xs font-semibold text-cyan-600 dark:text-cyan-400">Pipeline Stages</h4>
               <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">1. Vector Similarity</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">1. Vector Similarity</span>
                 <svg className="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="text-[11px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium">2. Sonnet Deep Analysis</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium">2. Sonnet Deep Analysis</span>
               </div>
             </div>
           </div>

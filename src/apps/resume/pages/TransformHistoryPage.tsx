@@ -7,6 +7,7 @@ import {
   TransformSessionStatus,
   SessionContextType,
 } from '../types';
+import { ChevronIcon, CloseIcon, SearchIcon } from '../components/shared/icons';
 
 const STATUS_STYLES: Record<TransformSessionStatus, { bg: string; dot: string }> = {
   draft: { bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400', dot: 'bg-amber-500' },
@@ -146,9 +147,7 @@ export default function TransformHistoryPage() {
       )}
 
       <div className="relative">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <SearchIcon size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
         <input
           type="text"
           value={nameFilter}
@@ -161,9 +160,7 @@ export default function TransformHistoryPage() {
             onClick={() => setNameFilter('')}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md hover:bg-white/10 text-muted hover:text-secondary transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon size="sm" />
           </button>
         )}
       </div>
@@ -206,10 +203,10 @@ export default function TransformHistoryPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2.5">
-                        <h3 className="text-sm font-semibold text-primary truncate">
+                        <h3 className="text-sm font-semibold text-primary truncate" title={session.name}>
                           {session.name}
                         </h3>
-                        <span className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md ${statusStyle.bg}`}>
+                        <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md ${statusStyle.bg}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
                           {session.status}
                         </span>
@@ -220,7 +217,7 @@ export default function TransformHistoryPage() {
                           {CONTEXT_LABELS[session.contextType] || session.contextType}
                         </span>
                         {session.contextName && (
-                          <span className="text-xs text-muted truncate max-w-[200px]">
+                          <span className="text-xs text-muted truncate max-w-[200px]" title={session.contextName}>
                             {session.contextName}
                           </span>
                         )}
@@ -229,7 +226,7 @@ export default function TransformHistoryPage() {
 
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       <span className="text-xs text-muted">{formatDate(session.createdAt)}</span>
-                      <span className="text-[10px] text-muted/60">{formatFullDate(session.updatedAt)}</span>
+                      <span className="text-xs text-muted/60">{formatFullDate(session.updatedAt)}</span>
                     </div>
                   </div>
 
@@ -248,9 +245,11 @@ export default function TransformHistoryPage() {
                       onClick={() => handleViewDetails(session.id)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-lg hover:bg-white/80 dark:hover:bg-dark-hover transition-colors"
                     >
-                      <svg className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
+                      <ChevronIcon
+                        size="sm"
+                        direction={isExpanded ? 'up' : 'down'}
+                        className="transition-transform"
+                      />
                       Details
                     </button>
                     <button

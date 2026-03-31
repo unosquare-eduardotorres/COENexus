@@ -70,8 +70,7 @@ export default function CandidateCard({
 
   return (
     <div
-      className="glass-card-hover cursor-pointer"
-      onClick={onSelect}
+      className="glass-card-hover"
       style={{
         opacity: 1,
         transform: 'translateY(0)',
@@ -80,64 +79,69 @@ export default function CandidateCard({
       }}
     >
       <div className="flex items-center gap-4 p-4">
-        <span className="text-lg font-mono font-bold text-muted w-8 text-center">{rank}</span>
-
-        <ScoreRing score={candidate.matchScore} size={56} />
-
-        <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${avatarGradient}`}
+        <button
+          type="button"
+          onClick={onSelect}
+          className="appearance-none bg-transparent border-none p-0 text-left w-full flex items-center gap-4 flex-1 min-w-0 cursor-pointer"
         >
-          {getInitials(candidate.name)}
-        </div>
+          <span className="text-lg font-mono font-bold text-muted w-8 text-center">{rank}</span>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-sm font-semibold text-primary truncate">{candidate.name}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${statusBadgeClass}`}>
-              {statusLabel}
-            </span>
+          <ScoreRing score={candidate.matchScore} size={56} />
+
+          <div
+            className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ${avatarGradient}`}
+          >
+            {getInitials(candidate.name)}
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-secondary">{candidate.role}</span>
-            {candidate.mainSkill && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 flex-shrink-0">
-                {candidate.mainSkill}
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm font-semibold text-primary truncate" title={candidate.name}>{candidate.name}</span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${statusBadgeClass}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-secondary">{candidate.role}</span>
+              {candidate.mainSkill && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400 flex-shrink-0">
+                  {candidate.mainSkill}
+                </span>
+              )}
+            </div>
+          <div className="text-xs text-muted truncate" title={candidate.summary}><FitVerdictSummary summary={candidate.summary} fitVerdict={candidate.analysis?.fitVerdict} variant="inline" /></div>
+          </div>
+
+          <div className="hidden lg:flex flex-col items-end text-right gap-0.5 min-w-[140px]">
+            {candidate.country && (
+              <span className="text-xs text-secondary font-medium">{candidate.country}</span>
+            )}
+            {salaryLines.map((line, i) => (
+              <span key={i} className="text-xs text-muted" title={line.label ? `${line.label} Salary` : undefined}>
+                {line.label ? <span className="text-xs text-muted/60 mr-1">{line.label}:</span> : null}
+                {line.value}
+              </span>
+            ))}
+            {candidate.lastStatusUpdate && (
+              <span className="text-xs text-muted">
+                Updated: {new Date(candidate.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </span>
             )}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeBadge}`}>
+              {candidate.type}
+            </span>
           </div>
-          <div className="text-xs text-muted truncate"><FitVerdictSummary summary={candidate.summary} fitVerdict={candidate.analysis?.fitVerdict} variant="inline" /></div>
-        </div>
 
-        <div className="hidden lg:flex flex-col items-end text-right gap-0.5 min-w-[140px]">
-          {candidate.country && (
-            <span className="text-xs text-secondary font-medium">{candidate.country}</span>
-          )}
-          {salaryLines.map((line, i) => (
-            <span key={i} className="text-xs text-muted" title={line.label ? `${line.label} Salary` : undefined}>
-              {line.label ? <span className="text-[10px] text-muted/60 mr-1">{line.label}:</span> : null}
-              {line.value}
-            </span>
-          ))}
-          {candidate.lastStatusUpdate && (
-            <span className="text-[10px] text-muted">
-              Updated: {new Date(candidate.lastStatusUpdate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-            </span>
-          )}
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${typeBadge}`}>
-            {candidate.type}
-          </span>
-        </div>
-
-        <div className="hidden md:block w-32 space-y-1.5">
-          <CategoryBar label="Technical" value={candidate.scores.technical} tooltip="Hard skills, frameworks, and tools match" />
-          <CategoryBar label="Domain" value={candidate.scores.domain} tooltip="Industry knowledge and vertical experience" />
-        </div>
+          <div className="hidden md:block w-32 space-y-1.5">
+            <CategoryBar label="Technical" value={candidate.scores.technical} tooltip="Hard skills, frameworks, and tools match" />
+            <CategoryBar label="Domain" value={candidate.scores.domain} tooltip="Industry knowledge and vertical experience" />
+          </div>
+        </button>
 
         <a
           href={sharepointUrl}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
           className="w-8 h-8 flex items-center justify-center rounded-lg glass-panel-subtle text-muted hover:text-accent-500 transition-colors flex-shrink-0"
           title="View in SharePoint"
         >
@@ -147,10 +151,8 @@ export default function CandidateCard({
         </a>
 
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleCompare();
-          }}
+          type="button"
+          onClick={onToggleCompare}
           className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-all duration-200 flex-shrink-0 ${
             isCompareSelected
               ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500'

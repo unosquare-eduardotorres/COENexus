@@ -7,6 +7,15 @@ import {
 } from '../types';
 import { getDefaultTemplate } from '../data/defaultTemplateConfig';
 
+export interface RuleCatalogEntry {
+  section: string;
+  rule: string;
+  description: string;
+  severity: 'error' | 'warning';
+  status: 'pass' | 'fail' | 'not-applicable';
+  message?: string;
+}
+
 function parseResumeDate(dateStr: string): Date | null {
   if (!dateStr || !dateStr.trim()) return null;
   const normalized = dateStr.trim().toLowerCase();
@@ -67,6 +76,7 @@ export const validationService = {
     results.push(...this.validateCertifications(resume.certifications, activeTemplate));
     results.push(...this.validateContactInfo(resume));
     results.push(...this.validateExperienceTimeline(resume.experience, resume.education));
+    results.push(...this.validateSeniorityAlignment(resume.experience));
 
     return results;
   },
@@ -456,7 +466,7 @@ export const validationService = {
         status: 'warning',
         message: 'Email address is recommended',
         rule: 'presence',
-        category: 'warning',
+        category: 'improvement',
       });
     } else {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -477,7 +487,7 @@ export const validationService = {
         status: 'warning',
         message: 'Phone number is recommended',
         rule: 'presence',
-        category: 'warning',
+        category: 'improvement',
       });
     }
 
@@ -524,6 +534,144 @@ export const validationService = {
     return results;
   },
 
+  validateSeniorityAlignment(experience: StructuredResume['experience']): ValidationResult[] {
+    const results: ValidationResult[] = [];
+    if (!experience || experience.length === 0) return results;
+
+    const now = new Date();
+    let totalMonths = 0;
+
+    for (const exp of experience) {
+      const start = parseResumeDate(exp.startDate);
+      if (!start) continue;
+      const end = parseResumeDate(exp.endDate) || now;
+      const months = (end.getTime() - start.getTime()) / (30 * 24 * 60 * 60 * 1000);
+      if (months > 0) totalMonths += months;
+    }
+
+    const totalYears = Math.round(totalMonths / 12);
+    if (totalYears === 0) return results;
+
+    const mostRecent = [...experience]
+      .filter(e => parseResumeDate(e.startDate))
+      .sort((a, b) => (parseResumeDate(b.startDate)?.getTime() || 0) - (parseResumeDate(a.startDate)?.getTime() || 0))[0];
+    const mostRecentTitle = mostRecent?.title?.toLowerCase() || '';
+
+    const SENIOR_KEYWORDS = ['senior', 'sr.', 'sr ', 'lead', 'principal', 'staff', 'architect', 'director', 'vp', 'head of', 'chief'];
+    const JUNIOR_KEYWORDS = ['junior', 'jr.', 'jr ', 'intern', 'trainee', 'entry', 'associate'];
+    const MID_KEYWORDS = ['mid', 'intermediate', 'developer', 'engineer', 'analyst', 'consultant', 'specialist'];
+
+    const isSeniorTitle = SENIOR_KEYWORDS.some(kw => mostRecentTitle.includes(kw));
+    const isJuniorTitle = JUNIOR_KEYWORDS.some(kw => mostRecentTitle.includes(kw));
+    const isMidTitle = !isSeniorTitle && !isJuniorTitle && MID_KEYWORDS.some(kw => mostRecentTitle.includes(kw));
+
+    if (isSeniorTitle && totalYears <= 3) {
+      results.push({
+        field: 'experience.seniority',
+        status: 'warning',
+        message: `Title "${mostRecent?.title}" suggests senior level, but total experience is ~${totalYears} year${totalYears === 1 ? '' : 's'}`,
+        rule: 'seniority-mismatch',
+        category: 'warning',
+      });
+    }
+
+    if ((isMidTitle || isJuniorTitle) && totalYears >= 12) {
+      const titleLabel = isJuniorTitle ? 'junior' : 'mid-level';
+      results.push({
+        field: 'experience.seniority',
+        status: 'warning',
+        message: `${totalYears} years of experience but most recent title appears ${titleLabel} ("${mostRecent?.title}")`,
+        rule: 'seniority-mismatch',
+        category: 'warning',
+      });
+    }
+
+    return results;
+  },
+
+  getRuleCatalog(resume: StructuredResume, template?: ResumeTemplate): {
+    hardRules: RuleCatalogEntry[];
+    tips: ValidationResult[];
+  } {
+    const activeTemplate = template || getDefaultTemplate();
+    const results = this.validateResume(resume, activeTemplate);
+
+    const hardResults = results.filter(r => r.category !== 'improvement' && r.rule !== 'complete');
+    const tips = results.filter(r => r.category === 'improvement');
+
+    const catalog: RuleCatalogEntry[] = [
+      { section: 'Summary', rule: 'summary-presence', description: 'Summary is present', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-presence', description: 'Has experience entries', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-title', description: 'All entries have job title', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-company', description: 'All entries have company name', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-dates', description: 'All entries have start date', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'gap-between', description: 'No employment gap > 6 months between roles', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'gap-current', description: 'No employment gap > 6 months since last role', severity: 'warning', status: 'pass' },
+      { section: 'Experience Timeline', rule: 'pre-graduation', description: 'No experience started before graduation', severity: 'warning', status: 'pass' },
+      { section: 'Experience Seniority', rule: 'seniority-mismatch', description: 'Title seniority aligns with years of experience', severity: 'warning', status: 'pass' },
+      { section: 'Education', rule: 'edu-presence', description: 'Has education entries', severity: 'error', status: 'pass' },
+      { section: 'Education', rule: 'edu-institution', description: 'All entries have institution', severity: 'error', status: 'pass' },
+      { section: 'Education', rule: 'edu-degree', description: 'All entries have degree', severity: 'error', status: 'pass' },
+      { section: 'Skills', rule: 'skills-presence', description: 'Has skills section', severity: 'error', status: 'pass' },
+      { section: 'Certifications', rule: 'cert-name', description: 'All certifications have a name', severity: 'error', status: 'pass' },
+      { section: 'Contact Info', rule: 'candidate-name', description: 'Candidate name is present', severity: 'error', status: 'pass' },
+      { section: 'Contact Info', rule: 'email-format', description: 'Email format is valid', severity: 'error', status: 'pass' },
+    ];
+
+    const matchRuleToCatalog = (r: ValidationResult): string | null => {
+      if (r.field === 'summary' && r.rule === 'presence') return 'summary-presence';
+      if (r.field === 'experience' && r.rule === 'presence') return 'exp-presence';
+      if (r.field.match(/^experience\[\d+\]\.title/) && r.rule === 'presence') return 'exp-title';
+      if (r.field.match(/^experience\[\d+\]\.company/) && r.rule === 'presence') return 'exp-company';
+      if (r.field.match(/^experience\[\d+\]\.dates/) && r.rule === 'presence') return 'exp-dates';
+      if (r.field === 'experience.gap' && r.rule === 'employment-gap') {
+        return r.message.includes('today') ? 'gap-current' : 'gap-between';
+      }
+      if (r.field === 'experience.timeline' && r.rule === 'pre-graduation-experience') return 'pre-graduation';
+      if (r.field === 'experience.seniority' && r.rule === 'seniority-mismatch') return 'seniority-mismatch';
+      if (r.field === 'education' && r.rule === 'presence') return 'edu-presence';
+      if (r.field.match(/^education\[\d+\]\.institution/) && r.rule === 'presence') return 'edu-institution';
+      if (r.field.match(/^education\[\d+\]\.degree/) && r.rule === 'presence') return 'edu-degree';
+      if (r.field === 'skills' && r.rule === 'presence') return 'skills-presence';
+      if (r.field.match(/^certifications\[\d+\]\.name/) && r.rule === 'presence') return 'cert-name';
+      if (r.field === 'candidateName' && r.rule === 'presence') return 'candidate-name';
+      if (r.field === 'email' && r.rule === 'format') return 'email-format';
+      return null;
+    };
+
+    for (const result of hardResults) {
+      const catalogKey = matchRuleToCatalog(result);
+      if (catalogKey) {
+        const entry = catalog.find(c => c.rule === catalogKey);
+        if (entry && entry.status !== 'fail') {
+          entry.status = 'fail';
+          entry.message = result.message;
+        } else if (entry && entry.status === 'fail' && result.message) {
+          entry.message = entry.message + '; ' + result.message;
+        }
+      }
+    }
+
+    if (!resume.education || resume.education.length === 0) {
+      const eduPresence = catalog.find(c => c.rule === 'edu-presence');
+      if (eduPresence && eduPresence.status === 'pass') {
+        const eduSection = activeTemplate.sections.find(s => s.type === 'education');
+        if (!eduSection?.required) {
+          eduPresence.status = 'not-applicable';
+        }
+      }
+    }
+
+    if (!resume.certifications || resume.certifications.length === 0) {
+      const certName = catalog.find(c => c.rule === 'cert-name');
+      if (certName && certName.status === 'pass') {
+        certName.status = 'not-applicable';
+      }
+    }
+
+    return { hardRules: catalog, tips };
+  },
+
   getOverallStatus(results: ValidationResult[]): ValidationStatus {
     if (results.some((r) => r.status === 'error')) {
       return 'error';
@@ -545,9 +693,6 @@ export const validationService = {
   } {
     const fields = [
       { name: 'Candidate Name', filled: !!resume.candidateName },
-      { name: 'Email', filled: !!resume.email },
-      { name: 'Phone', filled: !!resume.phone },
-      { name: 'Location', filled: !!resume.location },
       { name: 'Summary', filled: !!resume.summary && resume.summary.length > 50 },
       { name: 'Experience', filled: resume.experience && resume.experience.length > 0 },
       { name: 'Education', filled: resume.education && resume.education.length > 0 },

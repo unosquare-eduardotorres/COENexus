@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { SyncSourceType, SyncProgress, SyncRecord, PipelineStatus, ProcessingProgress } from '../../types';
+import { ISSUE_STATUS_COLORS, PIPELINE_STATUS_COLORS } from '../../utils/statusColors';
 import SyncRecordTable from './SyncRecordTable';
 import ConfirmModal from './ConfirmModal';
 import DangerConfirmModal from './DangerConfirmModal';
 import YearSelector from './YearSelector';
+import { CheckIcon, DocumentIcon, SettingsIcon, SpinnerIcon } from '../shared/icons';
 
 interface SyncDashboardProps {
   source: SyncSourceType;
@@ -60,10 +62,10 @@ type StatusCardKey = PipelineStatus | 'all' | 'excluded';
 interface StatusCardDef {
   key: StatusCardKey;
   label: string;
-  icon: JSX.Element;
+  icon: (className: string) => JSX.Element;
   borderColor: string;
   bgColor: string;
-  iconBg: string;
+  iconColor: string;
   glowRing: string;
   glowShadow: string;
   getValue: (p: SyncProgress, records: SyncRecord[]) => number;
@@ -73,34 +75,34 @@ const ISSUE_CARDS: StatusCardDef[] = [
   {
     key: 'incomplete',
     label: 'Incomplete',
-    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
-    borderColor: 'border-amber-200/60 dark:border-amber-500/20',
-    bgColor: 'bg-amber-100 dark:bg-amber-500/20',
-    iconBg: 'text-amber-600 dark:text-amber-400',
-    glowRing: 'ring-2 ring-amber-400 dark:ring-amber-500',
-    glowShadow: 'shadow-lg shadow-amber-500/20',
+    icon: (className) => (
+      <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    ...ISSUE_STATUS_COLORS.incomplete,
     getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'incomplete').length,
   },
   {
     key: 'not-processed',
     label: 'Not Processed',
-    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />,
-    borderColor: 'border-red-200/60 dark:border-red-500/20',
-    bgColor: 'bg-red-100 dark:bg-red-500/20',
-    iconBg: 'text-red-600 dark:text-red-400',
-    glowRing: 'ring-2 ring-red-400 dark:ring-red-500',
-    glowShadow: 'shadow-lg shadow-red-500/20',
+    icon: (className) => (
+      <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+      </svg>
+    ),
+    ...ISSUE_STATUS_COLORS['not-processed'],
     getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'not-processed').length,
   },
   {
     key: 'excluded',
     label: 'Excluded',
-    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" />,
-    borderColor: 'border-orange-200/60 dark:border-orange-500/20',
-    bgColor: 'bg-orange-100 dark:bg-orange-500/20',
-    iconBg: 'text-orange-600 dark:text-orange-400',
-    glowRing: 'ring-2 ring-orange-400 dark:ring-orange-500',
-    glowShadow: 'shadow-lg shadow-orange-500/20',
+    icon: (className) => (
+      <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636" />
+      </svg>
+    ),
+    ...ISSUE_STATUS_COLORS.excluded,
     getValue: (p) => p.skippedCount ?? 0,
   },
 ];
@@ -109,41 +111,22 @@ const PIPELINE_CARDS: StatusCardDef[] = [
   {
     key: 'synced',
     label: 'Synced',
-    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />,
-    borderColor: 'border-emerald-200/60 dark:border-emerald-500/20',
-    bgColor: 'bg-emerald-100 dark:bg-emerald-500/20',
-    iconBg: 'text-emerald-600 dark:text-emerald-400',
-    glowRing: 'ring-2 ring-emerald-400 dark:ring-emerald-500',
-    glowShadow: 'shadow-lg shadow-emerald-500/20',
+    icon: (className) => <CheckIcon className={className} />,
+    ...PIPELINE_STATUS_COLORS.synced,
     getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'synced' && !r.failed).length,
   },
   {
     key: 'extracted',
     label: 'Extracted',
-    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
-    borderColor: 'border-blue-200/60 dark:border-blue-500/20',
-    bgColor: 'bg-blue-100 dark:bg-blue-500/20',
-    iconBg: 'text-blue-600 dark:text-blue-400',
-    glowRing: 'ring-2 ring-blue-400 dark:ring-blue-500',
-    glowShadow: 'shadow-lg shadow-blue-500/20',
+    icon: (className) => <DocumentIcon className={className} />,
+    ...PIPELINE_STATUS_COLORS.extracted,
     getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'extracted' || (r.pipelineStatus === 'synced' && r.failed)).length,
   },
   {
     key: 'vectorized',
     label: 'Vectorized',
-    icon: (
-      <>
-        <circle cx="5" cy="12" r="2" strokeWidth={2} />
-        <circle cx="19" cy="6" r="2" strokeWidth={2} />
-        <circle cx="19" cy="18" r="2" strokeWidth={2} />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l10-4M7 13l10 4" />
-      </>
-    ),
-    borderColor: 'border-violet-200/60 dark:border-violet-500/20',
-    bgColor: 'bg-violet-100 dark:bg-violet-500/20',
-    iconBg: 'text-violet-600 dark:text-violet-400',
-    glowRing: 'ring-2 ring-violet-400 dark:ring-violet-500',
-    glowShadow: 'shadow-lg shadow-violet-500/20',
+    icon: (className) => <SettingsIcon className={className} />,
+    ...PIPELINE_STATUS_COLORS.vectorized,
     getValue: (_p, records) => records.filter(r => r.pipelineStatus === 'vectorized' || (r.pipelineStatus === 'extracted' && r.failed)).length,
   },
 ];
@@ -332,7 +315,7 @@ function ProgressBar({
         />
       </div>
       {progress.currentRecord && (
-        <p className="text-xs text-muted truncate">
+        <p className="text-xs text-muted truncate" title={progress.currentRecord}>
           Processing "{progress.currentRecord}"
         </p>
       )}
@@ -401,6 +384,21 @@ export default function SyncDashboard({
     vectorizationProgress && vectorizationProgress.totalRecords > 0
       ? Math.round((vectorizationProgress.processedRecords / vectorizationProgress.totalRecords) * 100)
       : 0;
+  const selectedFilterLabel = statusFilter === 'all' ? 'all statuses' : statusFilter.replace(/-/g, ' ');
+  const selectedStatusTabId = statusFilter === 'all' ? undefined : `sync-status-tab-${statusFilter}`;
+  const syncLiveMessages: Array<string | null> = [
+    isLoadingRecords ? `Loading ${sourceLabel} records.` : null,
+    isClearing ? `Clearing ${sourceLabel} records.` : null,
+    isActiveOrPaused ? `Sync ${progress.status}. ${progressPercent}% complete.` : null,
+    isExtracting ? `Extraction ${extractionProgress?.status ?? 'in progress'}. ${extractionPercent}% complete.` : null,
+    isVectorizing ? `Vectorization ${vectorizationProgress?.status ?? 'in progress'}. ${vectorizationPercent}% complete.` : null,
+    !isLoadingRecords && !isClearing && !isActiveOrPaused && !isExtracting && !isVectorizing
+      ? `Showing ${records.length.toLocaleString()} records. Filter ${selectedFilterLabel}.`
+      : null,
+  ];
+  const syncLiveMessage = syncLiveMessages
+    .filter((message): message is string => Boolean(message))
+    .join(' ');
 
   const handleCardClick = (key: StatusCardKey) => {
     setStatusFilter((prev) => (prev === key ? 'all' : key));
@@ -416,8 +414,8 @@ export default function SyncDashboard({
     onClearData?.();
   };
 
-  const renderCardGrid = (cards: StatusCardDef[], isRecordDerived: (key: StatusCardKey) => boolean) => (
-    <div className="grid grid-cols-3 gap-4">
+  const renderCardGrid = (cards: StatusCardDef[], isRecordDerived: (key: StatusCardKey) => boolean, groupLabel: string) => (
+    <div className="grid grid-cols-3 gap-4" role="tablist" aria-label={groupLabel}>
       {cards.map((card) => {
         const isSelected = statusFilter === card.key;
         const value = card.getValue(progress, records);
@@ -425,6 +423,13 @@ export default function SyncDashboard({
         return (
           <button
             key={card.key}
+            id={`sync-status-tab-${card.key}`}
+            type="button"
+            role="tab"
+            aria-selected={isSelected}
+            aria-controls="sync-records-panel"
+            tabIndex={0}
+            aria-label={`${card.label}: ${value.toLocaleString()} (${pct(value, isDerived ? records.length : fetchedBase)})`}
             onClick={() => handleCardClick(card.key)}
             className={`glass-card p-5 border text-left transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
               isSelected
@@ -434,9 +439,7 @@ export default function SyncDashboard({
           >
             <div className="flex items-center gap-2.5 mb-3">
               <div className={`w-10 h-10 rounded-lg ${card.bgColor} flex items-center justify-center flex-shrink-0`}>
-                <svg className={`w-5 h-5 ${card.iconBg}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {card.icon}
-                </svg>
+                {card.icon(card.iconColor)}
               </div>
               <span className="text-xs font-semibold text-muted uppercase tracking-wider">{card.label}</span>
             </div>
@@ -452,6 +455,9 @@ export default function SyncDashboard({
 
   return (
     <div className="space-y-4">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {syncLiveMessage}
+      </div>
       <div className="glass-card p-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -519,17 +525,14 @@ export default function SyncDashboard({
         </div>
       )}
 
-      {renderCardGrid(ISSUE_CARDS, () => true)}
-      {renderCardGrid(PIPELINE_CARDS, () => true)}
+      {renderCardGrid(ISSUE_CARDS, () => true, 'Issue status filters')}
+      {renderCardGrid(PIPELINE_CARDS, () => true, 'Pipeline status filters')}
 
       <div className="flex items-center justify-between gap-2">
         <div>
           {isClearing ? (
             <div className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-500 dark:text-red-400">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <SpinnerIcon size="sm" className="text-red-500 dark:text-red-400" />
               Clearing...
             </div>
           ) : canClear && onClearData ? (
@@ -665,11 +668,7 @@ export default function SyncDashboard({
               gradientClass="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
               label={source === 'open-positions' ? 'Extract JDs' : 'Extract Resumes'}
               reLabel={source === 'open-positions' ? 'Re-extract JDs' : 'Re-extract'}
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              }
+              icon={<DocumentIcon size="sm" />}
               disabled={isSyncInProgress}
             />
           )}
@@ -683,17 +682,10 @@ export default function SyncDashboard({
               onResume={onResumeVectorization}
               bgClass="bg-violet-500"
               hoverBgClass="hover:bg-violet-600"
-              gradientClass="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+              gradientClass="bg-gradient-to-r from-violet-500 to-violet-500 hover:from-violet-600 hover:to-violet-600"
               label={source === 'open-positions' ? 'Vectorize JDs' : 'Vectorize'}
               reLabel={source === 'open-positions' ? 'Re-vectorize JDs' : 'Re-vectorize'}
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="5" cy="12" r="2" strokeWidth={2} />
-                  <circle cx="19" cy="6" r="2" strokeWidth={2} />
-                  <circle cx="19" cy="18" r="2" strokeWidth={2} />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l10-4M7 13l10 4" />
-                </svg>
-              }
+              icon={<SettingsIcon size="sm" />}
               disabled={isSyncInProgress}
             />
           )}
@@ -719,36 +711,40 @@ export default function SyncDashboard({
           progress={vectorizationProgress}
           percent={vectorizationPercent}
           dotColor="bg-violet-500"
-          barGradient="bg-gradient-to-r from-violet-500 to-purple-500"
+          barGradient="bg-gradient-to-r from-violet-500 to-violet-500"
           textColor="text-violet-500"
           onPause={onPauseVectorization}
           onResume={onResumeVectorization}
         />
       )}
 
-      {isLoadingRecords ? (
-        <div className="glass-card flex items-center justify-center py-12">
-          <div className="flex items-center gap-3 text-sm text-muted">
-            <svg className="w-5 h-5 animate-spin text-accent-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading records...
+      <div
+        id="sync-records-panel"
+        role="tabpanel"
+        aria-label={`${sourceLabel} records`}
+        aria-labelledby={selectedStatusTabId}
+      >
+        {isLoadingRecords ? (
+          <div className="glass-card flex items-center justify-center py-12" role="status" aria-live="polite" aria-atomic="true">
+            <div className="flex items-center gap-3 text-sm text-muted">
+              <SpinnerIcon className="text-accent-500" />
+              Loading records...
+            </div>
           </div>
-        </div>
-      ) : (
-        <SyncRecordTable
-          records={records}
-          source={source}
-          statusFilter={statusFilter}
-          onRefreshRecord={onRefreshRecord}
-          refreshingId={refreshingId}
-          onVectorizeRecord={onVectorizeRecord}
-          vectorizingId={vectorizingId}
-          extractingUpstreamId={extractingUpstreamId}
-          vectorizingUpstreamId={vectorizingUpstreamId}
-        />
-      )}
+        ) : (
+          <SyncRecordTable
+            records={records}
+            source={source}
+            statusFilter={statusFilter}
+            onRefreshRecord={onRefreshRecord}
+            refreshingId={refreshingId}
+            onVectorizeRecord={onVectorizeRecord}
+            vectorizingId={vectorizingId}
+            extractingUpstreamId={extractingUpstreamId}
+            vectorizingUpstreamId={vectorizingUpstreamId}
+          />
+        )}
+      </div>
 
       {showClearConfirm && (
         <DangerConfirmModal

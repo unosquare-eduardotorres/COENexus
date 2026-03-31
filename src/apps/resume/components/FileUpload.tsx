@@ -207,14 +207,14 @@ export default function FileUpload({
             {acceptedFormats.map((format) => (
               <span
                 key={format}
-                className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100/50 dark:bg-dark-hover/50 text-muted rounded"
+                className="px-1.5 py-0.5 text-xs font-medium bg-gray-100/50 dark:bg-dark-hover/50 text-muted rounded"
               >
                 {format.replace('.', '').toUpperCase()}
               </span>
             ))}
           </div>
 
-          <p className="text-[10px] text-gray-400">
+          <p className="text-xs text-gray-400">
             Max {maxFiles} files, {maxSizeMB}MB each
           </p>
         </div>
@@ -267,12 +267,12 @@ export default function FileUpload({
                 >
                   {getFileIcon(file.name)}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-primary truncate">{file.name}</p>
+                    <p className="text-sm font-medium text-primary truncate" title={file.name}>{file.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
+                      <span className="px-1.5 py-0.5 text-xs font-semibold bg-gray-100 dark:bg-dark-hover text-gray-500 dark:text-gray-400 rounded">
                         {ext}
                       </span>
-                      <span className="text-[10px] text-muted">{formatFileSize(file.size)}</span>
+                      <span className="text-xs text-muted">{formatFileSize(file.size)}</span>
                     </div>
                   </div>
                   <button

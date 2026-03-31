@@ -87,12 +87,12 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-primary truncate">{candidate.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${typeBadge}`}>
+                    <span className="text-sm font-semibold text-primary truncate" title={candidate.name}>{candidate.name}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${typeBadge}`}>
                       {candidate.type}
                     </span>
                   </div>
-                  <div className="text-xs text-secondary truncate">{candidate.role}</div>
+                  <div className="text-xs text-secondary truncate" title={candidate.role}>{candidate.role}</div>
                 </div>
               </div>
 
@@ -120,7 +120,7 @@ export default function CompareView({ candidates, onBack }: CompareViewProps) {
                             : 'bg-red-500'
                       }`}
                     />
-                    <span className="text-xs text-secondary flex-1 truncate">{skill.name}</span>
+                    <span className="text-xs text-secondary flex-1 truncate" title={skill.name}>{skill.name}</span>
                     <span className="text-xs font-mono text-muted">{skill.years}y</span>
                   </div>
                 ))}

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { validateJwtStructure, decodeTokenPayload, isTokenExpired } from '../../utils/tokenUtils';
+import { ArrowIcon, CheckIcon, SpinnerIcon } from '../shared/icons';
 
 interface TokenInputProps {
   token: string;
@@ -72,7 +73,7 @@ export default function TokenInput({
             <ol className="space-y-1.5">
               {extractionSteps.map((step, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-secondary">
-                  <span className="flex-shrink-0 w-4 h-4 rounded-full bg-accent-500/10 text-accent-500 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                  <span className="flex-shrink-0 w-4 h-4 rounded-full bg-accent-500/10 text-accent-500 flex items-center justify-center text-xs font-bold mt-0.5">
                     {i + 1}
                   </span>
                   {step}
@@ -112,9 +113,7 @@ export default function TokenInput({
 
       {localValidation === 'valid' && !isValid && !error && (
         <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl">
-          <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <CheckIcon size="sm" className="text-emerald-500 flex-shrink-0" />
           <p className="text-sm text-emerald-600 dark:text-emerald-400">Token structure looks valid. Click below to verify with the server.</p>
         </div>
       )}
@@ -131,9 +130,7 @@ export default function TokenInput({
       {isValid && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <CheckIcon size="sm" className="text-emerald-500 flex-shrink-0" />
             <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Connected successfully</p>
           </div>
           <button
@@ -154,10 +151,7 @@ export default function TokenInput({
           >
             {isValidating ? (
               <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <SpinnerIcon size="sm" />
                 Validating...
               </>
             ) : (
@@ -178,9 +172,7 @@ export default function TokenInput({
                 onClick={onContinueWithoutToken}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-secondary bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl hover:bg-gray-50 dark:hover:bg-dark-hover transition-colors duration-200 font-medium text-sm"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
+                <ArrowIcon size="sm" />
                 Continue without Token
               </button>
               <p className="text-xs text-muted text-center">

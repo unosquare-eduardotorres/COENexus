@@ -46,7 +46,7 @@ const SOURCES: SourceOption[] = [
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
-    gradient: 'from-violet-500 to-purple-500',
+    gradient: 'from-violet-500 to-violet-500',
     badgeClass: 'bg-violet-500/15 text-violet-400',
   },
   {
@@ -116,7 +116,7 @@ export default function DataSourceStep({ onNext, initialSource, poolCounts }: Da
                   <div className="flex items-center justify-center gap-2">
                     <h3 className="text-sm font-semibold text-primary">{source.title}</h3>
                     {getCount(source.countKey) !== null && getCount(source.countKey)! > 0 && (
-                      <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md ${source.badgeClass}`}>
+                      <span className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded-md ${source.badgeClass}`}>
                         {getCount(source.countKey)!.toLocaleString()}
                       </span>
                     )}

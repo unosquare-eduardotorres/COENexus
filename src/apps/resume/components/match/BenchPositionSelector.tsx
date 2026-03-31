@@ -295,7 +295,7 @@ export default function BenchPositionSelector({
                     <td className="py-2 px-2 font-medium text-primary">
                       {pos.account}
                       {disabled && (
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
                           Not vectorized
                         </span>
                       )}
