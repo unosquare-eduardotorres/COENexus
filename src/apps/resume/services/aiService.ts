@@ -4,7 +4,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   provider: 'local',
   localEndpoint: '/api/claude/v1',
   cloudEndpoint: 'https://api.anthropic.com/v1',
-  model: 'claude-sonnet-4',
+  model: 'claude-sonnet-4-20250514',
   temperature: 0.1,
   maxTokens: 4096,
 };
@@ -135,7 +135,7 @@ function mapToStructuredResume(
       institution: String(e.institution || ''),
       degree: String(e.degree || ''),
       field: String(e.field || ''),
-      graduationDate: String(e.graduationDate || ''),
+      graduationDate: String(e.graduationDate || '').toLowerCase() === 'unknown' ? '' : String(e.graduationDate || ''),
       gpa: e.gpa ? String(e.gpa) : undefined,
       honors: e.honors ? String(e.honors) : undefined,
     };
@@ -156,7 +156,7 @@ function mapToStructuredResume(
       id: `cert-${now}-${idx}`,
       name: String(c.name || ''),
       issuer: String(c.issuer || ''),
-      date: String(c.date || ''),
+      date: String(c.date || '').toLowerCase() === 'unknown' ? '' : String(c.date || ''),
     };
   });
 
@@ -391,8 +391,11 @@ function buildEnhancementPrompt(resume: StructuredResume, mode: RefinementMode):
   };
 
   const allSkills = resume.skills.flatMap(cat => cat.skills);
+  const today = new Date().toISOString().split('T')[0];
 
   return `Enhance this resume content. Mode: ${mode}. Instructions: ${modeInstructions[mode]}
+
+Today's date is ${today}. When the summary mentions years of experience, recalculate from the earliest experience start date to today and use the correct number.
 
 Return ONLY valid JSON (no markdown, no explanation) with this structure:
 {
@@ -400,15 +403,17 @@ Return ONLY valid JSON (no markdown, no explanation) with this structure:
   "experience": [
     { "description": "enhanced description", "achievements": ["enhanced achievement 1"], "technologies": ["technology1", "technology2"] }
   ],
-  "templateSkills": ["top 14 most relevant technical skills"],
+  "templateSkills": ["top 14 technical skills — prioritize the candidate's primary tech domain"],
   "cloudSkills": ["all AI/cloud-related skills"]
 }
 
 Keep the same number of experience entries in the same order. Only enhance summary and experience descriptions/achievements/technologies. When returning technologies, split compound entries (e.g. 'Entity Framework/Dapper' → separate items).
 
 Current resume data:
-${JSON.stringify({ summary: resume.summary, experience: resume.experience.map(e => ({ description: e.description, achievements: e.achievements, technologies: e.technologies || [] })) })}
-Also select the TOP 14 most relevant technical skills and all AI/cloud tools from: ${JSON.stringify(allSkills)}`;
+${JSON.stringify({ summary: resume.summary, experience: resume.experience.map(e => ({ startDate: e.startDate, endDate: e.endDate, description: e.description, achievements: e.achievements, technologies: e.technologies || [] })) })}
+Select the TOP 14 most relevant technical skills from: ${JSON.stringify(allSkills)}
+IMPORTANT for templateSkills selection: First identify the candidate's primary technology domain from their experience entries (e.g., iOS/Swift, .NET/C#, React/TypeScript, Java/Android, Python/ML). Ensure at least 8 of the 14 skills are core technologies from that domain (languages, frameworks, SDKs, testing tools). Fill the remaining slots with supporting tools. Do NOT prioritize generic project management tools (Jira, SCRUM, Confluence) over domain-specific technologies.
+Also select all AI/cloud-related skills for cloudSkills.`;
 }
 
 export const aiService = {
@@ -457,8 +462,8 @@ export const aiService = {
       const processingTimeMs = Math.round(performance.now() - startTime);
       return { resume, metrics: { extractionTokens: usage, totalTokens: usage, processingTimeMs, modelUsed: config.model, wasAiExtraction: true } };
     } catch (error) {
-      console.warn('AI extraction failed, using regex fallback:', error);
-      return { resume: regexFallbackParse(rawText, fileName, fileType), metrics: { extractionTokens: null, totalTokens: null, processingTimeMs: Math.round(performance.now() - startTime), modelUsed: config.model, wasAiExtraction: false } };
+      const msg = error instanceof Error ? error.message : 'AI extraction failed';
+      throw new Error(`Resume extraction failed: ${msg}`);
     }
   },
 

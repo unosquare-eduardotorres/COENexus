@@ -995,7 +995,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     {
-                      id: 'claude-sonnet-4',
+                      id: 'claude-sonnet-4-20250514',
                       name: 'Sonnet 4',
                       badge: 'Balanced',
                       description: 'Best balance of quality and speed. Excellent at structured extraction and JSON output.',
@@ -1007,7 +1007,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       checkColor: 'text-accent-500',
                     },
                     {
-                      id: 'claude-opus-4',
+                      id: 'claude-opus-4-20250514',
                       name: 'Opus 4',
                       badge: 'Premium',
                       description: 'Highest quality and deepest reasoning. Best for complex analysis tasks.',
@@ -1019,7 +1019,7 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       checkColor: 'text-purple-500',
                     },
                     {
-                      id: 'claude-haiku-4',
+                      id: 'claude-haiku-4-20250414',
                       name: 'Haiku 4',
                       badge: 'Fastest',
                       description: 'Lightweight and ultra-fast. Good for quick validation and simple checks.',

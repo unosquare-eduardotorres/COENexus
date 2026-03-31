@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "electron:dev": "concurrently \"npm run build:electron\" \"electron .\"",
+    "electron:build": "npm run build && npm run build:electron",
+    "build:electron": "tsc -p electron/tsconfig.json",
+    "dist": "npm run build && npm run build:electron && electron-builder"
   },
   "dependencies": {
     "jszip": "^3.10.1",
@@ -18,7 +23,9 @@
     "pdfjs-dist": "^4.9.155",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0"
+    "react-router-dom": "^6.21.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -38,6 +45,63 @@
     "vitest": "^3.0.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/jest-dom": "^6.6.0",
-    "jsdom": "^25.0.0"
+    "jsdom": "^25.0.0",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "concurrently": "^8.2.2",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17"
+  },
+  "build": {
+    "appId": "com.unosquare.operation-nexus",
+    "productName": "Operation Nexus",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "resources/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

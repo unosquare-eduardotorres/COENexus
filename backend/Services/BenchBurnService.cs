@@ -244,34 +244,10 @@ public class BenchBurnService
                 }
                 else
                 {
-                    candidateTimings.Add(new CandidateTimingDto
-                    {
-                        Name = $"{emp?.FullName ?? "Unknown"} × {posLabel}",
-                        Phase = "opus",
-                        DurationMs = callTimer.ElapsedMilliseconds,
-                        Fallback = true,
-                        Error = lastEx?.Message,
-                    });
-                    Interlocked.Increment(ref fallbackCount);
-
-                    allResults.Add(new CrossMatchResultDto
-                    {
-                        EmployeeUpstreamId = empId,
-                        EmployeeName = emp?.FullName ?? "Unknown",
-                        PositionUpstreamId = posId,
-                        PositionLabel = posLabel,
-                        MatchScore = (int)(cosine * 100),
-                        CosineSimilarity = cosine,
-                        Scores = new MatchScoresDto
-                        {
-                            Technical = (int)(cosine * 90),
-                            Domain = (int)(cosine * 70),
-                            Leadership = 50,
-                            SoftSkills = 50,
-                            Availability = 100
-                        },
-                        Summary = "AI analysis unavailable — score based on vector similarity only."
-                    });
+                    _logger.LogError("[BenchBurn] Opus failed for {Emp}×{Pos}: {Err}",
+                        emp?.FullName ?? "Unknown", posLabel, lastEx?.Message);
+                    throw lastEx ?? new InvalidOperationException(
+                        $"Opus analysis returned no result for {emp?.FullName ?? "Unknown"} × {posLabel}");
                 }
             }
             finally
@@ -577,34 +553,10 @@ public class BenchBurnService
                 }
                 else
                 {
-                    candidateTimings.Add(new CandidateTimingDto
-                    {
-                        Name = $"{candidateName} × {posLabel}",
-                        Phase = "opus",
-                        DurationMs = callTimer.ElapsedMilliseconds,
-                        Fallback = true,
-                        Error = lastEx?.Message,
-                    });
-                    Interlocked.Increment(ref fallbackCount);
-
-                    allResults.Add(new CrossMatchResultDto
-                    {
-                        EmployeeUpstreamId = candidateId,
-                        EmployeeName = candidateName,
-                        PositionUpstreamId = posId,
-                        PositionLabel = posLabel,
-                        MatchScore = (int)(cosine * 100),
-                        CosineSimilarity = cosine,
-                        Scores = new MatchScoresDto
-                        {
-                            Technical = (int)(cosine * 90),
-                            Domain = (int)(cosine * 70),
-                            Leadership = 50,
-                            SoftSkills = 50,
-                            Availability = 100
-                        },
-                        Summary = "AI analysis unavailable — score based on vector similarity only."
-                    });
+                    _logger.LogError("[ExternalCandidate] Opus failed for {Name}×{Pos}: {Err}",
+                        candidateName, posLabel, lastEx?.Message);
+                    throw lastEx ?? new InvalidOperationException(
+                        $"Opus analysis returned no result for {candidateName} × {posLabel}");
                 }
             }
             finally
@@ -847,15 +799,10 @@ public class BenchBurnService
                 }
                 else
                 {
-                    candidateTimings.Add(new CandidateTimingDto
-                    {
-                        Name = $"{emp?.FullName ?? "Unknown"} × {posLabel}",
-                        Phase = "opus",
-                        DurationMs = callTimer.ElapsedMilliseconds,
-                        Fallback = true,
-                        Error = lastEx?.Message,
-                    });
-                    Interlocked.Increment(ref fallbackCount);
+                    _logger.LogError("[BenchBurn Retry] Opus failed for {Emp}×{Pos}: {Err}",
+                        emp?.FullName ?? "Unknown", posLabel, lastEx?.Message);
+                    throw lastEx ?? new InvalidOperationException(
+                        $"Opus retry failed for {emp?.FullName ?? "Unknown"} × {posLabel}");
                 }
             }
             finally

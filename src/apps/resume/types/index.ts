@@ -91,11 +91,14 @@ export type ResumeStatus =
 
 export type ValidationStatus = 'valid' | 'warning' | 'error' | 'pending';
 
+export type ValidationCategory = 'warning' | 'improvement';
+
 export interface ValidationResult {
   field: string;
   status: ValidationStatus;
   message: string;
   rule: string;
+  category: ValidationCategory;
 }
 
 export interface AISuggestion {
@@ -248,7 +251,10 @@ export interface ATSCandidate {
   email?: string;
   phone?: string;
   resumeFile?: string;
+  resumeUrl?: string;
   upstreamId?: number;
+  hasResume?: boolean;
+  isVectorized?: boolean;
 }
 
 export interface PresentedCandidate {

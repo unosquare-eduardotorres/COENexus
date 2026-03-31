@@ -17,10 +17,11 @@ export default function ValidationPanel({
   onFieldClick,
 }: ValidationPanelProps) {
   const errors = results.filter((r) => r.status === 'error');
-  const warnings = results.filter((r) => r.status === 'warning');
+  const warnings = results.filter((r) => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning');
+  const improvements = results.filter((r) => r.status !== 'valid' && r.status !== 'error' && r.category === 'improvement');
   const valid = results.filter((r) => r.status === 'valid');
 
-  const getStatusIcon = (status: ValidationStatus) => {
+  const getStatusIcon = (status: ValidationStatus, category?: 'warning' | 'improvement') => {
     switch (status) {
       case 'error':
         return (
@@ -33,6 +34,13 @@ export default function ValidationPanel({
           </svg>
         );
       case 'warning':
+        if (category === 'improvement') {
+          return (
+            <svg className="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+            </svg>
+          );
+        }
         return (
           <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
             <path
@@ -101,13 +109,13 @@ export default function ValidationPanel({
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2.5 bg-red-50/50 dark:bg-red-500/10 rounded-xl">
-            <span className="text-xl font-semibold text-red-600 dark:text-red-400">{errors.length}</span>
-            <p className="text-[10px] text-red-600 dark:text-red-400 mt-0.5">Errors</p>
-          </div>
           <div className="text-center p-2.5 bg-amber-50/50 dark:bg-amber-500/10 rounded-xl">
-            <span className="text-xl font-semibold text-amber-600 dark:text-amber-400">{warnings.length}</span>
+            <span className="text-xl font-semibold text-amber-600 dark:text-amber-400">{errors.length + warnings.length}</span>
             <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">Warnings</p>
+          </div>
+          <div className="text-center p-2.5 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-xl">
+            <span className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">{improvements.length}</span>
+            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">Improvements</p>
           </div>
           <div className="text-center p-2.5 bg-emerald-50/50 dark:bg-emerald-500/10 rounded-xl">
             <span className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">{valid.length}</span>
@@ -165,7 +173,16 @@ export default function ValidationPanel({
 
         {warnings.length > 0 && (
           <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30">
-            <h4 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">Warnings</h4>
+            <h4 className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Warnings
+            </h4>
             <div className="space-y-1.5">
               {warnings.map((result, index) => (
                 <div
@@ -173,12 +190,40 @@ export default function ValidationPanel({
                   onClick={() => onFieldClick?.(result.field)}
                   className="flex items-start gap-2 p-2 bg-amber-50/50 dark:bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-500/15 transition-colors"
                 >
-                  {getStatusIcon(result.status)}
+                  {getStatusIcon(result.status, 'warning')}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                       {formatFieldName(result.field)}
                     </p>
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">{result.message}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {improvements.length > 0 && (
+          <div className="p-3 border-b border-gray-200/30 dark:border-dark-border/30">
+            <h4 className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+              </svg>
+              Improvements
+            </h4>
+            <div className="space-y-1.5">
+              {improvements.map((result, index) => (
+                <div
+                  key={`improvement-${index}`}
+                  onClick={() => onFieldClick?.(result.field)}
+                  className="flex items-start gap-2 p-2 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-lg cursor-pointer hover:bg-indigo-100/50 dark:hover:bg-indigo-500/15 transition-colors"
+                >
+                  {getStatusIcon(result.status, 'improvement')}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                      {formatFieldName(result.field)}
+                    </p>
+                    <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-0.5">{result.message}</p>
                   </div>
                 </div>
               ))}

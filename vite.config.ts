@@ -17,6 +17,9 @@ export default defineConfig({
         target: 'http://localhost:3456',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/claude/, ''),
+        headers: {
+          'Authorization': 'Bearer nexus-local-dev',
+        },
       },
       '/api/sync': {
         target: backendTarget,
@@ -31,6 +34,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/database': {
+        target: backendTarget,
+        changeOrigin: true,
+      },
+      '/api/sessions': {
         target: backendTarget,
         changeOrigin: true,
       },

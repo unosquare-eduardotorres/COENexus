@@ -49,3 +49,5 @@ backend/tessdata/*.traineddata
 
 # HAR files (may contain tokens and sensitive data)
 *.har
+# Agent Studio worktrees
+.agent-studio/

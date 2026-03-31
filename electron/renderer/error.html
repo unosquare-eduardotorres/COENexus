@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operation Nexus - Error</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        .error-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logo {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #fff, #e0e7ff);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin: 20px 0;
+            opacity: 0.9;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+
+        .retry-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .retry-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .version-info {
+            margin-top: 40px;
+            opacity: 0.6;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="logo">⚡ Operation Nexus</div>
+        <h1>Unable to Load Application</h1>
+        <p>
+            The application failed to load properly. This could be due to a network issue
+            or the local server not being available.
+        </p>
+        <button class="retry-button" onclick="location.reload()">
+            Retry Loading
+        </button>
+
+        <div class="version-info">
+            <p>
+                Chrome: <span id="chrome-version"></span><br>
+                Node: <span id="node-version"></span><br>
+                Electron: <span id="electron-version"></span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

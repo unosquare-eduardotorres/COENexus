@@ -97,6 +97,18 @@ export const benchBurnService = {
     return res.json();
   },
 
+  async searchCandidates(query: string): Promise<SyncedCandidateListItem[]> {
+    const res = await fetch(`${API_BASE}/search-candidates?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error(`Search candidates failed: ${res.status}`);
+    return res.json();
+  },
+
+  async searchEmployees(query: string): Promise<BenchEmployee[]> {
+    const res = await fetch(`${API_BASE}/search-employees?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error(`Search employees failed: ${res.status}`);
+    return res.json();
+  },
+
   async getOpenPositions(): Promise<BenchOpenPosition[]> {
     const res = await fetch(`${API_BASE}/open-positions`);
     if (!res.ok) throw new Error(`Open positions failed: ${res.status}`);

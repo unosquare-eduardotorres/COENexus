@@ -9,4 +9,5 @@ public class ClaudeProxySettings
     public int TimeoutSeconds { get; set; } = 120;
     public int MaxConcurrency { get; set; } = 8;
     public int HaikuMaxConcurrency { get; set; } = 20;
+    public string ApiKey { get; set; } = "nexus-local-dev";
 }

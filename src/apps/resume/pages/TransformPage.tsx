@@ -322,6 +322,7 @@ export default function TransformPage() {
   const [showFallbackWarning, setShowFallbackWarning] = useState(false);
   const [processingMetrics, setProcessingMetrics] = useState<ResumeProcessingMetrics[]>([]);
   const [reviewViewMode, setReviewViewMode] = useState<ReviewViewMode>('editor');
+  const [validationCollapsed, setValidationCollapsed] = useState(true);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [generatedDocx, setGeneratedDocx] = useState<Blob | null>(null);
   const [showEnhancerModal, setShowEnhancerModal] = useState(false);
@@ -419,33 +420,36 @@ export default function TransformPage() {
   }, [currentStepKey]);
 
   useEffect(() => {
-    if (sourceType === 'employees' && liveEmployees.length === 0 && !loadingEmployees) {
-      setLoadingEmployees(true);
-      benchBurnService.getAllEmployees()
-        .then(setLiveEmployees)
-        .catch(() => {})
-        .finally(() => setLoadingEmployees(false));
+    if (candidateSearch.trim().length < 3) {
+      setLiveCandidates([]);
+      return;
     }
-    if (sourceType === 'ats-candidates' && liveCandidates.length === 0 && !loadingCandidates) {
-      setLoadingCandidates(true);
-      benchBurnService.getAllCandidates()
+    setLoadingCandidates(true);
+    const timeout = setTimeout(() => {
+      benchBurnService.searchCandidates(candidateSearch.trim())
         .then(setLiveCandidates)
-        .catch(() => {})
+        .catch(() => setLiveCandidates([]))
         .finally(() => setLoadingCandidates(false));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceType]);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [candidateSearch]);
 
-  const filteredEmployees = useMemo(() => {
-    if (!employeeSearch.trim()) return liveEmployees;
-    const q = employeeSearch.toLowerCase();
-    return liveEmployees.filter(e =>
-      e.name.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q) ||
-      e.mainSkill.toLowerCase().includes(q) ||
-      e.country.toLowerCase().includes(q)
-    );
-  }, [liveEmployees, employeeSearch]);
+  useEffect(() => {
+    if (employeeSearch.trim().length < 3) {
+      setLiveEmployees([]);
+      return;
+    }
+    setLoadingEmployees(true);
+    const timeout = setTimeout(() => {
+      benchBurnService.searchEmployees(employeeSearch.trim())
+        .then(setLiveEmployees)
+        .catch(() => setLiveEmployees([]))
+        .finally(() => setLoadingEmployees(false));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [employeeSearch]);
+
+  const filteredEmployees = useMemo(() => liveEmployees, [liveEmployees]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -490,6 +494,10 @@ export default function TransformPage() {
     if (resume.skills.flatMap(c => c.skills).length === 0) warnings.push('No technical skills found');
     if (!resume.cloudSkills?.length && !resume.templateSkills?.some(s => /azure|aws|gcp|cloud/i.test(s))) warnings.push('No AI cloud skills or tools found');
     if (resume.education.length === 0) warnings.push('No academic background found');
+    if (resume.education.some(e => !e.graduationDate?.trim() || e.graduationDate.toLowerCase() === 'unknown'))
+      warnings.push('Missing graduation year in academic background');
+    if (resume.certifications.some(c => !c.date?.trim() || c.date.toLowerCase() === 'unknown'))
+      warnings.push('Missing year in certifications');
     return warnings;
   }, []);
 
@@ -503,8 +511,15 @@ export default function TransformPage() {
     return validationService.getCompleteness(activeResume);
   }, [activeResume]);
 
+  useEffect(() => {
+    if (currentStepKey === 'review' && activeResume) {
+      const results = validationService.validateResume(activeResume);
+      setValidationResults(results);
+    }
+  }, [currentStepKey, activeResume]);
+
   const filteredCandidates = useMemo(() => {
-    const mapped: ATSCandidate[] = liveCandidates.map(c => ({
+    return liveCandidates.map(c => ({
       id: String(c.upstreamId),
       upstreamId: c.upstreamId,
       name: c.name,
@@ -514,14 +529,9 @@ export default function TransformPage() {
       positions: [],
       resumeUrl: '',
       hasResume: c.hasResume,
+      isVectorized: c.isVectorized,
     }));
-    if (!candidateSearch.trim()) return mapped;
-    const q = candidateSearch.toLowerCase();
-    return mapped.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.email?.toLowerCase().includes(q)
-    );
-  }, [liveCandidates, candidateSearch]);
+  }, [liveCandidates]);
 
   const isCandidateAlreadyPresented = useCallback(
     (position: ATSPosition) => {
@@ -707,6 +717,8 @@ export default function TransformPage() {
   }, [sourceType, selectedCandidate, selectedEmployee, selectedPosition, selectedFiles, refinementMode, jobDescriptionSource, customJobDescription]);
 
   const defaultSessionName = useMemo(() => {
+    const now = new Date();
+    const dateStr = `${String(now.getFullYear()).slice(-2)}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
     const subject = sourceType === 'ats-candidates' && selectedCandidate
       ? selectedCandidate.name
       : sourceType === 'employees' && selectedEmployee
@@ -718,8 +730,8 @@ export default function TransformPage() {
       'ats-optimized': 'ATS-Optimized',
       'job-tailoring': 'Job Description Tailoring',
     };
-    return `${subject} — ${modeLabels[refinementMode]}`;
-  }, [sourceType, selectedCandidate, selectedFiles, refinementMode]);
+    return `${dateStr} - ${subject} - ${modeLabels[refinementMode]}`;
+  }, [sourceType, selectedCandidate, selectedEmployee, selectedFiles, refinementMode]);
 
   const handleTransform = useCallback(() => {
     if (claudeConnected === false) {
@@ -1478,13 +1490,14 @@ export default function TransformPage() {
                       {loadingEmployees ? (
                         <p className="text-sm text-muted text-center py-4">Loading employees...</p>
                       ) : filteredEmployees.length === 0 ? (
-                        <p className="text-sm text-muted text-center py-4">No employees found</p>
+                        <p className="text-sm text-muted text-center py-4">{employeeSearch.trim().length < 3 ? 'Type at least 3 characters to search employees' : 'No employees found'}</p>
                       ) : (
                         filteredEmployees.map((employee) => (
                           <button
                             key={employee.upstreamId}
                             onClick={() => handleEmployeeSelect(employee)}
-                            className={`w-full text-left p-3 rounded-lg transition-all ${
+                            disabled={!employee.isVectorized}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${!employee.isVectorized ? 'opacity-50 cursor-not-allowed' : ''} ${
                               selectedEmployee?.upstreamId === employee.upstreamId
                                 ? 'bg-accent-50 dark:bg-accent-500/15 border-2 border-accent-500'
                                 : 'bg-white/50 dark:bg-dark-hover/30 border-2 border-transparent hover:bg-white/80 dark:hover:bg-dark-hover/50'
@@ -1520,6 +1533,11 @@ export default function TransformPage() {
                                   {employee.isVectorized && (
                                     <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 rounded">
                                       Vectorized
+                                    </span>
+                                  )}
+                                  {!employee.isVectorized && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
+                                      Not Vectorized
                                     </span>
                                   )}
                                 </div>
@@ -1592,13 +1610,14 @@ export default function TransformPage() {
                       {loadingCandidates ? (
                         <p className="text-sm text-muted text-center py-4">Loading candidates...</p>
                       ) : filteredCandidates.length === 0 ? (
-                        <p className="text-sm text-muted text-center py-4">No candidates found</p>
+                        <p className="text-sm text-muted text-center py-4">{candidateSearch.trim().length < 3 ? 'Type at least 3 characters to search candidates' : 'No candidates found'}</p>
                       ) : (
                         filteredCandidates.map((candidate) => (
                           <button
                             key={candidate.id}
                             onClick={() => handleCandidateSelect(candidate)}
-                            className={`w-full text-left p-3 rounded-lg transition-all ${
+                            disabled={!candidate.isVectorized}
+                            className={`w-full text-left p-3 rounded-lg transition-all ${!candidate.isVectorized ? 'opacity-50 cursor-not-allowed' : ''} ${
                               selectedCandidate?.id === candidate.id
                                 ? 'bg-accent-50 dark:bg-accent-500/15 border-2 border-accent-500'
                                 : 'bg-white/50 dark:bg-dark-hover/30 border-2 border-transparent hover:bg-white/80 dark:hover:bg-dark-hover/50'
@@ -1624,6 +1643,11 @@ export default function TransformPage() {
                                       {skill}
                                     </span>
                                   ))}
+                                  {!candidate.isVectorized && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 rounded">
+                                      Not Vectorized
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                               <div className="text-xs text-muted">
@@ -2055,6 +2079,42 @@ export default function TransformPage() {
                       </div>
                     </div>
 
+                    {validationResults.length > 0 && (
+                      <div className="glass-card mb-4 overflow-hidden">
+                        <button
+                          onClick={() => setValidationCollapsed(!validationCollapsed)}
+                          className="w-full flex items-center justify-between p-3 hover:bg-white/30 dark:hover:bg-dark-hover/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <svg className={`w-4 h-4 text-muted transition-transform ${validationCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="text-xs font-semibold text-primary">Validation & Completeness</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {validationResults.filter(r => r.status === 'error').length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-red-100/80 dark:bg-red-500/20 text-red-700 dark:text-red-400 rounded-full">
+                                {validationResults.filter(r => r.status === 'error').length} errors
+                              </span>
+                            )}
+                            {validationResults.filter(r => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning').length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full">
+                                {validationResults.filter(r => r.status !== 'valid' && r.status !== 'error' && r.category === 'warning').length} warnings
+                              </span>
+                            )}
+                            {validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement').length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 rounded-full">
+                                {validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement').length} improvements
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                        {!validationCollapsed && (
+                          <ValidationPanel results={validationResults} completeness={completeness} />
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex gap-4">
                       {(reviewViewMode === 'editor' || reviewViewMode === 'split') && activeResume && (
                         <div className={reviewViewMode === 'split' ? 'w-1/2 min-w-0' : 'w-full'}>
@@ -2107,11 +2167,6 @@ export default function TransformPage() {
                       )}
                     </div>
 
-                    {validationResults.length > 0 && (
-                      <div className="mt-4">
-                        <ValidationPanel results={validationResults} completeness={completeness} />
-                      </div>
-                    )}
                   </div>
                 </div>
 

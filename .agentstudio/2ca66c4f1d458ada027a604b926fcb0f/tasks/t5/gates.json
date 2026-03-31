@@ -1,0 +1,114 @@
+{
+  "gates": [
+    {
+      "type": "typecheck",
+      "passed": true,
+      "summary": "typecheck passed"
+    },
+    {
+      "type": "lint",
+      "passed": true,
+      "summary": "lint passed"
+    },
+    {
+      "type": "test",
+      "passed": true,
+      "summary": "test passed"
+    }
+  ],
+  "loopState": {
+    "taskId": "t5",
+    "agentId": "unknown",
+    "iteration": 4,
+    "maxIterations": 4,
+    "gateHistory": [
+      {
+        "iteration": 1,
+        "gates": [
+          {
+            "type": "typecheck",
+            "passed": false,
+            "summary": "TypeScript: unknown error(s).   Property 'onExport' does not exist on type 'IntrinsicAttributes & PdfPreviewPanelProps'.\nsrc/apps/resume/pages/TransformPage.tsx(316,10): error TS6133: 'isGeneratingSuggestions' is declared but its value is never read.\nsrc/apps/resume/pages/TransformPage.tsx(853,9): error TS6133: 'handleExportDocx' is declared but its value is never read.\nsrc/apps/resume/services/pdfExportService.ts(11,47): erro"
+          },
+          {
+            "type": "lint",
+            "passed": false,
+            "summary": "Lint: unknown issue(s). > coe-operation-nexus@0.0.0 lint\n> eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0\nOops! Something went wrong! :(\nESLint: 8.57.1\nESLint couldn't find a configuration file. To set up a configuration file for this project, please run:\n    npm init @eslint/config\nESLint looked for configuration files in /Users/eduardo.torres/Downloads/COE Operation Nexus/.agent-studio/worktr"
+          },
+          {
+            "type": "test",
+            "passed": false,
+            "summary": "Tests: unknown failure(s). > coe-operation-nexus@0.0.0 test\n> vitest run\nsh: vitest: command not found"
+          }
+        ],
+        "allPassed": false
+      },
+      {
+        "iteration": 2,
+        "gates": [
+          {
+            "type": "typecheck",
+            "passed": true,
+            "summary": "typecheck passed"
+          },
+          {
+            "type": "lint",
+            "passed": false,
+            "summary": "Lint: unknown issue(s). > coe-operation-nexus@0.0.0 lint\n> eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0\nOops! Something went wrong! :(\nESLint: 8.57.1\nESLint couldn't find a configuration file. To set up a configuration file for this project, please run:\n    npm init @eslint/config\nESLint looked for configuration files in /Users/eduardo.torres/Downloads/COE Operation Nexus/.agent-studio/worktr"
+          },
+          {
+            "type": "test",
+            "passed": false,
+            "summary": "Tests: unknown failure(s). > coe-operation-nexus@0.0.0 test\n> vitest run\nsh: vitest: command not found"
+          }
+        ],
+        "allPassed": false
+      },
+      {
+        "iteration": 3,
+        "gates": [
+          {
+            "type": "typecheck",
+            "passed": true,
+            "summary": "typecheck passed"
+          },
+          {
+            "type": "lint",
+            "passed": true,
+            "summary": "lint passed"
+          },
+          {
+            "type": "test",
+            "passed": false,
+            "summary": "Tests: unknown failure(s). > coe-operation-nexus@0.0.0 test\n> vitest run\nsh: vitest: command not found"
+          }
+        ],
+        "allPassed": false
+      },
+      {
+        "iteration": 4,
+        "gates": [
+          {
+            "type": "typecheck",
+            "passed": true,
+            "summary": "typecheck passed"
+          },
+          {
+            "type": "lint",
+            "passed": true,
+            "summary": "lint passed"
+          },
+          {
+            "type": "test",
+            "passed": true,
+            "summary": "test passed"
+          }
+        ],
+        "allPassed": true
+      }
+    ],
+    "stuckDetected": false,
+    "outcome": "passed"
+  },
+  "timestamp": "2026-03-28T16:57:59.259Z"
+}

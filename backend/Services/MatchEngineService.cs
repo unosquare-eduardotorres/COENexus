@@ -482,21 +482,8 @@ Resume:
                 }
                 catch (Exception ex)
                 {
-                    callTimer.Stop();
-                    Interlocked.Increment(ref haikuFallbackCount);
-                    candidateTimings.Add(new CandidateTimingDto
-                    {
-                        Name = candidate.Name ?? "Unknown",
-                        Phase = "haiku",
-                        DurationMs = callTimer.ElapsedMilliseconds,
-                        Fallback = true,
-                        Error = ex.Message
-                    });
-                    _logger.LogWarning("[MatchEngine] Haiku FALLBACK [{I}/{Total}] {Name}: {Ms}ms — {Err}",
-                        i + 1, afterConstraints.Count, candidate.Name, callTimer.ElapsedMilliseconds, ex.Message);
-                    var fallbackScore = (int)(candidate.CosineSimilarity * 80);
-                    haikuScores[candidate.UpstreamId] = fallbackScore;
-                    triaged.Add((candidate, fallbackScore));
+                    _logger.LogError(ex, "[MatchEngine] Haiku call failed for {Name} — aborting pipeline", candidate.Name);
+                    throw;
                 }
             }
             finally
@@ -758,48 +745,8 @@ Resume:
                 }
                 catch (Exception ex)
                 {
-                    callTimer.Stop();
-                    Interlocked.Increment(ref sonnetFallbackCount);
-                    candidateTimings.Add(new CandidateTimingDto
-                    {
-                        Name = candidate.Name ?? "Unknown",
-                        Phase = "sonnet",
-                        DurationMs = callTimer.ElapsedMilliseconds,
-                        Fallback = true,
-                        Error = ex.Message
-                    });
-                    _logger.LogWarning("[MatchEngine] Sonnet FALLBACK [{I}/{Total}] {Name}: {Ms}ms — {Err}",
-                        i + 1, topCandidates.Count, candidate.Name, callTimer.ElapsedMilliseconds, ex.Message);
-                    var emptyArray = JsonSerializer.Deserialize<JsonElement>("[]");
-                    results.Add(new MatchCandidateResult
-                    {
-                        Id = candidate.UpstreamId,
-                        Name = candidate.Name ?? "Unknown",
-                        Type = candidate.SourceType == "employees" ? "employee" : "candidate",
-                        Role = candidate.JobTitle ?? "Unknown",
-                        MatchScore = (int)(candidate.CosineSimilarity * 100),
-                        Summary = "AI analysis unavailable — score based on vector similarity only.",
-                        Seniority = candidate.Seniority ?? "",
-                        ExpectedRate = candidate.Rate ?? 0,
-                        Currency = candidate.Currency ?? "",
-                        Country = candidate.Country ?? "",
-                        MainSkill = candidate.MainSkill ?? "",
-                        IsBench = candidate.IsBench,
-                        CandidateStatus = candidate.CandidateStatus ?? (candidate.SourceType == "employees" ? "Employee" : null),
-                        SalaryExpectations = candidate.SalaryExpectations ?? 0,
-                        SalaryExpectationsCurrency = candidate.SalaryExpectationsCurrency ?? "",
-                        LastStatusUpdate = candidate.LastStatusUpdate?.ToString("yyyy-MM-dd"),
-                        Leadership = emptyArray,
-                        SoftSkills = emptyArray,
-                        Scores = new MatchScoresDto
-                        {
-                            Technical = (int)(candidate.CosineSimilarity * 90),
-                            Domain = (int)(candidate.CosineSimilarity * 70),
-                            Leadership = 50,
-                            SoftSkills = 50,
-                            Availability = candidate.IsBench ? 100 : 70
-                        }
-                    });
+                    _logger.LogError(ex, "[MatchEngine] Sonnet/Opus analysis failed for {Name} — aborting pipeline", candidate.Name);
+                    throw;
                 }
             }
             finally

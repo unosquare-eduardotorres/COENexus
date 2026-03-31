@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Options;
 using OperationNexus.Api.Configuration;
 using OperationNexus.Api.Data;
 using OperationNexus.Api.Services;
@@ -57,8 +58,12 @@ builder.Services.AddSingleton<IEmbeddingJobQueue, EmbeddingJobQueue>();
 builder.Services.AddHostedService<EmbeddingBackgroundService>();
 
 builder.Services.Configure<ClaudeProxySettings>(builder.Configuration.GetSection("ClaudeProxy"));
-builder.Services.AddHttpClient<ClaudeProxyService>();
-builder.Services.AddScoped<IClaudeProxyService, ClaudeProxyService>();
+builder.Services.AddHttpClient<IClaudeProxyService, ClaudeProxyService>((sp, client) =>
+{
+    var settings = sp.GetRequiredService<IOptions<ClaudeProxySettings>>().Value;
+    client.DefaultRequestHeaders.Authorization =
+        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", settings.ApiKey);
+});
 builder.Services.AddScoped<IMatchEngineService, MatchEngineService>();
 builder.Services.AddScoped<BenchBurnService>();
 builder.Services.AddScoped<IDatabaseSharingService, DatabaseSharingService>();

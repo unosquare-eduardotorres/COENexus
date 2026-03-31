@@ -87,7 +87,7 @@ function buildTokenMap(resume: StructuredResume): Record<string, string> {
 
   tokens['{{PROFILE_SUMMARY}}'] = resume.summary;
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < resume.experience.length; i++) {
     const exp = resume.experience[i];
     const prefix = `{{EXP${i + 1}_`;
 
@@ -148,7 +148,7 @@ function clearEmptyExperienceBlocks(xml: string): string {
   const paragraphs = Array.from(doc.getElementsByTagNameNS(ns, 'p'));
 
   const emptyBlockPrefixes: string[] = [];
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= 10; i++) {
     const companyToken = `{{EXP${i}_COMPANY}}`;
     const isCleared = !xml.includes(companyToken) &&
       paragraphs.some(p => {
@@ -174,6 +174,60 @@ function clearEmptyExperienceBlocks(xml: string): string {
       for (const t of Array.from(textNodes)) {
         t.textContent = '';
       }
+    }
+
+    if (fullText.length > 3 && (fullText.endsWith(' \u2014') || fullText.endsWith(' \u2014 '))) {
+      for (const t of Array.from(textNodes)) {
+        const content = t.textContent || '';
+        if (content.includes('\u2014')) {
+          t.textContent = content.replace(/\s*\u2014\s*$/, '');
+        }
+      }
+    }
+  }
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
+function cloneExperienceBlocks(xml: string, experienceCount: number): string {
+  if (experienceCount <= 3) return xml;
+
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  const paragraphs = Array.from(doc.getElementsByTagNameNS(ns, 'p'));
+
+  let exp3StartIdx = -1;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const textNodes = paragraphs[i].getElementsByTagNameNS(ns, 't');
+    const text = Array.from(textNodes).map(t => t.textContent || '').join('');
+    if (text.includes('{{EXP3_COMPANY}}')) {
+      exp3StartIdx = i;
+      break;
+    }
+  }
+
+  if (exp3StartIdx === -1) return xml;
+
+  const exp3Paragraphs = paragraphs.slice(exp3StartIdx, exp3StartIdx + 4);
+  const insertionPoint = exp3Paragraphs[3].nextSibling;
+  const parentNode = exp3Paragraphs[3].parentNode;
+  if (!parentNode) return xml;
+
+  for (let expIdx = 4; expIdx <= experienceCount; expIdx++) {
+    const clonedParagraphs: Node[] = [];
+    for (const para of exp3Paragraphs) {
+      const clone = para.cloneNode(true) as Element;
+      const textNodes = clone.getElementsByTagNameNS(ns, 't');
+      for (const t of Array.from(textNodes)) {
+        const content = t.textContent || '';
+        t.textContent = content.replace(/EXP3_/g, `EXP${expIdx}_`);
+      }
+      clonedParagraphs.push(clone);
+    }
+
+    for (const cloned of clonedParagraphs) {
+      parentNode.insertBefore(cloned, insertionPoint);
     }
   }
 
@@ -260,6 +314,129 @@ function removeEmptyCertificationsTable(xml: string, certifications: { name: str
   return new XMLSerializer().serializeToString(doc);
 }
 
+function keepExperienceBlocksTogether(xml: string): string {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  const paragraphs = Array.from(doc.getElementsByTagNameNS(ns, 'p'));
+
+  const techIndices: number[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const textNodes = paragraphs[i].getElementsByTagNameNS(ns, 't');
+    const text = Array.from(textNodes).map(t => t.textContent || '').join('');
+    if (text.includes('Technologies') && text.includes('Tools')) {
+      techIndices.push(i);
+    }
+  }
+
+  for (const techIdx of techIndices) {
+    for (let offset = 3; offset >= 1; offset--) {
+      const paraIdx = techIdx - offset;
+      if (paraIdx < 0) continue;
+      const para = paragraphs[paraIdx];
+
+      let pPr = para.getElementsByTagNameNS(ns, 'pPr')[0];
+      if (!pPr) {
+        pPr = doc.createElementNS(ns, 'w:pPr');
+        para.insertBefore(pPr, para.firstChild);
+      }
+
+      if (pPr.getElementsByTagNameNS(ns, 'keepNext').length === 0) {
+        const keepNext = doc.createElementNS(ns, 'w:keepNext');
+        pPr.appendChild(keepNext);
+      }
+
+      if (pPr.getElementsByTagNameNS(ns, 'keepLines').length === 0) {
+        const keepLines = doc.createElementNS(ns, 'w:keepLines');
+        pPr.appendChild(keepLines);
+      }
+    }
+
+    const techPara = paragraphs[techIdx];
+    let techPPr = techPara.getElementsByTagNameNS(ns, 'pPr')[0];
+    if (!techPPr) {
+      techPPr = doc.createElementNS(ns, 'w:pPr');
+      techPara.insertBefore(techPPr, techPara.firstChild);
+    }
+    if (techPPr.getElementsByTagNameNS(ns, 'keepLines').length === 0) {
+      const keepLines = doc.createElementNS(ns, 'w:keepLines');
+      techPPr.appendChild(keepLines);
+    }
+  }
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
+function adjustNameFontSize(headerXml: string, candidateName: string): string {
+  const nameLen = candidateName.length;
+  if (nameLen <= 25) return headerXml;
+
+  let newSize: string;
+  if (nameLen <= 35) newSize = '52';
+  else if (nameLen <= 45) newSize = '44';
+  else newSize = '36';
+
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(headerXml, 'application/xml');
+  const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
+
+  for (const para of Array.from(paragraphs)) {
+    const textNodes = para.getElementsByTagNameNS(ns, 't');
+    const text = Array.from(textNodes).map(t => t.textContent || '').join('');
+
+    if (text === candidateName || text.includes(candidateName)) {
+      const runs = para.getElementsByTagNameNS(ns, 'r');
+      for (const run of Array.from(runs)) {
+        const rPr = run.getElementsByTagNameNS(ns, 'rPr')[0];
+        if (!rPr) continue;
+
+        const szNodes = rPr.getElementsByTagNameNS(ns, 'sz');
+        const szCsNodes = rPr.getElementsByTagNameNS(ns, 'szCs');
+
+        for (const sz of Array.from(szNodes)) {
+          sz.setAttribute('w:val', newSize);
+        }
+        for (const szCs of Array.from(szCsNodes)) {
+          szCs.setAttribute('w:val', newSize);
+        }
+      }
+      break;
+    }
+  }
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
+function forcePageBreakBeforeTechnicalSkills(xml: string): string {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  const paragraphs = doc.getElementsByTagNameNS(ns, 'p');
+
+  for (const para of Array.from(paragraphs)) {
+    const textNodes = para.getElementsByTagNameNS(ns, 't');
+    const fullText = Array.from(textNodes).map(t => t.textContent || '').join('').trim();
+
+    if (fullText === 'Technical Skills') {
+      let pPr = para.getElementsByTagNameNS(ns, 'pPr')[0];
+      if (!pPr) {
+        pPr = doc.createElementNS(ns, 'w:pPr');
+        para.insertBefore(pPr, para.firstChild);
+      }
+
+      const existing = pPr.getElementsByTagNameNS(ns, 'pageBreakBefore');
+      if (existing.length === 0) {
+        const pageBreak = doc.createElementNS(ns, 'w:pageBreakBefore');
+        pPr.appendChild(pageBreak);
+      }
+      break;
+    }
+  }
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
 export const templateFillService = {
   async getTemplateBuffer(): Promise<ArrayBuffer> {
     const stored = localStorage.getItem('output_template_docx');
@@ -296,6 +473,7 @@ export const templateFillService = {
       for (const [token, value] of Object.entries(tokenMap)) {
         header2 = replaceTokenInXml(header2, token, value);
       }
+      header2 = adjustNameFontSize(header2, resume.candidateName);
       zip.file('word/header2.xml', header2);
     }
 
@@ -303,12 +481,15 @@ export const templateFillService = {
     if (docFile) {
       let docXml = await docFile.async('string');
       docXml = mergeFragmentedTokens(docXml);
+      docXml = cloneExperienceBlocks(docXml, resume.experience.length);
       for (const [token, value] of Object.entries(tokenMap)) {
         docXml = replaceTokenInXml(docXml, token, value);
       }
       docXml = fillCloudSkillsTable(docXml, resume.cloudSkills || []);
       docXml = removeEmptyCertificationsTable(docXml, resume.certifications);
       docXml = clearEmptyExperienceBlocks(docXml);
+      docXml = keepExperienceBlocksTogether(docXml);
+      docXml = forcePageBreakBeforeTechnicalSkills(docXml);
       zip.file('word/document.xml', docXml);
     }
 

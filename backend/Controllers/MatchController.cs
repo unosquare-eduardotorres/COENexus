@@ -266,6 +266,71 @@ public class MatchController : ControllerBase
         return Ok(candidates);
     }
 
+    [HttpGet("search-candidates")]
+    public async Task<IActionResult> SearchCandidates([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Length < 3)
+            return Ok(Array.Empty<object>());
+
+        var query = q.ToLower();
+        var candidates = await _dbContext.SyncedCandidates
+            .Where(c => c.FullName.ToLower().Contains(query) ||
+                         (c.Email != null && c.Email.ToLower().Contains(query)) ||
+                         (c.MainSkill != null && c.MainSkill.ToLower().Contains(query)))
+            .OrderBy(c => c.FullName)
+            .Take(50)
+            .Select(c => new
+            {
+                c.UpstreamId,
+                Name = c.FullName,
+                Email = c.Email ?? "",
+                Seniority = c.Seniority ?? "",
+                MainSkill = c.MainSkill ?? "",
+                Country = c.Country ?? "",
+                CurrentSalary = c.CurrentSalary,
+                SalaryCurrency = c.SalaryCurrency ?? "",
+                c.CoeCertified,
+                CandidateStatus = c.CandidateStatus ?? "",
+                c.HasResume,
+                IsVectorized = _dbContext.ResumeEmbeddings
+                    .Any(re => re.SourceType == "candidates" && re.UpstreamId == c.UpstreamId && re.Embedding != null)
+            })
+            .ToListAsync();
+        return Ok(candidates);
+    }
+
+    [HttpGet("search-employees")]
+    public async Task<IActionResult> SearchEmployees([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Length < 3)
+            return Ok(Array.Empty<object>());
+
+        var query = q.ToLower();
+        var employees = await _dbContext.SyncedEmployees
+            .Where(e => e.FullName.ToLower().Contains(query) ||
+                         e.Email.ToLower().Contains(query) ||
+                         e.MainSkill.ToLower().Contains(query))
+            .OrderBy(e => e.FullName)
+            .Take(50)
+            .Select(e => new
+            {
+                e.UpstreamId,
+                Name = e.FullName,
+                e.Email,
+                e.Seniority,
+                e.MainSkill,
+                e.Country,
+                e.GrossMonthlySalary,
+                e.SalaryCurrency,
+                e.LastAccount,
+                e.IsBench,
+                IsVectorized = _dbContext.ResumeEmbeddings
+                    .Any(re => re.SourceType == "employees" && re.UpstreamId == e.UpstreamId && re.Embedding != null)
+            })
+            .ToListAsync();
+        return Ok(employees);
+    }
+
     [HttpGet("open-positions")]
     public async Task<IActionResult> GetOpenPositions()
     {
@@ -405,7 +470,8 @@ public class MatchController : ControllerBase
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[ExternalCandidate] Stream died: {ex}");
-            var errorData = JsonSerializer.Serialize(new { error = ex.Message }, jsonOptions);
+            var errorMsg = ex.InnerException != null ? $"{ex.Message} → {ex.InnerException.Message}" : ex.Message;
+            var errorData = JsonSerializer.Serialize(new { error = errorMsg }, jsonOptions);
             await Response.WriteAsync($"event: error\ndata: {errorData}\n\n");
             await Response.Body.FlushAsync();
         }
