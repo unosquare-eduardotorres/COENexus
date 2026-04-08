@@ -503,11 +503,16 @@ export const upstreamApiService = {
 
   async getNoteFile(token: string, noteId: number): Promise<ArrayBuffer> {
     const { upstream } = getConfig()
-    const response = await fetch(`${upstream.apiUrl}personanote/file/${noteId}`, {
-      headers: { 'x-sharepoint-token': token },
-    })
-    if (!response.ok) throw new Error(`Note file download failed: ${response.status}`)
-    return response.arrayBuffer()
+    try {
+      const response = await fetch(`${upstream.apiUrl}personanote/file/${noteId}`, {
+        headers: { 'x-sharepoint-token': token },
+      })
+      if (!response.ok) throw new Error(`Note file download failed: ${response.status}`)
+      return response.arrayBuffer()
+    } catch (err) {
+      log.error(`getNoteFile failed for noteId=${noteId}`, err instanceof Error ? err : new Error(String(err)), { noteId })
+      throw err
+    }
   },
 
   async getOpenPositionsPaged(token: string, skip: number, take: number): Promise<{ items: OpenPositionListItem[]; totalRecords: number }> {
@@ -533,6 +538,7 @@ export const upstreamApiService = {
       sourcing: row.length > 19 ? getString(row, 19) : '',
       replacement: row.length > 20 && getBool(row, 20),
     }))
+    log.debug('getOpenPositionsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
@@ -575,13 +581,20 @@ export const upstreamApiService = {
     formData.append('NoteTypeName', noteType)
     formData.append('File', new Blob([fileContent]), fileName)
 
-    const response = await fetch(`${upstream.apiUrl}personanote/save`, {
-      method: 'POST',
-      headers: { 'x-sharepoint-token': token },
-      body: formData,
-    })
-    if (!response.ok) throw new Error(`Save note failed: ${response.status}`)
-    const result = await response.json() as { personaNoteId?: number }
-    return result.personaNoteId ?? 0
+    try {
+      const response = await fetch(`${upstream.apiUrl}personanote/save`, {
+        method: 'POST',
+        headers: { 'x-sharepoint-token': token },
+        body: formData,
+      })
+      if (!response.ok) throw new Error(`Save note failed: ${response.status}`)
+      const result = await response.json() as { personaNoteId?: number }
+      const noteId = result.personaNoteId ?? 0
+      log.info('savePersonaNote succeeded', { personId, noteType, fileName, noteId })
+      return noteId
+    } catch (err) {
+      log.error(`savePersonaNote failed for personId=${personId}`, err instanceof Error ? err : new Error(String(err)), { personId, noteType, fileName })
+      throw err
+    }
   },
 }
