@@ -1,0 +1,334 @@
+import { AIConfig, AISuggestion, SuggestionOption, StructuredResume, RefinementMode, ExperienceEntry, EducationEntry, SkillCategory, CertificationEntry, TokenUsage, ResumeProcessingMetrics } from '../types';
+
+const DEFAULT_AI_CONFIG: AIConfig = {
+  provider: 'local',
+  localEndpoint: '/api/claude/v1',
+  cloudEndpoint: 'https://api.anthropic.com/v1',
+  model: 'claude-sonnet-4-20250514',
+  temperature: 0.1,
+  maxTokens: 4096,
+};
+
+let currentConfig: AIConfig = { ...DEFAULT_AI_CONFIG };
+
+const TECH_SKILL_SLOTS = 14;
+
+function buildExtractionPrompt(rawText: string): string {
+  return `Extract the resume information from the text below and return ONLY valid JSON matching this exact schema. Do not rewrite or improve the content — extract it as-is from the source. Return no markdown code blocks, no explanations, just the raw JSON object.
+
+Schema:
+{
+  "candidateName": "string",
+  "email": "string or null",
+  "phone": "string or null",
+  "location": "string or null",
+  "linkedIn": "string or null",
+  "summary": "string",
+  "experience": [
+    {
+      "company": "string",
+      "title": "string",
+      "projectName": "string or null",
+      "startDate": "string",
+      "endDate": "string",
+      "location": "string or null",
+      "description": "3-5 line paragraph describing the work, team, methodologies, and responsibilities",
+      "achievements": ["string"],
+      "technologies": ["string — each individual technology or tool used in this role"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "string",
+      "degree": "string",
+      "field": "string",
+      "graduationDate": "string",
+      "gpa": "string or omit if not present",
+      "honors": "string or omit if not present"
+    }
+  ],
+  "skills": [
+    {
+      "name": "string (category name, e.g. Technical Skills)",
+      "skills": ["string"]
+    }
+  ],
+  "certifications": [
+    {
+      "name": "string",
+      "issuer": "string",
+      "date": "string"
+    }
+  ]
+}
+
+IMPORTANT: For skills and technologies, split compound entries. E.g. 'Entity Framework/Dapper/ADO.NET' should become three separate items: 'Entity Framework', 'Dapper', 'ADO.NET'. Same for 'CI/CD (Jenkins, Git, JIRA)' → 'CI/CD', 'Jenkins', 'Git', 'JIRA'. Each skill/technology must be a single, atomic item.
+For cloudSkills, classify skills related to AI, cloud platforms, or cloud-native tools. E.g. 'Azure CosmosDB', 'Azure Functions', 'AWS Lambda', 'OpenAI' are cloud/AI skills. Standard frameworks like 'React', '.NET', 'Entity Framework' are NOT cloud skills.
+For each work experience entry, extract a 'technologies' array listing the individual technologies, frameworks, tools, and platforms mentioned. Split compound entries. Also extract 'projectName' if the resume mentions a specific project name for that role.
+
+Resume text:
+${rawText}`;
+}
+
+async function callClaudeLocal(config: AIConfig, prompt: string): Promise<{ content: string; usage: TokenUsage | null }> {
+  const messages = [{ role: 'user', content: prompt }];
+  const data = await window.api.ai.chat(config.model, messages, config.maxTokens) as {
+    choices: { message: { content: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  };
+  const content = data.choices[0].message.content;
+  const rawUsage = data.usage;
+  const usage: TokenUsage | null = rawUsage
+    ? {
+        promptTokens: rawUsage.prompt_tokens ?? 0,
+        completionTokens: rawUsage.completion_tokens ?? 0,
+        totalTokens: rawUsage.total_tokens ?? 0,
+      }
+    : null;
+  return { content, usage };
+}
+
+function mapToStructuredResume(
+  parsed: Record<string, unknown>,
+  fileName: string,
+  fileType: 'pdf' | 'docx' | 'txt',
+  rawText: string
+): StructuredResume {
+  const now = Date.now();
+
+  const rawExperience = Array.isArray(parsed.experience) ? parsed.experience : [];
+  const rawEducation = Array.isArray(parsed.education) ? parsed.education : [];
+  const rawSkills = Array.isArray(parsed.skills) ? parsed.skills : [];
+  const rawCertifications = Array.isArray(parsed.certifications) ? parsed.certifications : [];
+
+  const experience: ExperienceEntry[] = rawExperience.map((item: unknown, idx: number) => {
+    const e = (item as Record<string, unknown>) || {};
+    return {
+      id: `exp-${now}-${idx}`,
+      company: String(e.company || ''),
+      title: String(e.title || ''),
+      startDate: String(e.startDate || ''),
+      endDate: String(e.endDate || ''),
+      location: e.location ? String(e.location) : undefined,
+      description: String(e.description || ''),
+      achievements: Array.isArray(e.achievements) ? e.achievements.map(String) : [],
+      technologies: Array.isArray(e.technologies) ? e.technologies.map(String) : [],
+      projectName: e.projectName ? String(e.projectName) : undefined,
+    };
+  });
+
+  const education: EducationEntry[] = rawEducation.map((item: unknown, idx: number) => {
+    const e = (item as Record<string, unknown>) || {};
+    return {
+      id: `edu-${now}-${idx}`,
+      institution: String(e.institution || ''),
+      degree: String(e.degree || ''),
+      field: String(e.field || ''),
+      graduationDate: String(e.graduationDate || '').toLowerCase() === 'unknown' ? '' : String(e.graduationDate || ''),
+      gpa: e.gpa ? String(e.gpa) : undefined,
+      honors: e.honors ? String(e.honors) : undefined,
+    };
+  });
+
+  const skills: SkillCategory[] = rawSkills.map((item: unknown, idx: number) => {
+    const s = (item as Record<string, unknown>) || {};
+    return {
+      id: `skill-cat-${now}-${idx}`,
+      name: String(s.name || ''),
+      skills: Array.isArray(s.skills) ? s.skills.map(String) : [],
+    };
+  });
+
+  const certifications: CertificationEntry[] = rawCertifications.map((item: unknown, idx: number) => {
+    const c = (item as Record<string, unknown>) || {};
+    return {
+      id: `cert-${now}-${idx}`,
+      name: String(c.name || ''),
+      issuer: String(c.issuer || ''),
+      date: String(c.date || '').toLowerCase() === 'unknown' ? '' : String(c.date || ''),
+    };
+  });
+
+  const processedSkills = splitCompoundSkills(skills);
+  const allExtractedSkills = processedSkills.flatMap(cat => cat.skills);
+  const classified = classifyCloudSkills(allExtractedSkills);
+
+  return {
+    id: `resume-${now}`,
+    originalFileName: fileName,
+    originalFileType: fileType,
+    originalContent: rawText,
+    candidateName: String(parsed.candidateName || ''),
+    email: parsed.email ? String(parsed.email) : undefined,
+    phone: parsed.phone ? String(parsed.phone) : undefined,
+    location: parsed.location ? String(parsed.location) : undefined,
+    linkedIn: parsed.linkedIn ? String(parsed.linkedIn) : undefined,
+    summary: String(parsed.summary || ''),
+    experience,
+    education,
+    skills: processedSkills,
+    certifications,
+    templateSkills: classified.techSkills,
+    cloudSkills: classified.cloudSkills,
+    status: 'transformed',
+    transformedAt: new Date().toISOString(),
+    validationResults: [],
+    overallValidationStatus: 'pending',
+  };
+}
+
+function splitCompoundSkills(skills: SkillCategory[]): SkillCategory[] {
+  return skills.map(cat => ({
+    ...cat,
+    skills: cat.skills.flatMap(skill => {
+      let parts = [skill];
+      if (skill.includes('/') && !skill.match(/^\.NET|^Node\.js|^CI\/CD/i)) {
+        parts = skill.split('/').map(s => s.trim()).filter(Boolean);
+      }
+      return parts.flatMap(part => {
+        const match = part.match(/^(.+?)\s*\(([^)]+)\)$/);
+        if (match) {
+          const base = match[1].trim();
+          const inner = match[2].split(',').map(s => s.trim()).filter(Boolean);
+          return [base, ...inner];
+        }
+        return [part];
+      });
+    }),
+  }));
+}
+
+function classifyCloudSkills(allSkills: string[]): { techSkills: string[]; cloudSkills: string[] } {
+  const cloudPatterns = /azure|aws|gcp|cloud|lambda|cosmos|openai|gemini|anthropic|vertex|sagemaker|bedrock|devops/i;
+  const genericExclusions = /^azure\s*hosting$/i;
+
+  const cloudSkills = allSkills.filter(s => cloudPatterns.test(s) && !genericExclusions.test(s));
+  const cloudSet = new Set(cloudSkills);
+  const techSkills = allSkills.filter(s => !cloudSet.has(s)).slice(0, TECH_SKILL_SLOTS);
+  return { techSkills, cloudSkills };
+}
+
+function buildEnhancementPrompt(resume: StructuredResume, mode: RefinementMode): string {
+  const modeInstructions: Record<RefinementMode, string> = {
+    'professional-polish': 'Refine the language to be more professional and polished. Use strong action verbs, eliminate filler words, and improve clarity.',
+    'impact-focused': 'Rewrite to emphasize measurable impact and achievements. Add quantified results where possible (percentages, dollar amounts, team sizes).',
+    'ats-optimized': 'Optimize for Applicant Tracking Systems. Use industry-standard keywords, remove creative formatting, and ensure keyword density.',
+    'job-tailoring': 'Enhance the content to be more compelling and tailored for the target role.',
+  };
+
+  const allSkills = resume.skills.flatMap(cat => cat.skills);
+  const today = new Date().toISOString().split('T')[0];
+
+  return `Enhance this resume content. Mode: ${mode}. Instructions: ${modeInstructions[mode]}
+
+Today's date is ${today}. When the summary mentions years of experience, recalculate from the earliest experience start date to today and use the correct number.
+
+Return ONLY valid JSON (no markdown, no explanation) with this structure:
+{
+  "summary": "enhanced summary text",
+  "experience": [
+    { "description": "enhanced description", "achievements": ["enhanced achievement 1"], "technologies": ["technology1", "technology2"] }
+  ],
+  "templateSkills": ["top 14 technical skills — prioritize the candidate's primary tech domain"],
+  "cloudSkills": ["all AI/cloud-related skills"]
+}
+
+Keep the same number of experience entries in the same order. Only enhance summary and experience descriptions/achievements/technologies. When returning technologies, split compound entries (e.g. 'Entity Framework/Dapper' → separate items).
+
+Current resume data:
+${JSON.stringify({ summary: resume.summary, experience: resume.experience.map(e => ({ startDate: e.startDate, endDate: e.endDate, description: e.description, achievements: e.achievements, technologies: e.technologies || [] })) })}
+Select the TOP 14 most relevant technical skills from: ${JSON.stringify(allSkills)}
+IMPORTANT for templateSkills selection: First identify the candidate's primary technology domain from their experience entries (e.g., iOS/Swift, .NET/C#, React/TypeScript, Java/Android, Python/ML). Ensure at least 8 of the 14 skills are core technologies from that domain (languages, frameworks, SDKs, testing tools). Fill the remaining slots with supporting tools. Do NOT prioritize generic project management tools (Jira, SCRUM, Confluence) over domain-specific technologies.
+Also select all AI/cloud-related skills for cloudSkills.`;
+}
+
+export const aiService = {
+  getConfig(): AIConfig {
+    const stored = localStorage.getItem('ai_config');
+    if (stored) {
+      currentConfig = JSON.parse(stored);
+    }
+    return currentConfig;
+  },
+
+  async checkConnection(): Promise<boolean> {
+    try {
+      const result = await window.api.ai.checkConnection() as { available: boolean };
+      return result.available;
+    } catch {
+      return false;
+    }
+  },
+
+  updateConfig(config: Partial<AIConfig>): AIConfig {
+    currentConfig = { ...currentConfig, ...config };
+    localStorage.setItem('ai_config', JSON.stringify(currentConfig));
+    return currentConfig;
+  },
+
+  async extractResumeData(rawText: string, fileName: string): Promise<{ resume: StructuredResume; metrics: ResumeProcessingMetrics }> {
+    const config = this.getConfig();
+    const fileType = (fileName.split('.').pop()?.toLowerCase() || 'txt') as 'pdf' | 'docx' | 'txt';
+    const startTime = performance.now();
+
+    try {
+      const prompt = buildExtractionPrompt(rawText);
+      const { content: response, usage } = await callClaudeLocal(config, prompt);
+      let cleanJson = response.trim();
+      if (cleanJson.startsWith('```')) {
+        cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
+      }
+      const parsed = JSON.parse(cleanJson);
+      const resume = mapToStructuredResume(parsed, fileName, fileType, rawText);
+      const processingTimeMs = Math.round(performance.now() - startTime);
+      return { resume, metrics: { extractionTokens: usage, totalTokens: usage, processingTimeMs, modelUsed: config.model, wasAiExtraction: true } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'AI extraction failed';
+      throw new Error(`Resume extraction failed: ${msg}`);
+    }
+  },
+
+  async generateSuggestions(
+    _text: string,
+    _sectionType: string,
+    _context?: string
+  ): Promise<SuggestionOption[]> {
+    throw new Error('Suggestions require AI connection');
+  },
+
+  async transformResume(
+    rawContent: string,
+    fileName: string,
+    _refinementMode?: RefinementMode,
+    _jobDescription?: string
+  ): Promise<{ resume: StructuredResume; metrics: ResumeProcessingMetrics }> {
+    return this.extractResumeData(rawContent, fileName);
+  },
+
+  async enhanceFullResume(resume: StructuredResume, mode: RefinementMode): Promise<{ resume: StructuredResume; usage: TokenUsage | null }> {
+    const config = this.getConfig();
+    const prompt = buildEnhancementPrompt(resume, mode);
+    const { content, usage } = await callClaudeLocal(config, prompt);
+    let cleanJson = content.trim();
+    if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
+    }
+    const parsed = JSON.parse(cleanJson);
+    const enhanced = {
+      ...resume,
+      summary: parsed.summary || resume.summary,
+      templateSkills: parsed.templateSkills || resume.templateSkills,
+      cloudSkills: parsed.cloudSkills || resume.cloudSkills,
+      experience: resume.experience.map((exp, i) => ({
+        ...exp,
+        description: parsed.experience?.[i]?.description || exp.description,
+        achievements: parsed.experience?.[i]?.achievements || exp.achievements,
+        technologies: parsed.experience?.[i]?.technologies || exp.technologies || [],
+      })),
+    };
+    return { resume: enhanced, usage };
+  },
+
+};
+
+export default aiService;

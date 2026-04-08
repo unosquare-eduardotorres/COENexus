@@ -7,6 +7,8 @@ dist-ssr
 build
 bin/
 obj/
+out/
+.vite/
 
 # Local env files
 .env
@@ -44,10 +46,15 @@ coverage
 # Vite
 *.local
 
-# Tesseract OCR trained data (large binary files)
-backend/tessdata/*.traineddata
+# Native extensions (downloaded per-platform)
+resources/sqlite-vec/*.dylib
+resources/sqlite-vec/*.so
+resources/sqlite-vec/*.dll
+
+# Installers
+*.dmg
+*.exe
+*.AppImage
 
 # HAR files (may contain tokens and sensitive data)
 *.har
-# Agent Studio worktrees
-.agent-studio/

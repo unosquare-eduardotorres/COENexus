@@ -1,107 +1,56 @@
 {
-  "name": "coe-operation-nexus",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "main": "dist-electron/main/index.js",
+  "name": "operation-nexus",
+  "version": "1.0.0",
+  "main": "./out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview",
+    "dev": "unset ELECTRON_RUN_AS_NODE && electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "unset ELECTRON_RUN_AS_NODE && electron-vite preview",
+    "start": "unset ELECTRON_RUN_AS_NODE && electron-vite preview",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
     "test": "vitest run",
     "test:watch": "vitest",
-    "electron:dev": "concurrently \"npm run build:electron\" \"electron .\"",
-    "electron:build": "npm run build && npm run build:electron",
-    "build:electron": "tsc -p electron/tsconfig.json",
-    "dist": "npm run build && npm run build:electron && electron-builder"
+    "test:e2e": "npx playwright test --config=e2e/playwright.config.ts",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "npx tsx scripts/download-sqlite-vec.ts"
   },
   "dependencies": {
-    "jszip": "^3.10.1",
+    "@tanstack/react-query": "^5.75.0",
+    "better-sqlite3": "^12.8.0",
     "docx-preview": "^0.3.3",
+    "electron-updater": "^6.6.2",
+    "jszip": "^3.10.1",
     "mammoth": "^1.8.0",
     "pdfjs-dist": "^4.9.155",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.0",
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.6.2",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "eslint": "^8.55.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
-    "patch-package": "^8.0.0",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.0",
-    "typescript": "^5.2.2",
-    "vite": "^5.0.8",
-    "vitest": "^3.0.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.6.0",
-    "jsdom": "^25.0.0",
-    "electron": "^28.2.0",
-    "electron-builder": "^24.9.1",
-    "concurrently": "^8.2.2",
-    "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17"
-  },
-  "build": {
-    "appId": "com.unosquare.operation-nexus",
-    "productName": "Operation Nexus",
-    "directories": {
-      "output": "dist-app"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "resources/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "resources",
-        "to": "resources"
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
-        }
-      ],
-      "icon": "resources/icon.icns"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ],
-      "icon": "resources/icon.ico"
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": ["x64"]
-        }
-      ],
-      "icon": "resources/icon.png",
-      "category": "Office"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+    "@electron-forge/cli": "^7.8.0",
+    "@electron-forge/maker-dmg": "^7.8.0",
+    "@electron-forge/maker-squirrel": "^7.8.0",
+    "@electron-forge/maker-zip": "^7.8.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.0",
+    "@electron-forge/plugin-fuses": "^7.8.0",
+    "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.52.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "autoprefixer": "^10.4.20",
+    "electron": "^35.7.5",
+    "electron-rebuild": "^3.2.9",
+    "electron-vite": "^5.0.0",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.1"
   }
 }
