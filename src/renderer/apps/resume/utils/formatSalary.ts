@@ -10,7 +10,7 @@ export function formatSalary(amount: number, currency?: string): string {
     minimumFractionDigits: amount % 1 !== 0 ? 2 : 0,
     maximumFractionDigits: 2,
   });
-  return `${formatted}${currency ? ` ${currency}` : ''}`;
+  return `${currency ? `${currency} ` : ''}${formatted}`;
 }
 
 export function formatEmployeeRate(rate: number, currency?: string): { display: string; isContractor: boolean } {

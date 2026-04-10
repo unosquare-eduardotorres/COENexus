@@ -1,5 +1,5 @@
 import { VectorizationConfig, VoyageModel } from '../types';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('vectorizationConfigService');
 
@@ -27,12 +27,30 @@ export const vectorizationConfigService = {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...config, model }));
   },
 
-  async checkVoyageKey(): Promise<{ configured: boolean; keyCount?: number }> {
+  async checkVoyageKey(): Promise<{
+    configured: boolean
+    keyCount?: number
+    maskedKeys?: Array<{ index: number; masked: string }>
+    source?: string
+  }> {
     try {
-      return await window.api.processing.getVoyageKeyStatus() as { configured: boolean; keyCount?: number };
+      return await window.api.processing.getVoyageKeyStatus() as {
+        configured: boolean
+        keyCount?: number
+        maskedKeys?: Array<{ index: number; masked: string }>
+        source?: string
+      };
     } catch (error) {
       log.error('[VectorizationConfig] Failed to check Voyage key status:', error);
       return { configured: false };
     }
+  },
+
+  async addVoyageKey(apiKey: string): Promise<{ saved: boolean }> {
+    return await window.api.processing.addVoyageKey({ apiKey }) as { saved: boolean };
+  },
+
+  async removeVoyageKey(index: number): Promise<{ deleted: boolean }> {
+    return await window.api.processing.removeVoyageKey({ index }) as { deleted: boolean };
   },
 };

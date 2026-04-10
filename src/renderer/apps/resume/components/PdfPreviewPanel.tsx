@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { StructuredResume } from '../types';
 import { templateFillService } from '../services/templateFillService';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('PdfPreviewPanel');
 

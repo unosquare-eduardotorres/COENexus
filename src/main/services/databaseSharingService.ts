@@ -77,6 +77,40 @@ function getRecordCounts(): Record<string, number> {
   return counts
 }
 
+function importDatabaseFile(sourcePath: string, displayFilename: string): { tablesRestored: number; recordCounts: Record<string, number> } {
+  closeDatabase()
+  const dbPath = getDbPath()
+  const backupPath = `${dbPath}.backup`
+
+  try {
+    if (existsSync(dbPath)) copyFileSync(dbPath, backupPath)
+    copyFileSync(sourcePath, dbPath)
+    initDatabase()
+
+    const recordCounts = getRecordCounts()
+
+    const importMeta = {
+      lastImportedAt: new Date().toISOString(),
+      lastImportedFile: displayFilename,
+    }
+    writeFileSync(
+      join(app.getPath('userData'), 'last-import.json'),
+      JSON.stringify(importMeta, null, 2),
+      'utf-8'
+    )
+
+    log.info('Database imported successfully', { file: displayFilename, tables: TABLES.length, records: recordCounts })
+    return { tablesRestored: TABLES.length, recordCounts }
+  } catch (err) {
+    log.error('Database import failed, attempting rollback', err instanceof Error ? err : new Error(String(err)), { file: displayFilename })
+    if (existsSync(backupPath)) {
+      copyFileSync(backupPath, dbPath)
+    }
+    initDatabase()
+    throw err
+  }
+}
+
 export const databaseSharingService = {
   getConfig(): DatabaseSharingConfig {
     const path = getConfigFilePath()
@@ -93,11 +127,14 @@ export const databaseSharingService = {
 
   saveConfig(config: DatabaseSharingConfig): void {
     writeFileSync(getConfigFilePath(), JSON.stringify(config, null, 2), 'utf-8')
+    log.info('Sharing config saved', { sharedPath: config.sharedPath, exporterName: config.exporterName })
   },
 
   exportSnapshot(): ExportResult {
     const config = this.getConfig()
     if (!config.sharedPath) throw new Error('Shared path not configured')
+
+    log.info('Snapshot export started', { sharedPath: config.sharedPath })
 
     if (!existsSync(config.sharedPath)) {
       mkdirSync(config.sharedPath, { recursive: true })
@@ -128,6 +165,8 @@ export const databaseSharingService = {
 
     writeFileSync(`${destPath}.meta.json`, JSON.stringify(meta, null, 2), 'utf-8')
 
+    log.info('Snapshot exported', { filename, sizeBytes: stat.size, records: recordCounts })
+
     return {
       filename,
       sizeBytes: stat.size,
@@ -139,86 +178,18 @@ export const databaseSharingService = {
   importSnapshot(filename: string): ImportResult {
     const config = this.getConfig()
     if (!config.sharedPath) throw new Error('Shared path not configured')
-
     const sourcePath = join(config.sharedPath, filename)
     if (!existsSync(sourcePath)) throw new Error(`Snapshot not found: ${filename}`)
-
-    closeDatabase()
-
-    const dbPath = getDbPath()
-    const backupPath = `${dbPath}.backup`
-
-    try {
-      if (existsSync(dbPath)) copyFileSync(dbPath, backupPath)
-      copyFileSync(sourcePath, dbPath)
-      initDatabase()
-
-      const recordCounts = getRecordCounts()
-
-      const importMeta = {
-        lastImportedAt: new Date().toISOString(),
-        lastImportedFile: filename,
-      }
-      writeFileSync(
-        join(app.getPath('userData'), 'last-import.json'),
-        JSON.stringify(importMeta, null, 2),
-        'utf-8'
-      )
-
-      return {
-        success: true,
-        tablesRestored: TABLES.length,
-        recordCounts,
-      }
-    } catch (err) {
-      log.error('Failed to import snapshot, attempting rollback', err instanceof Error ? err : new Error(String(err)))
-      if (existsSync(backupPath)) {
-        copyFileSync(backupPath, dbPath)
-      }
-      initDatabase()
-      throw err
-    }
+    log.info('Snapshot import started', { filename })
+    const { tablesRestored, recordCounts } = importDatabaseFile(sourcePath, filename)
+    return { success: true, tablesRestored, recordCounts }
   },
 
   importFromAbsolutePath(sourcePath: string): { success: boolean; filePath: string; tablesRestored: number; recordCounts: Record<string, number> } {
     if (!existsSync(sourcePath)) throw new Error(`File not found: ${sourcePath}`)
-
-    closeDatabase()
-
-    const dbPath = getDbPath()
-    const backupPath = `${dbPath}.backup`
-
-    try {
-      if (existsSync(dbPath)) copyFileSync(dbPath, backupPath)
-      copyFileSync(sourcePath, dbPath)
-      initDatabase()
-
-      const recordCounts = getRecordCounts()
-
-      const importMeta = {
-        lastImportedAt: new Date().toISOString(),
-        lastImportedFile: basename(sourcePath),
-      }
-      writeFileSync(
-        join(app.getPath('userData'), 'last-import.json'),
-        JSON.stringify(importMeta, null, 2),
-        'utf-8'
-      )
-
-      return {
-        success: true,
-        filePath: sourcePath,
-        tablesRestored: TABLES.length,
-        recordCounts,
-      }
-    } catch (err) {
-      log.error('Failed to import database file, attempting rollback', err instanceof Error ? err : new Error(String(err)))
-      if (existsSync(backupPath)) {
-        copyFileSync(backupPath, dbPath)
-      }
-      initDatabase()
-      throw err
-    }
+    log.info('Database file import started', { path: sourcePath })
+    const { tablesRestored, recordCounts } = importDatabaseFile(sourcePath, basename(sourcePath))
+    return { success: true, filePath: sourcePath, tablesRestored, recordCounts }
   },
 
   listSnapshots(): SnapshotInfo[] {

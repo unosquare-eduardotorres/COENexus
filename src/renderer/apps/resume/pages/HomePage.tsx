@@ -69,7 +69,7 @@ const secondaryActions = [
   {
     title: 'Data Sync',
     description: 'Import and sync employee & candidate records from external sources',
-    href: '/resume/data-sync',
+    href: '/datasync',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path

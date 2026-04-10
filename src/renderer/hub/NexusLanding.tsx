@@ -1,7 +1,14 @@
-import { useTheme } from '../contexts/ThemeContext';
 import AppCard from './AppCard';
 import ParticleNetwork from './ParticleNetwork';
 import VemLogo from '../components/VemLogo';
+
+function CloudDownloadIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+    </svg>
+  );
+}
 
 function CompassTrailIcon() {
   return (
@@ -28,21 +35,20 @@ function AccentLetter({ children, color }: { children: string; color: string }) 
 }
 
 export default function NexusLanding() {
-  const { theme, toggleTheme } = useTheme();
-
   const resumeColor = '#3b82f6';
+  const dataSyncColor = '#f59e0b';
   const pathColor = '#8b5cf6';
 
   return (
     <div className="relative flex min-h-screen flex-col gradient-subtle transition-colors duration-300">
-      <div className="fixed top-0 left-0 right-0 h-14 z-40 titlebar-drag" />
-      <ParticleNetwork isDark={theme === 'dark'} />
+      <div className="fixed top-0 left-0 right-0 h-10 z-40 titlebar-drag" />
+      <ParticleNetwork isDark />
 
-      <nav className="glass-nav fixed top-0 z-50 w-full titlebar-drag">
-        <div className="relative mx-auto flex h-14 max-w-7xl items-center justify-center px-4 sm:px-6">
-          <div className="flex items-center gap-3 titlebar-no-drag">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-violet-600">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <nav className="glass-nav fixed top-0 z-50 w-full titlebar-drag border-b border-white/5">
+        <div className="relative mx-auto flex h-10 max-w-7xl items-center justify-center px-4 sm:px-6">
+          <div className="flex items-center gap-2 titlebar-no-drag">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-violet-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="12" x2="5" y2="6" />
                 <line x1="12" y1="12" x2="19" y2="6" />
                 <line x1="12" y1="12" x2="5" y2="18" />
@@ -56,32 +62,13 @@ export default function NexusLanding() {
                 <circle cx="12" cy="12" r="3" fill="white" />
               </svg>
             </div>
-            <span className="text-sm font-semibold tracking-tight text-primary">COE Operation Nexus</span>
+            <span className="text-xs font-semibold tracking-tight text-primary">COE Operation Nexus</span>
           </div>
 
-          <button onClick={toggleTheme} className="absolute right-4 sm:right-6 glass-button rounded-lg p-2 titlebar-no-drag">
-            {theme === 'dark' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-yellow-400">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2" />
-                <path d="M12 20v2" />
-                <path d="m4.93 4.93 1.41 1.41" />
-                <path d="m17.66 17.66 1.41 1.41" />
-                <path d="M2 12h2" />
-                <path d="M20 12h2" />
-                <path d="m6.34 17.66-1.41 1.41" />
-                <path d="m19.07 4.93-1.41 1.41" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-              </svg>
-            )}
-          </button>
         </div>
       </nav>
 
-      <section className="relative z-10 mx-auto max-w-3xl px-4 pb-12 pt-24 text-center">
+      <section className="relative z-10 mx-auto max-w-3xl px-4 pb-12 pt-20 text-center">
         <div className="glass-card mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
           <span className="text-xs font-medium tracking-wide text-secondary">Center of Excellence</span>
@@ -94,7 +81,7 @@ export default function NexusLanding() {
       </section>
 
       <section className="relative z-10 mx-auto max-w-5xl px-4 pb-16 flex-1">
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           <AppCard
             name="V.E.M."
             codename="Vectorize, Extract, Match"
@@ -104,6 +91,16 @@ export default function NexusLanding() {
             tagline=""
             description={<><AccentLetter color={resumeColor}>V</AccentLetter>ectorize. <AccentLetter color={resumeColor}>E</AccentLetter>xtract. <AccentLetter color={resumeColor}>M</AccentLetter>atch. Resumes, reimagined. Matches, made.</>}
             icon={<VemLogo size={72} />}
+          />
+          <AppCard
+            name="D.A.T.A."
+            codename="Data Sync"
+            status="active"
+            href="/datasync"
+            accentColor={dataSyncColor}
+            tagline=""
+            description={<><AccentLetter color={dataSyncColor}>D</AccentLetter>ownload. <AccentLetter color={dataSyncColor}>A</AccentLetter>lign. <AccentLetter color={dataSyncColor}>T</AccentLetter>ransform. <AccentLetter color={dataSyncColor}>A</AccentLetter>ctivate. Sync employee, candidate &amp; position data from upstream HR systems.</>}
+            icon={<CloudDownloadIcon />}
           />
           <AppCard
             name="P.A.T.H."

@@ -1,75 +1,4 @@
-import { ResumeTemplate, ContentGuideline, ValidationRule } from '../types';
-
-export const defaultValidationRules: ValidationRule[] = [
-  {
-    id: 'rule-action-verbs',
-    name: 'Action Verbs Required',
-    type: 'content',
-    enabled: true,
-    config: {
-      mustStartWithActionVerb: true,
-      requiredWords: [],
-    },
-    errorMessage: 'Experience descriptions should start with strong action verbs',
-    severity: 'warning',
-  },
-  {
-    id: 'rule-date-format',
-    name: 'Date Format',
-    type: 'format',
-    enabled: true,
-    config: {
-      dateFormat: 'MMM YYYY',
-      pattern: '^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s\\d{4}$|^Present$',
-    },
-    errorMessage: 'Dates should be in "MMM YYYY" format (e.g., Jan 2024)',
-    severity: 'warning',
-  },
-  {
-    id: 'rule-min-summary-length',
-    name: 'Summary Minimum Length',
-    type: 'length',
-    enabled: true,
-    config: {
-      minLength: 100,
-    },
-    errorMessage: 'Summary should be at least 100 characters',
-    severity: 'error',
-  },
-  {
-    id: 'rule-max-summary-length',
-    name: 'Summary Maximum Length',
-    type: 'length',
-    enabled: true,
-    config: {
-      maxLength: 500,
-    },
-    errorMessage: 'Summary should not exceed 500 characters',
-    severity: 'warning',
-  },
-  {
-    id: 'rule-no-pronouns',
-    name: 'No First Person Pronouns',
-    type: 'content',
-    enabled: true,
-    config: {
-      forbiddenWords: ['I ', 'me ', 'my ', 'myself'],
-    },
-    errorMessage: 'Avoid first-person pronouns (I, me, my)',
-    severity: 'warning',
-  },
-  {
-    id: 'rule-quantify-achievements',
-    name: 'Quantified Achievements',
-    type: 'custom',
-    enabled: true,
-    config: {
-      pattern: '\\d+%|\\$\\d+|\\d+\\+|\\d+x',
-    },
-    errorMessage: 'Consider adding quantified achievements (percentages, dollar amounts, etc.)',
-    severity: 'warning',
-  },
-];
+import { ResumeTemplate, ContentGuideline } from '../types';
 
 export const defaultContentGuidelines: ContentGuideline[] = [
   {
@@ -339,7 +268,7 @@ export const defaultTemplate: ResumeTemplate = {
       sectionValidationRules: [],
     },
   ],
-  globalValidationRules: defaultValidationRules,
+  globalValidationRules: [],
   contentGuidelines: defaultContentGuidelines,
 };
 

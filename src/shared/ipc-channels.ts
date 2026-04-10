@@ -22,6 +22,8 @@ export const IPC_CHANNELS = {
   PROCESSING_RETRY_FAILED: 'processing:retry-failed',
   PROCESSING_RETRY_FAILED_VECTORIZATION: 'processing:retry-failed-vectorization',
   PROCESSING_RESET_STATUS: 'processing:reset-status',
+  PROCESSING_ADD_VOYAGE_KEY: 'processing:add-voyage-key',
+  PROCESSING_REMOVE_VOYAGE_KEY: 'processing:remove-voyage-key',
 
   MATCH_POOL_COUNTS: 'match:pool-counts',
   MATCH_FILTER_OPTIONS: 'match:filter-options',

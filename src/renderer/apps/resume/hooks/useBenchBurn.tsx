@@ -7,7 +7,7 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
 import BenchBurnSearchDepth from '../components/match/BenchBurnSearchDepth';
@@ -15,9 +15,9 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import BenchBurnResults from '../components/match/BenchBurnResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
-import { useIpcQuery } from '../../../hooks/useIpcQuery';
+import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
-import { STEP_ICONS } from '../components/shared/icons/stepIcons';
+import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 
 export function useBenchBurn(parentReset?: () => void) {
   const initialSessionId = useMemo(() => {

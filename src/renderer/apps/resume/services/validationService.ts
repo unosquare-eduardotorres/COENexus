@@ -1,12 +1,11 @@
 import {
   StructuredResume,
   ValidationResult,
-  ValidationRule,
   ResumeTemplate,
 } from '../types';
 import { getDefaultTemplate } from '../data/defaultTemplateConfig';
 
-interface RuleCatalogEntry {
+export interface RuleCatalogEntry {
   section: string;
   rule: string;
   description: string;
@@ -617,25 +616,32 @@ export const validationService = {
       { section: 'Contact Info', rule: 'email-format', description: 'Email format is valid', severity: 'error', status: 'pass' },
     ];
 
+    const RULE_MAPPINGS: { fieldPattern: RegExp; rule: string; catalogKey: string; messageTest?: (msg: string) => boolean }[] = [
+      { fieldPattern: /^summary$/, rule: 'presence', catalogKey: 'summary-presence' },
+      { fieldPattern: /^experience$/, rule: 'presence', catalogKey: 'exp-presence' },
+      { fieldPattern: /^experience\[\d+\]\.title/, rule: 'presence', catalogKey: 'exp-title' },
+      { fieldPattern: /^experience\[\d+\]\.company/, rule: 'presence', catalogKey: 'exp-company' },
+      { fieldPattern: /^experience\[\d+\]\.dates/, rule: 'presence', catalogKey: 'exp-dates' },
+      { fieldPattern: /^experience\.gap$/, rule: 'employment-gap', catalogKey: 'gap-current', messageTest: (msg) => msg.includes('today') },
+      { fieldPattern: /^experience\.gap$/, rule: 'employment-gap', catalogKey: 'gap-between', messageTest: (msg) => !msg.includes('today') },
+      { fieldPattern: /^experience\.timeline$/, rule: 'pre-graduation-experience', catalogKey: 'pre-graduation' },
+      { fieldPattern: /^experience\.seniority$/, rule: 'seniority-mismatch', catalogKey: 'seniority-mismatch' },
+      { fieldPattern: /^education$/, rule: 'presence', catalogKey: 'edu-presence' },
+      { fieldPattern: /^education\[\d+\]\.institution/, rule: 'presence', catalogKey: 'edu-institution' },
+      { fieldPattern: /^education\[\d+\]\.degree/, rule: 'presence', catalogKey: 'edu-degree' },
+      { fieldPattern: /^skills$/, rule: 'presence', catalogKey: 'skills-presence' },
+      { fieldPattern: /^certifications\[\d+\]\.name/, rule: 'presence', catalogKey: 'cert-name' },
+      { fieldPattern: /^candidateName$/, rule: 'presence', catalogKey: 'candidate-name' },
+      { fieldPattern: /^email$/, rule: 'format', catalogKey: 'email-format' },
+    ];
+
     const matchRuleToCatalog = (r: ValidationResult): string | null => {
-      if (r.field === 'summary' && r.rule === 'presence') return 'summary-presence';
-      if (r.field === 'experience' && r.rule === 'presence') return 'exp-presence';
-      if (r.field.match(/^experience\[\d+\]\.title/) && r.rule === 'presence') return 'exp-title';
-      if (r.field.match(/^experience\[\d+\]\.company/) && r.rule === 'presence') return 'exp-company';
-      if (r.field.match(/^experience\[\d+\]\.dates/) && r.rule === 'presence') return 'exp-dates';
-      if (r.field === 'experience.gap' && r.rule === 'employment-gap') {
-        return r.message.includes('today') ? 'gap-current' : 'gap-between';
-      }
-      if (r.field === 'experience.timeline' && r.rule === 'pre-graduation-experience') return 'pre-graduation';
-      if (r.field === 'experience.seniority' && r.rule === 'seniority-mismatch') return 'seniority-mismatch';
-      if (r.field === 'education' && r.rule === 'presence') return 'edu-presence';
-      if (r.field.match(/^education\[\d+\]\.institution/) && r.rule === 'presence') return 'edu-institution';
-      if (r.field.match(/^education\[\d+\]\.degree/) && r.rule === 'presence') return 'edu-degree';
-      if (r.field === 'skills' && r.rule === 'presence') return 'skills-presence';
-      if (r.field.match(/^certifications\[\d+\]\.name/) && r.rule === 'presence') return 'cert-name';
-      if (r.field === 'candidateName' && r.rule === 'presence') return 'candidate-name';
-      if (r.field === 'email' && r.rule === 'format') return 'email-format';
-      return null;
+      const mapping = RULE_MAPPINGS.find(m =>
+        m.fieldPattern.test(r.field) &&
+        m.rule === r.rule &&
+        (!m.messageTest || m.messageTest(r.message))
+      );
+      return mapping?.catalogKey ?? null;
     };
 
     for (const result of hardResults) {
@@ -669,6 +675,51 @@ export const validationService = {
     }
 
     return { hardRules: catalog, tips };
+  },
+
+  getRuleCatalogStatic(): { category: string; rules: RuleCatalogEntry[] }[] {
+    const allRules: RuleCatalogEntry[] = [
+      { section: 'Contact Info', rule: 'candidate-name', description: 'Candidate name is present', severity: 'error', status: 'pass' },
+      { section: 'Contact Info', rule: 'email-format', description: 'Email format is valid', severity: 'error', status: 'pass' },
+      { section: 'Contact Info', rule: 'email-recommended', description: 'Email address is recommended', severity: 'warning', status: 'pass' },
+      { section: 'Contact Info', rule: 'phone-recommended', description: 'Phone number is recommended', severity: 'warning', status: 'pass' },
+
+      { section: 'Summary', rule: 'summary-presence', description: 'Professional summary is present', severity: 'error', status: 'pass' },
+      { section: 'Summary', rule: 'summary-min-length', description: 'Summary is at least 100 characters', severity: 'warning', status: 'pass' },
+      { section: 'Summary', rule: 'summary-max-length', description: 'Summary does not exceed 500 characters', severity: 'warning', status: 'pass' },
+      { section: 'Summary', rule: 'summary-no-pronouns', description: 'No first-person pronouns (I, me, my)', severity: 'warning', status: 'pass' },
+
+      { section: 'Experience', rule: 'exp-presence', description: 'At least one experience entry exists', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-title', description: 'All entries have a job title', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-company', description: 'All entries have a company name', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-dates', description: 'All entries have a start date', severity: 'error', status: 'pass' },
+      { section: 'Experience', rule: 'exp-action-verbs', description: 'Achievements start with action verbs', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'exp-quantify', description: 'Achievements include quantified metrics', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'exp-content-quality', description: 'Entries have achievements or detailed description', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'gap-between', description: 'No employment gap > 6 months between roles', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'gap-current', description: 'No employment gap > 6 months since last role', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'pre-graduation', description: 'No experience started before graduation', severity: 'warning', status: 'pass' },
+      { section: 'Experience', rule: 'seniority-mismatch', description: 'Title seniority aligns with years of experience', severity: 'warning', status: 'pass' },
+
+      { section: 'Education', rule: 'edu-presence', description: 'Has education entries (when required)', severity: 'error', status: 'pass' },
+      { section: 'Education', rule: 'edu-institution', description: 'All entries have an institution', severity: 'error', status: 'pass' },
+      { section: 'Education', rule: 'edu-degree', description: 'All entries have a degree', severity: 'error', status: 'pass' },
+
+      { section: 'Skills', rule: 'skills-presence', description: 'Skills section is present', severity: 'error', status: 'pass' },
+      { section: 'Skills', rule: 'skills-count', description: 'Recommended 8\u201325 skills listed', severity: 'warning', status: 'pass' },
+
+      { section: 'Certifications', rule: 'cert-name', description: 'All certifications have a name', severity: 'error', status: 'pass' },
+      { section: 'Certifications', rule: 'cert-issuer', description: 'Issuing organization is recommended', severity: 'warning', status: 'pass' },
+    ]
+
+    const grouped = new Map<string, RuleCatalogEntry[]>()
+    for (const rule of allRules) {
+      const list = grouped.get(rule.section) || []
+      list.push(rule)
+      grouped.set(rule.section, list)
+    }
+
+    return [...grouped.entries()].map(([category, rules]) => ({ category, rules }))
   },
 
   getCompleteness(resume: StructuredResume): {

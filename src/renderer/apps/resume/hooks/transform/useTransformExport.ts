@@ -9,7 +9,7 @@ import {
   ResumeSourceType,
   StructuredResume,
 } from '../../types';
-import { createRendererLogger } from '../../utils/rendererLogger';
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useTransformExport');
 

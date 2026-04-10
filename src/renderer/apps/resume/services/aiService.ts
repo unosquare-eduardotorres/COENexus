@@ -1,4 +1,65 @@
+import { z } from 'zod';
 import { AIConfig, AISuggestion, SuggestionOption, StructuredResume, RefinementMode, ExperienceEntry, EducationEntry, SkillCategory, CertificationEntry, TokenUsage, ResumeProcessingMetrics } from '../types';
+import { TECH_SKILL_SLOTS } from '../constants/resume';
+
+const extractionResponseSchema = z.object({
+  candidateName: z.string().default(''),
+  email: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  linkedIn: z.string().nullable().optional(),
+  summary: z.string().default(''),
+  experience: z.array(z.object({
+    company: z.string().default(''),
+    title: z.string().default(''),
+    projectName: z.string().nullable().optional(),
+    startDate: z.string().default(''),
+    endDate: z.string().default(''),
+    location: z.string().nullable().optional(),
+    description: z.string().default(''),
+    achievements: z.array(z.string()).default([]),
+    technologies: z.array(z.string()).default([]),
+  })).default([]),
+  education: z.array(z.object({
+    institution: z.string().default(''),
+    degree: z.string().default(''),
+    field: z.string().default(''),
+    graduationDate: z.string().default(''),
+    gpa: z.string().nullable().optional(),
+    honors: z.string().nullable().optional(),
+  })).default([]),
+  skills: z.array(z.object({
+    name: z.string().default(''),
+    skills: z.array(z.string()).default([]),
+  })).default([]),
+  certifications: z.array(z.object({
+    name: z.string().default(''),
+    issuer: z.string().default(''),
+    date: z.string().default(''),
+  })).default([]),
+});
+
+const enhancementResponseSchema = z.object({
+  summary: z.string().optional(),
+  experience: z.array(z.object({
+    description: z.string().optional(),
+    achievements: z.array(z.string()).optional(),
+    technologies: z.array(z.string()).optional(),
+  })).default([]),
+  templateSkills: z.array(z.string()).optional(),
+  cloudSkills: z.array(z.string()).optional(),
+});
+
+function parseAiJson<T>(raw: string, schema: z.ZodSchema<T>, context: string): T {
+  const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
+  const parsed = JSON.parse(cleaned);
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    console.error(`AI response validation failed (${context}):`, result.error.issues);
+    throw new Error(`AI response validation failed (${context}): ${result.error.issues.map(i => i.message).join(', ')}`);
+  }
+  return result.data;
+}
 
 const DEFAULT_AI_CONFIG: AIConfig = {
   provider: 'local',
@@ -10,8 +71,6 @@ const DEFAULT_AI_CONFIG: AIConfig = {
 };
 
 let currentConfig: AIConfig = { ...DEFAULT_AI_CONFIG };
-
-const TECH_SKILL_SLOTS = 14;
 
 function buildExtractionPrompt(rawText: string): string {
   return `Extract the resume information from the text below and return ONLY valid JSON matching this exact schema. Do not rewrite or improve the content — extract it as-is from the source. Return no markdown code blocks, no explanations, just the raw JSON object.
@@ -274,12 +333,8 @@ export const aiService = {
     try {
       const prompt = buildExtractionPrompt(rawText);
       const { content: response, usage } = await callClaudeLocal(config, prompt);
-      let cleanJson = response.trim();
-      if (cleanJson.startsWith('```')) {
-        cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
-      }
-      const parsed = JSON.parse(cleanJson);
-      const resume = mapToStructuredResume(parsed, fileName, fileType, rawText);
+      const parsed = parseAiJson(response, extractionResponseSchema, 'extractResumeData');
+      const resume = mapToStructuredResume(parsed as Record<string, unknown>, fileName, fileType, rawText);
       const processingTimeMs = Math.round(performance.now() - startTime);
       return { resume, metrics: { extractionTokens: usage, totalTokens: usage, processingTimeMs, modelUsed: config.model, wasAiExtraction: true } };
     } catch (error) {
@@ -293,7 +348,8 @@ export const aiService = {
     _sectionType: string,
     _context?: string
   ): Promise<SuggestionOption[]> {
-    throw new Error('Suggestions require AI connection');
+    // TODO: Implement AI-powered suggestions when backend endpoint is available
+    return [];
   },
 
   async transformResume(
@@ -309,11 +365,7 @@ export const aiService = {
     const config = this.getConfig();
     const prompt = buildEnhancementPrompt(resume, mode);
     const { content, usage } = await callClaudeLocal(config, prompt);
-    let cleanJson = content.trim();
-    if (cleanJson.startsWith('```')) {
-      cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
-    }
-    const parsed = JSON.parse(cleanJson);
+    const parsed = parseAiJson(content, enhancementResponseSchema, 'enhanceFullResume');
     const enhanced = {
       ...resume,
       summary: parsed.summary || resume.summary,

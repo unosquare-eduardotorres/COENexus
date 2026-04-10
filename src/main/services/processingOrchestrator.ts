@@ -5,6 +5,9 @@ import { syncRepository } from '../db/repositories/syncRepository'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { getDatabase } from '../db/connection'
 import { getConfig } from '../config'
+import { createLogger } from './logger'
+
+const log = createLogger('ProcessingOrchestrator')
 
 export interface ProcessingRecordDto {
   id: string
@@ -42,7 +45,7 @@ interface EligibleRecord {
   isBench: boolean
 }
 
-let pauseRequested = false
+let activeController: AbortController | null = null
 
 function makeProgress(source: string, total: number, processed: number, success: number, failed: number, skipped: number, status = 'processing'): ProcessingEvent {
   return { type: 'progress', progress: { source, status, totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } }
@@ -54,7 +57,7 @@ function getEligibleEmployeesForExtraction(): EligibleRecord[] {
     SELECT e.id, e.upstream_id, e.full_name, e.resume_note_id, e.resume_filename, e.is_bench
     FROM synced_employees e
     LEFT JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
-    WHERE e.has_resume = 1 AND e.status IN ('synced', 'incomplete')
+    WHERE e.has_resume = 1 AND e.status IN ('synced', 'incomplete', 'extract_failed')
       AND (re.id IS NULL OR re.resume_text IS NULL OR re.resume_text = '')
     ORDER BY e.full_name
   `).all() as { id: number; upstream_id: number; full_name: string; resume_note_id: number | null; resume_filename: string | null; is_bench: number }[]
@@ -68,7 +71,7 @@ function getEligibleCandidatesForExtraction(): EligibleRecord[] {
     SELECT c.id, c.upstream_id, c.full_name, c.resume_note_id, c.resume_filename
     FROM synced_candidates c
     LEFT JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
-    WHERE c.has_resume = 1 AND c.status IN ('synced', 'incomplete')
+    WHERE c.has_resume = 1 AND c.status IN ('synced', 'incomplete', 'extract_failed')
       AND (re.id IS NULL OR re.resume_text IS NULL OR re.resume_text = '')
     ORDER BY c.full_name
   `).all() as { id: number; upstream_id: number; full_name: string; resume_note_id: number | null; resume_filename: string | null }[]
@@ -116,7 +119,7 @@ function buildEnrichedText(source: string, dbId: number, resumeText: string): st
 
 export const processingOrchestrator = {
   requestPause(): void {
-    pauseRequested = true
+    activeController?.abort()
   },
 
   getStatus(): { employees: { total: number; extracted: number; vectorized: number; failed: number }; candidates: { total: number; extracted: number; vectorized: number; failed: number }; positions: { total: number; extracted: number; vectorized: number; failed: number } } {
@@ -125,17 +128,17 @@ export const processingOrchestrator = {
     const empTotal = (db.prepare("SELECT COUNT(*) as c FROM synced_employees WHERE has_resume = 1").get() as { c: number }).c
     const empExtracted = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'employees' AND resume_text IS NOT NULL AND resume_text != ''").get() as { c: number }).c
     const empVectorized = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'employees' AND embedding IS NOT NULL").get() as { c: number }).c
-    const empFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_employees WHERE failed = 1").get() as { c: number }).c
+    const empFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_employees WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed')").get() as { c: number }).c
 
     const candTotal = (db.prepare("SELECT COUNT(*) as c FROM synced_candidates WHERE has_resume = 1").get() as { c: number }).c
     const candExtracted = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'candidates' AND resume_text IS NOT NULL AND resume_text != ''").get() as { c: number }).c
     const candVectorized = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'candidates' AND embedding IS NOT NULL").get() as { c: number }).c
-    const candFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_candidates WHERE failed = 1").get() as { c: number }).c
+    const candFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_candidates WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed')").get() as { c: number }).c
 
     const posTotal = (db.prepare("SELECT COUNT(*) as c FROM synced_open_positions").get() as { c: number }).c
     const posExtracted = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'positions' AND resume_text IS NOT NULL AND resume_text != ''").get() as { c: number }).c
     const posVectorized = (db.prepare("SELECT COUNT(*) as c FROM resume_embeddings WHERE source_type = 'positions' AND embedding IS NOT NULL").get() as { c: number }).c
-    const posFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_open_positions WHERE failed = 1").get() as { c: number }).c
+    const posFailed = (db.prepare("SELECT COUNT(*) as c FROM synced_open_positions WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed')").get() as { c: number }).c
 
     return {
       employees: { total: empTotal, extracted: empExtracted, vectorized: empVectorized, failed: empFailed },
@@ -145,11 +148,13 @@ export const processingOrchestrator = {
   },
 
   async extractAsync(source: string, token: string, emitEvent: (event: ProcessingEvent) => void): Promise<void> {
-    pauseRequested = false
+    activeController = new AbortController()
+    const { signal } = activeController
+    log.info('Text extraction started', { source })
 
     try {
       if (source === 'open-positions') {
-        await extractOpenPositions(emitEvent)
+        await extractOpenPositions(emitEvent, signal)
         return
       }
 
@@ -165,7 +170,7 @@ export const processingOrchestrator = {
       const batchSize = 5
 
       for (let i = 0; i < eligible.length; i += batchSize) {
-        if (pauseRequested) break
+        if (signal.aborted) break
 
         const batch = eligible.slice(i, i + batchSize)
 
@@ -185,6 +190,7 @@ export const processingOrchestrator = {
 
           if (result.status === 'rejected') {
             failed++
+            log.error('Extraction failed for record', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Extraction failed'), { source })
             emitEvent({ type: 'record', record: { id: `${source}-0`, upstreamId: 0, name: 'Unknown', status: 'failed', error: result.reason?.message ?? 'Extraction failed' } })
             emitEvent(makeProgress(source, total, processed, success, failed, skipped))
             continue
@@ -195,7 +201,7 @@ export const processingOrchestrator = {
           if (error || !text?.trim()) {
             failed++
             const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
-            syncRepository.markFailed(table, item.dbId, error ?? 'Empty text after extraction')
+            syncRepository.markFailed(table, item.dbId, 'extract_failed', error ?? 'Empty text after extraction')
             emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: error ?? 'Empty text' } })
           } else {
             const enrichedText = buildEnrichedText(source, item.dbId, text)
@@ -219,24 +225,31 @@ export const processingOrchestrator = {
         }
       }
 
-      emitEvent({ type: 'complete', progress: { source, status: pauseRequested ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
+      log.info('Text extraction complete', { source, total, success, failed, skipped, paused: signal.aborted })
+      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Extraction failed' })
+    } finally {
+      activeController = null
     }
   },
 
   async vectorizeAsync(source: string, model: string, emitEvent: (event: ProcessingEvent) => void): Promise<void> {
-    pauseRequested = false
+    activeController = new AbortController()
+    const { signal } = activeController
+    log.info('Vectorization started', { source, model })
 
     try {
       const eligible = getEligibleForVectorization(source)
       const total = eligible.length
+      log.info('Vectorization eligible records', { source, eligible: eligible.length })
       let processed = 0, success = 0, failed = 0, skipped = 0
 
       emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
 
       for (const item of eligible) {
-        if (pauseRequested) break
+        if (signal.aborted) break
         processed++
 
         try {
@@ -260,19 +273,29 @@ export const processingOrchestrator = {
           emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'vectorized', vectorDimensions: vector.length } })
         } catch (err) {
           failed++
+          log.error('Vectorization failed for record', err instanceof Error ? err : new Error(String(err)), { source, upstreamId: item.upstreamId })
+          const table = source === 'employees' ? 'synced_employees' as const
+            : source === 'candidates' ? 'synced_candidates' as const
+            : 'synced_open_positions' as const
+          syncRepository.markFailed(table, item.dbId, 'vectorize_failed', err instanceof Error ? err.message : 'Vectorization failed')
           emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: err instanceof Error ? err.message : 'Vectorization failed' } })
         }
 
         emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
       }
 
-      emitEvent({ type: 'complete', progress: { source, status: pauseRequested ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
+      log.info('Vectorization complete', { source, total, success, failed, paused: signal.aborted })
+      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Vectorization failed' })
+    } finally {
+      activeController = null
     }
   },
 
   async vectorizeSingle(source: string, upstreamId: number, model: string): Promise<{ success: boolean; error?: string }> {
+    log.info('Single vectorization requested', { source, upstreamId })
     const db = getDatabase()
     const embedding = db.prepare(
       'SELECT * FROM resume_embeddings WHERE source_type = ? AND upstream_id = ?'
@@ -299,7 +322,7 @@ export const processingOrchestrator = {
   },
 }
 
-async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void): Promise<void> {
+async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void, signal?: AbortSignal): Promise<void> {
   const db = getDatabase()
   const positions = db.prepare(`
     SELECT op.id, op.upstream_id, op.account, op.job_title, op.main_skill, op.job_description
@@ -312,11 +335,12 @@ async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void)
 
   const total = positions.length
   let processed = 0, success = 0, failed = 0
+  log.info('Open position text extraction started', { eligible: positions.length })
 
   emitEvent(makeProgress('open-positions', total, processed, success, failed, 0))
 
   for (const pos of positions) {
-    if (pauseRequested) break
+    if (signal?.aborted) break
     processed++
 
     const enrichedText = [
@@ -342,5 +366,6 @@ async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void)
     emitEvent(makeProgress('open-positions', total, processed, success, failed, 0))
   }
 
+  log.info('Open position text extraction complete', { total, success, failed })
   emitEvent({ type: 'complete', progress: { source: 'open-positions', status: 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: 0 } })
 }

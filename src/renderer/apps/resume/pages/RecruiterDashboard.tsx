@@ -3,7 +3,7 @@ import ResumeEditor from '../components/ResumeEditor';
 import OriginalResumeDrawer from '../components/OriginalResumeDrawer';
 import ValidationPanel from '../components/ValidationPanel';
 import PdfPreviewPanel from '../components/PdfPreviewPanel';
-import { DocumentIcon, SearchIcon, SpinnerIcon } from '../components/shared/icons';
+import { DocumentIcon, SearchIcon, SpinnerIcon } from '../../../shared/components/icons';
 import { useRecruiterDashboard } from '../hooks/useRecruiterDashboard';
 
 interface RejectResumeModalProps {

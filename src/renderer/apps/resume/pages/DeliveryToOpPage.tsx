@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { DeliveryToOpStepKey } from '../types';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import DeliveryEmployeeSelector from '../components/match/DeliveryEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
 import DeliveryToOpSummary from '../components/match/DeliveryToOpSummary';

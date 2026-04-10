@@ -7,8 +7,8 @@ import {
   TransformSessionStatus,
   SessionContextType,
 } from '../types';
-import { ChevronIcon, CloseIcon, SearchIcon } from '../components/shared/icons';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { ChevronIcon, CloseIcon, SearchIcon } from '../../../shared/components/icons';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('TransformHistoryPage');
 

@@ -3,7 +3,7 @@ import { StructuredResume, AISuggestion, ValidationResult } from '../types';
 import { validationService } from '../services/validationService';
 import { aiService } from '../services/aiService';
 import { pdfExportService } from '../services/pdfExportService';
-import { useToast } from '../components/shared/ToastContext';
+import { useToast } from '../../../shared/components/ToastContext';
 
 export function useRecruiterDashboard() {
   const { showToast } = useToast();

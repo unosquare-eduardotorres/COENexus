@@ -187,6 +187,14 @@ export const aiChatSchema = z.object({
   maxTokens: z.number().int().positive().optional(),
 })
 
+export const addVoyageKeySchema = z.object({
+  apiKey: z.string().min(1, 'API key is required'),
+})
+
+export const removeVoyageKeySchema = z.object({
+  index: z.number().int().min(0),
+})
+
 export function validatePayload<T>(schema: z.ZodSchema<T>, data: unknown, channel: string): T {
   const result = schema.safeParse(data)
   if (!result.success) {

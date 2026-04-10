@@ -1,6 +1,6 @@
 import { createElement, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { NavigateFunction, useNavigate } from 'react-router-dom';
-import { useToast } from '../components/shared/ToastContext';
+import { useToast } from '../../../shared/components/ToastContext';
 import { aiService } from '../services/aiService';
 import { sessionService } from '../services/sessionService';
 import { useTransformExport } from './transform/useTransformExport';
@@ -9,7 +9,7 @@ import { StepKey, useTransformSession } from './transform/useTransformSession';
 import { useTransformSearch } from './transform/useTransformSearch';
 import { useTransformValidation } from './transform/useTransformValidation';
 import { ATSCandidate, ATSPosition, BenchEmployee, RefinementMode, ResumeSourceType } from '../types';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useTransformWizard');
 

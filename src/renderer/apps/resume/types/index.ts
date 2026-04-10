@@ -475,7 +475,9 @@ export interface BatchResult {
 }
 
 export type SyncSourceType = 'employees' | 'candidates' | 'open-positions';
-export type PipelineStatus = 'not-processed' | 'incomplete' | 'synced' | 'extracted' | 'vectorized';
+export type PipelineStatus =
+  | 'not-processed' | 'incomplete' | 'synced' | 'extracted' | 'vectorized'
+  | 'sync_failed' | 'extract_failed' | 'vectorize_failed';
 
 export interface SyncRecord {
   id: string;
@@ -484,7 +486,6 @@ export interface SyncRecord {
   email?: string;
   source: SyncSourceType;
   pipelineStatus: PipelineStatus;
-  failed: boolean;
   reason?: string;
   seniority?: Seniority;
   expectedRate?: number;

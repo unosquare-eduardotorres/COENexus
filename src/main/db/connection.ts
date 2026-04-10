@@ -74,6 +74,7 @@ function runInitialSchema(database: Database.Database): void {
     if (existsSync(schemaPath)) {
       schemaSource = readFileSync(schemaPath, 'utf-8')
     } else {
+      log.warn('schema.sql not found at expected path — using inline fallback. Ensure schema.sql is bundled via forge.config.ts extraResource.')
       schemaSource = getInlineSchema()
     }
 
@@ -101,11 +102,19 @@ function runMigrations(database: Database.Database): void {
     'SELECT MAX(version) as v FROM schema_migrations'
   ).get() as { v: number } | undefined
 
-  const _currentVersion = current?.v ?? 0
+  const currentVersion = current?.v ?? 0
 
-  // Future migrations go here:
-  // if (currentVersion < 2) { runMigration002(database) }
-  // if (currentVersion < 3) { runMigration003(database) }
+  if (currentVersion < 2) {
+    log.info('Running migration 002: convert legacy failed status to pipeline error states')
+    database.exec(`
+      UPDATE synced_employees SET status = 'extract_failed' WHERE status = 'failed';
+      UPDATE synced_candidates SET status = 'extract_failed' WHERE status = 'failed';
+      UPDATE synced_open_positions SET status = 'extract_failed' WHERE status = 'failed';
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (2, 'convert_failed_to_status')"
+    ).run()
+  }
 }
 
 function getInlineSchema(): string {

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useIpcQuery } from '../../../../hooks/useIpcQuery';
+import { useIpcQuery } from '../../../../shared/hooks/useIpcQuery';
 import { benchBurnService } from '../../services/benchBurnService';
 import { ATSCandidate, BenchEmployee, ResumeSourceType, SyncedCandidateListItem } from '../../types';
-import { createRendererLogger } from '../../utils/rendererLogger';
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useTransformSearch');
 

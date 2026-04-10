@@ -1,5 +1,14 @@
 import { StructuredResume } from '../types';
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export const pdfExportService = {
   async downloadPdf(resume: StructuredResume, fileName?: string): Promise<void> {
     const htmlContent = generateResumeHtml(resume);
@@ -23,7 +32,7 @@ function generateResumeHtml(resume: StructuredResume): string {
   const formatDate = (dateStr: string) => {
     if (dateStr === 'Present' || dateStr.toLowerCase() === 'present') return 'Present';
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
+    if (isNaN(date.getTime())) return escapeHtml(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
@@ -33,7 +42,7 @@ function generateResumeHtml(resume: StructuredResume): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${resume.candidateName} - Resume</title>
+  <title>${escapeHtml(resume.candidateName)} - Resume</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -240,12 +249,12 @@ function generateResumeHtml(resume: StructuredResume): string {
 </head>
 <body>
   <header class="header">
-    <h1 class="name">${resume.candidateName}</h1>
+    <h1 class="name">${escapeHtml(resume.candidateName)}</h1>
     <div class="contact-info">
-      ${resume.email ? `<span>📧 ${resume.email}</span>` : ''}
-      ${resume.phone ? `<span>📱 ${resume.phone}</span>` : ''}
-      ${resume.location ? `<span>📍 ${resume.location}</span>` : ''}
-      ${resume.linkedIn ? `<span>🔗 ${resume.linkedIn}</span>` : ''}
+      ${resume.email ? `<span>📧 ${escapeHtml(resume.email)}</span>` : ''}
+      ${resume.phone ? `<span>📱 ${escapeHtml(resume.phone)}</span>` : ''}
+      ${resume.location ? `<span>📍 ${escapeHtml(resume.location)}</span>` : ''}
+      ${resume.linkedIn ? `<span>🔗 ${escapeHtml(resume.linkedIn)}</span>` : ''}
     </div>
   </header>
 
@@ -254,7 +263,7 @@ function generateResumeHtml(resume: StructuredResume): string {
       ? `
   <section class="section">
     <h2 class="section-title">Professional Summary</h2>
-    <p class="summary">${resume.summary}</p>
+    <p class="summary">${escapeHtml(resume.summary)}</p>
   </section>
   `
       : ''
@@ -271,18 +280,18 @@ function generateResumeHtml(resume: StructuredResume): string {
       <div class="experience-item">
         <div class="experience-header">
           <div>
-            <span class="job-title">${exp.title}</span>
-            <span class="company"> | ${exp.company}</span>
-            ${exp.location ? `<span class="location"> | ${exp.location}</span>` : ''}
+            <span class="job-title">${escapeHtml(exp.title)}</span>
+            <span class="company"> | ${escapeHtml(exp.company)}</span>
+            ${exp.location ? `<span class="location"> | ${escapeHtml(exp.location)}</span>` : ''}
           </div>
           <span class="dates">${formatDate(exp.startDate)} - ${formatDate(exp.endDate)}</span>
         </div>
-        ${exp.description ? `<p style="margin-top: 4px; color: #374151;">${exp.description}</p>` : ''}
+        ${exp.description ? `<p style="margin-top: 4px; color: #374151;">${escapeHtml(exp.description)}</p>` : ''}
         ${
           exp.achievements && exp.achievements.length > 0
             ? `
           <ul class="achievements">
-            ${exp.achievements.map((ach) => `<li>${ach}</li>`).join('')}
+            ${exp.achievements.map((ach) => `<li>${escapeHtml(ach)}</li>`).join('')}
           </ul>
         `
             : ''
@@ -307,13 +316,13 @@ function generateResumeHtml(resume: StructuredResume): string {
       <div class="education-item">
         <div class="education-header">
           <div>
-            <span class="degree">${edu.degree} in ${edu.field}</span>
-            <span class="institution"> | ${edu.institution}</span>
-            ${edu.gpa ? `<span style="font-size: 10pt; color: #6b7280;"> | GPA: ${edu.gpa}</span>` : ''}
+            <span class="degree">${escapeHtml(edu.degree)} in ${escapeHtml(edu.field)}</span>
+            <span class="institution"> | ${escapeHtml(edu.institution)}</span>
+            ${edu.gpa ? `<span style="font-size: 10pt; color: #6b7280;"> | GPA: ${escapeHtml(edu.gpa)}</span>` : ''}
           </div>
           <span class="dates">${formatDate(edu.graduationDate)}</span>
         </div>
-        ${edu.honors ? `<p style="font-size: 10pt; color: #6b7280; margin-top: 2px;">${edu.honors}</p>` : ''}
+        ${edu.honors ? `<p style="font-size: 10pt; color: #6b7280; margin-top: 2px;">${escapeHtml(edu.honors)}</p>` : ''}
       </div>
     `
       )
@@ -333,8 +342,8 @@ function generateResumeHtml(resume: StructuredResume): string {
         .map(
           (cat) => `
         <div class="skill-category">
-          <div class="skill-category-name">${cat.name}</div>
-          <div class="skills-list">${cat.skills.join(' • ')}</div>
+          <div class="skill-category-name">${escapeHtml(cat.name)}</div>
+          <div class="skills-list">${cat.skills.map(s => escapeHtml(s)).join(' • ')}</div>
         </div>
       `
         )
@@ -356,8 +365,8 @@ function generateResumeHtml(resume: StructuredResume): string {
           (cert) => `
         <div class="certification-item">
           <div>
-            <span class="cert-name">${cert.name}</span>
-            <span class="cert-issuer"> - ${cert.issuer}</span>
+            <span class="cert-name">${escapeHtml(cert.name)}</span>
+            <span class="cert-issuer"> - ${escapeHtml(cert.issuer)}</span>
           </div>
           <span class="cert-date">${formatDate(cert.date)}</span>
         </div>

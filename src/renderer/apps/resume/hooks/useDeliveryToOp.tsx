@@ -7,7 +7,7 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import DeliveryEmployeeSelector from '../components/match/DeliveryEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
 import DeliveryToOpSummary from '../components/match/DeliveryToOpSummary';
@@ -15,10 +15,10 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import DeliveryToOpResults from '../components/match/DeliveryToOpResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
-import { createRendererLogger } from '../utils/rendererLogger';
-import { useIpcQuery } from '../../../hooks/useIpcQuery';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
-import { STEP_ICONS } from '../components/shared/icons/stepIcons';
+import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 
 const log = createRendererLogger('useDeliveryToOp');
 

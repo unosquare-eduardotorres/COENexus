@@ -6,7 +6,7 @@ export interface StatusColorClasses {
   glowShadow: string;
 }
 
-export const ISSUE_STATUS_COLORS: Record<'incomplete' | 'not-processed' | 'excluded', StatusColorClasses> = {
+export const ISSUE_STATUS_COLORS: Record<'incomplete' | 'not-processed' | 'excluded' | 'sync_failed' | 'extract_failed' | 'vectorize_failed', StatusColorClasses> = {
   incomplete: {
     borderColor: 'border-amber-200/60 dark:border-amber-500/20',
     bgColor: 'bg-amber-100 dark:bg-amber-500/20',
@@ -27,6 +27,27 @@ export const ISSUE_STATUS_COLORS: Record<'incomplete' | 'not-processed' | 'exclu
     iconColor: 'text-orange-600 dark:text-orange-400',
     glowRing: 'ring-2 ring-orange-400 dark:ring-orange-500',
     glowShadow: 'shadow-lg shadow-orange-500/20',
+  },
+  sync_failed: {
+    borderColor: 'border-rose-200/60 dark:border-rose-500/20',
+    bgColor: 'bg-rose-100 dark:bg-rose-500/20',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    glowRing: 'ring-2 ring-rose-400 dark:ring-rose-500',
+    glowShadow: 'shadow-lg shadow-rose-500/20',
+  },
+  extract_failed: {
+    borderColor: 'border-pink-200/60 dark:border-pink-500/20',
+    bgColor: 'bg-pink-100 dark:bg-pink-500/20',
+    iconColor: 'text-pink-600 dark:text-pink-400',
+    glowRing: 'ring-2 ring-pink-400 dark:ring-pink-500',
+    glowShadow: 'shadow-lg shadow-pink-500/20',
+  },
+  vectorize_failed: {
+    borderColor: 'border-fuchsia-200/60 dark:border-fuchsia-500/20',
+    bgColor: 'bg-fuchsia-100 dark:bg-fuchsia-500/20',
+    iconColor: 'text-fuchsia-600 dark:text-fuchsia-400',
+    glowRing: 'ring-2 ring-fuchsia-400 dark:ring-fuchsia-500',
+    glowShadow: 'shadow-lg shadow-fuchsia-500/20',
   },
 };
 

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import IntentStep from '../components/transform/IntentStep';
 import SelectResumeStep from '../components/transform/SelectResumeStep';
 import RefinementStep from '../components/transform/RefinementStep';
@@ -7,7 +7,7 @@ import JobDescriptionStep from '../components/transform/JobDescriptionStep';
 import ReviewStep from '../components/transform/ReviewStep';
 import SaveExportStep from '../components/transform/SaveExportStep';
 import SaveSessionModal from '../components/SaveSessionModal';
-import { useToast } from '../components/shared/ToastContext';
+import { useToast } from '../../../shared/components/ToastContext';
 import { TransformProvider } from '../contexts/TransformContext';
 import { useTransformWizard } from '../hooks/useTransformWizard';
 import { aiService } from '../services/aiService';

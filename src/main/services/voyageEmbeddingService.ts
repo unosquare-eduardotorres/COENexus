@@ -1,5 +1,6 @@
 import { getConfig } from '../config'
 import { createLogger } from './logger'
+import { keychainService } from './keychainService'
 
 const log = createLogger('Voyage')
 
@@ -14,15 +15,24 @@ interface VoyageResponse {
 const MAX_RETRIES = 5
 const BACKOFF_SECONDS = [2, 5, 10, 20, 40]
 
-let keyIndex = 0
+function createKeyRotator() {
+  let keyIndex = 0
+  return {
+    getNextApiKey(): string {
+      const keychainKeys = keychainService.getVoyageKeys()
+      const { voyage } = getConfig()
+      const allKeys = keychainKeys.length > 0 ? keychainKeys : voyage.apiKeys
 
-function getNextApiKey(): string {
-  const { voyage } = getConfig()
-  if (voyage.apiKeys.length === 0) throw new Error('Voyage API key not configured')
-  const key = voyage.apiKeys[keyIndex % voyage.apiKeys.length]
-  keyIndex++
-  return key
+      if (allKeys.length === 0) throw new Error('Voyage API key not configured')
+      const key = allKeys[keyIndex % allKeys.length]
+      keyIndex++
+      return key
+    },
+    reset(): void { keyIndex = 0 },
+  }
 }
+
+const keyRotator = createKeyRotator()
 
 export const voyageEmbeddingService = {
   async generateEmbedding(
@@ -32,7 +42,7 @@ export const voyageEmbeddingService = {
   ): Promise<Float32Array> {
     const { voyage } = getConfig()
     const apiUrl = voyage.apiUrl.replace(/\/+$/, '')
-    const apiKey = getNextApiKey()
+    const apiKey = keyRotator.getNextApiKey()
     const embeddingModel = model ?? voyage.defaultModel
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

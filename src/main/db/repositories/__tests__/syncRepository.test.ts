@@ -42,7 +42,7 @@ describe('syncRepository', () => {
       job_title: 'Frontend Engineer',
       status: 'synced',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
 
@@ -76,16 +76,16 @@ describe('syncRepository', () => {
       job_title: 'Engineer',
       status: 'synced',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
     const row = syncRepository.findEmployeeByUpstreamId(50)
 
-    syncRepository.updateStatus('synced_employees', row!.id, 'processing', 'Running')
+    syncRepository.updateStatus('synced_employees', row!.id, 'processing')
     const updated = syncRepository.findEmployeeByUpstreamId(50)
 
     expect(updated?.status).toBe('processing')
-    expect(updated?.status_reason).toBe('Running')
+    expect(updated?.status_reason).toBeNull()
   })
 
   it('should mark failed with reason', () => {
@@ -111,16 +111,15 @@ describe('syncRepository', () => {
       job_title: 'QA Engineer',
       status: 'processing',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
     const row = syncRepository.findEmployeeByUpstreamId(60)
 
-    syncRepository.markFailed('synced_employees', row!.id, 'Upstream timeout')
+    syncRepository.markFailed('synced_employees', row!.id, 'extract_failed', 'Upstream timeout')
     const failed = syncRepository.findEmployeeByUpstreamId(60)
 
-    expect(failed?.failed).toBe(1)
-    expect(failed?.status).toBe('failed')
+    expect(failed?.status).toBe('extract_failed')
     expect(failed?.status_reason).toBe('Upstream timeout')
   })
 
@@ -147,7 +146,7 @@ describe('syncRepository', () => {
       job_title: 'Developer',
       status: 'synced',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
     syncRepository.upsertEmployee({
@@ -170,7 +169,7 @@ describe('syncRepository', () => {
       job_title: 'Engineer',
       status: 'synced',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
 
@@ -204,7 +203,7 @@ describe('syncRepository', () => {
       job_title: 'Engineer',
       status: 'synced',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
     syncRepository.upsertEmployee({
@@ -227,7 +226,7 @@ describe('syncRepository', () => {
       job_title: 'Engineer',
       status: 'processing',
       status_reason: null,
-      failed: 0,
+
       synced_at: syncedAt,
     })
     syncRepository.upsertEmployee({

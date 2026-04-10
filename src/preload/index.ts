@@ -80,6 +80,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_RETRY_FAILED_VECTORIZATION, params),
     resetStatus: (params: ProcessingResetStatusParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_RESET_STATUS, params),
+    addVoyageKey: (params: { apiKey: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_ADD_VOYAGE_KEY, params),
+    removeVoyageKey: (params: { index: number }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_REMOVE_VOYAGE_KEY, params),
     onProgress: (callback: (data: ProcessingProgressEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: ProcessingProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.PROCESSING_PROGRESS_EVENT, handler)

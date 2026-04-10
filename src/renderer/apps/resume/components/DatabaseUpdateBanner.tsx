@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('DatabaseUpdateBanner');
 

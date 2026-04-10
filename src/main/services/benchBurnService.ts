@@ -6,6 +6,11 @@ import { matchRepository } from '../db/repositories/matchRepository'
 import { OPUS_ANALYSIS, BENCH_BURN_CONTEXT_BLOCK, EXTERNAL_CANDIDATE_CONTEXT_BLOCK, fillTemplate } from './promptTemplates'
 import { getConfig } from '../config'
 import type { MatchEvent } from './matchEngineService'
+import { parseAiResponse } from './utils/aiResponseParser'
+import { opusAnalysisSchema } from './utils/aiResponseSchemas'
+import { createLogger } from './logger'
+
+const log = createLogger('BenchBurn')
 
 export interface BenchBurnRequest {
   name: string
@@ -50,6 +55,8 @@ export const benchBurnService = {
     const startTime = Date.now()
     const { claudeProxy } = getConfig()
 
+    log.info('Bench burn started', { employees: request.employeeUpstreamIds.length, positions: request.positionUpstreamIds.length, topNPerEmployee: request.topNPerEmployee, topNPerPosition: request.topNPerPosition })
+
     try {
       emitEvent({ type: 'progress', percent: 5, stage: 'Loading employee and position data...' })
 
@@ -92,6 +99,8 @@ export const benchBurnService = {
 
       const uniquePairs = [...new Map(pairs.map(p => [`${p.emp.upstream_id}-${p.pos.upstream_id}`, p])).values()]
 
+      log.info('Cross-similarities computed', { pairs: similarities.length, uniquePairs: uniquePairs.length })
+
       emitEvent({ type: 'progress', percent: 30, stage: `Analyzing ${uniquePairs.length} employee-position pairs...` })
 
       const results = await runConcurrent(uniquePairs, claudeProxy.maxConcurrency, async (pair) => {
@@ -121,21 +130,21 @@ export const benchBurnService = {
 
         try {
           const response = await claudeProxyService.chatAsync(claudeProxy.opusModel, prompt, 4096, 0.1)
-          const parsed = JSON.parse(response.replace(/```json\n?|\n?```/g, '').trim())
+          const parsed = parseAiResponse(response, opusAnalysisSchema, 'bench-burn')
 
           return {
             employeeUpstreamId: pair.emp.upstream_id,
             employeeName: pair.emp.full_name,
             positionUpstreamId: pair.pos.upstream_id,
             positionLabel: `${pair.pos.account} - ${pair.pos.job_title}`,
-            matchScore: parsed.matchScore ?? 0,
+            matchScore: parsed.matchScore,
             cosineSimilarity: pair.similarity,
-            scores: parsed.scores ?? {},
-            skills: parsed.skills ?? [],
-            gaps: parsed.gaps ?? [],
-            domains: parsed.domains ?? [],
-            analysis: parsed.analysis ?? null,
-            summary: parsed.summary ?? '',
+            scores: parsed.scores,
+            skills: parsed.skills,
+            gaps: parsed.gaps,
+            domains: parsed.domains,
+            analysis: parsed.analysis,
+            summary: parsed.summary,
           } as CrossMatchResult
         } catch (err) {
           return {
@@ -181,6 +190,8 @@ export const benchBurnService = {
 
       const resultPayload = { employeeResults, positionResults, stats }
 
+      log.info('Bench burn analysis complete', { totalPairs: uniquePairs.length, analyzed: results.length, time: stats.time })
+
       emitEvent({ type: 'result', candidates: results, stats })
       emitEvent({ type: 'progress', percent: 95, stage: 'Saving session...' })
 
@@ -206,6 +217,7 @@ export const benchBurnService = {
 
       return sessionId
     } catch (err) {
+      log.error('Bench burn failed', err instanceof Error ? err : new Error(String(err)))
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Bench burn failed' })
       return null
     }
@@ -217,6 +229,8 @@ export const benchBurnService = {
   ): Promise<number | null> {
     const startTime = Date.now()
     const { claudeProxy } = getConfig()
+
+    log.info('External candidate match started', { candidates: request.candidates.length, positions: request.positionUpstreamIds.length, hasCustomPosition: !!request.customPosition })
 
     try {
       emitEvent({ type: 'progress', percent: 5, stage: 'Loading position data...' })
@@ -279,21 +293,21 @@ export const benchBurnService = {
 
           try {
             const response = await claudeProxyService.chatAsync(claudeProxy.opusModel, prompt, 4096, 0.1)
-            const parsed = JSON.parse(response.replace(/```json\n?|\n?```/g, '').trim())
+            const parsed = parseAiResponse(response, opusAnalysisSchema, 'external-candidate')
 
             allResults.push({
               employeeUpstreamId: 0,
               employeeName: candidate.name,
               positionUpstreamId: pos.upstream_id,
               positionLabel: `${pos.account} - ${pos.job_title}`,
-              matchScore: parsed.matchScore ?? 0,
+              matchScore: parsed.matchScore,
               cosineSimilarity: 0,
-              scores: parsed.scores ?? {},
-              skills: parsed.skills ?? [],
-              gaps: parsed.gaps ?? [],
-              domains: parsed.domains ?? [],
-              analysis: parsed.analysis ?? null,
-              summary: parsed.summary ?? '',
+              scores: parsed.scores,
+              skills: parsed.skills,
+              gaps: parsed.gaps,
+              domains: parsed.domains,
+              analysis: parsed.analysis,
+              summary: parsed.summary,
             })
           } catch (err) {
             allResults.push({
@@ -315,6 +329,8 @@ export const benchBurnService = {
         analyzed: allResults.length,
         time: `${((Date.now() - startTime) / 1000).toFixed(1)}s`,
       }
+
+      log.info('External candidate match complete', { totalPairs: stats.totalPairs, analyzed: allResults.length, time: stats.time })
 
       emitEvent({ type: 'result', candidates: allResults, stats })
 
@@ -340,6 +356,7 @@ export const benchBurnService = {
 
       return sessionId
     } catch (err) {
+      log.error('External candidate match failed', err instanceof Error ? err : new Error(String(err)))
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'External candidate match failed' })
       return null
     }

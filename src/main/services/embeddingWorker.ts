@@ -90,7 +90,7 @@ async function processJob(job: EmbeddingJob): Promise<void> {
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'Unknown error'
     log.error(`Failed job for ${job.source}/${job.upstreamId}: ${reason}`)
-    syncRepository.markFailed(table, job.dbId, reason)
+    syncRepository.markFailed(table, job.dbId, 'vectorize_failed', reason)
   }
 }
 

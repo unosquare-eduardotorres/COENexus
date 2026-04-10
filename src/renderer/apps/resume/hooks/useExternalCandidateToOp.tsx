@@ -8,7 +8,7 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import ExternalResumeUploader from '../components/match/ExternalResumeUploader';
 import ExternalPositionStep from '../components/match/ExternalPositionStep';
 import ExternalCandidateToOpSummary from '../components/match/ExternalCandidateToOpSummary';
@@ -16,10 +16,10 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import ExternalCandidateToOpResults from '../components/match/ExternalCandidateToOpResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
-import { createRendererLogger } from '../utils/rendererLogger';
-import { useIpcQuery } from '../../../hooks/useIpcQuery';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
-import { STEP_ICONS } from '../components/shared/icons/stepIcons';
+import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 
 const log = createRendererLogger('useExternalCandidateToOp');
 

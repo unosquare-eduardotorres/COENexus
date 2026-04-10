@@ -1,32 +1,23 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useIpcQuery } from '../../../hooks/useIpcQuery';
+import { useIpcQuery, useInvalidateQueries } from '../../../shared/hooks/useIpcQuery';
 import {
-  ResumeTemplate,
-  ValidationRule,
-  ContentGuideline,
   AIConfig,
   RefinementPrompt,
   MatchEnginePromptConfig,
   VectorizationConfig,
 } from '../types';
-import {
-  getDefaultTemplate,
-  saveTemplate,
-  resetTemplate,
-} from '../data/defaultTemplateConfig';
 import { getPrompts, savePrompt, resetPrompt, resetAllPrompts } from '../data/defaultPrompts';
 import { getMatchPrompts, saveMatchPrompt, resetMatchPrompt, resetAllMatchPrompts } from '../data/defaultMatchPrompts';
 import { aiService } from '../services/aiService';
 import { vectorizationConfigService } from '../services/vectorizationConfigService';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useAdminDashboard');
 
-export type AdminTab = 'template' | 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template' | 'vectorization' | 'database-sharing';
+export type AdminTab = 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template' | 'vectorization' | 'database-sharing';
 
 export function useAdminDashboard() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('template');
-  const [template, setTemplate] = useState<ResumeTemplate>(getDefaultTemplate());
+  const [activeTab, setActiveTab] = useState<AdminTab>('validation');
   const [aiConfig, setAiConfig] = useState<AIConfig>(aiService.getConfig());
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [prompts, setPrompts] = useState<RefinementPrompt[]>(getPrompts());
@@ -46,29 +37,13 @@ export function useAdminDashboard() {
     ['admin', 'voyage-key-status'],
     () => vectorizationConfigService.checkVoyageKey()
   );
+  const invalidate = useInvalidateQueries();
   const voyageKeyConfigured = voyageKeyStatus?.configured ?? false;
-  const voyageKeyMasked = voyageKeyStatus?.maskedKey ?? '';
+  const voyageMaskedKeys = voyageKeyStatus?.maskedKeys ?? [];
   const voyageKeySource = voyageKeyStatus?.source ?? '';
-  const [confirmAction, setConfirmAction] = useState<'reset-template' | 'reset-prompts' | null>(null);
-
-  const handleSaveTemplate = useCallback(() => {
-    setSaveStatus('saving');
-    saveTemplate(template);
-    setTimeout(() => {
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    }, 500);
-  }, [template]);
-
-  const handleResetTemplate = useCallback(() => {
-    setConfirmAction('reset-template');
-  }, []);
+  const [confirmAction, setConfirmAction] = useState<'reset-prompts' | null>(null);
 
   const handleConfirmAction = useCallback(() => {
-    if (confirmAction === 'reset-template') {
-      const defaultTemplate = resetTemplate();
-      setTemplate(defaultTemplate);
-    }
     if (confirmAction === 'reset-prompts') {
       const defaults = resetAllPrompts();
       setPrompts(defaults);
@@ -81,30 +56,6 @@ export function useAdminDashboard() {
     }
     setConfirmAction(null);
   }, [confirmAction]);
-
-  const updateValidationRule = useCallback(
-    (ruleId: string, updates: Partial<ValidationRule>) => {
-      setTemplate((prev) => ({
-        ...prev,
-        globalValidationRules: prev.globalValidationRules.map((rule) =>
-          rule.id === ruleId ? { ...rule, ...updates } : rule
-        ),
-      }));
-    },
-    []
-  );
-
-  const updateGuideline = useCallback(
-    (guidelineId: string, updates: Partial<ContentGuideline>) => {
-      setTemplate((prev) => ({
-        ...prev,
-        contentGuidelines: prev.contentGuidelines.map((g) =>
-          g.id === guidelineId ? { ...g, ...updates } : g
-        ),
-      }));
-    },
-    []
-  );
 
   const handleSaveAIConfig = useCallback(() => {
     aiService.updateConfig(aiConfig);
@@ -232,22 +183,41 @@ export function useAdminDashboard() {
       const container = templatePreviewRef.current;
       container.innerHTML = '';
       (async () => {
-        const docxPreview = await import('docx-preview');
-        await docxPreview.renderAsync(outputTemplateBuffer, container, undefined, {
-          className: 'docx-preview',
-          inWrapper: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          ignoreFonts: false,
-          breakPages: true,
-          renderHeaders: true,
-          renderFooters: true,
-          renderFootnotes: true,
-        });
+        try {
+          if (outputTemplateBuffer.byteLength === 0) {
+            log.warn('Template buffer is empty, skipping preview');
+            return;
+          }
+          const docxPreview = await import('docx-preview');
+          await docxPreview.renderAsync(outputTemplateBuffer, container, undefined, {
+            className: 'docx-preview',
+            inWrapper: true,
+            ignoreWidth: false,
+            ignoreHeight: false,
+            ignoreFonts: false,
+            breakPages: true,
+            renderHeaders: true,
+            renderFooters: true,
+            renderFootnotes: true,
+          });
+        } catch (err) {
+          log.warn('Template preview render failed:', err);
+          container.innerHTML = '<p class="text-sm text-muted p-4">Unable to preview template. The file may be missing or invalid.</p>';
+        }
       })();
     }
   }, [outputTemplateBuffer]);
 
+
+  const handleAddVoyageKey = useCallback(async (apiKey: string) => {
+    await vectorizationConfigService.addVoyageKey(apiKey);
+    invalidate(['admin', 'voyage-key-status']);
+  }, [invalidate]);
+
+  const handleRemoveVoyageKey = useCallback(async (index: number) => {
+    await vectorizationConfigService.removeVoyageKey(index);
+    invalidate(['admin', 'voyage-key-status']);
+  }, [invalidate]);
 
   const handleSaveVecModel = useCallback(() => {
     vectorizationConfigService.saveModel(vecConfig.model);
@@ -260,11 +230,6 @@ export function useAdminDashboard() {
 
   return {
     tabs: { activeTab, setActiveTab },
-    template: {
-      template, setTemplate,
-      handleSaveTemplate, handleResetTemplate,
-      updateValidationRule, updateGuideline,
-    },
     ai: { aiConfig, setAiConfig, handleSaveAIConfig },
     prompts: {
       prompts, setPrompts, expandedPromptId, editingPromptId, setEditingPromptId,
@@ -283,7 +248,8 @@ export function useAdminDashboard() {
     },
     vectorization: {
       vecConfig, setVecConfig, handleSaveVecModel,
-      voyageKeyConfigured, voyageKeyMasked, voyageKeySource,
+      voyageKeyConfigured, voyageMaskedKeys, voyageKeySource,
+      handleAddVoyageKey, handleRemoveVoyageKey,
     },
     confirm: { confirmAction, setConfirmAction, handleConfirmAction },
     saveStatus,

@@ -1,6 +1,5 @@
 import { useState, useEffect, memo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useTheme } from '../../../contexts/ThemeContext';
 import DatabaseUpdateBanner from './DatabaseUpdateBanner';
 import VemLogo from '../../../components/VemLogo';
 
@@ -8,34 +7,30 @@ type SidebarMode = 'expanded' | 'collapsed' | 'top';
 
 const SIDEBAR_MODE_KEY = 'resume-sidebar-mode';
 const MAIN_CONTENT_ID = 'main-content';
+const TITLEBAR_HEIGHT = 'h-10';
+const TITLEBAR_TOP = 'top-10';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-function SunIcon({ className }: { className?: string }) {
+function NexusIcon() {
   return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-      />
-    </svg>
-  );
-}
-
-function MoonIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-      />
-    </svg>
+    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-violet-600">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="12" x2="5" y2="6" />
+        <line x1="12" y1="12" x2="19" y2="6" />
+        <line x1="12" y1="12" x2="5" y2="18" />
+        <line x1="12" y1="12" x2="19" y2="18" />
+        <line x1="12" y1="12" x2="12" y2="3" />
+        <circle cx="5" cy="6" r="2" fill="white" opacity="0.6" />
+        <circle cx="19" cy="6" r="2" fill="white" opacity="0.6" />
+        <circle cx="5" cy="18" r="2" fill="white" opacity="0.6" />
+        <circle cx="19" cy="18" r="2" fill="white" opacity="0.6" />
+        <circle cx="12" cy="3" r="2" fill="white" opacity="0.6" />
+        <circle cx="12" cy="12" r="3" fill="white" />
+      </svg>
+    </div>
   );
 }
 
@@ -95,20 +90,6 @@ const navigation = [
     ),
   },
   {
-    name: 'Data Sync',
-    href: '/resume/data-sync',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-        />
-      </svg>
-    ),
-  },
-  {
     name: 'Settings',
     href: '/resume/settings',
     icon: (
@@ -130,6 +111,19 @@ const navigation = [
   },
 ];
 
+function GlobalTitleBar() {
+  return (
+    <div className={`glass-nav fixed top-0 left-0 right-0 z-[60] ${TITLEBAR_HEIGHT} titlebar-drag border-b border-white/5`}>
+      <div className="flex items-center justify-center h-full px-4">
+        <Link to="/" className="titlebar-no-drag flex items-center gap-2">
+          <NexusIcon />
+          <span className="text-xs font-semibold tracking-tight text-primary">COE Operation Nexus</span>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar({
   mode,
   onToggleMode,
@@ -146,7 +140,6 @@ function Sidebar({
   onNavClick: (href: string) => void;
 }) {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
   const isExpanded = mode === 'expanded';
   const sidebarWidth = isExpanded ? 'w-[220px]' : 'w-[60px]';
 
@@ -163,17 +156,17 @@ function Sidebar({
       <aside
         id="primary-sidebar"
         aria-label="Primary navigation"
-        className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl transition-all duration-300 ${sidebarWidth} ${
+        className={`fixed ${TITLEBAR_TOP} left-0 bottom-0 z-50 flex flex-col border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl overflow-hidden transition-all duration-300 ${sidebarWidth} ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className={`titlebar-drag flex items-center h-14 border-b border-gray-200/30 dark:border-dark-border/30 ${isExpanded ? 'pl-[78px] pr-4 gap-2.5' : 'justify-center px-2 pt-1'}`}>
+        <div className={`flex items-center h-12 border-b border-gray-200/30 dark:border-dark-border/30 ${isExpanded ? 'px-4 gap-2.5' : 'justify-center px-2'}`}>
           <Link to="/resume" className="titlebar-no-drag flex items-center gap-2.5 min-w-0" onClick={onMobileClose}>
-            <div className="w-10 h-10 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex-shrink-0 flex items-center justify-center">
-              <VemLogo size={32} className="text-accent-500 dark:text-accent-400" />
+            <div className="w-8 h-8 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex-shrink-0 flex items-center justify-center">
+              <VemLogo size={24} className="text-accent-500 dark:text-accent-400" />
             </div>
             {isExpanded && (
-              <span className="text-base font-bold text-primary tracking-tight truncate" title="V.E.M.">
+              <span className="text-sm font-bold text-primary tracking-tight truncate" title="V.E.M.">
                 V.E.M.
               </span>
             )}
@@ -204,7 +197,7 @@ function Sidebar({
           </Link>
         )}
 
-        <nav className="flex-1 py-2 overflow-y-auto" aria-label="Resume app sections">
+        <nav className="flex-1 py-2 overflow-hidden" aria-label="Resume app sections">
           {navigation.map((item) => {
             const isActive =
               location.pathname === item.href ||
@@ -236,27 +229,6 @@ function Sidebar({
         </nav>
 
         <div className={`border-t border-gray-200/30 dark:border-dark-border/30 py-2 ${isExpanded ? 'px-2' : 'px-1'}`}>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            className={`flex items-center gap-3 w-full rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-dark-hover/50 transition-colors ${
-              isExpanded ? 'px-3 py-2.5 min-h-[44px]' : 'justify-center px-2 py-2.5 min-h-[44px] min-w-[44px]'
-            }`}
-          >
-            {theme === 'dark' ? (
-              <SunIcon className="w-5 h-5 flex-shrink-0" />
-            ) : (
-              <MoonIcon className="w-5 h-5 flex-shrink-0" />
-            )}
-            {isExpanded && (
-              <span className="text-sm font-medium">
-                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              </span>
-            )}
-          </button>
-
           <button
             type="button"
             onClick={onToggleMode}
@@ -302,18 +274,17 @@ function Sidebar({
 
 function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavClick: (href: string) => void }) {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="glass-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300 titlebar-drag" aria-label="Top navigation">
+    <nav className="glass-nav fixed ${TITLEBAR_TOP} left-0 right-0 z-50 transition-all duration-300" aria-label="Top navigation" style={{ top: '2.5rem' }}>
       <div className="max-w-[1400px] mx-auto px-6" style={{ paddingLeft: '86px' }}>
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-12">
           <div className="flex items-center gap-10 titlebar-no-drag">
             <Link to="/resume" className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
-                <VemLogo size={32} className="text-accent-500 dark:text-accent-400" />
+              <div className="w-8 h-8 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
+                <VemLogo size={24} className="text-accent-500 dark:text-accent-400" />
               </div>
-              <span className="text-base font-bold text-primary tracking-tight">
+              <span className="text-sm font-bold text-primary tracking-tight">
                 V.E.M.
               </span>
             </Link>
@@ -348,18 +319,6 @@ function TopBar({ onSwitchMode, onNavClick }: { onSwitchMode: () => void; onNavC
           </div>
 
           <div className="flex items-center gap-3 titlebar-no-drag">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="h-11 w-11 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {theme === 'dark' ? (
-                <SunIcon className="w-4 h-4" />
-              ) : (
-                <MoonIcon className="w-4 h-4" />
-              )}
-            </button>
             <button
               type="button"
               onClick={onSwitchMode}
@@ -412,7 +371,7 @@ const Layout = memo(function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen gradient-subtle transition-colors duration-300">
-      <div className="fixed top-0 left-0 right-0 h-14 z-40 titlebar-drag" />
+      <GlobalTitleBar />
       <a
         href={`#${MAIN_CONTENT_ID}`}
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[70] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-accent-600 focus:text-white focus:shadow-lg"
@@ -431,13 +390,13 @@ const Layout = memo(function Layout({ children }: LayoutProps) {
           />
 
           <div className={`flex flex-col min-h-screen transition-all duration-300 ${mainMargin}`}>
-            <div className="md:hidden glass-nav fixed top-0 left-0 right-0 z-30 titlebar-drag">
-              <div className="flex items-center justify-between h-14 px-4" style={{ paddingLeft: '86px' }}>
+            <div className="md:hidden glass-nav fixed top-10 left-0 right-0 z-30">
+              <div className="flex items-center justify-between h-12 px-4" style={{ paddingLeft: '86px' }}>
                 <Link to="/resume" className="titlebar-no-drag flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
-                    <VemLogo size={28} className="text-accent-500 dark:text-accent-400" />
+                  <div className="w-8 h-8 rounded-lg bg-accent-500/15 dark:bg-accent-400/15 flex items-center justify-center">
+                    <VemLogo size={24} className="text-accent-500 dark:text-accent-400" />
                   </div>
-                  <span className="text-base font-bold text-primary">V.E.M.</span>
+                  <span className="text-sm font-bold text-primary">V.E.M.</span>
                 </Link>
                 <div className="flex items-center gap-2 titlebar-no-drag">
                   <button
@@ -471,7 +430,7 @@ const Layout = memo(function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            <main id={MAIN_CONTENT_ID} className="flex-1 md:pt-0 pt-14">
+            <main id={MAIN_CONTENT_ID} className="flex-1 pt-10">
               <DatabaseUpdateBanner />
               {children}
             </main>
@@ -490,7 +449,7 @@ const Layout = memo(function Layout({ children }: LayoutProps) {
         <>
           <TopBar onSwitchMode={handleSwitchToSidebar} onNavClick={handleNavClick} />
 
-          <main id={MAIN_CONTENT_ID} className="pt-14">
+          <main id={MAIN_CONTENT_ID} className="pt-[5.5rem]">
             <DatabaseUpdateBanner />
             {children}
           </main>

@@ -1,5 +1,8 @@
 import { getDatabase } from '../connection'
 import { buildUpsertSql } from '../../services/utils/upsertBuilder'
+import { createLogger } from '../../services/logger'
+
+const log = createLogger('SyncRepository')
 
 type SyncTable = 'synced_employees' | 'synced_candidates' | 'synced_open_positions'
 
@@ -24,7 +27,7 @@ export interface SyncedEmployeeRow {
   job_title: string
   status: string
   status_reason: string | null
-  failed: number
+  failed?: number
   synced_at: string
 }
 
@@ -49,7 +52,7 @@ export interface SyncedCandidateRow {
   resume_filename: string | null
   status: string
   status_reason: string | null
-  failed: number
+  failed?: number
   synced_at: string
 }
 
@@ -76,7 +79,7 @@ export interface SyncedOpenPositionRow {
   replacement: number
   status: string
   status_reason: string | null
-  failed: number
+  failed?: number
   synced_at: string
 }
 
@@ -84,21 +87,21 @@ const EMPLOYEE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'gross_monthly_salary', 'salary_currency', 'last_account', 'last_account_start_date', 'rate',
   'has_resume', 'resume_note_id', 'resume_date_created', 'resume_filename', 'is_bench', 'job_title',
-  'status', 'status_reason', 'failed', 'synced_at',
+  'status', 'status_reason', 'synced_at',
 ]
 
 const CANDIDATE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'current_salary', 'salary_currency', 'coe_certified', 'candidate_status', 'last_status_update',
   'salary_expectations', 'salary_expectations_currency', 'has_resume', 'resume_note_id',
-  'resume_date_created', 'resume_filename', 'status', 'status_reason', 'failed', 'synced_at',
+  'resume_date_created', 'resume_filename', 'status', 'status_reason', 'synced_at',
 ]
 
 const POSITION_COLUMNS = [
   'upstream_id', 'account', 'coe', 'practice', 'stakeholder', 'main_skill',
   'countries', 'seniorities', 'available_range', 'account_overview', 'job_description', 'job_title',
   'position_status', 'aging', 'created', 'ready_date', 'last_modification', 'sourcing', 'replacement',
-  'status', 'status_reason', 'failed', 'synced_at',
+  'status', 'status_reason', 'synced_at',
 ]
 
 const EMPLOYEE_UPSERT = buildUpsertSql({ table: 'synced_employees', columns: EMPLOYEE_COLUMNS, conflictColumns: ['upstream_id'] })
@@ -108,20 +111,35 @@ const POSITION_UPSERT = buildUpsertSql({ table: 'synced_open_positions', columns
 export const syncRepository = {
   upsertEmployee(data: Omit<SyncedEmployeeRow, 'id'>): number {
     const db = getDatabase()
-    const result = db.prepare(EMPLOYEE_UPSERT).run(data)
-    return Number(result.lastInsertRowid)
+    try {
+      const result = db.prepare(EMPLOYEE_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertEmployee failed for upstream_id=${data.upstream_id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: data.upstream_id, name: data.full_name })
+      throw err
+    }
   },
 
   upsertCandidate(data: Omit<SyncedCandidateRow, 'id'>): number {
     const db = getDatabase()
-    const result = db.prepare(CANDIDATE_UPSERT).run(data)
-    return Number(result.lastInsertRowid)
+    try {
+      const result = db.prepare(CANDIDATE_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertCandidate failed for upstream_id=${data.upstream_id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: data.upstream_id, name: data.full_name })
+      throw err
+    }
   },
 
   upsertOpenPosition(data: Omit<SyncedOpenPositionRow, 'id'>): number {
     const db = getDatabase()
-    const result = db.prepare(POSITION_UPSERT).run(data)
-    return Number(result.lastInsertRowid)
+    try {
+      const result = db.prepare(POSITION_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertOpenPosition failed for upstream_id=${data.upstream_id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: data.upstream_id, account: data.account })
+      throw err
+    }
   },
 
   findEmployeeByUpstreamId(upstreamId: number): SyncedEmployeeRow | undefined {
@@ -179,14 +197,15 @@ export const syncRepository = {
     `).all(pattern, pattern, pattern, limit) as SyncedCandidateRow[]
   },
 
-  updateStatus(table: SyncTable, id: number, status: string, statusReason?: string): void {
+  updateStatus(table: SyncTable, id: number, status: string): void {
     const db = getDatabase()
-    db.prepare(`UPDATE ${table} SET status = ?, status_reason = ? WHERE id = ?`).run(status, statusReason ?? null, id)
+    db.prepare(`UPDATE ${table} SET status = ?, status_reason = NULL WHERE id = ?`).run(status, id)
   },
 
-  markFailed(table: SyncTable, id: number, reason: string): void {
+  markFailed(table: SyncTable, id: number, failedStatus: string, reason: string): void {
     const db = getDatabase()
-    db.prepare(`UPDATE ${table} SET failed = 1, status = 'failed', status_reason = ? WHERE id = ?`).run(reason, id)
+    log.info('Marking record as failed', { table, id, failedStatus, reason })
+    db.prepare(`UPDATE ${table} SET status = ?, status_reason = ? WHERE id = ?`).run(failedStatus, reason, id)
   },
 
   clearTable(dataSource: 'employees' | 'candidates' | 'positions'): void {
@@ -198,6 +217,7 @@ export const syncRepository = {
     }
     const table = tableMap[dataSource]
     if (table) {
+      log.warn('Clearing sync table', { dataSource, table })
       db.prepare(`DELETE FROM ${table}`).run()
     }
   },
@@ -206,7 +226,7 @@ export const syncRepository = {
     const db = getDatabase()
     const total = (db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as { c: number }).c
     const synced = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE status = 'synced'`).get() as { c: number }).c
-    const failed = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE failed = 1`).get() as { c: number }).c
+    const failed = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed')`).get() as { c: number }).c
     const processing = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE status = 'processing'`).get() as { c: number }).c
     return { total, synced, failed, processing }
   },

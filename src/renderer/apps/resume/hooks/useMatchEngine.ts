@@ -23,8 +23,8 @@ import { exportToExcel, ColumnDef } from '../utils/exportToExcel';
 import { formatSalary } from '../utils/formatSalary';
 import { SAMPLE_JOB_DESCRIPTION } from '../data/sampleJobDescription';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
-import { useIpcQuery, useInvalidateQueries } from '../../../hooks/useIpcQuery';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { useIpcQuery, useInvalidateQueries } from '../../../shared/hooks/useIpcQuery';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useStepWizard } from './useStepWizard';
 
 const log = createRendererLogger('useMatchEngine');

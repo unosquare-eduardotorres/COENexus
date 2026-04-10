@@ -98,6 +98,11 @@ function enrichWithEntityData(vectorResults: { id: number; source_type: string; 
   })
 }
 
+const ALLOWED_OPERATORS = new Set([
+  'equals', 'not-equals', 'contains', 'starts-with',
+  'greater-than', 'less-than', 'between',
+])
+
 function buildConstraintFilter(constraints: AdvancedConstraints | undefined, dataSource: string): { sql: string; params: unknown[] } {
   if (!constraints) return { sql: '', params: [] }
 
@@ -116,10 +121,16 @@ function buildConstraintFilter(constraints: AdvancedConstraints | undefined, dat
     const col = mapFieldToColumn(rule.field, dataSource)
     if (!col) continue
 
+    const operator = rule.operator.toLowerCase()
+    if (!ALLOWED_OPERATORS.has(operator)) {
+      log.warn(`Unknown filter operator "${rule.operator}" — skipping rule`, { field: rule.field })
+      continue
+    }
+
     const connector = rule.connector?.toLowerCase() === 'or' ? 'OR' : 'AND'
     if (conditions.length > 0) conditions.push(connector)
 
-    switch (rule.operator.toLowerCase()) {
+    switch (operator) {
       case 'equals':
         conditions.push(`${col} = ?`)
         params.push(rule.value)
@@ -146,15 +157,14 @@ function buildConstraintFilter(constraints: AdvancedConstraints | undefined, dat
         break
       case 'between': {
         const parts = rule.value.split(',').map(v => parseFloat(v.trim()))
-        if (parts.length === 2) {
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
           conditions.push(`${col} BETWEEN ? AND ?`)
           params.push(parts[0], parts[1])
+        } else {
+          log.warn(`Invalid "between" value: "${rule.value}"`, { field: rule.field })
         }
         break
       }
-      default:
-        conditions.push(`${col} = ?`)
-        params.push(rule.value)
     }
   }
 
@@ -179,6 +189,194 @@ function mapFieldToColumn(field: string, dataSource: string): string | null {
 }
 
 import { runConcurrent } from './utils/concurrency'
+import { parseAiResponse } from './utils/aiResponseParser'
+import { haikuTriageSchema, opusAnalysisSchema } from './utils/aiResponseSchemas'
+
+interface HaikuResult {
+  candidate: EnrichedCandidate
+  relevant: boolean
+  score: number
+  reason: string
+}
+
+interface CandidateStageSummary {
+  upstreamId: number
+  name: string
+  sourceType: string
+  cosineSimilarity: number
+  seniority: string
+  mainSkill: string
+  country: string
+  isBench: boolean
+}
+
+function toStageSummary(c: EnrichedCandidate): CandidateStageSummary {
+  return { upstreamId: c.upstreamId, name: c.name, sourceType: c.sourceType, cosineSimilarity: c.cosineSimilarity, seniority: c.seniority, mainSkill: c.mainSkill, country: c.country, isBench: c.isBench }
+}
+
+async function generateJdEmbedding(jobDescription: string): Promise<Float32Array> {
+  return voyageEmbeddingService.generateEmbedding(jobDescription)
+}
+
+function searchVectors(embedding: Float32Array, dataSource: string, topN: number): EnrichedCandidate[] {
+  const sourceType = dataSource === 'bench' ? 'employees'
+    : dataSource === 'candidates' ? 'candidates'
+    : undefined
+
+  const vectorLimit = Math.max(topN * 10, 50)
+  const rawResults = embeddingRepository.searchSimilar(embedding, vectorLimit, sourceType)
+  let enriched = enrichWithEntityData(rawResults)
+
+  if (dataSource === 'bench') {
+    enriched = enriched.filter(c => c.isBench)
+  }
+  return enriched
+}
+
+function applyConstraintFilters(
+  candidates: EnrichedCandidate[],
+  constraints: AdvancedConstraints | undefined,
+  dataSource: string
+): { filtered: EnrichedCandidate[]; constraintSql: string } {
+  const { sql: constraintSql, params: constraintParams } = buildConstraintFilter(constraints, dataSource)
+
+  if (!constraintSql) return { filtered: candidates, constraintSql }
+
+  const upstreamIds = new Set(candidates.map(c => c.upstreamId))
+  const db = getDatabase()
+  const table = dataSource === 'candidates' ? 'synced_candidates c' : 'synced_employees e'
+  const idCol = dataSource === 'candidates' ? 'c.upstream_id' : 'e.upstream_id'
+  const placeholders = [...upstreamIds].map(() => '?').join(',')
+  const filterSql = `SELECT ${idCol} as uid FROM ${table} WHERE ${idCol} IN (${placeholders}) ${constraintSql}`
+  const filteredRows = db.prepare(filterSql).all(...[...upstreamIds], ...constraintParams) as { uid: number }[]
+  const filteredIds = new Set(filteredRows.map(r => r.uid))
+  return { filtered: candidates.filter(c => filteredIds.has(c.upstreamId)), constraintSql }
+}
+
+async function runHaikuTriage(
+  candidates: EnrichedCandidate[],
+  jobDescription: string,
+  topN: number,
+  haikuModel: string,
+  concurrency: number
+): Promise<HaikuResult[]> {
+  const haikuCandidates = candidates.slice(0, Math.max(topN * 3, 20))
+
+  return runConcurrent(haikuCandidates, concurrency, async (candidate) => {
+    try {
+      const prompt = `Evaluate if this candidate is relevant for the job. Return JSON: {"relevant": true/false, "score": 0-100, "reason": "..."}\n\nJob Description:\n${jobDescription}\n\nCandidate: ${candidate.name}\nSkill: ${candidate.mainSkill}\nSeniority: ${candidate.seniority}\nResume excerpt: ${candidate.resumeText.slice(0, 2000)}`
+
+      const response = await claudeProxyService.chatAsync(haikuModel, prompt, 256, 0.1)
+      const parsed = parseAiResponse(response, haikuTriageSchema, 'haiku-triage')
+      return { candidate, relevant: parsed.relevant, score: parsed.score, reason: parsed.reason }
+    } catch (err) {
+      log.error(`Haiku triage failed for candidate ${candidate.upstreamId}`, err instanceof Error ? err : new Error(String(err)))
+      return { candidate, relevant: true, score: 50, reason: 'Haiku triage failed — included by default' }
+    }
+  })
+}
+
+async function runDeepAnalysis(
+  haikuResults: HaikuResult[],
+  request: MatchRequest,
+  opusModel: string,
+  concurrency: number
+): Promise<Record<string, unknown>[]> {
+  return runConcurrent(haikuResults, concurrency, async (haikuResult) => {
+    const candidate = haikuResult.candidate
+    try {
+      const contextBlock = fillTemplate(MATCH_ENGINE_CONTEXT_BLOCK, {
+        jobDescription: request.jobDescription,
+        candidateName: candidate.name,
+        jobTitle: candidate.jobTitle,
+        seniority: candidate.seniority,
+        mainSkill: candidate.mainSkill,
+        country: candidate.country,
+        rate: String(candidate.rate || ''),
+        currency: candidate.currency || '',
+        isBench: String(candidate.isBench),
+        sourceType: candidate.sourceType,
+      })
+
+      const salaryDisplay = candidate.grossMonthlySalary ? `$${candidate.grossMonthlySalary}/mo` : (candidate.rate ? `$${candidate.rate}/hr` : 'N/A')
+      const prompt = fillTemplate(OPUS_ANALYSIS, {
+        contextBlock,
+        resume: candidate.resumeText.slice(0, 8000),
+        country: candidate.country,
+        salaryDisplay,
+        availabilityDisplay: candidate.isBench ? 'Immediately available (bench)' : 'Currently assigned',
+      })
+
+      const response = await claudeProxyService.chatAsync(opusModel, prompt, 4096, 0.1)
+      const parsed = parseAiResponse(response, opusAnalysisSchema, 'opus-analysis')
+
+      return {
+        id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
+        matchScore: parsed.matchScore, role: parsed.role, years: parsed.years,
+        location: parsed.location ?? candidate.country,
+        salary: parsed.salary ?? salaryDisplay,
+        availability: parsed.availability ?? '',
+        scores: parsed.scores,
+        summary: parsed.summary, skills: parsed.skills,
+        domains: parsed.domains, gaps: parsed.gaps,
+        leadership: parsed.leadership, softSkills: parsed.softSkills,
+        analysis: parsed.analysis,
+        seniority: candidate.seniority, expectedRate: candidate.rate,
+        currency: candidate.currency, country: candidate.country,
+        mainSkill: candidate.mainSkill, isBench: candidate.isBench,
+        candidateStatus: candidate.candidateStatus,
+        salaryExpectations: candidate.salaryExpectations ?? 0,
+        salaryExpectationsCurrency: candidate.salaryExpectationsCurrency ?? '',
+      }
+    } catch (err) {
+      return {
+        id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
+        matchScore: haikuResult.score, role: '', years: 0,
+        location: candidate.country, salary: '', availability: '',
+        scores: {}, summary: `Analysis failed: ${err instanceof Error ? err.message : 'Unknown'}`,
+        skills: [], domains: [], gaps: [], leadership: [], softSkills: [],
+        seniority: candidate.seniority, expectedRate: candidate.rate,
+        currency: candidate.currency, country: candidate.country,
+        mainSkill: candidate.mainSkill, isBench: candidate.isBench,
+      }
+    }
+  })
+}
+
+function saveMatchSession(
+  request: MatchRequest,
+  results: Record<string, unknown>[],
+  stats: Record<string, string>,
+  stages: Record<string, unknown>
+): number {
+  return matchRepository.createSession({
+    name: request.name || `Search ${new Date().toLocaleDateString()}`,
+    match_flow_type: request.matchFlowType || 'find-for-position',
+    data_source: request.dataSource,
+    top_n: request.topN,
+    search_mode: request.searchMode || 'opus',
+    job_description: request.jobDescription,
+    jd_source: request.jdSource || 'custom',
+    constraints_json: request.constraints ? JSON.stringify(request.constraints) : null,
+    pipeline_stats_json: JSON.stringify(stats),
+    pipeline_stages_json: JSON.stringify(stages),
+    results_json: JSON.stringify(results),
+    status: 'completed',
+    created_at: new Date().toISOString(),
+    completed_at: new Date().toISOString(),
+  })
+}
+
+interface FilterOptionsResult {
+  seniorities: string[]
+  mainSkills: string[]
+  countries: string[]
+  currencies: string[]
+  candidateStatuses: string[]
+}
+
+let filterOptionsCache: { data: FilterOptionsResult; expiry: number } | null = null
+const CACHE_TTL_MS = 60_000
 
 export const matchEngineService = {
   getPoolCounts(): { bench: number; employees: number; candidates: number; allSources: number } {
@@ -189,14 +387,23 @@ export const matchEngineService = {
     return { bench: benchOnly, employees: bench, candidates, allSources: bench + candidates }
   },
 
-  getFilterOptions(): { seniorities: string[]; mainSkills: string[]; countries: string[]; currencies: string[]; candidateStatuses: string[] } {
+  getFilterOptions(): FilterOptionsResult {
+    if (filterOptionsCache && Date.now() < filterOptionsCache.expiry) {
+      return filterOptionsCache.data
+    }
     const db = getDatabase()
     const seniorities = (db.prepare("SELECT DISTINCT seniority FROM synced_employees WHERE seniority != '' UNION SELECT DISTINCT seniority FROM synced_candidates WHERE seniority IS NOT NULL AND seniority != ''").all() as { seniority: string }[]).map(r => r.seniority)
     const mainSkills = (db.prepare("SELECT DISTINCT main_skill FROM synced_employees WHERE main_skill != '' UNION SELECT DISTINCT main_skill FROM synced_candidates WHERE main_skill IS NOT NULL AND main_skill != ''").all() as { main_skill: string }[]).map(r => r.main_skill)
     const countries = (db.prepare("SELECT DISTINCT country FROM synced_employees WHERE country != '' UNION SELECT DISTINCT country FROM synced_candidates WHERE country IS NOT NULL AND country != ''").all() as { country: string }[]).map(r => r.country)
     const currencies = (db.prepare("SELECT DISTINCT salary_currency FROM synced_employees WHERE salary_currency IS NOT NULL AND salary_currency != '' UNION SELECT DISTINCT salary_currency FROM synced_candidates WHERE salary_currency IS NOT NULL AND salary_currency != ''").all() as { salary_currency: string }[]).map(r => r.salary_currency)
     const candidateStatuses = (db.prepare("SELECT DISTINCT candidate_status FROM synced_candidates WHERE candidate_status IS NOT NULL AND candidate_status != ''").all() as { candidate_status: string }[]).map(r => r.candidate_status)
-    return { seniorities, mainSkills, countries, currencies, candidateStatuses }
+    const result = { seniorities, mainSkills, countries, currencies, candidateStatuses }
+    filterOptionsCache = { data: result, expiry: Date.now() + CACHE_TTL_MS }
+    return result
+  },
+
+  invalidateFilterCache(): void {
+    filterOptionsCache = null
   },
 
   async searchAsync(
@@ -205,87 +412,62 @@ export const matchEngineService = {
   ): Promise<number | null> {
     const startTime = Date.now()
     const { claudeProxy } = getConfig()
-    const searchId = `search-${Date.now()}`
+    log.info('Search pipeline started', { dataSource: request.dataSource, topN: request.topN, searchMode: request.searchMode, matchFlowType: request.matchFlowType })
 
     try {
       emitEvent({ type: 'progress', percent: 5, stage: 'Generating job description embedding...' })
-
-      const jdEmbedding = await voyageEmbeddingService.generateEmbedding(request.jobDescription)
+      const jdEmbedding = await generateJdEmbedding(request.jobDescription)
 
       emitEvent({ type: 'progress', percent: 15, stage: 'Searching vector database...' })
-
-      const sourceType = request.dataSource === 'bench' ? 'employees'
-        : request.dataSource === 'candidates' ? 'candidates'
-        : undefined
-
-      const vectorLimit = Math.max(request.topN * 10, 50)
-      const rawResults = embeddingRepository.searchSimilar(jdEmbedding, vectorLimit, sourceType)
-
-      let enriched = enrichWithEntityData(rawResults)
-
-      if (request.dataSource === 'bench') {
-        enriched = enriched.filter(c => c.isBench)
-      }
-
-      const vectorStage = enriched.map(c => ({
-        upstreamId: c.upstreamId, name: c.name, sourceType: c.sourceType,
-        cosineSimilarity: c.cosineSimilarity, seniority: c.seniority,
-        mainSkill: c.mainSkill, country: c.country, isBench: c.isBench,
-      }))
+      const enriched = searchVectors(jdEmbedding, request.dataSource, request.topN)
+      const vectorStage = enriched.map(toStageSummary)
+      log.info('Vector search complete', { vectorMatches: enriched.length, dataSource: request.dataSource })
 
       emitEvent({ type: 'progress', percent: 25, stage: `Found ${enriched.length} vector matches. Applying constraints...` })
+      const { filtered, constraintSql } = applyConstraintFilters(enriched, request.constraints, request.dataSource)
+      const afterConstraints = filtered.map(toStageSummary)
+      log.info('Constraints applied', { before: enriched.length, after: filtered.length, hasConstraints: !!constraintSql })
 
-      const { sql: constraintSql, params: constraintParams } = buildConstraintFilter(request.constraints, request.dataSource)
+      emitEvent({ type: 'progress', percent: 35, stage: `${filtered.length} candidates after constraints.` })
+      emitEvent({ type: 'progress', percent: 40, stage: `Running Haiku triage on ${Math.min(Math.max(request.topN * 3, 20), filtered.length)} candidates...` })
 
-      if (constraintSql) {
-        const upstreamIds = new Set(enriched.map(c => c.upstreamId))
-        const db = getDatabase()
-        const table = request.dataSource === 'candidates' ? 'synced_candidates c' : 'synced_employees e'
-        const idCol = request.dataSource === 'candidates' ? 'c.upstream_id' : 'e.upstream_id'
-        const placeholders = [...upstreamIds].map(() => '?').join(',')
-        const filterSql = `SELECT ${idCol} as uid FROM ${table} WHERE ${idCol} IN (${placeholders}) ${constraintSql}`
-        const filtered = db.prepare(filterSql).all(...[...upstreamIds], ...constraintParams) as { uid: number }[]
-        const filteredIds = new Set(filtered.map(r => r.uid))
-        enriched = enriched.filter(c => filteredIds.has(c.upstreamId))
-      }
-
-      const afterConstraints = enriched.map(c => ({
-        upstreamId: c.upstreamId, name: c.name, sourceType: c.sourceType,
-        cosineSimilarity: c.cosineSimilarity, seniority: c.seniority,
-        mainSkill: c.mainSkill, country: c.country, isBench: c.isBench,
-      }))
-
-      emitEvent({ type: 'progress', percent: 35, stage: `${enriched.length} candidates after constraints.` })
-
-      const haikuCandidates = enriched.slice(0, Math.max(request.topN * 3, 20))
-
-      emitEvent({ type: 'progress', percent: 40, stage: `Running Haiku triage on ${haikuCandidates.length} candidates...` })
-
-      const haikuResults = await runConcurrent(haikuCandidates, claudeProxy.haikuMaxConcurrency, async (candidate) => {
-        try {
-          const prompt = `Evaluate if this candidate is relevant for the job. Return JSON: {"relevant": true/false, "score": 0-100, "reason": "..."}\n\nJob Description:\n${request.jobDescription}\n\nCandidate: ${candidate.name}\nSkill: ${candidate.mainSkill}\nSeniority: ${candidate.seniority}\nResume excerpt: ${candidate.resumeText.slice(0, 2000)}`
-
-          const response = await claudeProxyService.chatAsync(claudeProxy.haikuModel, prompt, 256, 0.1)
-          const parsed = JSON.parse(response.replace(/```json\n?|\n?```/g, '').trim())
-          return { candidate, relevant: parsed.relevant ?? false, score: parsed.score ?? 0, reason: parsed.reason ?? '' }
-        } catch (err) {
-          log.error(`Haiku triage failed for candidate ${candidate.upstreamId}`, err instanceof Error ? err : new Error(String(err)))
-          return { candidate, relevant: true, score: 50, reason: 'Haiku triage failed — included by default' }
-        }
-      })
-
+      const haikuResults = await runHaikuTriage(filtered, request.jobDescription, request.topN, claudeProxy.haikuModel, claudeProxy.haikuMaxConcurrency)
       const passed = haikuResults.filter(r => r.relevant || r.score >= 40).sort((a, b) => b.score - a.score)
-      const topCandidates = passed.slice(0, request.topN)
+      let topCandidates = passed.slice(0, request.topN)
+      log.info('Haiku triage complete', { triaged: haikuResults.length, passed: passed.length, topN: topCandidates.length })
 
       const afterHaiku = haikuResults.map(r => ({
-        upstreamId: r.candidate.upstreamId, name: r.candidate.name,
-        sourceType: r.candidate.sourceType, cosineSimilarity: r.candidate.cosineSimilarity,
-        seniority: r.candidate.seniority, mainSkill: r.candidate.mainSkill,
-        country: r.candidate.country, isBench: r.candidate.isBench,
+        ...toStageSummary(r.candidate),
         haikuScore: r.score, eliminationReason: r.relevant ? undefined : r.reason,
       }))
 
-      emitEvent({ type: 'pipelineStages', stages: { vectorResults: vectorStage, afterConstraints, afterHaikuTriage: afterHaiku } })
+      const stages = { vectorResults: vectorStage, afterConstraints, afterHaikuTriage: afterHaiku }
+      emitEvent({ type: 'pipelineStages', stages })
+
+      if (passed.length < request.topN && request.searchMode !== 'haiku-only') {
+        const rejected = haikuResults.filter(r => !r.relevant && r.score < 40).sort((a, b) => b.score - a.score)
+        const bestRejected = rejected.slice(0, 5).map(r => ({
+          name: r.candidate.name,
+          haikuScore: r.score,
+          cosineSimilarity: r.candidate.cosineSimilarity,
+          seniority: r.candidate.seniority,
+          mainSkill: r.candidate.mainSkill,
+        }))
+        const lowestPassed = passed.length > 0 ? passed[passed.length - 1].score : 0
+        const highestRejected = rejected.length > 0 ? rejected[0].score : 0
+        const searchId = `search-${Date.now()}`
+        emitEvent({ type: 'haikuConfirm', payload: { requestedTopN: request.topN, passedCount: passed.length, highestRejectedScore: highestRejected, lowestPassedScore: lowestPassed, bestRejected } })
+        log.info('Haiku confirmation requested', { passedCount: passed.length, requestedTopN: request.topN, searchId })
+        const decision = await matchSearchCoordinator.register(searchId)
+        if (decision === 'include-all') {
+          const allSorted = haikuResults.sort((a, b) => b.score - a.score)
+          topCandidates = allSorted.slice(0, request.topN)
+          log.info('User chose include-all', { newTopCount: topCandidates.length })
+        } else {
+          log.info('User chose proceed', { topCount: topCandidates.length })
+        }
+      }
+
       emitEvent({ type: 'progress', percent: 60, stage: `${topCandidates.length} candidates passed Haiku. Running deep analysis...` })
 
       if (request.searchMode === 'haiku-only') {
@@ -298,79 +480,22 @@ export const matchEngineService = {
           currency: r.candidate.currency, country: r.candidate.country,
           mainSkill: r.candidate.mainSkill, isBench: r.candidate.isBench,
         }))
-
-        emitEvent({ type: 'result', candidates: results, stats: { profilesScanned: String(rawResults.length), preFiltered: String(enriched.length + (constraintSql ? 0 : 0)), constraintsApplied: constraintSql ? 'Yes' : 'None', haikuTriage: `${passed.length}/${haikuCandidates.length} passed`, sonnetAnalyzed: '0', time: `${((Date.now() - startTime) / 1000).toFixed(1)}s` } })
+        const haikuCandidateCount = Math.min(Math.max(request.topN * 3, 20), filtered.length)
+        emitEvent({ type: 'result', candidates: results, stats: { profilesScanned: String(vectorStage.length), preFiltered: String(filtered.length), constraintsApplied: constraintSql ? 'Yes' : 'None', haikuTriage: `${passed.length}/${haikuCandidateCount} passed`, sonnetAnalyzed: '0', time: `${((Date.now() - startTime) / 1000).toFixed(1)}s` } })
         emitEvent({ type: 'progress', percent: 100, stage: 'Search complete' })
+        log.info('Search pipeline complete', { totalTime: `${((Date.now() - startTime) / 1000).toFixed(1)}s`, resultCount: results.length, mode: 'haiku-only' })
         return null
       }
 
-      const opusResults = await runConcurrent(topCandidates, claudeProxy.maxConcurrency, async (haikuResult) => {
-        const candidate = haikuResult.candidate
-        try {
-          const contextBlock = fillTemplate(MATCH_ENGINE_CONTEXT_BLOCK, {
-            jobDescription: request.jobDescription,
-            candidateName: candidate.name,
-            jobTitle: candidate.jobTitle,
-            seniority: candidate.seniority,
-            mainSkill: candidate.mainSkill,
-            country: candidate.country,
-            rate: String(candidate.rate || ''),
-            currency: candidate.currency || '',
-            isBench: String(candidate.isBench),
-            sourceType: candidate.sourceType,
-          })
+      const opusResults = await runDeepAnalysis(topCandidates, request, claudeProxy.opusModel, claudeProxy.maxConcurrency)
+      const sortedResults = opusResults.sort((a, b) => (b.matchScore as number) - (a.matchScore as number))
 
-          const salaryDisplay = candidate.grossMonthlySalary ? `$${candidate.grossMonthlySalary}/mo` : (candidate.rate ? `$${candidate.rate}/hr` : 'N/A')
-          const prompt = fillTemplate(OPUS_ANALYSIS, {
-            contextBlock,
-            resume: candidate.resumeText.slice(0, 8000),
-            country: candidate.country,
-            salaryDisplay,
-            availabilityDisplay: candidate.isBench ? 'Immediately available (bench)' : 'Currently assigned',
-          })
-
-          const response = await claudeProxyService.chatAsync(claudeProxy.opusModel, prompt, 4096, 0.1)
-          const parsed = JSON.parse(response.replace(/```json\n?|\n?```/g, '').trim())
-
-          return {
-            id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
-            matchScore: parsed.matchScore ?? 0, role: parsed.role ?? '', years: parsed.years ?? 0,
-            location: parsed.location ?? candidate.country,
-            salary: parsed.salary ?? salaryDisplay,
-            availability: parsed.availability ?? '',
-            scores: parsed.scores ?? {},
-            summary: parsed.summary ?? '', skills: parsed.skills ?? [],
-            domains: parsed.domains ?? [], gaps: parsed.gaps ?? [],
-            leadership: parsed.leadership ?? [], softSkills: parsed.softSkills ?? [],
-            analysis: parsed.analysis ?? null,
-            seniority: candidate.seniority, expectedRate: candidate.rate,
-            currency: candidate.currency, country: candidate.country,
-            mainSkill: candidate.mainSkill, isBench: candidate.isBench,
-            candidateStatus: candidate.candidateStatus,
-            salaryExpectations: candidate.salaryExpectations ?? 0,
-            salaryExpectationsCurrency: candidate.salaryExpectationsCurrency ?? '',
-          }
-        } catch (err) {
-          return {
-            id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
-            matchScore: haikuResult.score, role: '', years: 0,
-            location: candidate.country, salary: '', availability: '',
-            scores: {}, summary: `Analysis failed: ${err instanceof Error ? err.message : 'Unknown'}`,
-            skills: [], domains: [], gaps: [], leadership: [], softSkills: [],
-            seniority: candidate.seniority, expectedRate: candidate.rate,
-            currency: candidate.currency, country: candidate.country,
-            mainSkill: candidate.mainSkill, isBench: candidate.isBench,
-          }
-        }
-      })
-
-      const sortedResults = opusResults.sort((a, b) => b.matchScore - a.matchScore)
-
+      const haikuCandidateCount = Math.min(Math.max(request.topN * 3, 20), filtered.length)
       const stats = {
-        profilesScanned: String(rawResults.length),
+        profilesScanned: String(vectorStage.length),
         preFiltered: String(vectorStage.length),
         constraintsApplied: constraintSql ? 'Yes' : 'None',
-        haikuTriage: `${passed.length}/${haikuCandidates.length} passed`,
+        haikuTriage: `${passed.length}/${haikuCandidateCount} passed`,
         sonnetAnalyzed: String(topCandidates.length),
         time: `${((Date.now() - startTime) / 1000).toFixed(1)}s`,
       }
@@ -378,28 +503,15 @@ export const matchEngineService = {
       emitEvent({ type: 'result', candidates: sortedResults, stats })
       emitEvent({ type: 'progress', percent: 95, stage: 'Saving session...' })
 
-      const sessionId = matchRepository.createSession({
-        name: request.name || `Search ${new Date().toLocaleDateString()}`,
-        match_flow_type: request.matchFlowType || 'find-for-position',
-        data_source: request.dataSource,
-        top_n: request.topN,
-        search_mode: request.searchMode || 'opus',
-        job_description: request.jobDescription,
-        jd_source: request.jdSource || 'custom',
-        constraints_json: request.constraints ? JSON.stringify(request.constraints) : null,
-        pipeline_stats_json: JSON.stringify(stats),
-        pipeline_stages_json: JSON.stringify({ vectorResults: vectorStage, afterConstraints, afterHaikuTriage: afterHaiku }),
-        results_json: JSON.stringify(sortedResults),
-        status: 'completed',
-        created_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-      })
+      const sessionId = saveMatchSession(request, sortedResults, stats, stages)
 
       emitEvent({ type: 'session', sessionId })
       emitEvent({ type: 'progress', percent: 100, stage: 'Search complete' })
+      log.info('Search pipeline complete', { sessionId, totalTime: `${((Date.now() - startTime) / 1000).toFixed(1)}s`, resultCount: sortedResults.length })
 
       return sessionId
     } catch (err) {
+      log.error('Search pipeline failed', err instanceof Error ? err : new Error(String(err)), { dataSource: request.dataSource })
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Search failed' })
       return null
     }

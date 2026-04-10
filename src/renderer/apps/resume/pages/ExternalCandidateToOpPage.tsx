@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { ExternalCandidateToOpStepKey } from '../types';
-import StepperBar from '../components/shared/StepperBar';
+import StepperBar from '../../../shared/components/StepperBar';
 import ExternalResumeUploader from '../components/match/ExternalResumeUploader';
 import ExternalPositionStep from '../components/match/ExternalPositionStep';
 import ExternalCandidateToOpSummary from '../components/match/ExternalCandidateToOpSummary';

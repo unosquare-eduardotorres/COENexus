@@ -75,7 +75,6 @@ export interface SyncRecordDto {
   reason?: string | null
   resumeChanged: boolean
   upstreamId: number
-  failed: boolean
   syncDetail?: string
   syncedAt: string
   resumeDateCreated?: string | null
@@ -319,6 +318,16 @@ export interface DatabaseImportFileResult {
 export interface VoyageKeyStatus {
   configured: boolean
   keyCount: number
+  maskedKeys: Array<{ index: number; masked: string }>
+  source: 'keychain' | 'config' | ''
+}
+
+export interface AddVoyageKeyParams {
+  apiKey: string
+}
+
+export interface RemoveVoyageKeyParams {
+  index: number
 }
 
 export interface SyncCountByStatus {
@@ -407,6 +416,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.PROCESSING_RETRY_FAILED]: { request: ProcessingStartExtractionParams; response: { started: boolean } }
   [IPC_CHANNELS.PROCESSING_RETRY_FAILED_VECTORIZATION]: { request: ProcessingStartVectorizationParams; response: { started: boolean } }
   [IPC_CHANNELS.PROCESSING_RESET_STATUS]: { request: ProcessingResetStatusParams; response: { reset: boolean } }
+  [IPC_CHANNELS.PROCESSING_ADD_VOYAGE_KEY]: { request: AddVoyageKeyParams; response: { saved: boolean } }
+  [IPC_CHANNELS.PROCESSING_REMOVE_VOYAGE_KEY]: { request: RemoveVoyageKeyParams; response: { deleted: boolean } }
 
   [IPC_CHANNELS.MATCH_POOL_COUNTS]: { request: void; response: PoolCounts }
   [IPC_CHANNELS.MATCH_FILTER_OPTIONS]: { request: void; response: FilterOptions }

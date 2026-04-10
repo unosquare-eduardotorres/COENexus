@@ -8,7 +8,6 @@ interface BaseSyncRecord {
   isBench: boolean
   resumeChanged: boolean
   upstreamId: number
-  failed: boolean
   syncDetail?: string
   syncedAt: string
   resumeDateCreated?: string | null

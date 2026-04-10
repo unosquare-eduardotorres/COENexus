@@ -1,12 +1,14 @@
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { embeddingRepository } from '../../db/repositories/embeddingRepository'
+import { createLogger } from '../logger'
+
+const log = createLogger('ChangeDetection')
 
 interface BaseRow {
   id: number
   upstream_id: number
   status: string
   status_reason: string | null
-  failed: number
   has_resume: number
   resume_date_created: string | null
 }
@@ -34,21 +36,24 @@ export function upsertWithChangeDetection<TRow extends BaseRow>(
 
     if (!infoChanged && !resumeChanged) {
       const needsStatusFix = existing.status !== 'extracted' && existing.status !== 'vectorized' &&
-        (existing.status !== entity.status || existing.failed === 1)
+        (existing.status !== entity.status)
       if (needsStatusFix) {
-        syncRepository.updateStatus(config.tableName, existing.id, entity.status, entity.status_reason ?? undefined)
+        syncRepository.updateStatus(config.tableName, existing.id, entity.status)
       }
       return { dbId: existing.id, resumeChanged: false, syncDetail: 'unchanged' }
     }
 
     if (resumeChanged) {
+      log.info('Resume changed — clearing embeddings for re-index', { source: config.source, dbId: existing.id })
       embeddingRepository.deleteBySource(config.source, existing.id)
     }
 
     config.upsert(entity)
+    log.info('Record updated', { source: config.source, upstreamId: entity.upstream_id, resumeChanged })
     return { dbId: existing.id, resumeChanged, syncDetail: 'updated' }
   }
 
   const dbId = config.upsert(entity)
+  log.info('New record inserted', { source: config.source, upstreamId: entity.upstream_id })
   return { dbId, resumeChanged: false, syncDetail: 'new' }
 }

@@ -1,8 +1,11 @@
 import { existsSync } from 'fs'
 import { join } from 'path'
-import { execFileSync } from 'child_process'
+import { execFile as execFileCb } from 'child_process'
+import { promisify } from 'util'
 import { tmpdir } from 'os'
 import { writeFileSync, readFileSync, mkdirSync, rmSync, readdirSync } from 'fs'
+
+const execFile = promisify(execFileCb)
 import { createLogger } from './logger'
 
 const log = createLogger('ResumeTextExtractor')
@@ -33,12 +36,12 @@ export const resumeTextExtractor = {
         raw = await extractFromDocx(fileBytes)
         break
       case '.doc':
-        raw = extractWithTextutil(fileBytes, '.doc')
+        raw = await extractWithTextutil(fileBytes, '.doc')
         break
       case '.jpg':
       case '.jpeg':
       case '.png':
-        raw = extractFromImage(fileBytes, `.${ext}`)
+        raw = await extractFromImage(fileBytes, `.${ext}`)
         break
       default:
         throw new Error(`Unsupported resume format: .${ext}`)
@@ -69,14 +72,14 @@ async function extractFromPdf(fileBytes: Buffer): Promise<string> {
     const meaningfulChars = fullText.replace(/[^a-zA-Z0-9]/g, '').length
 
     if (meaningfulChars < 50 && PDFTOPPM_PATH && TESSERACT_PATH) {
-      const ocrText = extractWithOcr(fileBytes)
+      const ocrText = await extractWithOcr(fileBytes)
       if (ocrText.trim()) return ocrText
     }
 
     return fullText
   } catch (err) {
     if (PDFTOPPM_PATH && TESSERACT_PATH) {
-      const ocrText = extractWithOcr(fileBytes)
+      const ocrText = await extractWithOcr(fileBytes)
       if (ocrText.trim()) return ocrText
     }
     throw err
@@ -92,10 +95,10 @@ async function extractFromDocx(fileBytes: Buffer): Promise<string> {
     log.error('DOCX extraction with mammoth failed, falling back to textutil', err instanceof Error ? err : new Error(String(err)))
   }
 
-  return extractWithTextutil(fileBytes, '.docx')
+  return await extractWithTextutil(fileBytes, '.docx')
 }
 
-function extractWithOcr(pdfBytes: Buffer): string {
+async function extractWithOcr(pdfBytes: Buffer): Promise<string> {
   if (!TESSERACT_PATH) throw new Error('Tesseract CLI not found. Install via "brew install tesseract" on macOS.')
   if (!PDFTOPPM_PATH) throw new Error('pdftoppm not found. Install via "brew install poppler" on macOS.')
 
@@ -107,7 +110,7 @@ function extractWithOcr(pdfBytes: Buffer): string {
     const pagesPrefix = join(tempDir, 'page')
     writeFileSync(pdfPath, pdfBytes)
 
-    execFileSync(PDFTOPPM_PATH, ['-png', '-r', '300', pdfPath, pagesPrefix], { timeout: 60000 })
+    await execFile(PDFTOPPM_PATH, ['-png', '-r', '300', pdfPath, pagesPrefix], { timeout: 60000 })
 
     const pageImages = readdirSync(tempDir)
       .filter(f => f.startsWith('page-') && f.endsWith('.png'))
@@ -121,7 +124,7 @@ function extractWithOcr(pdfBytes: Buffer): string {
       const outputBase = imagePath.replace('.png', '-ocr')
 
       try {
-        execFileSync(TESSERACT_PATH, [imagePath, outputBase, '-l', 'eng+spa'], { timeout: 30000 })
+        await execFile(TESSERACT_PATH, [imagePath, outputBase, '-l', 'eng+spa'], { timeout: 30000 })
         const outputFile = `${outputBase}.txt`
         if (existsSync(outputFile)) {
           const text = readFileSync(outputFile, 'utf-8')
@@ -143,7 +146,7 @@ function extractWithOcr(pdfBytes: Buffer): string {
   }
 }
 
-function extractFromImage(imageBytes: Buffer, extension: string): string {
+async function extractFromImage(imageBytes: Buffer, extension: string): Promise<string> {
   if (!TESSERACT_PATH) throw new Error('Tesseract CLI not found. Install via "brew install tesseract" on macOS.')
 
   const tempDir = join(tmpdir(), `ocr-img-${randomUUID().replace(/-/g, '')}`)
@@ -154,7 +157,7 @@ function extractFromImage(imageBytes: Buffer, extension: string): string {
     const outputBase = join(tempDir, 'output')
     writeFileSync(inputPath, imageBytes)
 
-    execFileSync(TESSERACT_PATH, [inputPath, outputBase, '-l', 'eng+spa'], { timeout: 30000 })
+    await execFile(TESSERACT_PATH, [inputPath, outputBase, '-l', 'eng+spa'], { timeout: 30000 })
 
     const outputFile = `${outputBase}.txt`
     if (existsSync(outputFile)) {
@@ -171,7 +174,7 @@ function extractFromImage(imageBytes: Buffer, extension: string): string {
   }
 }
 
-function extractWithTextutil(fileBytes: Buffer, extension: string): string {
+async function extractWithTextutil(fileBytes: Buffer, extension: string): Promise<string> {
   const tempDir = join(tmpdir(), `textutil-${randomUUID().replace(/-/g, '')}`)
   mkdirSync(tempDir, { recursive: true })
 
@@ -180,7 +183,7 @@ function extractWithTextutil(fileBytes: Buffer, extension: string): string {
     const outputPath = join(tempDir, 'output.txt')
     writeFileSync(inputPath, fileBytes)
 
-    execFileSync('/usr/bin/textutil', ['-convert', 'txt', '-output', outputPath, inputPath], { timeout: 15000 })
+    await execFile('/usr/bin/textutil', ['-convert', 'txt', '-output', outputPath, inputPath], { timeout: 15000 })
 
     if (!existsSync(outputPath)) throw new Error('textutil produced no output')
     return readFileSync(outputPath, 'utf-8')

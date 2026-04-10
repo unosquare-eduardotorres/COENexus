@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useIpcQuery } from '../../../hooks/useIpcQuery';
+import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import {
   databaseSharingService,
   DatabaseSharingConfig,
@@ -8,7 +8,7 @@ import {
   ExportResult,
   ImportResult,
 } from '../services/databaseSharingService';
-import { createRendererLogger } from '../utils/rendererLogger';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useDatabaseSharing');
 

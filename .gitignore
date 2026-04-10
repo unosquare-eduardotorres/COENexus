@@ -58,3 +58,7 @@ resources/sqlite-vec/*.dll
 
 # HAR files (may contain tokens and sensitive data)
 *.har
+.agentstudio/
+
+# Agent Studio worktrees
+.agent-studio/

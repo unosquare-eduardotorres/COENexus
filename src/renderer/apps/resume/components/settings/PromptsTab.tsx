@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { RefinementMode, RefinementPrompt, MatchEnginePromptConfig } from '../../types';
 import { getPrompts } from '../../data/defaultPrompts';
 import { getMatchPrompts } from '../../data/defaultMatchPrompts';
-import { ChevronIcon } from '../shared/icons';
+import { ChevronIcon } from '../../../../shared/components/icons';
 
 interface PromptsTabProps {
   prompts: RefinementPrompt[];
@@ -39,6 +39,7 @@ const PromptsTab = memo(function PromptsTab(props: PromptsTabProps) {
     getModeIcon,
   } = props;
 
+  return (
     <div className="space-y-5">
       <div className="glass-card p-5">
         <h3 className="text-sm font-semibold text-primary mb-1">AI Refinement Prompts</h3>

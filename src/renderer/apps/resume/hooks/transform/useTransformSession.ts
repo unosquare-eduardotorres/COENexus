@@ -1,6 +1,6 @@
 import { createElement, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { NavigateFunction, useSearchParams } from 'react-router-dom';
-import { useIpcQuery } from '../../../../hooks/useIpcQuery';
+import { useIpcQuery } from '../../../../shared/hooks/useIpcQuery';
 import { transformSessionService } from '../../services/transformSessionService';
 import {
   CreateOrUpdateTransformSession,
@@ -11,7 +11,7 @@ import {
   StructuredResume,
   TransformSessionSummary,
 } from '../../types';
-import { createRendererLogger } from '../../utils/rendererLogger';
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useTransformSession');
 
@@ -265,19 +265,6 @@ export function useTransformSession(navigate: NavigateFunction) {
     }
   }, [listedSessions, listedSessionsError]);
 
-  useEffect(() => {
-    window.location.hash = currentStepKey;
-  }, [currentStepKey]);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      const hash = window.location.hash.replace('#', '') as StepKey;
-      const validKeys: StepKey[] = ['intent', 'select', 'refinement', 'job-description', 'review', 'save'];
-      if (validKeys.includes(hash)) setCurrentStepKey(hash);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
 
   const history = useMemo(
     () => ({

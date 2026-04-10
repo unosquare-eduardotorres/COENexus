@@ -1,4 +1,7 @@
 import { EventEmitter } from 'events'
+import { createLogger } from './logger'
+
+const log = createLogger('EmbeddingJobQueue')
 
 export interface EmbeddingJob {
   source: string
@@ -24,6 +27,7 @@ export const embeddingJobQueue = {
   enqueue(job: EmbeddingJob): void {
     queue.push(job)
     _pendingCount++
+    log.debug('Job enqueued', { source: job.source, dbId: job.dbId, name: job.name, pendingCount: _pendingCount })
     emitter.emit('job')
   },
 
@@ -31,6 +35,7 @@ export const embeddingJobQueue = {
     const existing = queue.shift()
     if (existing) {
       _pendingCount--
+      log.debug('Job dequeued', { source: existing.source, dbId: existing.dbId, name: existing.name, pendingCount: _pendingCount })
       return existing
     }
 
@@ -39,6 +44,7 @@ export const embeddingJobQueue = {
         const job = queue.shift()
         if (job) {
           _pendingCount--
+          log.debug('Job dequeued', { source: job.source, dbId: job.dbId, name: job.name, pendingCount: _pendingCount })
           emitter.removeListener('job', handler)
           resolve(job)
         }
@@ -49,8 +55,10 @@ export const embeddingJobQueue = {
 
   drain(): EmbeddingJob[] {
     const items = [...queue]
+    const count = items.length
     queue.length = 0
     _pendingCount = 0
+    log.info('Queue drained', { drainedCount: count })
     return items
   },
 }

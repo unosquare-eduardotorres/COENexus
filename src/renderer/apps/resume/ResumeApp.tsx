@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import { ToastProvider } from './components/shared/ToastContext';
+import { ToastProvider } from '../../shared/components/ToastContext';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TransformPage = lazy(() => import('./pages/TransformPage'));
@@ -9,7 +9,6 @@ const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const MatchEnginePage = lazy(() => import('./pages/MatchEnginePage'));
 const BatchPage = lazy(() => import('./pages/BatchPage'));
-const DataSyncPage = lazy(() => import('./pages/DataSyncPage'));
 const TransformHistoryPage = lazy(() => import('./pages/TransformHistoryPage'));
 
 function RouteFallback() {
@@ -43,7 +42,6 @@ export default function ResumeApp() {
             <Route path="/history" element={<TransformHistoryPage />} />
             <Route path="/match" element={<MatchEnginePage />} />
             <Route path="/batch" element={<BatchPage />} />
-            <Route path="/data-sync" element={<DataSyncPage />} />
             <Route path="/review" element={<RecruiterDashboard />} />
             <Route path="/settings" element={<SettingsWrapper />} />
           </Routes>
