@@ -1,10 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { dataSyncService } from '../services/dataSyncService';
 import { isTokenExpired, getTokenExpiration } from '../../../shared/utils/tokenUtils';
-import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { safeJsonParse as safeParseJSON } from '../../../shared/utils/safeJsonParse';
-
-const log = createRendererLogger('useSyncAuth');
 
 export function useSyncAuth() {
   const [token, setToken] = useState(() =>
@@ -15,12 +12,6 @@ export function useSyncAuth() {
     const wasValid = safeParseJSON(localStorage.getItem('datasync-is-token-valid'), false);
     if (wasValid && storedToken && !isTokenExpired(storedToken)) return true;
     return false;
-  });
-  const [hasEntered, setHasEntered] = useState(() => {
-    const storedToken = localStorage.getItem('datasync-token') ?? '';
-    const wasValid = safeParseJSON(localStorage.getItem('datasync-is-token-valid'), false);
-    if (wasValid && storedToken && !isTokenExpired(storedToken)) return true;
-    return localStorage.getItem('datasync-entered') === 'true';
   });
   const [isValidating, setIsValidating] = useState(false);
   const [tokenError, setTokenError] = useState<string | undefined>();
@@ -44,12 +35,6 @@ export function useSyncAuth() {
     localStorage.setItem('datasync-is-token-valid', JSON.stringify(isTokenValid));
   }, [isTokenValid]);
 
-  useEffect(() => {
-    if (hasEntered) {
-      localStorage.setItem('datasync-entered', 'true');
-    }
-  }, [hasEntered]);
-
   const handleValidate = useCallback(async () => {
     setIsValidating(true);
     setTokenError(undefined);
@@ -57,7 +42,6 @@ export function useSyncAuth() {
     setIsValidating(false);
     if (result.valid) {
       setIsTokenValid(true);
-      setHasEntered(true);
     } else {
       setTokenError(result.error);
     }
@@ -72,10 +56,6 @@ export function useSyncAuth() {
     localStorage.removeItem('datasync-is-token-valid');
   }, []);
 
-  const handleContinueWithoutToken = useCallback(() => {
-    setHasEntered(true);
-  }, []);
-
   const handleTokenExpired = useCallback(() => {
     setShowExpirationWarning(true);
   }, []);
@@ -88,8 +68,6 @@ export function useSyncAuth() {
     token,
     setToken,
     isTokenValid,
-    hasEntered,
-    setHasEntered,
     isValidating,
     tokenError,
     showExpirationWarning,
@@ -97,7 +75,6 @@ export function useSyncAuth() {
     minutesRemaining,
     handleValidate,
     handleDisconnect,
-    handleContinueWithoutToken,
     handleTokenExpired,
     handleRefreshToken,
   };

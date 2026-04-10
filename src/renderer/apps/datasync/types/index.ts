@@ -6,4 +6,6 @@ export type {
   ProcessingRecordStatus,
   ProcessingRecord,
   ProcessingProgress,
+  VectorizationConfig,
+  VoyageModel,
 } from '../../resume/types';

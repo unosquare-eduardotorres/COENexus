@@ -62,20 +62,19 @@ describe('useDataSync', () => {
   });
 
   it('should initialize with default state', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.token.token).toBe('');
     expect(result.current.token.isTokenValid).toBe(false);
-    expect(result.current.tab.activeTab).toBe('candidates');
     expect(result.current.token.isValidating).toBe(false);
   });
 
   it('should restore token from localStorage', () => {
     localStorage.setItem('datasync-token', 'test-token-123');
 
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -83,7 +82,7 @@ describe('useDataSync', () => {
   });
 
   it('should update token', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -94,20 +93,8 @@ describe('useDataSync', () => {
     expect(result.current.token.token).toBe('new-token');
   });
 
-  it('should switch active tab', () => {
-    const { result } = renderHook(() => useDataSync(), {
-      wrapper: createWrapper(),
-    });
-
-    act(() => {
-      result.current.tab.setActiveTab('employees');
-    });
-
-    expect(result.current.tab.activeTab).toBe('employees');
-  });
-
   it('should initialize progress for active pipeline', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -116,7 +103,7 @@ describe('useDataSync', () => {
   });
 
   it('should manage year selection for candidates', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -128,7 +115,7 @@ describe('useDataSync', () => {
   });
 
   it('should track clearing state', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -136,7 +123,7 @@ describe('useDataSync', () => {
   });
 
   it('should track refreshing and vectorizing IDs', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -145,7 +132,7 @@ describe('useDataSync', () => {
   });
 
   it('should provide sync control handlers', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -155,7 +142,7 @@ describe('useDataSync', () => {
   });
 
   it('should provide extraction and vectorization handlers', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
@@ -166,10 +153,34 @@ describe('useDataSync', () => {
   });
 
   it('should report isSyncing as false initially', () => {
-    const { result } = renderHook(() => useDataSync(), {
+    const { result } = renderHook(() => useDataSync('candidates'), {
       wrapper: createWrapper(),
     });
 
     expect(result.current.sync.isSyncing).toBe(false);
+  });
+
+  it('should use employees pipeline when panel is employees', () => {
+    const { result } = renderHook(() => useDataSync('employees'), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.records.activeProgress.source).toBe('employees');
+  });
+
+  it('should use open-positions pipeline when panel is open-positions', () => {
+    const { result } = renderHook(() => useDataSync('open-positions'), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.records.activeProgress.source).toBe('open-positions');
+  });
+
+  it('should default to candidates pipeline for config panels', () => {
+    const { result } = renderHook(() => useDataSync('vectorization'), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.records.activeProgress.source).toBe('candidates');
   });
 });

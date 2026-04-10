@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SyncSourceType } from '../types';
-import TokenInput from '../components/TokenInput';
-import TokenTimer from '../components/TokenTimer';
-import TokenExpirationWarning from '../components/TokenExpirationWarning';
+import { DataSyncPanel } from '../components/DataSyncSidebar';
+import DataSyncLayout from '../components/DataSyncLayout';
 import SyncDashboard from '../components/SyncDashboard';
+import TokenExpirationWarning from '../components/TokenExpirationWarning';
+import VectorizationPanel from '../components/VectorizationPanel';
+import DatabaseSharingPanel from '../components/DatabaseSharingPanel';
 import { isTokenExpired } from '../../../shared/utils/tokenUtils';
 import { useDataSync } from '../hooks/useDataSync';
-import { databaseSharingService } from '../../resume/services/databaseSharingService';
+import { useDataSyncSettings } from '../hooks/useDataSyncSettings';
+import { databaseSharingService } from '../services/databaseSharingService';
 
 export default function DataSyncPage() {
+  const [activePanel, setActivePanel] = useState<DataSyncPanel>('candidates');
   const [isDatabaseEmpty, setIsDatabaseEmpty] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -53,8 +56,7 @@ export default function DataSyncPage() {
   };
 
   const {
-    token: { token, setToken, isTokenValid, hasEntered, setHasEntered, isValidating, tokenError, handleValidate, handleDisconnect, handleContinueWithoutToken, handleRefreshToken, handleTokenExpired },
-    tab: { activeTab, setActiveTab },
+    token: { token, setToken, isTokenValid, isValidating, tokenError, handleValidate, handleDisconnect, handleRefreshToken, handleTokenExpired },
     sync: { isSyncing, handleStartSync, handlePauseSync, handleResumeSync },
     records: { activeRecords, activeProgress, isLoadingRecords },
     processing: { activeExtractionProgress, activeVectorizationProgress },
@@ -64,26 +66,36 @@ export default function DataSyncPage() {
     year: { selectedYear, handleYearChange },
     clear: { isClearing, handleClearData },
     expiration: { showExpirationWarning, minutesRemaining },
-  } = useDataSync();
+  } = useDataSync(activePanel);
 
-  const handleDismissWarning = () => {};
+  const settings = useDataSyncSettings();
 
-  return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel-subtle text-xs font-medium text-muted mb-5">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Data Sync
-          </div>
-          <h1 className="text-3xl font-bold text-primary tracking-tight">Data Sync</h1>
-          <p className="text-base text-secondary mt-3 max-w-xl mx-auto">
-            Import employee, candidate & open position data from source systems
-          </p>
-        </div>
+  const isSourcePanel = activePanel === 'employees' || activePanel === 'candidates' || activePanel === 'open-positions';
 
+  const renderContent = () => {
+    if (activePanel === 'vectorization') {
+      return (
+        <VectorizationPanel
+          vecConfig={settings.vecConfig}
+          setVecConfig={settings.setVecConfig}
+          handleSaveVecModel={settings.handleSaveVecModel}
+          voyageKeyConfigured={settings.voyageKeyConfigured}
+          voyageMaskedKeys={settings.voyageMaskedKeys}
+          voyageKeySource={settings.voyageKeySource}
+          onAddVoyageKey={settings.handleAddVoyageKey}
+          onRemoveVoyageKey={settings.handleRemoveVoyageKey}
+        />
+      );
+    }
+
+    if (activePanel === 'database-sharing') {
+      return <DatabaseSharingPanel />;
+    }
+
+    return (
+      <>
         {isDatabaseEmpty && !dismissedBanner && !importSuccess && (
-          <div className="mb-8 glass-panel border-amber-400/30 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10">
+          <div className="mb-6 glass-panel border-amber-400/30 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10">
             <div className="flex items-start gap-4 p-5">
               <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
                 <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,106 +149,61 @@ export default function DataSyncPage() {
           </div>
         )}
 
-        {!hasEntered ? (
-          <div className="max-w-lg mx-auto">
-            <TokenInput
-              token={token}
-              onTokenChange={setToken}
-              isValid={isTokenValid}
-              onValidate={handleValidate}
-              isValidating={isValidating}
-              error={tokenError}
-              onDisconnect={handleDisconnect}
-              onContinueWithoutToken={handleContinueWithoutToken}
-            />
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="inline-flex bg-white/50 dark:bg-dark-surface/50 rounded-xl p-1 border border-gray-200/50 dark:border-dark-border/50">
-                {(['employees', 'candidates', 'open-positions'] as SyncSourceType[]).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      activeTab === tab
-                        ? 'bg-white dark:bg-dark-hover shadow-sm text-primary'
-                        : 'text-muted hover:text-secondary'
-                    }`}
-                  >
-                    {tab === 'employees' ? 'Employees' : tab === 'candidates' ? 'Candidates' : 'Open Positions'}
-                  </button>
-                ))}
-              </div>
+        <SyncDashboard
+          source={activePanel as 'employees' | 'candidates' | 'open-positions'}
+          progress={activeProgress}
+          records={activeRecords}
+          onStartSync={isTokenValid ? handleStartSync : undefined}
+          onPauseSync={handlePauseSync}
+          onResumeSync={isTokenValid ? handleResumeSync : undefined}
+          onStartExtraction={isTokenValid ? handleStartExtraction : undefined}
+          onPauseExtraction={handlePauseExtraction}
+          onResumeExtraction={isTokenValid ? handleStartExtraction : undefined}
+          extractionProgress={activeExtractionProgress}
+          extractingUpstreamId={extractingUpstreamId}
+          onStartVectorization={handleStartVectorization}
+          onPauseVectorization={handlePauseVectorization}
+          onResumeVectorization={handleStartVectorization}
+          vectorizationProgress={activeVectorizationProgress}
+          vectorizingUpstreamId={vectorizingUpstreamId}
+          onRefreshRecord={isTokenValid ? handleRefreshRecord : undefined}
+          onVectorizeRecord={handleVectorizeRecord}
+          refreshingId={refreshingId}
+          vectorizingId={vectorizingId}
+          onClearData={handleClearData}
+          isLoadingRecords={isLoadingRecords}
+          isClearing={isClearing}
+          selectedYear={selectedYear}
+          onYearChange={handleYearChange}
+        />
+      </>
+    );
+  };
 
-              <div className="flex items-center gap-3">
-                {isTokenValid ? (
-                  <>
-                    <TokenTimer token={token} onExpired={handleTokenExpired} />
-                    <button
-                      onClick={handleDisconnect}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-600 bg-red-500/5 hover:bg-red-500/10 border border-red-500/20 rounded-lg transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                      </svg>
-                      Disconnect
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setHasEntered(false)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-accent-500 hover:bg-accent-600 rounded-lg transition-colors shadow-sm shadow-accent-500/25 animate-pulse hover:animate-none"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.9-4.243a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
-                    </svg>
-                    Connect Token
-                  </button>
-                )}
-              </div>
-            </div>
+  return (
+    <DataSyncLayout
+      activePanel={activePanel}
+      onPanelChange={setActivePanel}
+      token={token}
+      onTokenChange={setToken}
+      isTokenValid={isTokenValid}
+      isValidating={isValidating}
+      tokenError={tokenError}
+      onValidate={handleValidate}
+      onDisconnect={handleDisconnect}
+      onTokenExpired={handleTokenExpired}
+    >
+      {renderContent()}
 
-            <SyncDashboard
-              source={activeTab}
-              progress={activeProgress}
-              records={activeRecords}
-              onStartSync={isTokenValid ? handleStartSync : undefined}
-              onPauseSync={handlePauseSync}
-              onResumeSync={isTokenValid ? handleResumeSync : undefined}
-              onStartExtraction={isTokenValid ? handleStartExtraction : undefined}
-              onPauseExtraction={handlePauseExtraction}
-              onResumeExtraction={isTokenValid ? handleStartExtraction : undefined}
-              extractionProgress={activeExtractionProgress}
-              extractingUpstreamId={extractingUpstreamId}
-              onStartVectorization={handleStartVectorization}
-              onPauseVectorization={handlePauseVectorization}
-              onResumeVectorization={handleStartVectorization}
-              vectorizationProgress={activeVectorizationProgress}
-              vectorizingUpstreamId={vectorizingUpstreamId}
-              onRefreshRecord={isTokenValid ? handleRefreshRecord : undefined}
-              onVectorizeRecord={handleVectorizeRecord}
-              refreshingId={refreshingId}
-              vectorizingId={vectorizingId}
-              onClearData={handleClearData}
-              isLoadingRecords={isLoadingRecords}
-              isClearing={isClearing}
-              selectedYear={selectedYear}
-              onYearChange={handleYearChange}
-            />
-          </div>
-        )}
-      </div>
-
-      {showExpirationWarning && (
+      {showExpirationWarning && isSourcePanel && (
         <TokenExpirationWarning
           minutesRemaining={minutesRemaining}
           isExpired={isTokenExpired(token)}
           onRefreshToken={handleRefreshToken}
-          onDismiss={handleDismissWarning}
+          onDismiss={() => {}}
           isSyncing={isSyncing}
         />
       )}
-    </div>
+    </DataSyncLayout>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { SyncSourceType } from '../types';
+import { DataSyncPanel } from '../components/DataSyncSidebar';
 import { resumeProcessingService } from '../services/processingService';
 import { useSyncAuth } from './useSyncAuth';
 import { useSyncPipeline } from './useSyncPipeline';
@@ -7,10 +8,9 @@ import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { SYNC_STATUS } from '../constants/syncStatus';
 import { safeJsonParse as safeParseJSON } from '../../../shared/utils/safeJsonParse';
 
-export function useDataSync() {
+export function useDataSync(activePanel: DataSyncPanel) {
   const auth = useSyncAuth();
 
-  const [activeTab, setActiveTab] = useState<SyncSourceType>('candidates');
   const [selectedYear, setSelectedYear] = useState<number | null>(() =>
     safeParseJSON(localStorage.getItem('datasync-candidate-year'), null)
   );
@@ -23,27 +23,28 @@ export function useDataSync() {
   const employees = useSyncPipeline({
     source: 'employees',
     token: auth.token,
-    enabled: auth.hasEntered,
+    enabled: true,
   });
   const candidates = useSyncPipeline({
     source: 'candidates',
     token: auth.token,
-    enabled: auth.hasEntered,
+    enabled: true,
     selectedYear,
   });
   const openPositions = useSyncPipeline({
     source: 'open-positions',
     token: auth.token,
-    enabled: auth.hasEntered,
+    enabled: true,
   });
 
   useIpcQuery(
     ['datasync-processing-status'],
     () => resumeProcessingService.getProcessingStatus(),
-    { enabled: auth.hasEntered, refetchInterval: 5000 },
+    { enabled: true, refetchInterval: 5000 },
   );
 
-  const activePipeline = activeTab === 'employees' ? employees : activeTab === 'candidates' ? candidates : openPositions;
+  const activeSource: SyncSourceType = activePanel === 'employees' ? 'employees' : activePanel === 'open-positions' ? 'open-positions' : 'candidates';
+  const activePipeline = activeSource === 'employees' ? employees : activeSource === 'candidates' ? candidates : openPositions;
 
   const isSyncing = employees.progress.status === SYNC_STATUS.SYNCING || candidates.progress.status === SYNC_STATUS.SYNCING || openPositions.progress.status === SYNC_STATUS.SYNCING;
 
@@ -52,17 +53,13 @@ export function useDataSync() {
       token: auth.token,
       setToken: auth.setToken,
       isTokenValid: auth.isTokenValid,
-      hasEntered: auth.hasEntered,
-      setHasEntered: auth.setHasEntered,
       isValidating: auth.isValidating,
       tokenError: auth.tokenError,
       handleValidate: auth.handleValidate,
       handleDisconnect: auth.handleDisconnect,
-      handleContinueWithoutToken: auth.handleContinueWithoutToken,
       handleRefreshToken: auth.handleRefreshToken,
       handleTokenExpired: auth.handleTokenExpired,
     },
-    tab: { activeTab, setActiveTab },
     sync: {
       isSyncing,
       handleStartSync: activePipeline.handleStartSync,

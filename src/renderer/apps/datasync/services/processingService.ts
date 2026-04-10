@@ -1,5 +1,5 @@
 import { SyncSourceType, ProcessingProgress, ProcessingRecord } from '../types';
-import { vectorizationConfigService } from '../../resume/services/vectorizationConfigService';
+import { vectorizationConfigService } from './vectorizationConfigService';
 
 function ipcProcessingStream(
   source: SyncSourceType,

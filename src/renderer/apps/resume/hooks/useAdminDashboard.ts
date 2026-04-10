@@ -1,20 +1,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useIpcQuery, useInvalidateQueries } from '../../../shared/hooks/useIpcQuery';
 import {
   AIConfig,
   RefinementPrompt,
   MatchEnginePromptConfig,
-  VectorizationConfig,
 } from '../types';
 import { getPrompts, savePrompt, resetPrompt, resetAllPrompts } from '../data/defaultPrompts';
 import { getMatchPrompts, saveMatchPrompt, resetMatchPrompt, resetAllMatchPrompts } from '../data/defaultMatchPrompts';
 import { aiService } from '../services/aiService';
-import { vectorizationConfigService } from '../services/vectorizationConfigService';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useAdminDashboard');
 
-export type AdminTab = 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template' | 'vectorization' | 'database-sharing';
+export type AdminTab = 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template';
 
 export function useAdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('validation');
@@ -32,15 +29,6 @@ export function useAdminDashboard() {
   );
   const [outputTemplateBuffer, setOutputTemplateBuffer] = useState<ArrayBuffer | null>(null);
   const templatePreviewRef = useRef<HTMLDivElement>(null);
-  const [vecConfig, setVecConfig] = useState<VectorizationConfig>(vectorizationConfigService.getConfig());
-  const { data: voyageKeyStatus } = useIpcQuery(
-    ['admin', 'voyage-key-status'],
-    () => vectorizationConfigService.checkVoyageKey()
-  );
-  const invalidate = useInvalidateQueries();
-  const voyageKeyConfigured = voyageKeyStatus?.configured ?? false;
-  const voyageMaskedKeys = voyageKeyStatus?.maskedKeys ?? [];
-  const voyageKeySource = voyageKeyStatus?.source ?? '';
   const [confirmAction, setConfirmAction] = useState<'reset-prompts' | null>(null);
 
   const handleConfirmAction = useCallback(() => {
@@ -209,25 +197,6 @@ export function useAdminDashboard() {
   }, [outputTemplateBuffer]);
 
 
-  const handleAddVoyageKey = useCallback(async (apiKey: string) => {
-    await vectorizationConfigService.addVoyageKey(apiKey);
-    invalidate(['admin', 'voyage-key-status']);
-  }, [invalidate]);
-
-  const handleRemoveVoyageKey = useCallback(async (index: number) => {
-    await vectorizationConfigService.removeVoyageKey(index);
-    invalidate(['admin', 'voyage-key-status']);
-  }, [invalidate]);
-
-  const handleSaveVecModel = useCallback(() => {
-    vectorizationConfigService.saveModel(vecConfig.model);
-    setSaveStatus('saving');
-    setTimeout(() => {
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 1500);
-    }, 300);
-  }, [vecConfig.model]);
-
   return {
     tabs: { activeTab, setActiveTab },
     ai: { aiConfig, setAiConfig, handleSaveAIConfig },
@@ -245,11 +214,6 @@ export function useAdminDashboard() {
     outputTemplate: {
       outputTemplateName, outputTemplateBuffer, templatePreviewRef,
       handleTemplateUpload, handleResetOutputTemplate,
-    },
-    vectorization: {
-      vecConfig, setVecConfig, handleSaveVecModel,
-      voyageKeyConfigured, voyageMaskedKeys, voyageKeySource,
-      handleAddVoyageKey, handleRemoveVoyageKey,
     },
     confirm: { confirmAction, setConfirmAction, handleConfirmAction },
     saveStatus,

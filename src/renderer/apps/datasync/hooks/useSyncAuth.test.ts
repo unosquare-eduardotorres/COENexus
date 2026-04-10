@@ -68,18 +68,6 @@ describe('useSyncAuth', () => {
     expect(result.current.isTokenValid).toBe(false);
   });
 
-  it('should handle continue without token', () => {
-    const { result } = renderHook(() => useSyncAuth());
-
-    expect(result.current.hasEntered).toBe(false);
-
-    act(() => {
-      result.current.handleContinueWithoutToken();
-    });
-
-    expect(result.current.hasEntered).toBe(true);
-  });
-
   it('should handle token expired warning', () => {
     const { result } = renderHook(() => useSyncAuth());
 
