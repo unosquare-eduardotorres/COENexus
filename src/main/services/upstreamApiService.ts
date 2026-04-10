@@ -3,22 +3,11 @@ import { createLogger } from './logger'
 import { fetchAuthorized, fetchPaged, type PagedResponse } from './upstream/upstreamApiClient'
 import { getString, getNullableString, getInt, getDecimal, getBool, getDateTime, getNullableDateTime } from './upstream/upstreamRowParsers'
 import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns } from './upstream/upstreamColumnDefs'
+import { mapKeysToCamelCase } from './upstream/caseMapper'
 
 export type { ColumnDefinition, PagedRequest, PagedResponse } from './upstream/upstreamApiClient'
 
 const log = createLogger('UpstreamApi')
-
-function toCamelCase(key: string): string {
-  return key.charAt(0).toLowerCase() + key.slice(1)
-}
-
-function mapKeysToCamelCase<T>(obj: Record<string, unknown>): T {
-  const result: Record<string, unknown> = {}
-  for (const key of Object.keys(obj)) {
-    result[toCamelCase(key)] = obj[key]
-  }
-  return result as T
-}
 
 export interface EmployeeDetail {
   userId: number
@@ -346,7 +335,8 @@ export const upstreamApiService = {
         body: formData,
       })
       if (!response.ok) throw new Error(`Save note failed: ${response.status}`)
-      const result = await response.json() as { personaNoteId?: number }
+      const raw = await response.json() as Record<string, unknown>
+      const result = mapKeysToCamelCase<{ personaNoteId?: number }>(raw)
       const noteId = result.personaNoteId ?? 0
       log.info('savePersonaNote succeeded', { personId, noteType, fileName, noteId })
       return noteId

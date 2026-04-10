@@ -1,5 +1,6 @@
 import { getConfig } from '../config'
 import { createLogger } from './logger'
+import { mapKeysToCamelCase } from './upstream/caseMapper'
 
 const log = createLogger('CatalogService')
 
@@ -36,7 +37,8 @@ export const catalogService = {
     }
     const { catalog } = getConfig()
     log.info('Loading seniorities catalog from API')
-    const items = await fetchAuthorized<KeyTextItem[]>(`${catalog.apiUrl}seniorities`, token)
+    const raw = await fetchAuthorized<Record<string, unknown>[]>(`${catalog.apiUrl}seniorities`, token)
+    const items = raw.map(item => mapKeysToCamelCase<KeyTextItem>(item))
     senioritiesCache = new Map(items.map(i => [i.key, i.text]))
     log.info('Seniorities catalog loaded', { count: senioritiesCache.size })
     return senioritiesCache
@@ -49,7 +51,8 @@ export const catalogService = {
     }
     const { catalog } = getConfig()
     log.info('Loading main skills catalog from API')
-    const items = await fetchAuthorized<ValueLabelItem[]>(`${catalog.apiUrl}main-skills`, token)
+    const raw = await fetchAuthorized<Record<string, unknown>[]>(`${catalog.apiUrl}main-skills`, token)
+    const items = raw.map(item => mapKeysToCamelCase<ValueLabelItem>(item))
     mainSkillsCache = new Map(items.map(i => [i.value, i.label]))
     log.info('Main skills catalog loaded', { count: mainSkillsCache.size })
     return mainSkillsCache
@@ -62,7 +65,8 @@ export const catalogService = {
     }
     const { catalog } = getConfig()
     log.info('Loading countries catalog from API')
-    const items = await fetchAuthorized<ValueLabelItem[]>(`${catalog.apiUrl}locations/countries/true`, token)
+    const raw = await fetchAuthorized<Record<string, unknown>[]>(`${catalog.apiUrl}locations/countries/true`, token)
+    const items = raw.map(item => mapKeysToCamelCase<ValueLabelItem>(item))
     countriesCache = new Map(items.map(i => [i.value, i.label]))
     log.info('Countries catalog loaded', { count: countriesCache.size })
     return countriesCache
