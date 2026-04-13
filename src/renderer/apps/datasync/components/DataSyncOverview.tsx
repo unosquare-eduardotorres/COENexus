@@ -63,7 +63,7 @@ export default function DataSyncOverview({ onNavigate }: DataSyncOverviewProps) 
     databaseSharingService.getStatus().then(setDbStatus).catch(() => {})
   }, [])
 
-  const totalRecords = dbStatus
+  const totalRecords = dbStatus?.recordCounts
     ? Object.values(dbStatus.recordCounts).reduce((sum, n) => sum + n, 0)
     : 0
 

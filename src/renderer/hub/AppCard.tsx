@@ -8,15 +8,24 @@ interface AppCardProps {
   href: string;
   icon: React.ReactNode;
   accentColor: string;
-  status: 'active' | 'coming-soon';
+  status: 'active' | 'experimental' | 'coming-soon';
 }
 
-function StatusBadge({ status }: { status: 'active' | 'coming-soon' }) {
+function StatusBadge({ status }: { status: 'active' | 'experimental' | 'coming-soon' }) {
   if (status === 'active') {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
         Active
+      </span>
+    );
+  }
+
+  if (status === 'experimental') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+        Experimental
       </span>
     );
   }
@@ -56,7 +65,7 @@ function CardContent({ name, codename, tagline, description, icon, accentColor, 
         <p className="text-sm text-muted pt-1">{description}</p>
       </div>
 
-      {status === 'active' && (
+      {(status === 'active' || status === 'experimental') && (
         <div className="relative mt-auto pt-4 flex items-center gap-1.5 text-sm font-medium group-hover:gap-2.5 transition-all duration-300" style={{ color: accentColor }}>
           Launch
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -70,7 +79,7 @@ function CardContent({ name, codename, tagline, description, icon, accentColor, 
 }
 
 export default function AppCard(props: AppCardProps) {
-  if (props.status === 'active') {
+  if (props.status === 'active' || props.status === 'experimental') {
     return (
       <Link to={props.href} className="glass-card-hover p-6 block group relative overflow-hidden h-full">
         <CardContent {...props} />

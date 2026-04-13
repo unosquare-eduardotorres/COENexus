@@ -12,14 +12,14 @@ export function buildEnvWithPath(): NodeJS.ProcessEnv {
   const homeDir = env.HOME || env.USERPROFILE || ''
   const extraDirs: string[] = []
 
+  extraDirs.push('/opt/homebrew/bin')
+  extraDirs.push('/usr/local/bin')
   if (homeDir) {
-    extraDirs.push(`${homeDir}/.local/bin`)
     extraDirs.push(`${homeDir}/.nvm/current/bin`)
     extraDirs.push(`${homeDir}/.volta/bin`)
     extraDirs.push(`${homeDir}/.fnm/current/bin`)
+    extraDirs.push(`${homeDir}/.local/bin`)
   }
-  extraDirs.push('/opt/homebrew/bin')
-  extraDirs.push('/usr/local/bin')
 
   const missing = extraDirs.filter(d => !basePath.includes(d))
   env.PATH = missing.length > 0

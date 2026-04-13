@@ -132,7 +132,7 @@ export default function NexusLanding() {
           <AppCard
             name="P.A.T.H."
             codename="Training Hub"
-            status="active"
+            status="experimental"
             href="/path"
             accentColor={pathColor}
             tagline=""
@@ -142,7 +142,7 @@ export default function NexusLanding() {
           <AppCard
             name="A.G.E.N.T."
             codename="Agent Studio"
-            status="active"
+            status="experimental"
             href="/agents"
             accentColor={agentColor}
             tagline=""
