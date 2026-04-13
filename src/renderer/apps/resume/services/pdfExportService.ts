@@ -1,13 +1,5 @@
 import { StructuredResume } from '../types';
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '../utils/escapeHtml';
 
 export const pdfExportService = {
   async downloadPdf(resume: StructuredResume, fileName?: string): Promise<void> {

@@ -3,6 +3,8 @@ import { join } from 'path'
 import { registerAllHandlers } from './ipc'
 import { createMenu } from './menu'
 import { initDatabase, closeDatabase } from './db/connection'
+import { initPathDatabase, closePathDatabase } from './db/path/pathConnection'
+import { initScout9Database, closeScout9Database } from './db/scout9/scout9Connection'
 import { embeddingWorker } from './services/embeddingWorker'
 import { initAutoUpdater, stopAutoUpdater } from './updater'
 import { createLogger } from './services/logger'
@@ -93,17 +95,17 @@ function setupCSP(): void {
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:*;"
-      : "script-src 'self';"
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' http://localhost:*;"
+      : "script-src 'self' 'wasm-unsafe-eval';"
     const connectSrc = isDev
-      ? "connect-src 'self' http://localhost:* ws://localhost:*;"
-      : "connect-src 'self' http://localhost:*;"
+      ? "connect-src 'self' http://localhost:* ws://localhost:* https://unpkg.com https://www.gstatic.com;"
+      : "connect-src 'self' http://localhost:* https://unpkg.com https://www.gstatic.com;"
 
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          `default-src 'self'; ${scriptSrc} style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; ${connectSrc}`
+          `default-src 'self'; ${scriptSrc} style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; ${connectSrc}`
         ]
       }
     })
@@ -125,6 +127,18 @@ app.whenReady().then(async () => {
     initDatabase()
   } catch (err) {
     log.error('Database initialization failed', err instanceof Error ? err : new Error(String(err)))
+  }
+
+  try {
+    initPathDatabase()
+  } catch (err) {
+    log.error('PATH database initialization failed', err instanceof Error ? err : new Error(String(err)))
+  }
+
+  try {
+    initScout9Database()
+  } catch (err) {
+    log.error('Scout-9 database initialization failed', err instanceof Error ? err : new Error(String(err)))
   }
 
   try {
@@ -161,6 +175,8 @@ app.on('before-quit', () => {
   embeddingWorker.stop()
   stopAutoUpdater()
   closeDatabase()
+  closePathDatabase()
+  closeScout9Database()
 })
 
 app.on('web-contents-created', (_event, contents) => {

@@ -115,6 +115,44 @@ function runMigrations(database: Database.Database): void {
       "INSERT INTO schema_migrations (version, name) VALUES (2, 'convert_failed_to_status')"
     ).run()
   }
+
+  if (currentVersion < 3) {
+    log.info('Running migration 003: add open position report fields + discussions table')
+    database.exec(`
+      ALTER TABLE synced_open_positions ADD COLUMN vertical_industry TEXT NOT NULL DEFAULT '';
+      ALTER TABLE synced_open_positions ADD COLUMN in_office INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE synced_open_positions ADD COLUMN csu TEXT NOT NULL DEFAULT '';
+      ALTER TABLE synced_open_positions ADD COLUMN cs TEXT NOT NULL DEFAULT '';
+      ALTER TABLE synced_open_positions ADD COLUMN closed_date TEXT;
+      ALTER TABLE synced_open_positions ADD COLUMN closed_reason TEXT;
+      ALTER TABLE synced_open_positions ADD COLUMN is_ready INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE synced_open_positions ADD COLUMN is_promotion INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE synced_open_positions ADD COLUMN maximum_rate REAL;
+      ALTER TABLE synced_open_positions ADD COLUMN minimum_rate REAL;
+      ALTER TABLE synced_open_positions ADD COLUMN additional_skills TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE synced_open_positions ADD COLUMN created_with_assignments_tool INTEGER;
+      ALTER TABLE synced_open_positions ADD COLUMN candidates_presented INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE synced_open_positions ADD COLUMN last_discussion_date TEXT;
+
+      CREATE TABLE IF NOT EXISTS open_position_discussions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        open_position_id INTEGER NOT NULL,
+        comment_id INTEGER NOT NULL,
+        author TEXT NOT NULL DEFAULT '',
+        date TEXT NOT NULL DEFAULT '',
+        message TEXT NOT NULL DEFAULT '',
+        parent_comment_id INTEGER,
+        synced_at TEXT NOT NULL,
+        UNIQUE(open_position_id, comment_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_op_discussions_position
+        ON open_position_discussions(open_position_id);
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (3, 'open_position_report_fields')"
+    ).run()
+  }
 }
 
 function getInlineSchema(): string {
@@ -193,11 +231,39 @@ function getInlineSchema(): string {
       last_modification TEXT,
       sourcing TEXT NOT NULL DEFAULT '',
       replacement INTEGER NOT NULL DEFAULT 0,
+      vertical_industry TEXT NOT NULL DEFAULT '',
+      in_office INTEGER NOT NULL DEFAULT 0,
+      csu TEXT NOT NULL DEFAULT '',
+      cs TEXT NOT NULL DEFAULT '',
+      closed_date TEXT,
+      closed_reason TEXT,
+      is_ready INTEGER NOT NULL DEFAULT 0,
+      is_promotion INTEGER NOT NULL DEFAULT 0,
+      maximum_rate REAL,
+      minimum_rate REAL,
+      additional_skills TEXT NOT NULL DEFAULT '[]',
+      created_with_assignments_tool INTEGER,
+      candidates_presented INTEGER NOT NULL DEFAULT 0,
+      last_discussion_date TEXT,
       status TEXT NOT NULL DEFAULT 'synced',
       status_reason TEXT,
       failed INTEGER NOT NULL DEFAULT 0,
       synced_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS open_position_discussions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      open_position_id INTEGER NOT NULL,
+      comment_id INTEGER NOT NULL,
+      author TEXT NOT NULL DEFAULT '',
+      date TEXT NOT NULL DEFAULT '',
+      message TEXT NOT NULL DEFAULT '',
+      parent_comment_id INTEGER,
+      synced_at TEXT NOT NULL,
+      UNIQUE(open_position_id, comment_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_op_discussions_position
+      ON open_position_discussions(open_position_id);
 
     CREATE TABLE IF NOT EXISTS resume_embeddings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -294,9 +360,25 @@ function getInlineSchema(): string {
       candidate_status TEXT NOT NULL DEFAULT '',
       rate REAL NOT NULL DEFAULT 0,
       start_date TEXT,
+      rejection_feedback TEXT NOT NULL DEFAULT '[]',
+      rejection_comments TEXT NOT NULL DEFAULT '',
+      rejection_action_date TEXT,
       synced_at TEXT NOT NULL,
       UNIQUE(open_position_id, candidate_requisition_id)
     );
+
+    CREATE TABLE IF NOT EXISTS candidate_analysis_cache (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      candidate_upstream_id INTEGER NOT NULL,
+      candidate_source_type TEXT NOT NULL,
+      jd_hash TEXT NOT NULL,
+      analysis_json TEXT NOT NULL,
+      model_used TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      UNIQUE(candidate_upstream_id, candidate_source_type, jd_hash)
+    );
+    CREATE INDEX IF NOT EXISTS idx_analysis_cache_lookup
+      ON candidate_analysis_cache(candidate_upstream_id, candidate_source_type, jd_hash);
 
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,

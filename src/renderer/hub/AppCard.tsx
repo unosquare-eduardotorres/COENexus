@@ -30,35 +30,34 @@ function StatusBadge({ status }: { status: 'active' | 'coming-soon' }) {
 
 function CardContent({ name, codename, tagline, description, icon, accentColor, status }: AppCardProps) {
   return (
-    <>
+    <div className="relative flex flex-col h-full">
       <div
         className="absolute -left-8 -top-8 h-32 w-32 rounded-full blur-3xl opacity-20"
         style={{ background: accentColor }}
       />
 
-      <div className="relative mb-4">
-        <div className="absolute top-0 right-0">
-          <StatusBadge status={status} />
-        </div>
-        <div className="flex justify-center">
-          <div
-            className="flex h-20 w-20 items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${accentColor}26` }}
-          >
-            <div style={{ color: accentColor }}>{icon}</div>
-          </div>
+      <div className="relative flex justify-end mb-3 min-h-[24px]">
+        <StatusBadge status={status} />
+      </div>
+
+      <div className="relative flex justify-center mb-4">
+        <div
+          className="flex h-20 w-20 items-center justify-center rounded-xl"
+          style={{ backgroundColor: `${accentColor}26` }}
+        >
+          <div style={{ color: accentColor }}>{icon}</div>
         </div>
       </div>
 
-      <div className="relative space-y-1.5">
+      <div className="relative space-y-1.5 flex-1">
         <h3 className="text-lg font-semibold text-primary">{name}</h3>
         <p className="text-xs font-mono tracking-wider text-muted uppercase">{codename}</p>
-        <p className="text-sm italic text-secondary">{tagline}</p>
+        {tagline && <p className="text-sm italic text-secondary">{tagline}</p>}
         <p className="text-sm text-muted pt-1">{description}</p>
       </div>
 
       {status === 'active' && (
-        <div className="relative mt-4 flex items-center gap-1.5 text-sm font-medium group-hover:gap-2.5 transition-all duration-300" style={{ color: accentColor }}>
+        <div className="relative mt-auto pt-4 flex items-center gap-1.5 text-sm font-medium group-hover:gap-2.5 transition-all duration-300" style={{ color: accentColor }}>
           Launch
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14" />
@@ -66,14 +65,14 @@ function CardContent({ name, codename, tagline, description, icon, accentColor, 
           </svg>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 export default function AppCard(props: AppCardProps) {
   if (props.status === 'active') {
     return (
-      <Link to={props.href} className="glass-card-hover p-6 block group relative overflow-hidden">
+      <Link to={props.href} className="glass-card-hover p-6 block group relative overflow-hidden h-full">
         <CardContent {...props} />
       </Link>
     );
@@ -84,7 +83,7 @@ export default function AppCard(props: AppCardProps) {
       type="button"
       disabled
       aria-disabled="true"
-      className="glass-card p-6 relative overflow-hidden opacity-60 cursor-not-allowed appearance-none bg-transparent border-none text-left w-full"
+      className="glass-card p-6 relative overflow-hidden opacity-60 cursor-not-allowed appearance-none bg-transparent border-none text-left w-full h-full"
     >
       <CardContent {...props} />
     </button>

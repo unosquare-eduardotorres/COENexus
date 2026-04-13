@@ -1,15 +1,15 @@
 import { useState, useCallback } from 'react';
 import { SyncSourceType } from '../types';
-import { DataSyncPanel } from '../components/DataSyncSidebar';
+import { DataSyncPanel } from '../components/DataSyncLayout';
 import { resumeProcessingService } from '../services/processingService';
-import { useSyncAuth } from './useSyncAuth';
 import { useSyncPipeline } from './useSyncPipeline';
 import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { SYNC_STATUS } from '../constants/syncStatus';
 import { safeJsonParse as safeParseJSON } from '../../../shared/utils/safeJsonParse';
+import { useNexusStatus } from '../../../contexts/NexusStatusContext';
 
 export function useDataSync(activePanel: DataSyncPanel) {
-  const auth = useSyncAuth();
+  const { sharepoint } = useNexusStatus();
 
   const [selectedYear, setSelectedYear] = useState<number | null>(() =>
     safeParseJSON(localStorage.getItem('datasync-candidate-year'), null)
@@ -22,18 +22,18 @@ export function useDataSync(activePanel: DataSyncPanel) {
 
   const employees = useSyncPipeline({
     source: 'employees',
-    token: auth.token,
+    token: sharepoint.token,
     enabled: true,
   });
   const candidates = useSyncPipeline({
     source: 'candidates',
-    token: auth.token,
+    token: sharepoint.token,
     enabled: true,
     selectedYear,
   });
   const openPositions = useSyncPipeline({
     source: 'open-positions',
-    token: auth.token,
+    token: sharepoint.token,
     enabled: true,
   });
 
@@ -49,17 +49,6 @@ export function useDataSync(activePanel: DataSyncPanel) {
   const isSyncing = employees.progress.status === SYNC_STATUS.SYNCING || candidates.progress.status === SYNC_STATUS.SYNCING || openPositions.progress.status === SYNC_STATUS.SYNCING;
 
   return {
-    token: {
-      token: auth.token,
-      setToken: auth.setToken,
-      isTokenValid: auth.isTokenValid,
-      isValidating: auth.isValidating,
-      tokenError: auth.tokenError,
-      handleValidate: auth.handleValidate,
-      handleDisconnect: auth.handleDisconnect,
-      handleRefreshToken: auth.handleRefreshToken,
-      handleTokenExpired: auth.handleTokenExpired,
-    },
     sync: {
       isSyncing,
       handleStartSync: activePipeline.handleStartSync,
@@ -95,11 +84,6 @@ export function useDataSync(activePanel: DataSyncPanel) {
     clear: {
       isClearing: activePipeline.isClearing,
       handleClearData: activePipeline.handleClearData,
-    },
-    expiration: {
-      showExpirationWarning: auth.showExpirationWarning,
-      setShowExpirationWarning: auth.setShowExpirationWarning,
-      minutesRemaining: auth.minutesRemaining,
     },
   };
 }

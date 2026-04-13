@@ -19,22 +19,20 @@ interface VoyageConfig {
   apiKeys: string[]
 }
 
-interface ClaudeProxyConfig {
-  baseUrl: string
+interface ClaudeConfig {
   haikuModel: string
   sonnetModel: string
   opusModel: string
   timeoutSeconds: number
   maxConcurrency: number
   haikuMaxConcurrency: number
-  apiKey: string
 }
 
 interface AppConfig {
   upstream: UpstreamConfig
   catalog: CatalogConfig
   voyage: VoyageConfig
-  claudeProxy: ClaudeProxyConfig
+  claude: ClaudeConfig
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -49,15 +47,13 @@ const DEFAULT_CONFIG: AppConfig = {
     defaultModel: 'voyage-4-large',
     apiKeys: [],
   },
-  claudeProxy: {
-    baseUrl: 'http://localhost:3456',
+  claude: {
     haikuModel: 'claude-haiku-4-20250414',
     sonnetModel: 'claude-sonnet-4-20250514',
     opusModel: 'claude-opus-4-20250514',
     timeoutSeconds: 120,
     maxConcurrency: 8,
     haikuMaxConcurrency: 20,
-    apiKey: 'nexus-local-dev',
   },
 }
 
@@ -80,7 +76,7 @@ export function getConfig(): AppConfig {
         upstream: { ...DEFAULT_CONFIG.upstream, ...parsed.upstream },
         catalog: { ...DEFAULT_CONFIG.catalog, ...parsed.catalog },
         voyage: { ...DEFAULT_CONFIG.voyage, ...parsed.voyage },
-        claudeProxy: { ...DEFAULT_CONFIG.claudeProxy, ...parsed.claudeProxy },
+        claude: { ...DEFAULT_CONFIG.claude, ...(parsed.claude ?? (parsed as Record<string, unknown>).claudeProxy as Partial<ClaudeConfig>) },
       }
       return cachedConfig
     } catch (err) {

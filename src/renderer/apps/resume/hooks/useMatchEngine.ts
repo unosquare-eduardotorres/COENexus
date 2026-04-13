@@ -194,9 +194,11 @@ export function useMatchEngine() {
   const handleAiWarningCancel = useCallback(() => { setShowAiWarningModal(false); setPendingDataSource(null); }, []);
 
   const handleConfirmDecision = useCallback(async (action: 'proceed' | 'include-all') => {
+    if (!haikuConfirm) return;
+    const id = haikuConfirm.searchId;
     setHaikuConfirm(null);
-    await window.api.match.confirmHaiku({ searchId: sessionId, action });
-  }, [sessionId]);
+    await window.api.match.confirmHaiku({ searchId: id, action });
+  }, [haikuConfirm]);
 
   const handleLoadSession = useCallback(async (id: number) => {
     try {
@@ -335,7 +337,7 @@ export function useMatchEngine() {
     source: { dataSource, handleDataSourceNext, poolCounts, filterOptions },
     jd: { jobDescription, setJobDescription, jdSource, handleJdNext },
     filters: { advancedConstraints, handleFiltersNext, activeConstraintCount },
-    depth: { searchMode, topN, deeperTopN, setDeeperTopN, showAnalyzeDeeper, setShowAnalyzeDeeper, handleSearchDepthNext, candidateUpstreamIds, setCandidateUpstreamIds },
+    depth: { searchMode, setSearchMode, topN, deeperTopN, setDeeperTopN, showAnalyzeDeeper, setShowAnalyzeDeeper, handleSearchDepthNext, candidateUpstreamIds, setCandidateUpstreamIds },
     search: { progress, handleStartSearch, executeSearch, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName, pendingDataSource },
     results: { candidates, stats, pipelineStages, animateIn, sessionId, handleExportToExcel, handleReset },
     deepDive: { selectedProfile, setSelectedProfile, compareList, handleToggleCompare, handleStartCompare, deepDiveMode, handleSelectCandidate, handleBackToResults },

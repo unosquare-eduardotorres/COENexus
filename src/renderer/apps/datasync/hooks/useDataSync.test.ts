@@ -1,8 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { useDataSync } from './useDataSync';
+
+vi.mock('../../../contexts/NexusStatusContext', () => ({
+  useNexusStatus: () => ({
+    sharepoint: {
+      token: '',
+      isValid: false,
+      isValidating: false,
+      error: undefined,
+      remainingMs: 0,
+      showExpirationWarning: false,
+    },
+    requireSharePointToken: vi.fn().mockReturnValue(false),
+  }),
+}));
 
 vi.mock('../services/dataSyncService', () => ({
   dataSyncService: {
@@ -59,38 +73,6 @@ describe('useDataSync', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-  });
-
-  it('should initialize with default state', () => {
-    const { result } = renderHook(() => useDataSync('candidates'), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.token.token).toBe('');
-    expect(result.current.token.isTokenValid).toBe(false);
-    expect(result.current.token.isValidating).toBe(false);
-  });
-
-  it('should restore token from localStorage', () => {
-    localStorage.setItem('datasync-token', 'test-token-123');
-
-    const { result } = renderHook(() => useDataSync('candidates'), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.token.token).toBe('test-token-123');
-  });
-
-  it('should update token', () => {
-    const { result } = renderHook(() => useDataSync('candidates'), {
-      wrapper: createWrapper(),
-    });
-
-    act(() => {
-      result.current.token.setToken('new-token');
-    });
-
-    expect(result.current.token.token).toBe('new-token');
   });
 
   it('should initialize progress for active pipeline', () => {

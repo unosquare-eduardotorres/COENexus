@@ -19,7 +19,6 @@ interface Logger {
   info(msg: string, data?: Record<string, unknown>): void
   warn(msg: string, data?: Record<string, unknown>): void
   error(msg: string, error?: Error, data?: Record<string, unknown>): void
-  child(correlationId: string): Logger
 }
 
 const LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 }
@@ -76,7 +75,6 @@ function buildLogger(module: string, correlationId?: string): Logger {
     info: (msg, data?) => log('info', msg, undefined, data),
     warn: (msg, data?) => log('warn', msg, undefined, data),
     error: (msg, err?, data?) => log('error', msg, err, data),
-    child: (id: string) => buildLogger(module, id),
   }
 }
 

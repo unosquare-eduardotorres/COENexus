@@ -21,6 +21,25 @@ import type {
   ProcessingProgressEvent,
   MatchSearchEvent,
   BenchBurnEvent,
+  ReportStalledThresholds,
+  ReportStalledPositionResult,
+  Scout9RunParams,
+  Scout9ListReportsParams,
+  Scout9UpdateCandidateParams,
+  Scout9SubmitSkipParams,
+  Scout9CreateRuleParams,
+  Scout9UpdateRuleParams,
+  Scout9CreateGlossaryTermParams,
+  Scout9UpdateGlossaryTermParams,
+  Scout9CreateNoteParams,
+  Scout9UpdateNoteParams,
+  Scout9TogglePatternParams,
+  Scout9CreateOverrideParams,
+  Scout9UpdateConfigParams,
+  Scout9CreatePromptVersionParams,
+  Scout9ActivatePromptVersionParams,
+  Scout9PipelineEvent,
+  Scout9StatusEvent,
   IpcContracts,
   IpcEventContracts,
 } from '../shared/ipc-types'
@@ -132,6 +151,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_RESUME_TEXT, params),
     externalCandidate: (params: ExternalCandidateMatchRequest) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_EXTERNAL_CANDIDATE, params),
+    getAnalysisCacheStats: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_ANALYSIS_CACHE_STATS) as Promise<{ totalEntries: number; oldestEntry: string | null }>,
+    clearAnalysisCache: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_CLEAR_ANALYSIS_CACHE) as Promise<{ deleted: number }>,
     onSearchEvent: (callback: (data: MatchSearchEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: MatchSearchEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.MATCH_SEARCH_EVENT, handler)
@@ -172,6 +195,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DATABASE_STATUS),
     importFile: () =>
       ipcRenderer.invoke(IPC_CHANNELS.DATABASE_IMPORT_FILE),
+    getHealth: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATABASE_HEALTH),
   },
 
   ai: {
@@ -179,6 +204,157 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT, { model, messages, maxTokens } satisfies AiChatParams),
     checkConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_CHECK_CONNECTION),
+    getTokenUsage: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_TOKEN_USAGE),
+    resetTokenUsage: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RESET_TOKEN_USAGE),
+    getSubscriptionStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_SUBSCRIPTION_STATUS),
+  },
+
+  report: {
+    evaluatePositions: (thresholds: ReportStalledThresholds) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_EVALUATE_POSITIONS, thresholds),
+    getPositionDetail: (upstreamId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_POSITION_DETAIL, upstreamId),
+    exportCsv: (results: ReportStalledPositionResult[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_CSV, results),
+    getSyncStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_SYNC_STATUS),
+    getFeedbackCatalog: (token: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG, token),
+  },
+
+  path: {
+    getDeveloperDashboard: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GET_DEVELOPER_DASHBOARD]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_DEVELOPER_DASHBOARD, params),
+    listLearningPaths: (params: IpcContracts[typeof IPC_CHANNELS.PATH_LIST_LEARNING_PATHS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_LIST_LEARNING_PATHS, params),
+    getLearningPath: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GET_LEARNING_PATH]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_LEARNING_PATH, params),
+    createLearningPath: (params: IpcContracts[typeof IPC_CHANNELS.PATH_CREATE_LEARNING_PATH]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_CREATE_LEARNING_PATH, params),
+    updateLearningPath: (params: IpcContracts[typeof IPC_CHANNELS.PATH_UPDATE_LEARNING_PATH]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_UPDATE_LEARNING_PATH, params),
+    deleteLearningPath: (params: IpcContracts[typeof IPC_CHANNELS.PATH_DELETE_LEARNING_PATH]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_DELETE_LEARNING_PATH, params),
+    listAssessments: (params: IpcContracts[typeof IPC_CHANNELS.PATH_LIST_ASSESSMENTS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_LIST_ASSESSMENTS, params),
+    getAssessment: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GET_ASSESSMENT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_ASSESSMENT, params),
+    saveAssessmentDraft: (params: IpcContracts[typeof IPC_CHANNELS.PATH_SAVE_ASSESSMENT_DRAFT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_SAVE_ASSESSMENT_DRAFT, params),
+    submitAssessment: (params: IpcContracts[typeof IPC_CHANNELS.PATH_SUBMIT_ASSESSMENT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_SUBMIT_ASSESSMENT, params),
+    listDiscussionThreads: (params: IpcContracts[typeof IPC_CHANNELS.PATH_LIST_DISCUSSION_THREADS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_LIST_DISCUSSION_THREADS, params),
+    getDiscussionThread: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GET_DISCUSSION_THREAD]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_DISCUSSION_THREAD, params),
+    createDiscussionPost: (params: IpcContracts[typeof IPC_CHANNELS.PATH_CREATE_DISCUSSION_POST]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_CREATE_DISCUSSION_POST, params),
+    replyDiscussionPost: (params: IpcContracts[typeof IPC_CHANNELS.PATH_REPLY_DISCUSSION_POST]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_REPLY_DISCUSSION_POST, params),
+    listDossiers: (params: IpcContracts[typeof IPC_CHANNELS.PATH_LIST_DOSSIERS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_LIST_DOSSIERS, params),
+    getDossier: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GET_DOSSIER]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_DOSSIER, params),
+    updateDossierStatus: (params: IpcContracts[typeof IPC_CHANNELS.PATH_UPDATE_DOSSIER_STATUS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_UPDATE_DOSSIER_STATUS, params),
+    getAdminAnalytics: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_ADMIN_ANALYTICS),
+    getSettings: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GET_SETTINGS),
+    saveSettings: (params: IpcContracts[typeof IPC_CHANNELS.PATH_SAVE_SETTINGS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_SAVE_SETTINGS, params),
+    saveAnalyticsEvent: (params: IpcContracts[typeof IPC_CHANNELS.PATH_SAVE_ANALYTICS_EVENT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_SAVE_ANALYTICS_EVENT, params),
+    recalculateReadiness: (params: IpcContracts[typeof IPC_CHANNELS.PATH_RECALCULATE_READINESS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_RECALCULATE_READINESS, params),
+    generateDefensePrep: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GENERATE_DEFENSE_PREP]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GENERATE_DEFENSE_PREP, params),
+    generateRemediation: (params: IpcContracts[typeof IPC_CHANNELS.PATH_GENERATE_REMEDIATION]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_GENERATE_REMEDIATION, params),
+    searchDynamicResources: (params: IpcContracts[typeof IPC_CHANNELS.PATH_SEARCH_DYNAMIC_RESOURCES]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PATH_SEARCH_DYNAMIC_RESOURCES, params),
+  },
+
+  scout9: {
+    run: (params: Scout9RunParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_RUN, params),
+    cancel: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_CANCEL),
+    getStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_GET_STATUS),
+    getScopeOptions: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_GET_SCOPE_OPTIONS),
+    listReports: (params?: Scout9ListReportsParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_LIST_REPORTS, params),
+    getReport: (reportId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_GET_REPORT, reportId),
+    updateCandidate: (params: Scout9UpdateCandidateParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_UPDATE_CANDIDATE, params),
+    submitSkip: (params: Scout9SubmitSkipParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SUBMIT_SKIP, params),
+    listRules: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_LIST_RULES),
+    createRule: (params: Scout9CreateRuleParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_CREATE_RULE, params),
+    updateRule: (params: Scout9UpdateRuleParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_UPDATE_RULE, params),
+    deleteRule: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_DELETE_RULE, id),
+    listGlossary: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_LIST_GLOSSARY),
+    createGlossaryTerm: (params: Scout9CreateGlossaryTermParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_CREATE_GLOSSARY_TERM, params),
+    updateGlossaryTerm: (params: Scout9UpdateGlossaryTermParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_UPDATE_GLOSSARY_TERM, params),
+    deleteGlossaryTerm: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_DELETE_GLOSSARY_TERM, id),
+    listNotes: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_LIST_NOTES),
+    createNote: (params: Scout9CreateNoteParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_CREATE_NOTE, params),
+    updateNote: (params: Scout9UpdateNoteParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_UPDATE_NOTE, params),
+    deleteNote: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_DELETE_NOTE, id),
+    compileKnowledgeBase: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_COMPILE),
+    listPatterns: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_LIST_PATTERNS),
+    togglePattern: (params: Scout9TogglePatternParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_TOGGLE_PATTERN, params),
+    listOverrides: (clientId?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_LIST_OVERRIDES, clientId),
+    createOverride: (params: Scout9CreateOverrideParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_CREATE_OVERRIDE, params),
+    deleteOverride: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_DELETE_OVERRIDE, id),
+    getTokenBudget: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_KB_TOKEN_BUDGET),
+    getConfig: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_GET_CONFIG),
+    updateConfig: (params: Scout9UpdateConfigParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_UPDATE_CONFIG, params),
+    listPromptVersions: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_LIST_PROMPTS),
+    createPromptVersion: (params: Scout9CreatePromptVersionParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_CREATE_PROMPT, params),
+    activatePromptVersion: (params: Scout9ActivatePromptVersionParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_ACTIVATE_PROMPT, params),
+    getBrainSnapshot: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_GET_BRAIN_SNAPSHOT),
+    onPipelineEvent: (callback: (data: Scout9PipelineEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: Scout9PipelineEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)
+    },
+    onStatusEvent: (callback: (data: Scout9StatusEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: Scout9StatusEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.SCOUT9_STATUS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT9_STATUS_EVENT, handler)
+    },
   },
 
   app: {

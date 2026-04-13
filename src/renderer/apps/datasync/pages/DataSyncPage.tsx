@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DataSyncPanel } from '../components/DataSyncSidebar';
+import { DataSyncPanel } from '../components/DataSyncLayout';
 import DataSyncLayout from '../components/DataSyncLayout';
+import DataSyncOverview from '../components/DataSyncOverview';
 import SyncDashboard from '../components/SyncDashboard';
-import TokenExpirationWarning from '../components/TokenExpirationWarning';
 import VectorizationPanel from '../components/VectorizationPanel';
 import DatabaseSharingPanel from '../components/DatabaseSharingPanel';
-import { isTokenExpired } from '../../../shared/utils/tokenUtils';
 import { useDataSync } from '../hooks/useDataSync';
 import { useDataSyncSettings } from '../hooks/useDataSyncSettings';
+import { useNexusStatus } from '../../../contexts/NexusStatusContext';
 import { databaseSharingService } from '../services/databaseSharingService';
 
 export default function DataSyncPage() {
-  const [activePanel, setActivePanel] = useState<DataSyncPanel>('candidates');
+  const [activePanel, setActivePanel] = useState<DataSyncPanel>('overview');
   const [isDatabaseEmpty, setIsDatabaseEmpty] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -55,8 +55,10 @@ export default function DataSyncPage() {
     }
   };
 
+  const { sharepoint } = useNexusStatus();
+  const isTokenValid = sharepoint.isValid;
+
   const {
-    token: { token, setToken, isTokenValid, isValidating, tokenError, handleValidate, handleDisconnect, handleRefreshToken, handleTokenExpired },
     sync: { isSyncing, handleStartSync, handlePauseSync, handleResumeSync },
     records: { activeRecords, activeProgress, isLoadingRecords },
     processing: { activeExtractionProgress, activeVectorizationProgress },
@@ -65,14 +67,15 @@ export default function DataSyncPage() {
     singleRecord: { refreshingId, vectorizingId, handleRefreshRecord, handleVectorizeRecord },
     year: { selectedYear, handleYearChange },
     clear: { isClearing, handleClearData },
-    expiration: { showExpirationWarning, minutesRemaining },
   } = useDataSync(activePanel);
 
   const settings = useDataSyncSettings();
 
-  const isSourcePanel = activePanel === 'employees' || activePanel === 'candidates' || activePanel === 'open-positions';
-
   const renderContent = () => {
+    if (activePanel === 'overview') {
+      return <DataSyncOverview onNavigate={setActivePanel} />;
+    }
+
     if (activePanel === 'vectorization') {
       return (
         <VectorizationPanel
@@ -184,26 +187,8 @@ export default function DataSyncPage() {
     <DataSyncLayout
       activePanel={activePanel}
       onPanelChange={setActivePanel}
-      token={token}
-      onTokenChange={setToken}
-      isTokenValid={isTokenValid}
-      isValidating={isValidating}
-      tokenError={tokenError}
-      onValidate={handleValidate}
-      onDisconnect={handleDisconnect}
-      onTokenExpired={handleTokenExpired}
     >
       {renderContent()}
-
-      {showExpirationWarning && isSourcePanel && (
-        <TokenExpirationWarning
-          minutesRemaining={minutesRemaining}
-          isExpired={isTokenExpired(token)}
-          onRefreshToken={handleRefreshToken}
-          onDismiss={() => {}}
-          isSyncing={isSyncing}
-        />
-      )}
     </DataSyncLayout>
   );
 }

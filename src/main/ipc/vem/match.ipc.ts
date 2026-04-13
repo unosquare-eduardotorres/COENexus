@@ -9,7 +9,7 @@ import { benchBurnService } from '../../services/benchBurnService'
 import { matchSearchCoordinator } from '../../services/matchSearchCoordinator'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { matchRepository } from '../../db/repositories/matchRepository'
-import { claudeProxyService } from '../../services/claudeProxyService'
+import { claudeService } from '../../services/claudeService'
 import { validatePayload, matchSearchSchema, matchConfirmHaikuSchema, matchResumeTextSchema, benchBurnSchema, externalCandidateSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { createLogger } from '../../services/logger'
@@ -77,7 +77,7 @@ export function registerMatchHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.MATCH_PROXY_STATUS,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      const available = await claudeProxyService.checkAvailability()
+      const available = await claudeService.checkAvailability()
       return { available }
     })
 
@@ -161,5 +161,19 @@ export function registerMatchHandlers(): void {
       })
       win?.webContents.send(IPC_CHANNELS.MATCH_SEARCH_EVENT, { type: 'complete' })
       return { sessionId }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_ANALYSIS_CACHE_STATS,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return matchRepository.getAnalysisCacheStats()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_CLEAR_ANALYSIS_CACHE,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      const result = matchRepository.clearAnalysisCache()
+      log.info('Analysis cache cleared', { deleted: result.deleted })
+      return result
     })
 }

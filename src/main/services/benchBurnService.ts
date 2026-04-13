@@ -1,4 +1,4 @@
-import { claudeProxyService } from './claudeProxyService'
+import { claudeService } from './claudeService'
 import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { syncRepository } from '../db/repositories/syncRepository'
@@ -9,8 +9,13 @@ import type { MatchEvent } from './matchEngineService'
 import { parseAiResponse } from './utils/aiResponseParser'
 import { opusAnalysisSchema } from './utils/aiResponseSchemas'
 import { createLogger } from './logger'
+import { createHash } from 'crypto'
 
 const log = createLogger('BenchBurn')
+
+function hashJobDescription(jd: string): string {
+  return createHash('sha256').update(jd.trim().toLowerCase()).digest('hex')
+}
 
 export interface BenchBurnRequest {
   name: string
@@ -53,7 +58,7 @@ export const benchBurnService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claudeProxy } = getConfig()
+    const { claude } = getConfig()
 
     log.info('Bench burn started', { employees: request.employeeUpstreamIds.length, positions: request.positionUpstreamIds.length, topNPerEmployee: request.topNPerEmployee, topNPerPosition: request.topNPerPosition })
 
@@ -103,7 +108,33 @@ export const benchBurnService = {
 
       emitEvent({ type: 'progress', percent: 30, stage: `Analyzing ${uniquePairs.length} employee-position pairs...` })
 
-      const results = await runConcurrent(uniquePairs, claudeProxy.maxConcurrency, async (pair) => {
+      let cacheHits = 0
+      let cacheMisses = 0
+
+      const results = await runConcurrent(uniquePairs, claude.maxConcurrency, async (pair) => {
+        const jdHash = hashJobDescription(pair.pos.job_description)
+        const cached = matchRepository.getCachedAnalysis(pair.emp.upstream_id, 'employee', jdHash)
+
+        if (cached) {
+          cacheHits++
+          log.info('Bench burn cache hit', { employeeId: pair.emp.upstream_id, positionId: pair.pos.upstream_id })
+          return {
+            employeeUpstreamId: pair.emp.upstream_id,
+            employeeName: pair.emp.full_name,
+            positionUpstreamId: pair.pos.upstream_id,
+            positionLabel: `${pair.pos.account} - ${pair.pos.job_title}`,
+            matchScore: (cached.matchScore as number) ?? 0,
+            cosineSimilarity: pair.similarity,
+            scores: cached.scores ?? {},
+            skills: cached.skills ?? [],
+            gaps: cached.gaps ?? [],
+            domains: cached.domains ?? [],
+            analysis: cached.analysis ?? null,
+            summary: (cached.summary as string) ?? '',
+          } as CrossMatchResult
+        }
+
+        cacheMisses++
         const empEmbedding = embeddingRepository.findBySource('employees', pair.emp.id)
 
         const contextBlock = fillTemplate(BENCH_BURN_CONTEXT_BLOCK, {
@@ -129,8 +160,19 @@ export const benchBurnService = {
         })
 
         try {
-          const response = await claudeProxyService.chatAsync(claudeProxy.opusModel, prompt, 4096, 0.1)
+          const response = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
           const parsed = parseAiResponse(response, opusAnalysisSchema, 'bench-burn')
+
+          const analysisResult = {
+            matchScore: parsed.matchScore,
+            scores: parsed.scores,
+            skills: parsed.skills,
+            gaps: parsed.gaps,
+            domains: parsed.domains,
+            analysis: parsed.analysis,
+            summary: parsed.summary,
+          }
+          matchRepository.cacheAnalysis(pair.emp.upstream_id, 'employee', jdHash, analysisResult, claude.opusModel)
 
           return {
             employeeUpstreamId: pair.emp.upstream_id,
@@ -161,6 +203,8 @@ export const benchBurnService = {
         }
       })
 
+      log.info('Bench burn cache stats', { cacheHits, cacheMisses })
+
       const employeeResults: Record<string, CrossMatchResult[]> = {}
       const positionResults: Record<string, CrossMatchResult[]> = {}
 
@@ -185,12 +229,14 @@ export const benchBurnService = {
       const stats = {
         totalPairs: uniquePairs.length,
         analyzed: results.length,
+        cacheHits: String(cacheHits),
+        cacheMisses: String(cacheMisses),
         time: `${((Date.now() - startTime) / 1000).toFixed(1)}s`,
       }
 
       const resultPayload = { employeeResults, positionResults, stats }
 
-      log.info('Bench burn analysis complete', { totalPairs: uniquePairs.length, analyzed: results.length, time: stats.time })
+      log.info('Bench burn analysis complete', { totalPairs: uniquePairs.length, analyzed: results.length, cacheHits, cacheMisses, time: stats.time })
 
       emitEvent({ type: 'result', candidates: results, stats })
       emitEvent({ type: 'progress', percent: 95, stage: 'Saving session...' })
@@ -228,7 +274,7 @@ export const benchBurnService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claudeProxy } = getConfig()
+    const { claude } = getConfig()
 
     log.info('External candidate match started', { candidates: request.candidates.length, positions: request.positionUpstreamIds.length, hasCustomPosition: !!request.customPosition })
 
@@ -292,7 +338,7 @@ export const benchBurnService = {
           })
 
           try {
-            const response = await claudeProxyService.chatAsync(claudeProxy.opusModel, prompt, 4096, 0.1)
+            const response = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
             const parsed = parseAiResponse(response, opusAnalysisSchema, 'external-candidate')
 
             allResults.push({

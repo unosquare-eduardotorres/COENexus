@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AIConfig, AISuggestion, SuggestionOption, StructuredResume, RefinementMode, ExperienceEntry, EducationEntry, SkillCategory, CertificationEntry, TokenUsage, ResumeProcessingMetrics } from '../types';
 import { TECH_SKILL_SLOTS } from '../constants/resume';
+import { safeJsonParse } from '../../../shared/utils/safeJsonParse';
 
 const extractionResponseSchema = z.object({
   candidateName: z.string().default(''),
@@ -51,14 +52,19 @@ const enhancementResponseSchema = z.object({
 });
 
 function parseAiJson<T>(raw: string, schema: z.ZodSchema<T>, context: string): T {
-  const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
-  const parsed = JSON.parse(cleaned);
-  const result = schema.safeParse(parsed);
-  if (!result.success) {
-    console.error(`AI response validation failed (${context}):`, result.error.issues);
-    throw new Error(`AI response validation failed (${context}): ${result.error.issues.map(i => i.message).join(', ')}`);
+  try {
+    const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    const result = schema.safeParse(parsed);
+    if (!result.success) {
+      throw new Error(result.error.issues.map(i => i.message).join(', '));
+    }
+    return result.data;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`AI response parse failed (${context}):`, msg);
+    throw new Error(`AI response parse failed (${context}): ${msg}`);
   }
-  return result.data;
 }
 
 const DEFAULT_AI_CONFIG: AIConfig = {
@@ -70,7 +76,6 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   maxTokens: 4096,
 };
 
-let currentConfig: AIConfig = { ...DEFAULT_AI_CONFIG };
 
 function buildExtractionPrompt(rawText: string): string {
   return `Extract the resume information from the text below and return ONLY valid JSON matching this exact schema. Do not rewrite or improve the content — extract it as-is from the source. Return no markdown code blocks, no explanations, just the raw JSON object.
@@ -147,66 +152,51 @@ async function callClaudeLocal(config: AIConfig, prompt: string): Promise<{ cont
   return { content, usage };
 }
 
+type ExtractionResult = z.infer<typeof extractionResponseSchema>;
+
 function mapToStructuredResume(
-  parsed: Record<string, unknown>,
+  parsed: ExtractionResult,
   fileName: string,
   fileType: 'pdf' | 'docx' | 'txt',
   rawText: string
 ): StructuredResume {
   const now = Date.now();
 
-  const rawExperience = Array.isArray(parsed.experience) ? parsed.experience : [];
-  const rawEducation = Array.isArray(parsed.education) ? parsed.education : [];
-  const rawSkills = Array.isArray(parsed.skills) ? parsed.skills : [];
-  const rawCertifications = Array.isArray(parsed.certifications) ? parsed.certifications : [];
+  const experience: ExperienceEntry[] = parsed.experience.map((e, idx) => ({
+    id: `exp-${now}-${idx}`,
+    company: e.company,
+    title: e.title,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    location: e.location ?? undefined,
+    description: e.description,
+    achievements: e.achievements,
+    technologies: e.technologies,
+    projectName: e.projectName ?? undefined,
+  }));
 
-  const experience: ExperienceEntry[] = rawExperience.map((item: unknown, idx: number) => {
-    const e = (item as Record<string, unknown>) || {};
-    return {
-      id: `exp-${now}-${idx}`,
-      company: String(e.company || ''),
-      title: String(e.title || ''),
-      startDate: String(e.startDate || ''),
-      endDate: String(e.endDate || ''),
-      location: e.location ? String(e.location) : undefined,
-      description: String(e.description || ''),
-      achievements: Array.isArray(e.achievements) ? e.achievements.map(String) : [],
-      technologies: Array.isArray(e.technologies) ? e.technologies.map(String) : [],
-      projectName: e.projectName ? String(e.projectName) : undefined,
-    };
-  });
+  const education: EducationEntry[] = parsed.education.map((e, idx) => ({
+    id: `edu-${now}-${idx}`,
+    institution: e.institution,
+    degree: e.degree,
+    field: e.field,
+    graduationDate: e.graduationDate.toLowerCase() === 'unknown' ? '' : e.graduationDate,
+    gpa: e.gpa ?? undefined,
+    honors: e.honors ?? undefined,
+  }));
 
-  const education: EducationEntry[] = rawEducation.map((item: unknown, idx: number) => {
-    const e = (item as Record<string, unknown>) || {};
-    return {
-      id: `edu-${now}-${idx}`,
-      institution: String(e.institution || ''),
-      degree: String(e.degree || ''),
-      field: String(e.field || ''),
-      graduationDate: String(e.graduationDate || '').toLowerCase() === 'unknown' ? '' : String(e.graduationDate || ''),
-      gpa: e.gpa ? String(e.gpa) : undefined,
-      honors: e.honors ? String(e.honors) : undefined,
-    };
-  });
+  const skills: SkillCategory[] = parsed.skills.map((s, idx) => ({
+    id: `skill-cat-${now}-${idx}`,
+    name: s.name,
+    skills: s.skills,
+  }));
 
-  const skills: SkillCategory[] = rawSkills.map((item: unknown, idx: number) => {
-    const s = (item as Record<string, unknown>) || {};
-    return {
-      id: `skill-cat-${now}-${idx}`,
-      name: String(s.name || ''),
-      skills: Array.isArray(s.skills) ? s.skills.map(String) : [],
-    };
-  });
-
-  const certifications: CertificationEntry[] = rawCertifications.map((item: unknown, idx: number) => {
-    const c = (item as Record<string, unknown>) || {};
-    return {
-      id: `cert-${now}-${idx}`,
-      name: String(c.name || ''),
-      issuer: String(c.issuer || ''),
-      date: String(c.date || '').toLowerCase() === 'unknown' ? '' : String(c.date || ''),
-    };
-  });
+  const certifications: CertificationEntry[] = parsed.certifications.map((c, idx) => ({
+    id: `cert-${now}-${idx}`,
+    name: c.name,
+    issuer: c.issuer,
+    date: c.date.toLowerCase() === 'unknown' ? '' : c.date,
+  }));
 
   const processedSkills = splitCompoundSkills(skills);
   const allExtractedSkills = processedSkills.flatMap(cat => cat.skills);
@@ -217,12 +207,12 @@ function mapToStructuredResume(
     originalFileName: fileName,
     originalFileType: fileType,
     originalContent: rawText,
-    candidateName: String(parsed.candidateName || ''),
-    email: parsed.email ? String(parsed.email) : undefined,
-    phone: parsed.phone ? String(parsed.phone) : undefined,
-    location: parsed.location ? String(parsed.location) : undefined,
-    linkedIn: parsed.linkedIn ? String(parsed.linkedIn) : undefined,
-    summary: String(parsed.summary || ''),
+    candidateName: parsed.candidateName,
+    email: parsed.email ?? undefined,
+    phone: parsed.phone ?? undefined,
+    location: parsed.location ?? undefined,
+    linkedIn: parsed.linkedIn ?? undefined,
+    summary: parsed.summary,
     experience,
     education,
     skills: processedSkills,
@@ -303,11 +293,7 @@ Also select all AI/cloud-related skills for cloudSkills.`;
 
 export const aiService = {
   getConfig(): AIConfig {
-    const stored = localStorage.getItem('ai_config');
-    if (stored) {
-      currentConfig = JSON.parse(stored);
-    }
-    return currentConfig;
+    return safeJsonParse(localStorage.getItem('ai_config'), DEFAULT_AI_CONFIG);
   },
 
   async checkConnection(): Promise<boolean> {
@@ -320,9 +306,10 @@ export const aiService = {
   },
 
   updateConfig(config: Partial<AIConfig>): AIConfig {
-    currentConfig = { ...currentConfig, ...config };
-    localStorage.setItem('ai_config', JSON.stringify(currentConfig));
-    return currentConfig;
+    const current = this.getConfig();
+    const updated = { ...current, ...config };
+    localStorage.setItem('ai_config', JSON.stringify(updated));
+    return updated;
   },
 
   async extractResumeData(rawText: string, fileName: string): Promise<{ resume: StructuredResume; metrics: ResumeProcessingMetrics }> {
@@ -334,7 +321,7 @@ export const aiService = {
       const prompt = buildExtractionPrompt(rawText);
       const { content: response, usage } = await callClaudeLocal(config, prompt);
       const parsed = parseAiJson(response, extractionResponseSchema, 'extractResumeData');
-      const resume = mapToStructuredResume(parsed as Record<string, unknown>, fileName, fileType, rawText);
+      const resume = mapToStructuredResume(parsed, fileName, fileType, rawText);
       const processingTimeMs = Math.round(performance.now() - startTime);
       return { resume, metrics: { extractionTokens: usage, totalTokens: usage, processingTimeMs, modelUsed: config.model, wasAiExtraction: true } };
     } catch (error) {

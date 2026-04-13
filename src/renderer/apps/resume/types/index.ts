@@ -617,6 +617,7 @@ export interface PipelineStages {
 }
 
 export interface HaikuConfirmPayload {
+  searchId: string;
   requestedTopN: number;
   passedCount: number;
   highestRejectedScore: number;

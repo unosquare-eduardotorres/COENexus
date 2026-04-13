@@ -1,5 +1,6 @@
 import { sessionRepository } from '../db/repositories/sessionRepository'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
+import { matchRepository } from '../db/repositories/matchRepository'
 import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { createLogger } from './logger'
 
@@ -41,6 +42,14 @@ export const resumeSessionVectorizer = {
         resume_embedding_id: embeddingId,
         vectorization_status: 'completed',
       })
+
+      const upstreamId = session.candidate_upstream_id ?? session.employee_upstream_id
+      if (upstreamId) {
+        const invalidated = matchRepository.invalidateCacheForCandidate(upstreamId)
+        if (invalidated > 0) {
+          log.info(`Invalidated ${invalidated} cached analysis entries for upstream ${upstreamId}`)
+        }
+      }
 
       log.info(`Session ${sessionId} vectorized successfully`, { embeddingId })
     } catch (err) {

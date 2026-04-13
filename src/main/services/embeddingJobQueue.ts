@@ -20,10 +20,6 @@ const emitter = new EventEmitter()
 let _pendingCount = 0
 
 export const embeddingJobQueue = {
-  get pendingCount(): number {
-    return _pendingCount
-  },
-
   enqueue(job: EmbeddingJob): void {
     queue.push(job)
     _pendingCount++

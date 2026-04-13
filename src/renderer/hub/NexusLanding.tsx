@@ -20,12 +20,27 @@ function CompassTrailIcon() {
   );
 }
 
-function BeakerIcon() {
+function CoreIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4.5 3h15" />
-      <path d="M6 3v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V3" />
-      <path d="M6 14h12" />
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+      <circle cx="18" cy="10" r="2" fill="currentColor" opacity="0.3" />
+      <circle cx="12" cy="4" r="2" fill="currentColor" opacity="0.3" />
+      <circle cx="6" cy="14" r="2" fill="currentColor" opacity="0.3" />
+    </svg>
+  );
+}
+
+function BotIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <circle cx="12" cy="5" r="3" />
+      <line x1="12" y1="8" x2="12" y2="11" />
+      <circle cx="8" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
+      <circle cx="16" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
     </svg>
   );
 }
@@ -37,10 +52,12 @@ function AccentLetter({ children, color }: { children: string; color: string }) 
 export default function NexusLanding() {
   const resumeColor = '#3b82f6';
   const dataSyncColor = '#f59e0b';
+  const coreColor = '#10b981';
   const pathColor = '#8b5cf6';
+  const agentColor = '#a855f7';
 
   return (
-    <div className="relative flex min-h-screen flex-col gradient-subtle transition-colors duration-300">
+    <div className="relative flex min-h-screen pb-8 flex-col gradient-subtle transition-colors duration-300">
       <div className="fixed top-0 left-0 right-0 h-10 z-40 titlebar-drag" />
       <ParticleNetwork isDark />
 
@@ -80,8 +97,8 @@ export default function NexusLanding() {
         </p>
       </section>
 
-      <section className="relative z-10 mx-auto max-w-5xl px-4 pb-16 flex-1">
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 pb-16 flex-1">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 auto-rows-fr">
           <AppCard
             name="V.E.M."
             codename="Vectorize, Extract, Match"
@@ -103,9 +120,19 @@ export default function NexusLanding() {
             icon={<CloudDownloadIcon />}
           />
           <AppCard
+            name="C.O.R.E."
+            codename="Reports Engine"
+            status="active"
+            href="/command-center"
+            accentColor={coreColor}
+            tagline=""
+            description={<><AccentLetter color={coreColor}>C</AccentLetter>OE. <AccentLetter color={coreColor}>O</AccentLetter>perational. <AccentLetter color={coreColor}>R</AccentLetter>eports. <AccentLetter color={coreColor}>E</AccentLetter>ngine. Operational intelligence and position health monitoring for the COE.</>}
+            icon={<CoreIcon />}
+          />
+          <AppCard
             name="P.A.T.H."
             codename="Training Hub"
-            status="coming-soon"
+            status="active"
             href="/path"
             accentColor={pathColor}
             tagline=""
@@ -113,14 +140,14 @@ export default function NexusLanding() {
             icon={<CompassTrailIcon />}
           />
           <AppCard
-            name="S.K.I.L.L."
-            codename="Skills Matrix"
-            status="coming-soon"
-            href="/skill"
-            accentColor="#10b981"
-            tagline="Map talent. Build teams."
-            description="Survey. Know. Index. Learn. Level. Comprehensive skills inventory and gap analysis for workforce planning."
-            icon={<BeakerIcon />}
+            name="A.G.E.N.T."
+            codename="Agent Studio"
+            status="active"
+            href="/agents"
+            accentColor={agentColor}
+            tagline=""
+            description={<><AccentLetter color={agentColor}>A</AccentLetter>utonomous. <AccentLetter color={agentColor}>G</AccentLetter>enerative. <AccentLetter color={agentColor}>E</AccentLetter>xpert. <AccentLetter color={agentColor}>N</AccentLetter>etwork. <AccentLetter color={agentColor}>T</AccentLetter>eam. Multi-agent AI workforce for code, design, and operations.</>}
+            icon={<BotIcon />}
           />
         </div>
       </section>

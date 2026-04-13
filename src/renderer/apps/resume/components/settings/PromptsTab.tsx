@@ -387,6 +387,7 @@ const PromptsTab = memo(function PromptsTab(props: PromptsTabProps) {
         </button>
       </div>
     </div>
+  );
 });
 
 export default PromptsTab;

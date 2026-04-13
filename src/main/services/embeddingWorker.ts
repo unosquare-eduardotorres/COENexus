@@ -3,6 +3,7 @@ import { upstreamApiService } from './upstreamApiService'
 import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { resumeTextExtractor } from './resumeTextExtractor'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
+import { matchRepository } from '../db/repositories/matchRepository'
 import { createLogger } from './logger'
 
 const log = createLogger('EmbeddingWorker')
@@ -86,6 +87,11 @@ async function processJob(job: EmbeddingJob): Promise<void> {
       isBench: job.isBench,
     })
 
+    const invalidated = matchRepository.invalidateCacheForCandidate(job.upstreamId)
+    if (invalidated > 0) {
+      log.info(`Invalidated ${invalidated} cached analysis entries for ${job.source}/${job.upstreamId}`)
+    }
+
     syncRepository.updateStatus(table, job.dbId, 'vectorized')
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'Unknown error'
@@ -132,9 +138,5 @@ export const embeddingWorker = {
 
   stop(): void {
     stopRequested = true
-  },
-
-  get isRunning(): boolean {
-    return running
   },
 }

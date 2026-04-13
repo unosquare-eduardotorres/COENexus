@@ -33,10 +33,6 @@ function writeKeys(keys: string[]): void {
 }
 
 export const keychainService = {
-  isAvailable(): boolean {
-    return safeStorage.isEncryptionAvailable()
-  },
-
   getVoyageKeys(): string[] {
     return readKeys()
   },
@@ -63,13 +59,6 @@ export const keychainService = {
     log.info(`Voyage API key removed from secure storage (remaining: ${keys.length})`)
   },
 
-  clearAllVoyageKeys(): void {
-    const path = getKeysPath()
-    if (existsSync(path)) {
-      unlinkSync(path)
-      log.info('All Voyage API keys removed from secure storage')
-    }
-  },
 
   getMaskedKeys(): Array<{ index: number; masked: string }> {
     const keys = readKeys()

@@ -40,8 +40,15 @@ export const syncOpenPositionOrchestrator = {
         processedInRun++
 
         try {
-          const detail = await upstreamApiService.getOpenPositionDetail(token, pos.id)
-          const candidates = await upstreamApiService.getPresentedCandidates(token, pos.id)
+          const [detail, candidates, discussions] = await Promise.all([
+            upstreamApiService.getOpenPositionDetail(token, pos.id),
+            upstreamApiService.getPresentedCandidates(token, pos.id),
+            upstreamApiService.getDiscussionComments(token, pos.id),
+          ])
+
+          const latestDiscussionDate = discussions.length > 0
+            ? discussions.reduce((max, d) => (d.date > max ? d.date : max), '')
+            : null
 
           const entity: Omit<SyncedOpenPositionRow, 'id'> = {
             upstream_id: pos.id,
@@ -63,6 +70,20 @@ export const syncOpenPositionOrchestrator = {
             last_modification: pos.lastModification || null,
             sourcing: pos.sourcing || '',
             replacement: pos.replacement ? 1 : 0,
+            vertical_industry: pos.verticalIndustry || '',
+            in_office: detail?.inOffice ? 1 : 0,
+            csu: detail?.csu ?? '',
+            cs: detail?.cs ?? '',
+            closed_date: detail?.dateClosed ?? null,
+            closed_reason: pos.closedReason || null,
+            is_ready: detail?.isReady ? 1 : 0,
+            is_promotion: detail?.isPromotion ? 1 : 0,
+            maximum_rate: detail?.maximumRate ?? null,
+            minimum_rate: detail?.minimumRate ?? null,
+            additional_skills: JSON.stringify(detail?.additionalSkills ?? []),
+            created_with_assignments_tool: detail?.createdWithAssignmentsTool == null ? null : detail.createdWithAssignmentsTool ? 1 : 0,
+            candidates_presented: candidates.length,
+            last_discussion_date: latestDiscussionDate,
             status: 'synced',
             status_reason: null,
             synced_at: new Date().toISOString(),
@@ -83,6 +104,44 @@ export const syncOpenPositionOrchestrator = {
               rate: cand.rate ?? 0,
               start_date: cand.startDate || null,
               synced_at: new Date().toISOString(),
+            })
+          }
+
+          const rejectedCandidates = candidates.filter(c => c.candidateStatusName === 'RejectedByClient')
+          if (rejectedCandidates.length > 0) {
+            for (const rejected of rejectedCandidates) {
+              try {
+                const rejDetail = await upstreamApiService.getCandidateRequisitionDetail(
+                  token,
+                  rejected.candidateRequisitionId
+                )
+                if (rejDetail) {
+                  matchRepository.updateCandidateRejectionDetails(
+                    pos.id,
+                    rejected.candidateRequisitionId,
+                    {
+                      rejection_feedback: JSON.stringify(rejDetail.listFeedback ?? []),
+                      rejection_comments: rejDetail.comments ?? '',
+                      rejection_action_date: rejDetail.actionDate || null,
+                    }
+                  )
+                }
+              } catch (err) {
+                log.warn(`Failed to fetch rejection detail for candidateRequisition ${rejected.candidateRequisitionId}`, { positionId: pos.id })
+              }
+            }
+          }
+
+          const syncedAt = new Date().toISOString()
+          for (const comment of discussions) {
+            syncRepository.upsertDiscussion({
+              open_position_id: pos.id,
+              comment_id: comment.commentId,
+              author: comment.author || '',
+              date: comment.date || '',
+              message: comment.message || '',
+              parent_comment_id: comment.parentCommentId,
+              synced_at: syncedAt,
             })
           }
 

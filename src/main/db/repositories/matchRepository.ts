@@ -18,6 +18,16 @@ interface MatchSessionRow {
   completed_at: string | null
 }
 
+interface CandidateAnalysisCacheRow {
+  id: number
+  candidate_upstream_id: number
+  candidate_source_type: string
+  jd_hash: string
+  analysis_json: string
+  model_used: string
+  created_at: string
+}
+
 interface OpenPositionCandidateRow {
   id: number
   open_position_id: number
@@ -29,6 +39,9 @@ interface OpenPositionCandidateRow {
   candidate_status: string
   rate: number
   start_date: string | null
+  rejection_feedback: string
+  rejection_comments: string
+  rejection_action_date: string | null
   synced_at: string
 }
 
@@ -117,11 +130,66 @@ export const matchRepository = {
     ).all(positionId) as OpenPositionCandidateRow[]
   },
 
+  updateCandidateRejectionDetails(
+    openPositionId: number,
+    candidateRequisitionId: number,
+    data: { rejection_feedback: string; rejection_comments: string; rejection_action_date: string | null }
+  ): void {
+    const db = getDatabase()
+    db.prepare(`
+      UPDATE open_position_candidates
+      SET rejection_feedback = @rejection_feedback,
+          rejection_comments = @rejection_comments,
+          rejection_action_date = @rejection_action_date
+      WHERE open_position_id = @openPositionId AND candidate_requisition_id = @candidateRequisitionId
+    `).run({ ...data, openPositionId, candidateRequisitionId })
+  },
+
   getOpenPositionCandidateCount(positionId: number): number {
     const db = getDatabase()
     const result = db.prepare(
       'SELECT COUNT(*) as c FROM open_position_candidates WHERE open_position_id = ?'
     ).get(positionId) as { c: number }
     return result.c
+  },
+
+  getCachedAnalysis(candidateUpstreamId: number, sourceType: string, jdHash: string): Record<string, unknown> | null {
+    const db = getDatabase()
+    const row = db.prepare(
+      'SELECT analysis_json FROM candidate_analysis_cache WHERE candidate_upstream_id = ? AND candidate_source_type = ? AND jd_hash = ?'
+    ).get(candidateUpstreamId, sourceType, jdHash) as { analysis_json: string } | undefined
+    if (!row) return null
+    return JSON.parse(row.analysis_json) as Record<string, unknown>
+  },
+
+  cacheAnalysis(candidateUpstreamId: number, sourceType: string, jdHash: string, analysis: Record<string, unknown>, modelUsed: string): void {
+    const db = getDatabase()
+    db.prepare(`
+      INSERT INTO candidate_analysis_cache (candidate_upstream_id, candidate_source_type, jd_hash, analysis_json, model_used, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(candidate_upstream_id, candidate_source_type, jd_hash) DO UPDATE SET
+        analysis_json = excluded.analysis_json,
+        model_used = excluded.model_used,
+        created_at = excluded.created_at
+    `).run(candidateUpstreamId, sourceType, jdHash, JSON.stringify(analysis), modelUsed, new Date().toISOString())
+  },
+
+  invalidateCacheForCandidate(candidateUpstreamId: number): number {
+    const db = getDatabase()
+    const result = db.prepare('DELETE FROM candidate_analysis_cache WHERE candidate_upstream_id = ?').run(candidateUpstreamId)
+    return result.changes
+  },
+
+  clearAnalysisCache(): { deleted: number } {
+    const db = getDatabase()
+    const result = db.prepare('DELETE FROM candidate_analysis_cache').run()
+    return { deleted: result.changes }
+  },
+
+  getAnalysisCacheStats(): { totalEntries: number; oldestEntry: string | null } {
+    const db = getDatabase()
+    const count = db.prepare('SELECT COUNT(*) as c FROM candidate_analysis_cache').get() as { c: number }
+    const oldest = db.prepare('SELECT MIN(created_at) as oldest FROM candidate_analysis_cache').get() as { oldest: string | null }
+    return { totalEntries: count.c, oldestEntry: oldest.oldest }
   },
 }

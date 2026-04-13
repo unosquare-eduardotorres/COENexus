@@ -10,6 +10,7 @@ import {
   StructuredResume,
 } from '../../types';
 import { createRendererLogger } from '../../../../shared/utils/rendererLogger';
+import { useNexusStatus } from '../../../../contexts/NexusStatusContext';
 
 const log = createRendererLogger('useTransformExport');
 
@@ -34,6 +35,7 @@ export function useTransformExport({
   generatedDocx: externalGeneratedDocx,
   setGeneratedDocx: externalSetGeneratedDocx,
 }: UseTransformExportParams) {
+  const { sharepoint, requireSharePointToken } = useNexusStatus();
   const [internalGeneratedDocx, setInternalGeneratedDocx] = useState<Blob | null>(null);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadTargetResume, setDownloadTargetResume] = useState<StructuredResume | null>(null);
@@ -112,11 +114,10 @@ export function useTransformExport({
   }, [isCandidateAlreadyPresented, selectedPosition, showToast]);
 
   const handleSyncToATS = useCallback(async (resume: StructuredResume) => {
-    const token = localStorage.getItem('datasync-token') ?? '';
-    if (!token) {
-      setError('No ELP token found. Please validate your token on the Data Sync page first.');
+    if (!requireSharePointToken()) {
       return;
     }
+    const token = sharepoint.token;
 
     const personId = sourceType === 'ats-candidates'
       ? selectedCandidate?.upstreamId
@@ -143,7 +144,7 @@ export function useTransformExport({
         return next;
       });
     }
-  }, [selectedCandidate, setError, sourceType]);
+  }, [selectedCandidate, setError, sourceType, sharepoint.token, requireSharePointToken]);
 
   const isCandidatePresented = useCallback((position: ATSPosition) => {
     if (!selectedCandidate) return false;

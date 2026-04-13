@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import VemLogo from '../../../components/VemLogo';
+import ParticleBackground from '../../../components/ui/particle-background';
 
 const primaryActions = [
   {
@@ -159,10 +160,6 @@ const statsPills = [
   },
 ];
 
-function VemHeroGraphic() {
-  return <VemLogo size={88} className="text-accent-500 dark:text-accent-400 mx-auto block" />;
-}
-
 export default function HomePage() {
   const [activeWorkflow, setActiveWorkflow] = useState<'resume' | 'match'>('resume');
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
@@ -170,27 +167,36 @@ export default function HomePage() {
   const isMatch = activeWorkflow === 'match';
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 py-8 md:py-12">
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="hidden dark:block absolute inset-0 z-0 bg-gray-950">
+        <ParticleBackground
+          particleColor="rgba(96, 165, 250, 0.8)"
+          lineColor="rgba(147, 197, 253,"
+          opacity={0.45}
+          densityFactor={0.6}
+        />
+      </div>
+
+      <div className="relative z-10 max-w-5xl mx-auto px-6 py-8 md:py-12">
 
         <section className="relative overflow-hidden rounded-3xl mb-10 py-10 md:py-14">
           <div
-            className="absolute top-[-10%] left-[15%] w-80 h-80 md:w-96 md:h-96 bg-accent-400/20 dark:bg-accent-500/10 rounded-full blur-3xl animate-pulse"
+            className="dark:hidden absolute top-[-10%] left-[15%] w-80 h-80 md:w-96 md:h-96 bg-accent-400/20 dark:bg-accent-500/10 rounded-full blur-3xl animate-pulse"
             style={{ animationDuration: '5s' }}
             aria-hidden="true"
           />
           <div
-            className="absolute bottom-[-5%] right-[10%] w-64 h-64 md:w-80 md:h-80 bg-violet-400/15 dark:bg-violet-500/5 rounded-full blur-3xl animate-pulse"
+            className="dark:hidden absolute bottom-[-5%] right-[10%] w-64 h-64 md:w-80 md:h-80 bg-violet-400/15 dark:bg-violet-500/5 rounded-full blur-3xl animate-pulse"
             style={{ animationDuration: '7s' }}
             aria-hidden="true"
           />
           <div
-            className="absolute top-[30%] right-[40%] w-48 h-48 bg-emerald-400/10 dark:bg-emerald-500/5 rounded-full blur-3xl animate-pulse"
+            className="dark:hidden absolute top-[30%] right-[40%] w-48 h-48 bg-emerald-400/10 dark:bg-emerald-500/5 rounded-full blur-3xl animate-pulse"
             style={{ animationDuration: '6s' }}
             aria-hidden="true"
           />
 
-          <svg className="absolute inset-0 w-full h-full opacity-[0.04] dark:opacity-[0.03]" aria-hidden="true">
+          <svg className="dark:hidden absolute inset-0 w-full h-full opacity-[0.04]" aria-hidden="true">
             <defs>
               <pattern id="hero-dot-grid" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
                 <circle cx="2" cy="2" r="1" fill="currentColor" />
@@ -206,22 +212,22 @@ export default function HomePage() {
             </div>
 
             <div className="mb-6">
-              <VemHeroGraphic />
+              <VemLogo size={88} className="text-accent-500 dark:text-accent-400 mx-auto block" />
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-primary tracking-tight mb-4">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 text-primary dark:text-white">
               <span className="text-accent-500 dark:text-accent-400">V</span>
-              <span className="text-primary/60 dark:text-primary/40">.</span>
+              <span className="text-primary/60 dark:text-white/40">.</span>
               <span className="text-accent-500 dark:text-accent-400">E</span>
-              <span className="text-primary/60 dark:text-primary/40">.</span>
+              <span className="text-primary/60 dark:text-white/40">.</span>
               <span className="text-accent-500 dark:text-accent-400">M</span>
-              <span className="text-primary/60 dark:text-primary/40">.</span>
+              <span className="text-primary/60 dark:text-white/40">.</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-secondary font-medium mb-2">
+            <p className="text-lg md:text-xl font-medium mb-2 text-secondary dark:text-gray-300">
               Vectorize. Extract. Match.
             </p>
-            <p className="text-sm md:text-base text-muted mb-8">
+            <p className="text-sm md:text-base mb-8 text-muted dark:text-gray-400">
               Resumes, reimagined. Matches, made.
             </p>
 
@@ -229,7 +235,7 @@ export default function HomePage() {
               {statsPills.map((pill) => (
                 <div
                   key={pill.label}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel-subtle text-xs font-medium text-muted"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass-panel-subtle backdrop-blur-sm text-xs font-medium text-muted dark:text-gray-400"
                 >
                   <span className={pill.colorClass}>{pill.icon}</span>
                   {pill.label}
@@ -245,7 +251,7 @@ export default function HomePage() {
               <Link
                 key={action.title}
                 to={action.href}
-                className={`glass-card-hover p-6 block group relative overflow-hidden border-l-4 ${action.borderColor}`}
+                className={`glass-card-hover p-6 block group relative overflow-hidden border-l-4 backdrop-blur-md ${action.borderColor}`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${action.gradientOverlay} to-transparent pointer-events-none`} aria-hidden="true" />
                 <div className="relative">
@@ -276,7 +282,7 @@ export default function HomePage() {
               <Link
                 key={action.title}
                 to={action.href}
-                className="glass-card-hover p-5 block group"
+                className="glass-card-hover p-5 block group backdrop-blur-md"
               >
                 <div className="flex items-center gap-3 mb-2">
                   <div className={`w-10 h-10 rounded-xl ${action.iconBg} flex items-center justify-center ${action.iconText}`}>
@@ -374,7 +380,7 @@ export default function HomePage() {
 
         <section className="relative mb-8">
           <div className="absolute inset-0 bg-accent-500/5 dark:bg-accent-500/10 rounded-3xl blur-xl" aria-hidden="true" />
-          <div className="relative glass-card p-8 md:p-10 text-center">
+          <div className="relative glass-card p-8 md:p-10 text-center backdrop-blur-md">
             <h2 className="text-lg md:text-xl font-semibold text-primary mb-2">
               Ready to enhance your next resume?
             </h2>

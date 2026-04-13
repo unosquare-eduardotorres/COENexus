@@ -77,9 +77,34 @@ export interface SyncedOpenPositionRow {
   last_modification: string | null
   sourcing: string
   replacement: number
+  vertical_industry: string
+  in_office: number
+  csu: string
+  cs: string
+  closed_date: string | null
+  closed_reason: string | null
+  is_ready: number
+  is_promotion: number
+  maximum_rate: number | null
+  minimum_rate: number | null
+  additional_skills: string
+  created_with_assignments_tool: number | null
+  candidates_presented: number
+  last_discussion_date: string | null
   status: string
   status_reason: string | null
   failed?: number
+  synced_at: string
+}
+
+export interface OpenPositionDiscussionRow {
+  id: number
+  open_position_id: number
+  comment_id: number
+  author: string
+  date: string
+  message: string
+  parent_comment_id: number | null
   synced_at: string
 }
 
@@ -101,8 +126,21 @@ const POSITION_COLUMNS = [
   'upstream_id', 'account', 'coe', 'practice', 'stakeholder', 'main_skill',
   'countries', 'seniorities', 'available_range', 'account_overview', 'job_description', 'job_title',
   'position_status', 'aging', 'created', 'ready_date', 'last_modification', 'sourcing', 'replacement',
+  'vertical_industry', 'in_office', 'csu', 'cs', 'closed_date', 'closed_reason',
+  'is_ready', 'is_promotion', 'maximum_rate', 'minimum_rate', 'additional_skills',
+  'created_with_assignments_tool', 'candidates_presented', 'last_discussion_date',
   'status', 'status_reason', 'synced_at',
 ]
+
+const DISCUSSION_COLUMNS = [
+  'open_position_id', 'comment_id', 'author', 'date', 'message', 'parent_comment_id', 'synced_at',
+]
+
+const DISCUSSION_UPSERT = buildUpsertSql({
+  table: 'open_position_discussions',
+  columns: DISCUSSION_COLUMNS,
+  conflictColumns: ['open_position_id', 'comment_id'],
+})
 
 const EMPLOYEE_UPSERT = buildUpsertSql({ table: 'synced_employees', columns: EMPLOYEE_COLUMNS, conflictColumns: ['upstream_id'] })
 const CANDIDATE_UPSERT = buildUpsertSql({ table: 'synced_candidates', columns: CANDIDATE_COLUMNS, conflictColumns: ['upstream_id'] })
@@ -229,5 +267,65 @@ export const syncRepository = {
     const failed = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed')`).get() as { c: number }).c
     const processing = (db.prepare(`SELECT COUNT(*) as c FROM ${table} WHERE status = 'processing'`).get() as { c: number }).c
     return { total, synced, failed, processing }
+  },
+
+  getActiveOpenPositions(): SyncedOpenPositionRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      "SELECT * FROM synced_open_positions ORDER BY aging DESC"
+    ).all() as SyncedOpenPositionRow[]
+  },
+
+  getOpenPositionByUpstreamId(upstreamId: number): SyncedOpenPositionRow | undefined {
+    const db = getDatabase()
+    return db.prepare('SELECT * FROM synced_open_positions WHERE upstream_id = ?').get(upstreamId) as SyncedOpenPositionRow | undefined
+  },
+
+  getOpenPositionSyncStatus(): { total: number; lastSyncedAt: string | null } {
+    const db = getDatabase()
+    const total = (db.prepare("SELECT COUNT(*) as c FROM synced_open_positions").get() as { c: number }).c
+    const latest = db.prepare('SELECT MAX(synced_at) as latest FROM synced_open_positions').get() as { latest: string | null }
+    return { total, lastSyncedAt: latest?.latest ?? null }
+  },
+
+  upsertDiscussion(data: Omit<OpenPositionDiscussionRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(DISCUSSION_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertDiscussion failed for position=${data.open_position_id} comment=${data.comment_id}`, err instanceof Error ? err : new Error(String(err)))
+      throw err
+    }
+  },
+
+  getDiscussionsByPositionId(positionId: number): OpenPositionDiscussionRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM open_position_discussions WHERE open_position_id = ? ORDER BY date DESC'
+    ).all(positionId) as OpenPositionDiscussionRow[]
+  },
+
+  getDiscussionsByPositionIds(positionIds: number[]): Map<number, OpenPositionDiscussionRow[]> {
+    const db = getDatabase()
+    const result = new Map<number, OpenPositionDiscussionRow[]>()
+    if (positionIds.length === 0) return result
+
+    const placeholders = positionIds.map(() => '?').join(',')
+    const rows = db.prepare(
+      `SELECT * FROM open_position_discussions WHERE open_position_id IN (${placeholders}) ORDER BY date DESC`
+    ).all(...positionIds) as OpenPositionDiscussionRow[]
+
+    for (const row of rows) {
+      const existing = result.get(row.open_position_id) ?? []
+      existing.push(row)
+      result.set(row.open_position_id, existing)
+    }
+    return result
+  },
+
+  clearDiscussions(positionId: number): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM open_position_discussions WHERE open_position_id = ?').run(positionId)
   },
 }

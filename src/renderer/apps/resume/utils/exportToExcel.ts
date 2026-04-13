@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { escapeXml } from './escapeHtml';
 
 export interface ColumnDef {
   header: string;
@@ -22,14 +23,6 @@ const DEFAULT_WIDTHS: Record<string, number> = {
   lastStatusUpdate: 14, type: 12, technical: 13, domain: 13, leadership: 13,
   softSkills: 14, availability: 13, sharepointUrl: 14,
 };
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function colLetter(index: number): string {
   let result = '';

@@ -1,9 +1,12 @@
 import type { IpcMainInvokeEvent } from 'electron'
-import { dialog, BrowserWindow } from 'electron'
+import { app, dialog, BrowserWindow } from 'electron'
+import { statSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { DatabaseSaveConfigParams, DatabaseImportParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { databaseSharingService } from '../../services/databaseSharingService'
+import { getDatabase } from '../../db/connection'
 import { getConfig, saveConfig } from '../../config'
 import { validatePayload, databaseSaveConfigSchema, databaseImportSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
@@ -20,7 +23,6 @@ export function registerDatabaseHandlers(): void {
       return {
         sharing: sharingConfig,
         voyage: { apiKeys: appConfig.voyage.apiKeys, defaultModel: appConfig.voyage.defaultModel },
-        claudeProxy: { baseUrl: appConfig.claudeProxy.baseUrl },
       }
     })
 
@@ -36,15 +38,10 @@ export function registerDatabaseHandlers(): void {
         })
       }
 
-      if (c.voyage || c.claudeProxy) {
+      if (c.voyage) {
         const current = getConfig()
-        if (c.voyage) {
-          if (c.voyage.apiKeys) current.voyage.apiKeys = c.voyage.apiKeys
-          if (c.voyage.defaultModel) current.voyage.defaultModel = c.voyage.defaultModel
-        }
-        if (c.claudeProxy) {
-          if (c.claudeProxy.baseUrl) current.claudeProxy.baseUrl = c.claudeProxy.baseUrl
-        }
+        if (c.voyage.apiKeys) current.voyage.apiKeys = c.voyage.apiKeys
+        if (c.voyage.defaultModel) current.voyage.defaultModel = c.voyage.defaultModel
         saveConfig(current)
       }
 
@@ -96,5 +93,41 @@ export function registerDatabaseHandlers(): void {
 
       const importResult = databaseSharingService.importFromAbsolutePath(result.filePaths[0])
       return { ...importResult, cancelled: false }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.DATABASE_HEALTH,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      const db = getDatabase()
+      const dbPath = join(app.getPath('userData'), 'nexus.db')
+      const stats = statSync(dbPath)
+      const walPath = dbPath + '-wal'
+      const walSize = existsSync(walPath) ? statSync(walPath).size : 0
+      const integrity = db.pragma('integrity_check') as Array<{ integrity_check: string }>
+      const version = db.pragma('sqlite_version') as Array<{ sqlite_version: string }>
+      const journalMode = db.pragma('journal_mode') as Array<{ journal_mode: string }>
+      const foreignKeys = db.pragma('foreign_keys') as Array<{ foreign_keys: number }>
+
+      const tables = ['synced_employees', 'synced_candidates', 'synced_open_positions',
+        'resume_embeddings', 'match_sessions', 'resume_sessions',
+        'transform_sessions', 'open_position_candidates']
+      const recordCounts: Record<string, number> = {}
+      for (const t of tables) {
+        const row = db.prepare(`SELECT COUNT(*) as c FROM ${t}`).get() as { c: number }
+        recordCounts[t] = row.c
+      }
+
+      return {
+        engine: 'sqlite' as const,
+        filePath: dbPath,
+        fileSizeBytes: stats.size,
+        walSizeBytes: walSize,
+        sqliteVersion: version[0]?.sqlite_version ?? 'unknown',
+        integrityOk: integrity[0]?.integrity_check === 'ok',
+        journalMode: journalMode[0]?.journal_mode ?? 'unknown',
+        foreignKeys: (foreignKeys[0]?.foreign_keys ?? 0) === 1,
+        recordCounts,
+        tableCount: tables.length,
+      }
     })
 }

@@ -169,9 +169,6 @@ export const databaseSaveConfigSchema = z.object({
     apiKeys: z.array(z.string()).optional(),
     defaultModel: z.string().optional(),
   }).optional(),
-  claudeProxy: z.object({
-    baseUrl: z.string().optional(),
-  }).optional(),
 })
 
 export const databaseImportSchema = z.object({

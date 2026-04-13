@@ -153,4 +153,12 @@ export const matchEngineService = {
     const result = await window.api.match.getResumeText({ sourceType, upstreamId }) as { text: string | null };
     return result.text;
   },
+
+  async getAnalysisCacheStats(): Promise<{ totalEntries: number; oldestEntry: string | null }> {
+    return window.api.match.getAnalysisCacheStats();
+  },
+
+  async clearAnalysisCache(): Promise<{ deleted: number }> {
+    return window.api.match.clearAnalysisCache();
+  },
 };

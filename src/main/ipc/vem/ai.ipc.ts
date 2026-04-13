@@ -2,7 +2,8 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { AiChatParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
-import { claudeProxyService } from '../../services/claudeProxyService'
+import { claudeService } from '../../services/claudeService'
+import { subscriptionService } from '../../services/subscriptionService'
 import { validatePayload, aiChatSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 
@@ -16,7 +17,7 @@ export function registerAiHandlers(): void {
 
       if (!userMessage) throw new Error('No user message provided')
 
-      const response = await claudeProxyService.chatAsync(
+      const response = await claudeService.chatAsync(
         validated.model,
         userMessage.content,
         validated.maxTokens ?? 4096,
@@ -34,7 +35,26 @@ export function registerAiHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.AI_CHECK_CONNECTION,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      const available = await claudeProxyService.checkAvailability()
+      const available = await claudeService.checkAvailability()
       return { available }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.AI_TOKEN_USAGE,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return claudeService.getTokenUsage()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.AI_RESET_TOKEN_USAGE,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      claudeService.resetTokenUsage()
+      return { ok: true }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.AI_SUBSCRIPTION_STATUS,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return subscriptionService.validateAll()
     })
 }

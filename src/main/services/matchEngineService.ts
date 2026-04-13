@@ -1,5 +1,5 @@
 import { voyageEmbeddingService } from './voyageEmbeddingService'
-import { claudeProxyService } from './claudeProxyService'
+import { claudeService } from './claudeService'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { syncRepository } from '../db/repositories/syncRepository'
 import { matchRepository } from '../db/repositories/matchRepository'
@@ -8,8 +8,13 @@ import { OPUS_ANALYSIS, MATCH_ENGINE_CONTEXT_BLOCK, fillTemplate } from './promp
 import { getDatabase } from '../db/connection'
 import { getConfig } from '../config'
 import { createLogger } from './logger'
+import { createHash } from 'crypto'
 
 const log = createLogger('MatchEngine')
+
+function hashJobDescription(jd: string): string {
+  return createHash('sha256').update(jd.trim().toLowerCase()).digest('hex')
+}
 
 interface MatchRequest {
   jobDescription: string
@@ -266,7 +271,7 @@ async function runHaikuTriage(
     try {
       const prompt = `Evaluate if this candidate is relevant for the job. Return JSON: {"relevant": true/false, "score": 0-100, "reason": "..."}\n\nJob Description:\n${jobDescription}\n\nCandidate: ${candidate.name}\nSkill: ${candidate.mainSkill}\nSeniority: ${candidate.seniority}\nResume excerpt: ${candidate.resumeText.slice(0, 2000)}`
 
-      const response = await claudeProxyService.chatAsync(haikuModel, prompt, 256, 0.1)
+      const response = await claudeService.chatAsync(haikuModel, prompt, 256, 0.1)
       const parsed = parseAiResponse(response, haikuTriageSchema, 'haiku-triage')
       return { candidate, relevant: parsed.relevant, score: parsed.score, reason: parsed.reason }
     } catch (err) {
@@ -276,14 +281,31 @@ async function runHaikuTriage(
   })
 }
 
+interface DeepAnalysisStats {
+  cacheHits: number
+  cacheMisses: number
+}
+
 async function runDeepAnalysis(
   haikuResults: HaikuResult[],
   request: MatchRequest,
   opusModel: string,
   concurrency: number
-): Promise<Record<string, unknown>[]> {
-  return runConcurrent(haikuResults, concurrency, async (haikuResult) => {
+): Promise<{ results: Record<string, unknown>[]; cacheStats: DeepAnalysisStats }> {
+  const jdHash = hashJobDescription(request.jobDescription)
+  const cacheStats: DeepAnalysisStats = { cacheHits: 0, cacheMisses: 0 }
+
+  const results = await runConcurrent(haikuResults, concurrency, async (haikuResult) => {
     const candidate = haikuResult.candidate
+
+    const cached = matchRepository.getCachedAnalysis(candidate.upstreamId, candidate.sourceType, jdHash)
+    if (cached) {
+      cacheStats.cacheHits++
+      log.info('Analysis cache hit', { candidateId: candidate.upstreamId, sourceType: candidate.sourceType })
+      return { ...cached, fromCache: true }
+    }
+
+    cacheStats.cacheMisses++
     try {
       const contextBlock = fillTemplate(MATCH_ENGINE_CONTEXT_BLOCK, {
         jobDescription: request.jobDescription,
@@ -307,10 +329,10 @@ async function runDeepAnalysis(
         availabilityDisplay: candidate.isBench ? 'Immediately available (bench)' : 'Currently assigned',
       })
 
-      const response = await claudeProxyService.chatAsync(opusModel, prompt, 4096, 0.1)
+      const response = await claudeService.chatAsync(opusModel, prompt, 4096, 0.1)
       const parsed = parseAiResponse(response, opusAnalysisSchema, 'opus-analysis')
 
-      return {
+      const analysisResult: Record<string, unknown> = {
         id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
         matchScore: parsed.matchScore, role: parsed.role, years: parsed.years,
         location: parsed.location ?? candidate.country,
@@ -328,6 +350,11 @@ async function runDeepAnalysis(
         salaryExpectations: candidate.salaryExpectations ?? 0,
         salaryExpectationsCurrency: candidate.salaryExpectationsCurrency ?? '',
       }
+
+      matchRepository.cacheAnalysis(candidate.upstreamId, candidate.sourceType, jdHash, analysisResult, opusModel)
+      log.info('Analysis cached', { candidateId: candidate.upstreamId, sourceType: candidate.sourceType })
+
+      return analysisResult
     } catch (err) {
       return {
         id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
@@ -341,6 +368,8 @@ async function runDeepAnalysis(
       }
     }
   })
+
+  return { results, cacheStats }
 }
 
 function saveMatchSession(
@@ -411,7 +440,7 @@ export const matchEngineService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claudeProxy } = getConfig()
+    const { claude } = getConfig()
     log.info('Search pipeline started', { dataSource: request.dataSource, topN: request.topN, searchMode: request.searchMode, matchFlowType: request.matchFlowType })
 
     try {
@@ -431,7 +460,7 @@ export const matchEngineService = {
       emitEvent({ type: 'progress', percent: 35, stage: `${filtered.length} candidates after constraints.` })
       emitEvent({ type: 'progress', percent: 40, stage: `Running Haiku triage on ${Math.min(Math.max(request.topN * 3, 20), filtered.length)} candidates...` })
 
-      const haikuResults = await runHaikuTriage(filtered, request.jobDescription, request.topN, claudeProxy.haikuModel, claudeProxy.haikuMaxConcurrency)
+      const haikuResults = await runHaikuTriage(filtered, request.jobDescription, request.topN, claude.haikuModel, claude.haikuMaxConcurrency)
       const passed = haikuResults.filter(r => r.relevant || r.score >= 40).sort((a, b) => b.score - a.score)
       let topCandidates = passed.slice(0, request.topN)
       log.info('Haiku triage complete', { triaged: haikuResults.length, passed: passed.length, topN: topCandidates.length })
@@ -456,7 +485,7 @@ export const matchEngineService = {
         const lowestPassed = passed.length > 0 ? passed[passed.length - 1].score : 0
         const highestRejected = rejected.length > 0 ? rejected[0].score : 0
         const searchId = `search-${Date.now()}`
-        emitEvent({ type: 'haikuConfirm', payload: { requestedTopN: request.topN, passedCount: passed.length, highestRejectedScore: highestRejected, lowestPassedScore: lowestPassed, bestRejected } })
+        emitEvent({ type: 'haikuConfirm', payload: { searchId, requestedTopN: request.topN, passedCount: passed.length, highestRejectedScore: highestRejected, lowestPassedScore: lowestPassed, bestRejected } })
         log.info('Haiku confirmation requested', { passedCount: passed.length, requestedTopN: request.topN, searchId })
         const decision = await matchSearchCoordinator.register(searchId)
         if (decision === 'include-all') {
@@ -468,7 +497,13 @@ export const matchEngineService = {
         }
       }
 
-      emitEvent({ type: 'progress', percent: 60, stage: `${topCandidates.length} candidates passed Haiku. Running deep analysis...` })
+      const jdHash = hashJobDescription(request.jobDescription)
+      const cachedCount = topCandidates.filter(r => matchRepository.getCachedAnalysis(r.candidate.upstreamId, r.candidate.sourceType, jdHash) !== null).length
+      const uncachedCount = topCandidates.length - cachedCount
+      const cacheMsg = cachedCount > 0
+        ? `${topCandidates.length} candidates passed Haiku. ${cachedCount} cached, analyzing ${uncachedCount} remaining...`
+        : `${topCandidates.length} candidates passed Haiku. Running deep analysis...`
+      emitEvent({ type: 'progress', percent: 60, stage: cacheMsg })
 
       if (request.searchMode === 'haiku-only') {
         const results = topCandidates.map(r => ({
@@ -487,8 +522,9 @@ export const matchEngineService = {
         return null
       }
 
-      const opusResults = await runDeepAnalysis(topCandidates, request, claudeProxy.opusModel, claudeProxy.maxConcurrency)
+      const { results: opusResults, cacheStats } = await runDeepAnalysis(topCandidates, request, claude.opusModel, claude.maxConcurrency)
       const sortedResults = opusResults.sort((a, b) => (b.matchScore as number) - (a.matchScore as number))
+      log.info('Deep analysis cache stats', { cacheHits: cacheStats.cacheHits, cacheMisses: cacheStats.cacheMisses })
 
       const haikuCandidateCount = Math.min(Math.max(request.topN * 3, 20), filtered.length)
       const stats = {
@@ -497,6 +533,8 @@ export const matchEngineService = {
         constraintsApplied: constraintSql ? 'Yes' : 'None',
         haikuTriage: `${passed.length}/${haikuCandidateCount} passed`,
         sonnetAnalyzed: String(topCandidates.length),
+        cacheHits: String(cacheStats.cacheHits),
+        cacheMisses: String(cacheStats.cacheMisses),
         time: `${((Date.now() - startTime) / 1000).toFixed(1)}s`,
       }
 

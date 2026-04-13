@@ -1,16 +1,8 @@
 import JSZip from 'jszip';
 import { StructuredResume } from '../types';
+import { escapeXml } from '../utils/escapeHtml';
 
 const BUNDLED_TEMPLATE_PATH = '/templates/USQ Resume Template.docx';
-
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 function mergeFragmentedTokens(xml: string): string {
   const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';

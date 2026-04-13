@@ -64,6 +64,7 @@ export interface CandidateDetail {
 export interface OpenPositionListItem {
   id: number
   account: string
+  verticalIndustry: string
   coe: string
   practice: string
   stakeholder: string
@@ -78,6 +79,9 @@ export interface OpenPositionListItem {
   lastModification: string
   sourcing: string
   replacement: boolean
+  candidatesPresented: number
+  lastDiscussionDate: string
+  closedReason: string
 }
 
 export interface OpenPositionDetail {
@@ -95,6 +99,22 @@ export interface OpenPositionDetail {
   maximumRate: number | null
   minimumRate: number | null
   comments: string | null
+  inOffice: boolean
+  isReady: boolean
+  isPromotion: boolean
+  csu: string
+  cs: string
+  dateClosed: string | null
+  additionalSkills: Array<{ tagId: number; tagName: string }>
+  createdWithAssignmentsTool: boolean | null
+}
+
+export interface DiscussionCommentItem {
+  commentId: number
+  author: string
+  date: string
+  message: string
+  parentCommentId: number | null
 }
 
 export interface PersonaNote {
@@ -115,6 +135,18 @@ export interface PresentedCandidateItem {
   rate: number | null
   isEmployee: boolean
   candidateId: number
+}
+
+export interface CandidateRequisitionDetailItem {
+  candidateRequisitionId: number
+  candidateFullName: string
+  requisitionName: string
+  requisitionStatus: number
+  requisitionStatusId: number
+  listFeedback: number[]
+  comments: string
+  rate: number
+  actionDate: string
 }
 
 function mapNoteRows(paged: PagedResponse): PersonaNote[] {
@@ -269,6 +301,7 @@ export const upstreamApiService = {
     const items = paged.payload.map(row => ({
       id: getInt(row, 1),
       account: getString(row, 2),
+      verticalIndustry: getString(row, 3),
       coe: getString(row, 4),
       practice: getString(row, 5),
       stakeholder: getString(row, 6),
@@ -283,6 +316,9 @@ export const upstreamApiService = {
       lastModification: row.length > 18 ? getString(row, 18) : '',
       sourcing: row.length > 19 ? getString(row, 19) : '',
       replacement: row.length > 20 && getBool(row, 20),
+      candidatesPresented: row.length > 21 ? getInt(row, 21) : 0,
+      lastDiscussionDate: row.length > 22 ? getString(row, 22) : '',
+      closedReason: row.length > 23 ? getString(row, 23) : '',
     }))
     log.debug('getOpenPositionsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
     return { items, totalRecords: paged.filteredRecordCount }
@@ -318,6 +354,45 @@ export const upstreamApiService = {
     } catch (err) {
       log.error(`Failed to fetch presented candidates for position ${positionId}`, err instanceof Error ? err : new Error(String(err)))
       return []
+    }
+  },
+
+  async getDiscussionComments(token: string, positionId: number): Promise<DiscussionCommentItem[]> {
+    try {
+      const url = `https://unocorpdiskus.azurewebsites.net/comments?topicCode=${positionId}&topicName=OPEN_POSITION`
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        log.warn(`Discussion API returned ${response.status} for position ${positionId}`)
+        return []
+      }
+      const data = await response.json() as { comments?: Array<{ CommentId: number; Email: string; Comment: string; ParentCommentId: number | null; CreationDate: string }> }
+      return (data.comments ?? []).map(c => ({
+        commentId: c.CommentId,
+        author: c.Email,
+        date: c.CreationDate,
+        message: c.Comment,
+        parentCommentId: c.ParentCommentId,
+      }))
+    } catch (err) {
+      log.error(`Failed to fetch discussion comments for position ${positionId}`, err instanceof Error ? err : new Error(String(err)))
+      return []
+    }
+  },
+
+  async getCandidateRequisitionDetail(token: string, candidateRequisitionId: number): Promise<CandidateRequisitionDetailItem | null> {
+    const { upstream } = getConfig()
+    try {
+      const raw = await fetchAuthorized<Record<string, unknown>>(
+        'GET',
+        `${upstream.apiUrl}op/candidate/${candidateRequisitionId}`,
+        token
+      )
+      return mapKeysToCamelCase<CandidateRequisitionDetailItem>(raw)
+    } catch (err) {
+      log.error(`Failed to fetch candidate requisition detail for ${candidateRequisitionId}`, err instanceof Error ? err : new Error(String(err)))
+      return null
     }
   },
 

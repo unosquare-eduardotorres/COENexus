@@ -70,7 +70,7 @@ export default function MatchEnginePage() {
     source: { dataSource, handleDataSourceNext, poolCounts, filterOptions },
     jd: { jobDescription, setJobDescription, jdSource, handleJdNext },
     filters: { advancedConstraints, handleFiltersNext, activeConstraintCount },
-    depth: { searchMode, topN, deeperTopN, setDeeperTopN, showAnalyzeDeeper, setShowAnalyzeDeeper, handleSearchDepthNext, candidateUpstreamIds, setCandidateUpstreamIds },
+    depth: { searchMode, setSearchMode, topN, deeperTopN, setDeeperTopN, showAnalyzeDeeper, setShowAnalyzeDeeper, handleSearchDepthNext, candidateUpstreamIds, setCandidateUpstreamIds },
     search: { progress, handleStartSearch, executeSearch, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName, pendingDataSource },
     results: { candidates, stats, pipelineStages, animateIn, sessionId, handleExportToExcel, handleReset },
     deepDive: { selectedProfile, setSelectedProfile, compareList, handleToggleCompare, handleStartCompare, deepDiveMode, handleSelectCandidate, handleBackToResults },
@@ -137,18 +137,9 @@ export default function MatchEnginePage() {
     return summaries;
   }, [completedSteps, matchFlow, jdSource, activeConstraintCount, dataSource, topN, searchMode, stats, candidates.length]);
 
-  const handleAnalyzeDeeperHaiku = () => {
+  const handleAnalyzeDeeper = (mode: 'haiku-only' | 'opus') => {
     setShowAnalyzeDeeper(false);
-    setCandidateUpstreamIds(candidates.map(c => c.id));
-    setPendingDataSource({ source: dataSource, topN: deeperTopN });
-    const now = new Date();
-    const flowLabel = matchFlow === 'match-to-positions' ? 'Match to Positions' : 'Candidates to OP';
-    setSessionName(`${flowLabel} — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
-    setShowSessionNamePrompt(true);
-  };
-
-  const handleAnalyzeDeeperOpus = () => {
-    setShowAnalyzeDeeper(false);
+    setSearchMode(mode);
     setCandidateUpstreamIds(candidates.map(c => c.id));
     setPendingDataSource({ source: dataSource, topN: deeperTopN });
     const now = new Date();
@@ -302,8 +293,8 @@ export default function MatchEnginePage() {
           dataSource={dataSource}
           matchFlow={matchFlow}
           onSetDeeperTopN={setDeeperTopN}
-          onStartHaikuUpgrade={handleAnalyzeDeeperHaiku}
-          onStartOpusUpgrade={handleAnalyzeDeeperOpus}
+          onStartHaikuUpgrade={() => handleAnalyzeDeeper('haiku-only')}
+          onStartOpusUpgrade={() => handleAnalyzeDeeper('opus')}
           onCancel={() => setShowAnalyzeDeeper(false)}
         />
       )}
