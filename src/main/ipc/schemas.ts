@@ -192,7 +192,7 @@ export const removeVoyageKeySchema = z.object({
   index: z.number().int().min(0),
 })
 
-export function validatePayload<T>(schema: z.ZodSchema<T>, data: unknown, channel: string): T {
+export function validatePayload<T>(schema: z.ZodType<T>, data: unknown, channel: string): T {
   const result = schema.safeParse(data)
   if (!result.success) {
     const issues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')

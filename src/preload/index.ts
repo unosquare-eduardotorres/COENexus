@@ -23,6 +23,8 @@ import type {
   BenchBurnEvent,
   ReportStalledThresholds,
   ReportStalledPositionResult,
+  PrrUpdateCoeStatusParams,
+  PrrAddCommentParams,
   Scout9RunParams,
   Scout9ListReportsParams,
   Scout9UpdateCandidateParams,
@@ -223,6 +225,21 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_SYNC_STATUS),
     getFeedbackCatalog: (token: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG, token),
+  },
+
+  prr: {
+    getAll: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_GET_ALL),
+    getDetail: (upstreamId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_GET_DETAIL, upstreamId),
+    updateCoeStatus: (upstreamId: PrrUpdateCoeStatusParams['upstreamId'], coeStatus: PrrUpdateCoeStatusParams['coeStatus']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_UPDATE_COE_STATUS, { upstreamId, coeStatus } satisfies PrrUpdateCoeStatusParams),
+    addComment: (upstreamId: PrrAddCommentParams['upstreamId'], text: PrrAddCommentParams['text'], author: PrrAddCommentParams['author']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_ADD_COMMENT, { upstreamId, text, author } satisfies PrrAddCommentParams),
+    delete: (upstreamId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_DELETE, upstreamId),
+    getSyncStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_GET_SYNC_STATUS),
   },
 
   path: {

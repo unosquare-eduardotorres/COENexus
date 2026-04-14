@@ -34,6 +34,7 @@ interface SyncDashboardProps {
   isClearing?: boolean;
   selectedYear?: number | null;
   onYearChange?: (year: number) => void;
+  isSyncDisabled?: boolean;
 }
 
 function formatLastSynced(isoString?: string): string {
@@ -74,11 +75,12 @@ const SyncDashboard = memo(function SyncDashboard({
   isClearing,
   selectedYear,
   onYearChange,
+  isSyncDisabled,
 }: SyncDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusCardKey>('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-  const sourceLabel = source === 'open-positions' ? 'Open Positions' : source.charAt(0).toUpperCase() + source.slice(1);
+  const sourceLabel = source === 'open-positions' ? 'Open Positions' : source === 'project-reallocations' ? 'Project Reallocations' : source.charAt(0).toUpperCase() + source.slice(1);
   const isActiveOrPaused = progress.status === 'syncing' || progress.status === 'paused';
   const progressPercent =
     progress.totalRecords > 0
@@ -271,26 +273,23 @@ const SyncDashboard = memo(function SyncDashboard({
                   Resume
                 </button>
               )}
-              {(progress.status === 'idle' || progress.status === 'completed') && (
-                <>
-                  {onStartSync && (
-                    <button
-                      onClick={onStartSync}
-                      disabled={candidateNeedsYear}
-                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${candidateNeedsYear ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      Sync
-                    </button>
-                  )}
-                </>
+              {(progress.status === 'idle' || progress.status === 'completed') && onStartSync && (
+                <button
+                  onClick={isSyncDisabled ? undefined : onStartSync}
+                  disabled={isSyncDisabled || candidateNeedsYear}
+                  title={isSyncDisabled ? 'SharePoint connection required — connect via the status bar' : undefined}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${(isSyncDisabled || candidateNeedsYear) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Sync
+                </button>
               )}
             </>
           )}
 
-          {(statusFilter === 'synced' || statusFilter === 'extracted' || statusFilter === 'extract_failed') && (
+          {source !== 'project-reallocations' && (statusFilter === 'synced' || statusFilter === 'extracted' || statusFilter === 'extract_failed') && (
             <ProcessActionButtons
               progress={extractionProgress}
               hasEligible={source === 'open-positions'
@@ -304,11 +303,11 @@ const SyncDashboard = memo(function SyncDashboard({
               gradientClass="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
               label={source === 'open-positions' ? 'Extract JDs' : 'Extract Resumes'}
               icon={<DocumentIcon size="sm" />}
-              disabled={isSyncInProgress}
+              disabled={isSyncInProgress || isSyncDisabled}
             />
           )}
 
-          {(statusFilter === 'vectorized' || statusFilter === 'extracted' || statusFilter === 'vectorize_failed') && (
+          {source !== 'project-reallocations' && (statusFilter === 'vectorized' || statusFilter === 'extracted' || statusFilter === 'vectorize_failed') && (
             <ProcessActionButtons
               progress={vectorizationProgress}
               hasEligible={records.some((r) => r.pipelineStatus === 'extracted' || r.pipelineStatus === 'vectorize_failed')}

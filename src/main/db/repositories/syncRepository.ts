@@ -4,7 +4,7 @@ import { createLogger } from '../../services/logger'
 
 const log = createLogger('SyncRepository')
 
-type SyncTable = 'synced_employees' | 'synced_candidates' | 'synced_open_positions'
+type SyncTable = 'synced_employees' | 'synced_candidates' | 'synced_open_positions' | 'synced_project_reallocations'
 
 export interface SyncedEmployeeRow {
   id: number
@@ -97,6 +97,40 @@ export interface SyncedOpenPositionRow {
   synced_at: string
 }
 
+export interface SyncedProjectReallocationRow {
+  id: number
+  upstream_id: number
+  employee: string
+  account: string
+  team: string
+  main_skill: string
+  seniority: string
+  transition_status: string
+  transition_sub_type: string
+  location: string
+  request_date: string | null
+  days_since_last_interview: string
+  impact: string
+  attrition_risk: string
+  comments: string
+  presentations_count: number
+  status: string
+  status_reason: string | null
+  synced_at: string
+}
+
+export interface PrrPresentationRow {
+  id: number
+  prr_id: number
+  open_position_id: number
+  account: string
+  open_position_status: string
+  location: string
+  presented_on: string | null
+  candidate_status: string
+  synced_at: string
+}
+
 export interface OpenPositionDiscussionRow {
   id: number
   open_position_id: number
@@ -141,6 +175,21 @@ const DISCUSSION_UPSERT = buildUpsertSql({
   columns: DISCUSSION_COLUMNS,
   conflictColumns: ['open_position_id', 'comment_id'],
 })
+
+const PRR_COLUMNS = [
+  'upstream_id', 'employee', 'account', 'team', 'main_skill', 'seniority',
+  'transition_status', 'transition_sub_type', 'location', 'request_date',
+  'days_since_last_interview', 'impact', 'attrition_risk', 'comments',
+  'presentations_count', 'status', 'status_reason', 'synced_at',
+]
+
+const PRR_PRESENTATION_COLUMNS = [
+  'prr_id', 'open_position_id', 'account', 'open_position_status',
+  'location', 'presented_on', 'candidate_status', 'synced_at',
+]
+
+const PRR_UPSERT = buildUpsertSql({ table: 'synced_project_reallocations', columns: PRR_COLUMNS, conflictColumns: ['upstream_id'] })
+const PRR_PRESENTATION_UPSERT = buildUpsertSql({ table: 'prr_presentations', columns: PRR_PRESENTATION_COLUMNS, conflictColumns: ['prr_id', 'open_position_id', 'presented_on'] })
 
 const EMPLOYEE_UPSERT = buildUpsertSql({ table: 'synced_employees', columns: EMPLOYEE_COLUMNS, conflictColumns: ['upstream_id'] })
 const CANDIDATE_UPSERT = buildUpsertSql({ table: 'synced_candidates', columns: CANDIDATE_COLUMNS, conflictColumns: ['upstream_id'] })
@@ -246,8 +295,14 @@ export const syncRepository = {
     db.prepare(`UPDATE ${table} SET status = ?, status_reason = ? WHERE id = ?`).run(failedStatus, reason, id)
   },
 
-  clearTable(dataSource: 'employees' | 'candidates' | 'positions'): void {
+  clearTable(dataSource: 'employees' | 'candidates' | 'positions' | 'project-reallocations'): void {
     const db = getDatabase()
+    if (dataSource === 'project-reallocations') {
+      log.warn('Clearing PRR sync tables', { dataSource })
+      db.prepare('DELETE FROM prr_presentations').run()
+      db.prepare('DELETE FROM synced_project_reallocations').run()
+      return
+    }
     const tableMap: Record<string, SyncTable> = {
       employees: 'synced_employees',
       candidates: 'synced_candidates',
@@ -327,5 +382,42 @@ export const syncRepository = {
   clearDiscussions(positionId: number): void {
     const db = getDatabase()
     db.prepare('DELETE FROM open_position_discussions WHERE open_position_id = ?').run(positionId)
+  },
+
+  upsertProjectReallocation(data: Omit<SyncedProjectReallocationRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(PRR_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertProjectReallocation failed for upstream_id=${data.upstream_id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: data.upstream_id, employee: data.employee })
+      throw err
+    }
+  },
+
+  upsertPrrPresentation(data: Omit<PrrPresentationRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(PRR_PRESENTATION_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertPrrPresentation failed for prr_id=${data.prr_id} op_id=${data.open_position_id}`, err instanceof Error ? err : new Error(String(err)))
+      throw err
+    }
+  },
+
+  getAllProjectReallocations(limit = 500, offset = 0): SyncedProjectReallocationRow[] {
+    const db = getDatabase()
+    return db.prepare('SELECT * FROM synced_project_reallocations ORDER BY employee LIMIT ? OFFSET ?').all(limit, offset) as SyncedProjectReallocationRow[]
+  },
+
+  getPrrPresentationsByPrrId(prrId: number): PrrPresentationRow[] {
+    const db = getDatabase()
+    return db.prepare('SELECT * FROM prr_presentations WHERE prr_id = ? ORDER BY presented_on DESC').all(prrId) as PrrPresentationRow[]
+  },
+
+  getPrrPresentationCount(prrId: number): number {
+    const db = getDatabase()
+    return (db.prepare('SELECT COUNT(*) as c FROM prr_presentations WHERE prr_id = ?').get(prrId) as { c: number }).c
   },
 }

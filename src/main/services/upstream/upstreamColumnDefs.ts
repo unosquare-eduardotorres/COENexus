@@ -128,6 +128,36 @@ export function buildOpenPositionColumns(): ColumnDefinition[] {
   ]
 }
 
+export function buildPrrColumns(): ColumnDefinition[] {
+  return [
+    col('Id', 'Actions', { dataType: 'numeric', isKey: true, searchable: false, sortable: false, filterable: false, exportable: false, filterOperator: 'None' }),
+    col('Employee', 'Employee', { searchable: true, filterOperator: 'None' }),
+    col('Account', 'Client', { searchable: true, filterOperator: 'None' }),
+    col('Team', 'Team', { searchable: true, filterOperator: 'None' }),
+    col('MainSkill', 'Main Skill', { searchable: true, filterOperator: 'None' }),
+    col('Seniority', 'Seniority', { searchable: true, filterOperator: 'None' }),
+    col('ProjectTransitionStatus', 'Status', { searchable: true, filterOperator: 'None' }),
+    col('TransitionSubType', 'Sub Type', { searchable: true, filterOperator: 'None' }),
+    col('Location', 'Location', { searchable: true, filterOperator: 'None' }),
+    col('RequestDate', 'Request Date', { dataType: 'date', searchable: false, filterOperator: 'None' }),
+    col('DaysSinceLastInterview', 'Days Since Last Interview', { searchable: true, filterOperator: 'None' }),
+    col('Impact', 'Current Project Impact', { searchable: true, filterOperator: 'None' }),
+    col('AttritionRisk', 'Attrition Risk', { searchable: true, filterOperator: 'None' }),
+    col('Comments', 'Comments', { searchable: true, filterOperator: 'None' }),
+  ]
+}
+
+export function buildPrrPresentationColumns(): ColumnDefinition[] {
+  return [
+    col('OpenPositionId', ' Id', { dataType: 'numeric', isKey: true, searchable: false, sortable: false, filterable: false, exportable: false, filterOperator: 'None' }),
+    col('Account', 'Client', { searchable: true, filterOperator: 'None' }),
+    col('OpenPositionStatus', 'Position Status', { searchable: true, filterOperator: 'None' }),
+    col('Location', 'Location', { searchable: true, filterOperator: 'None' }),
+    col('Date', 'Presented On', { dataType: 'date', searchable: true, sortDirection: 'Descending', filterOperator: 'None' }),
+    col('CandidateStatus', 'Status', { searchable: true, filterOperator: 'None' }),
+  ]
+}
+
 export function buildPresentedCandidateColumns(): ColumnDefinition[] {
   return [
     col('CandidateRequisitionId', 'Actions', { dataType: 'numeric', isKey: true, filterable: false, exportable: false, sortable: false, filterOperator: 'None' }),

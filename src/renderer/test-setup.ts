@@ -1,6 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    constructor() { return Object.create(DOMMatrix.prototype); }
+    static fromMatrix() { return new DOMMatrix(); }
+    static fromFloat32Array() { return new DOMMatrix(); }
+    static fromFloat64Array() { return new DOMMatrix(); }
+  } as unknown as typeof globalThis.DOMMatrix;
+}
+
 Object.defineProperty(window, 'api', {
   value: {
     sync: {

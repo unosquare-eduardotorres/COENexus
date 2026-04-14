@@ -10,21 +10,30 @@ export function buildEnvWithPath(): NodeJS.ProcessEnv {
   const basePath = env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
 
   const homeDir = env.HOME || env.USERPROFILE || ''
-  const extraDirs: string[] = []
 
-  extraDirs.push('/opt/homebrew/bin')
-  extraDirs.push('/usr/local/bin')
+  const priorityDirs: string[] = []
+  const fallbackDirs: string[] = []
+
+  priorityDirs.push('/usr/local/bin')
+  priorityDirs.push('/opt/homebrew/bin')
   if (homeDir) {
-    extraDirs.push(`${homeDir}/.nvm/current/bin`)
-    extraDirs.push(`${homeDir}/.volta/bin`)
-    extraDirs.push(`${homeDir}/.fnm/current/bin`)
-    extraDirs.push(`${homeDir}/.local/bin`)
+    priorityDirs.push(`${homeDir}/.nvm/current/bin`)
+    priorityDirs.push(`${homeDir}/.volta/bin`)
+    priorityDirs.push(`${homeDir}/.fnm/current/bin`)
+    fallbackDirs.push(`${homeDir}/.local/bin`)
   }
 
-  const missing = extraDirs.filter(d => !basePath.includes(d))
-  env.PATH = missing.length > 0
-    ? `${missing.join(delimiter)}${delimiter}${basePath}`
-    : basePath
+  const missingPriority = priorityDirs.filter(d => !basePath.includes(d))
+  const missingFallback = fallbackDirs.filter(d => !basePath.includes(d))
+
+  let path = basePath
+  if (missingPriority.length > 0) {
+    path = `${missingPriority.join(delimiter)}${delimiter}${path}`
+  }
+  if (missingFallback.length > 0) {
+    path = `${path}${delimiter}${missingFallback.join(delimiter)}`
+  }
+  env.PATH = path
 
   return env
 }

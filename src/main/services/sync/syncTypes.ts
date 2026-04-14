@@ -57,7 +57,21 @@ export interface PositionSyncRecord extends BaseSyncRecord {
   mainSkill?: string
 }
 
-export type SyncRecordDto = EmployeeSyncRecord | CandidateSyncRecord | PositionSyncRecord
+export interface PrrSyncRecord extends BaseSyncRecord {
+  source: 'project-reallocations'
+  employee?: string
+  account?: string
+  team?: string
+  mainSkill?: string
+  seniority?: string
+  transitionStatus?: string
+  location?: string
+  impact?: string
+  attritionRisk?: string
+  presentationsCount?: number
+}
+
+export type SyncRecordDto = EmployeeSyncRecord | CandidateSyncRecord | PositionSyncRecord | PrrSyncRecord
 
 export interface SyncProgressDto {
   totalRecords: number

@@ -58,7 +58,7 @@ const reports = [
     title: 'Project Reallocation',
     description: 'Identify reallocation opportunities, track employee transitions between projects, and optimize resource utilization.',
     href: '/command-center/reallocation',
-    available: false,
+    available: true,
     icon: <ArrowsIcon />,
     iconBg: 'from-amber-500/15 to-amber-600/10 dark:from-amber-500/20 dark:to-amber-600/15',
     iconText: 'text-amber-600 dark:text-amber-400',

@@ -30,8 +30,6 @@ export default function SharePointTokenModal() {
 
   const [showInstructions, setShowInstructions] = useState(false);
 
-  if (!modals.sharepoint) return null;
-
   const localValidation = useMemo((): LocalValidation => {
     const trimmed = sharepoint.token.trim();
     if (!trimmed) return 'idle';
@@ -41,6 +39,8 @@ export default function SharePointTokenModal() {
     if (payload.exp && isTokenExpired(trimmed)) return 'expired';
     return 'valid';
   }, [sharepoint.token]);
+
+  if (!modals.sharepoint) return null;
 
   const canSubmit = localValidation === 'valid' && !sharepoint.isValidating && !sharepoint.isValid;
 

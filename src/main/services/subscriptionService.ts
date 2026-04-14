@@ -59,12 +59,43 @@ export const subscriptionService = {
     }
   },
 
-  async checkClaudeAuth(): Promise<AuthCheckResult> {
+  async checkClaudeAuth(): Promise<AuthCheckResult & { plan?: string }> {
+    try {
+      const { stdout } = await runCommand('claude', ['auth', 'status'], 10_000)
+      const trimmed = stdout.trim()
+
+      try {
+        const status = JSON.parse(trimmed) as {
+          loggedIn?: boolean
+          email?: string
+          subscriptionType?: string
+        }
+        if (status.loggedIn) {
+          log.info('Claude authentication verified', { email: status.email, plan: status.subscriptionType })
+          return {
+            authenticated: true,
+            accountEmail: status.email ?? null,
+            error: null,
+            plan: status.subscriptionType ?? null,
+          }
+        }
+        return { authenticated: false, accountEmail: null, error: 'Not logged in' }
+      } catch {
+        if (trimmed.toLowerCase().includes('logged in') || trimmed.toLowerCase().includes('authenticated')) {
+          log.info('Claude authentication verified (non-JSON)')
+          return { authenticated: true, accountEmail: null, error: null }
+        }
+        return { authenticated: false, accountEmail: null, error: `Unexpected response: ${trimmed.slice(0, 100)}` }
+      }
+    } catch (authStatusErr) {
+      log.info('claude auth status not available, falling back to prompt check')
+    }
+
     try {
       const { stdout } = await runCommand('claude', ['-p', 'reply with exactly OK'], 15_000)
       const trimmed = stdout.trim()
       if (trimmed.includes('OK')) {
-        log.info('Claude authentication verified')
+        log.info('Claude authentication verified via prompt fallback')
         return { authenticated: true, accountEmail: null, error: null }
       }
       return { authenticated: false, accountEmail: null, error: `Unexpected response: ${trimmed.slice(0, 100)}` }
@@ -72,19 +103,6 @@ export const subscriptionService = {
       const message = err instanceof Error ? err.message : String(err)
       log.warn('Claude authentication check failed', { error: message })
       return { authenticated: false, accountEmail: null, error: message }
-    }
-  },
-
-  async checkClaudeMax(): Promise<MaxCheckResult> {
-    try {
-      const authResult = await subscriptionService.checkClaudeAuth()
-      if (authResult.authenticated) {
-        return { active: true, plan: 'Max', error: null }
-      }
-      return { active: false, plan: null, error: authResult.error }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      return { active: false, plan: null, error: message }
     }
   },
 
@@ -99,20 +117,23 @@ export const subscriptionService = {
       }
     }
 
-    const claudeAuth = await subscriptionService.checkClaudeAuth()
+    const authResult = await subscriptionService.checkClaudeAuth()
 
-    if (!claudeAuth.authenticated) {
+    if (!authResult.authenticated) {
       return {
         claudeCli,
-        claudeAuth,
+        claudeAuth: { authenticated: authResult.authenticated, accountEmail: authResult.accountEmail, error: authResult.error },
         claudeMax: { active: false, plan: null, error: 'Not authenticated' },
       }
     }
 
+    const plan = authResult.plan ?? null
+    const isMax = plan?.toLowerCase() === 'max'
+
     return {
       claudeCli,
-      claudeAuth,
-      claudeMax: { active: true, plan: 'Max', error: null },
+      claudeAuth: { authenticated: true, accountEmail: authResult.accountEmail, error: null },
+      claudeMax: { active: isMax, plan, error: isMax ? null : 'No Max subscription detected' },
     }
   },
 }

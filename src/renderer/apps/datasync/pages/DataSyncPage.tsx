@@ -21,8 +21,12 @@ export default function DataSyncPage() {
   const checkDatabaseEmpty = useCallback(async () => {
     try {
       const status = await databaseSharingService.getStatus();
+      if ((status as any).__ipcError || !status.recordCounts) {
+        setIsDatabaseEmpty(false);
+        return;
+      }
       const syncTables = ['synced_employees', 'synced_candidates', 'synced_open_positions'];
-      const allEmpty = syncTables.every(t => (status.recordCounts[t] ?? 0) === 0);
+      const allEmpty = syncTables.every(t => (status.recordCounts?.[t] ?? 0) === 0);
       setIsDatabaseEmpty(allEmpty);
     } catch {
       setIsDatabaseEmpty(false);
@@ -156,12 +160,12 @@ export default function DataSyncPage() {
           source={activePanel as 'employees' | 'candidates' | 'open-positions'}
           progress={activeProgress}
           records={activeRecords}
-          onStartSync={isTokenValid ? handleStartSync : undefined}
+          onStartSync={handleStartSync}
           onPauseSync={handlePauseSync}
-          onResumeSync={isTokenValid ? handleResumeSync : undefined}
-          onStartExtraction={isTokenValid ? handleStartExtraction : undefined}
+          onResumeSync={handleResumeSync}
+          onStartExtraction={handleStartExtraction}
           onPauseExtraction={handlePauseExtraction}
-          onResumeExtraction={isTokenValid ? handleStartExtraction : undefined}
+          onResumeExtraction={handleStartExtraction}
           extractionProgress={activeExtractionProgress}
           extractingUpstreamId={extractingUpstreamId}
           onStartVectorization={handleStartVectorization}
@@ -169,7 +173,7 @@ export default function DataSyncPage() {
           onResumeVectorization={handleStartVectorization}
           vectorizationProgress={activeVectorizationProgress}
           vectorizingUpstreamId={vectorizingUpstreamId}
-          onRefreshRecord={isTokenValid ? handleRefreshRecord : undefined}
+          onRefreshRecord={handleRefreshRecord}
           onVectorizeRecord={handleVectorizeRecord}
           refreshingId={refreshingId}
           vectorizingId={vectorizingId}
@@ -178,6 +182,7 @@ export default function DataSyncPage() {
           isClearing={isClearing}
           selectedYear={selectedYear}
           onYearChange={handleYearChange}
+          isSyncDisabled={!isTokenValid}
         />
       </>
     );

@@ -1,6 +1,7 @@
 import { syncEmployeeOrchestrator } from './sync/syncEmployeeOrchestrator'
 import { syncCandidateOrchestrator } from './sync/syncCandidateOrchestrator'
 import { syncOpenPositionOrchestrator } from './sync/syncOpenPositionOrchestrator'
+import { syncPrrOrchestrator } from './sync/syncPrrOrchestrator'
 import type { SyncRecordDto, SyncEvent, SyncOptions } from './sync/syncTypes'
 import { createLogger } from './logger'
 
@@ -31,6 +32,8 @@ export const syncOrchestrator = {
         await syncCandidateOrchestrator.sync(token, options, emitEvent, signal)
       } else if (source === 'open-positions') {
         await syncOpenPositionOrchestrator.sync(token, options, emitEvent, signal)
+      } else if (source === 'project-reallocations') {
+        await syncPrrOrchestrator.sync(token, options, emitEvent, signal)
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, session } from 'electron'
+import { app, BrowserWindow, shell, session, nativeImage } from 'electron'
 import { join } from 'path'
 import { registerAllHandlers } from './ipc'
 import { createMenu } from './menu'
@@ -39,9 +39,7 @@ function createWindow(): void {
       webSecurity: true,
       preload: join(__dirname, '../preload/index.cjs')
     },
-    icon: process.platform === 'linux'
-      ? join(__dirname, '../../resources/icon.png')
-      : undefined
+    icon: join(__dirname, '../../resources/icon.png')
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -157,6 +155,11 @@ app.whenReady().then(async () => {
     initAutoUpdater()
   } catch (err) {
     log.error('Auto-updater initialization failed', err instanceof Error ? err : new Error(String(err)))
+  }
+
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const dockIcon = nativeImage.createFromPath(join(__dirname, '../../resources/icon.png'))
+    app.dock.setIcon(dockIcon)
   }
 
   createWindow()

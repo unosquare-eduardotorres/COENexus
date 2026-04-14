@@ -51,8 +51,8 @@ export interface SyncUploadNoteParams {
   fileContent: ArrayBuffer
 }
 
-export type SyncDataSource = 'employees' | 'candidates' | 'open-positions'
-export type SyncClearDataSource = 'employees' | 'candidates' | 'positions'
+export type SyncDataSource = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations'
+export type SyncClearDataSource = 'employees' | 'candidates' | 'positions' | 'project-reallocations'
 
 export interface SyncRecordDto {
   id: string
@@ -95,6 +95,13 @@ export interface SyncRecordDto {
   aging?: number | null
   hasJobDescription?: boolean
   candidatesCount?: number
+  team?: string
+  transitionStatus?: string
+  location?: string
+  impact?: string
+  attritionRisk?: string
+  presentationsCount?: number
+  employee?: string
 }
 
 export interface SyncProgressDto {
@@ -984,6 +991,65 @@ export interface Scout9ReportDetail {
   candidates: Scout9ReportCandidate[]
 }
 
+export type PrrCoeStatus = 'Undefined' | 'Active' | 'Idle' | 'Not Apply' | 'Closed'
+
+export interface PrrCommentDto {
+  text: string
+  author: string
+  createdAt: string
+}
+
+export interface PrrReportItem {
+  upstreamId: number
+  employee: string
+  account: string
+  team: string
+  mainSkill: string
+  seniority: string
+  transitionStatus: string
+  transitionSubType: string
+  location: string
+  requestDate: string | null
+  daysSinceLastInterview: string
+  impact: string
+  attritionRisk: string
+  comments: string
+  presentationsCount: number
+  coeStatus: PrrCoeStatus
+  coeComments: PrrCommentDto[]
+  daysOpened: number
+  syncedAt: string
+}
+
+export interface PrrDetailResult {
+  prr: PrrReportItem
+  presentations: Array<{
+    openPositionId: number
+    account: string
+    openPositionStatus: string
+    location: string
+    presentedOn: string | null
+    candidateStatus: string
+  }>
+}
+
+export interface PrrUpdateCoeStatusParams {
+  upstreamId: number
+  coeStatus: PrrCoeStatus
+}
+
+export interface PrrAddCommentParams {
+  upstreamId: number
+  text: string
+  author: string
+}
+
+export interface PrrSyncStatus {
+  hasData: boolean
+  total: number
+  lastSyncedAt: string | null
+}
+
 export interface IpcContracts {
   [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: string; response: { valid: boolean; message: string } }
   [IPC_CHANNELS.SYNC_GET_STATUS]: { request: SyncDataSource; response: SyncCountByStatus }
@@ -1060,6 +1126,13 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_EXPORT_CSV]: { request: readonly [ReportStalledPositionResult[]]; response: ReportExportCsvResult }
   [IPC_CHANNELS.REPORT_GET_SYNC_STATUS]: { request: void; response: ReportSyncStatus }
   [IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG]: { request: string; response: Record<number, string> }
+
+  [IPC_CHANNELS.PRR_GET_ALL]: { request: void; response: { results: PrrReportItem[]; lastSyncedAt: string | null } }
+  [IPC_CHANNELS.PRR_GET_DETAIL]: { request: number; response: PrrDetailResult | null }
+  [IPC_CHANNELS.PRR_UPDATE_COE_STATUS]: { request: PrrUpdateCoeStatusParams; response: { success: boolean } }
+  [IPC_CHANNELS.PRR_ADD_COMMENT]: { request: PrrAddCommentParams; response: { success: boolean } }
+  [IPC_CHANNELS.PRR_DELETE]: { request: number; response: { success: boolean } }
+  [IPC_CHANNELS.PRR_GET_SYNC_STATUS]: { request: void; response: PrrSyncStatus }
 
   [IPC_CHANNELS.PATH_GET_DEVELOPER_DASHBOARD]: { request: PathIdParams; response: PathDeveloperDashboard | null }
   [IPC_CHANNELS.PATH_LIST_LEARNING_PATHS]: { request: PathPaginationParams; response: PathLearningPathSummary[] }

@@ -1,9 +1,9 @@
-import { ZodSchema } from 'zod'
+import { z } from 'zod'
 import { createLogger } from '../logger'
 
 const log = createLogger('AiResponseParser')
 
-export function parseAiResponse<T>(raw: string, schema: ZodSchema<T>, context?: string): T {
+export function parseAiResponse<T>(raw: string, schema: z.ZodType<T>, context?: string): T {
   const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim()
   try {
     const parsed = JSON.parse(cleaned)

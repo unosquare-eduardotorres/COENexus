@@ -67,7 +67,7 @@ describe('useIpcMutation', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual({ id: 1, name: 'Test' });
-    expect(mockFn).toHaveBeenCalledWith({ name: 'Test' });
+    expect(mockFn).toHaveBeenCalledWith({ name: 'Test' }, expect.anything());
   });
 
   it('should handle mutation errors', async () => {

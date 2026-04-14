@@ -1,7 +1,7 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { SyncStartParams, SyncSingleParams, SyncRetryParams, SyncYearFilterParams, SyncUploadNoteParams, SyncRecordDto } from '../../../shared/ipc-types'
-import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow } from '../../db/repositories/syncRepository'
+import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow, SyncedProjectReallocationRow } from '../../db/repositories/syncRepository'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
 import { syncOrchestrator } from '../../services/syncOrchestrator'
@@ -75,7 +75,12 @@ function mapCandidateRowToDto(row: SyncedCandidateRow): SyncRecordDto {
 }
 
 function mapPositionRowToDto(row: SyncedOpenPositionRow): SyncRecordDto {
-  const candidatesCount = matchRepository.getOpenPositionCandidateCount(row.upstream_id)
+  let candidatesCount = 0;
+  try {
+    candidatesCount = matchRepository.getOpenPositionCandidateCount(row.upstream_id);
+  } catch {
+    // Non-critical — open_position_candidates table may be empty or unavailable
+  }
   return {
     id: `pos-${row.upstream_id}`,
     source: 'open-positions',
@@ -104,6 +109,35 @@ function mapPositionRowToDto(row: SyncedOpenPositionRow): SyncRecordDto {
   }
 }
 
+function mapPrrRowToDto(row: SyncedProjectReallocationRow): SyncRecordDto {
+  let presentationsCount = 0
+  try {
+    presentationsCount = syncRepository.getPrrPresentationCount(row.upstream_id)
+  } catch { /* non-critical */ }
+  return {
+    id: `prr-${row.upstream_id}`,
+    source: 'project-reallocations',
+    status: row.status,
+    name: row.employee,
+    email: '',
+    hasResume: false,
+    isBench: false,
+    resumeChanged: false,
+    upstreamId: row.upstream_id,
+    syncedAt: row.synced_at,
+    reason: row.status_reason,
+    account: row.account,
+    mainSkill: row.main_skill,
+    seniority: row.seniority,
+    team: row.team,
+    transitionStatus: row.transition_status,
+    location: row.location,
+    impact: row.impact,
+    attritionRisk: row.attrition_risk,
+    presentationsCount,
+  }
+}
+
 export function registerSyncHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.SYNC_VALIDATE_TOKEN,
     async (event: IpcMainInvokeEvent, token: string) => {
@@ -125,6 +159,7 @@ export function registerSyncHandlers(): void {
       validateSender(event)
       const table = dataSource === 'employees' ? 'synced_employees' as const
         : dataSource === 'candidates' ? 'synced_candidates' as const
+        : dataSource === 'project-reallocations' ? 'synced_project_reallocations' as const
         : 'synced_open_positions' as const
       return syncRepository.getCountByStatus(table)
     })
@@ -193,6 +228,7 @@ export function registerSyncHandlers(): void {
       if (dataSource === 'employees') return syncRepository.getAllEmployees(50000, 0).map(mapEmployeeRowToDto)
       if (dataSource === 'candidates') return syncRepository.getAllCandidates(50000, 0).map(mapCandidateRowToDto)
       if (dataSource === 'open-positions') return syncRepository.getAllOpenPositions(50000, 0).map(mapPositionRowToDto)
+      if (dataSource === 'project-reallocations') return syncRepository.getAllProjectReallocations(50000, 0).map(mapPrrRowToDto)
       return []
     })
 
@@ -200,7 +236,7 @@ export function registerSyncHandlers(): void {
     async (event: IpcMainInvokeEvent, dataSource: string) => {
       validateSender(event)
       log.warn('Sync table cleared', { dataSource })
-      syncRepository.clearTable(dataSource as 'employees' | 'candidates' | 'positions')
+      syncRepository.clearTable(dataSource as 'employees' | 'candidates' | 'positions' | 'project-reallocations')
       return { cleared: true, dataSource }
     })
 

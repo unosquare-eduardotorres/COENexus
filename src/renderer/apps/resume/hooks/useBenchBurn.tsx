@@ -176,6 +176,14 @@ export function useBenchBurn(parentReset?: () => void) {
     }
   }, [results, navigateStep]);
 
+  const handleExportToExcel = useCallback(() => {}, []);
+
+  const handleShowDetail = useCallback((match: CrossMatchResult, emp: BenchEmployee, pos: BenchOpenPosition) => {
+    setDetailMatch(match);
+    setDetailEmployee(emp);
+    setDetailPosition(pos);
+  }, []);
+
   const handleSelectMatch = useCallback((match: CrossMatchResult, emp: BenchEmployee, pos: BenchOpenPosition) => {
     setDetailMatch(match);
     setDetailEmployee(emp);
@@ -203,6 +211,8 @@ export function useBenchBurn(parentReset?: () => void) {
     setError(null);
     setDetailMatch(null);
   }, [resetWizard]);
+
+  const handleReset = handleFullReset;
 
   const handleBackToIntents = useCallback(() => {
     parentReset();

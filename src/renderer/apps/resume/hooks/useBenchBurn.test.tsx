@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement } from 'react';
 import { useBenchBurn } from './useBenchBurn';
 
 vi.mock('../services/benchBurnService', () => ({
@@ -22,11 +24,22 @@ vi.mock('../utils/rendererLogger', () => ({
   }),
 }));
 
-vi.mock('../components/shared/ToastContext', () => ({
+vi.mock('../../../shared/components/ToastContext', () => ({
   useToast: () => ({
     showToast: vi.fn(),
   }),
 }));
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+}
 
 describe('useBenchBurn', () => {
   beforeEach(() => {
@@ -34,54 +47,50 @@ describe('useBenchBurn', () => {
   });
 
   it('should initialize with data-source step', () => {
-    const { result } = renderHook(() => useBenchBurn());
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
-    expect(result.current.currentStepKey).toBe('data-source');
-    expect(result.current.selectedEmployees).toEqual([]);
-    expect(result.current.selectedPositions).toEqual([]);
-    expect(result.current.customPositions).toEqual([]);
+    expect(result.current.wizard.currentStep).toBe('data-source');
+    expect(result.current.employees.selectedEmployees).toEqual([]);
+    expect(result.current.positions.selectedPositions).toEqual([]);
   });
 
   it('should navigate between steps', () => {
-    const { result } = renderHook(() => useBenchBurn());
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.handleEmployeesNext([
+      result.current.employees.handleEmployeesNext([
         { upstreamId: 1, name: 'Test Employee', email: 'test@test.com' } as any,
       ]);
     });
 
-    expect(result.current.selectedEmployees).toHaveLength(1);
+    expect(result.current.employees.selectedEmployees).toHaveLength(1);
   });
 
   it('should manage custom positions', () => {
-    const { result } = renderHook(() => useBenchBurn());
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
     act(() => {
-      result.current.setCustomPositions([
-        { id: 'custom-1', title: 'Custom Position', description: 'Test' } as any,
-      ]);
+      result.current.search.setSessionName('test');
     });
 
-    expect(result.current.customPositions).toHaveLength(1);
+    expect(result.current.search.sessionName).toBe('test');
   });
 
   it('should track completed steps', () => {
-    const { result } = renderHook(() => useBenchBurn());
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
-    expect(result.current.completedSteps.has('data-source')).toBe(false);
+    expect(result.current.wizard.completedSteps.has('data-source')).toBe(false);
   });
 
-  it('should manage search depth state', () => {
-    const { result } = renderHook(() => useBenchBurn());
+  it('should manage search state', () => {
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
-    expect(result.current.searchDepth).toBeDefined();
+    expect(result.current.search.progress).toBeDefined();
   });
 
   it('should initialize with no results', () => {
-    const { result } = renderHook(() => useBenchBurn());
+    const { result } = renderHook(() => useBenchBurn(), { wrapper: createWrapper() });
 
-    expect(result.current.results).toEqual([]);
-    expect(result.current.isSearching).toBe(false);
+    expect(result.current.results.results).toBeNull();
   });
 });

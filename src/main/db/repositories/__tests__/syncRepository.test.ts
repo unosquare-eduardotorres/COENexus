@@ -247,7 +247,7 @@ describe('syncRepository', () => {
       resume_filename: null,
       is_bench: 0,
       job_title: 'Engineer',
-      status: 'failed',
+      status: 'sync_failed',
       status_reason: 'Error',
       failed: 1,
       synced_at: syncedAt,

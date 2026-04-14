@@ -57,4 +57,8 @@ export const embeddingJobQueue = {
     log.info('Queue drained', { drainedCount: count })
     return items
   },
+
+  get pendingCount(): number {
+    return _pendingCount
+  },
 }

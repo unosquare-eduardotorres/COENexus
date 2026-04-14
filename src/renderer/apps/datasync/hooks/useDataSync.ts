@@ -36,6 +36,11 @@ export function useDataSync(activePanel: DataSyncPanel) {
     token: sharepoint.token,
     enabled: true,
   });
+  const projectReallocations = useSyncPipeline({
+    source: 'project-reallocations',
+    token: sharepoint.token,
+    enabled: true,
+  });
 
   useIpcQuery(
     ['datasync-processing-status'],
@@ -43,10 +48,19 @@ export function useDataSync(activePanel: DataSyncPanel) {
     { enabled: true, refetchInterval: 5000 },
   );
 
-  const activeSource: SyncSourceType = activePanel === 'employees' ? 'employees' : activePanel === 'open-positions' ? 'open-positions' : 'candidates';
-  const activePipeline = activeSource === 'employees' ? employees : activeSource === 'candidates' ? candidates : openPositions;
+  const activeSource: SyncSourceType = activePanel === 'employees' ? 'employees'
+    : activePanel === 'open-positions' ? 'open-positions'
+    : activePanel === 'project-reallocations' ? 'project-reallocations'
+    : 'candidates';
+  const activePipeline = activeSource === 'employees' ? employees
+    : activeSource === 'candidates' ? candidates
+    : activeSource === 'project-reallocations' ? projectReallocations
+    : openPositions;
 
-  const isSyncing = employees.progress.status === SYNC_STATUS.SYNCING || candidates.progress.status === SYNC_STATUS.SYNCING || openPositions.progress.status === SYNC_STATUS.SYNCING;
+  const isSyncing = employees.progress.status === SYNC_STATUS.SYNCING
+    || candidates.progress.status === SYNC_STATUS.SYNCING
+    || openPositions.progress.status === SYNC_STATUS.SYNCING
+    || projectReallocations.progress.status === SYNC_STATUS.SYNCING;
 
   return {
     sync: {

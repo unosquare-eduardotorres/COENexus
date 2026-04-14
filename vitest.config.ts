@@ -6,6 +6,13 @@ export default defineConfig({
   test: {
     projects: [
       {
+        plugins: [react()],
+        define: {
+          'process.env.NODE_ENV': JSON.stringify('development'),
+        },
+        resolve: {
+          conditions: ['development', 'browser'],
+        },
         test: {
           name: 'renderer',
           environment: 'jsdom',

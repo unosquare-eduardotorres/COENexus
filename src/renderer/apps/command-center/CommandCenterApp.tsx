@@ -5,6 +5,7 @@ import { reportService } from './services/reportService'
 
 const CommandCenterHome = lazy(() => import('./pages/CommandCenterHome'))
 const OpenPositionsReport = lazy(() => import('./pages/OpenPositionsReport'))
+const PrrReport = lazy(() => import('./pages/PrrReport'))
 const UnderConstruction = lazy(() => import('./pages/UnderConstruction'))
 
 function RouteFallback() {
@@ -32,7 +33,7 @@ export default function CommandCenterApp() {
           <Route index element={<CommandCenterHome />} />
           <Route path="open-positions" element={<OpenPositionsReport />} />
           <Route path="placements" element={<UnderConstruction title="Placements" />} />
-          <Route path="reallocation" element={<UnderConstruction title="Project Reallocation" />} />
+          <Route path="reallocation" element={<PrrReport />} />
         </Route>
       </Routes>
     </Suspense>

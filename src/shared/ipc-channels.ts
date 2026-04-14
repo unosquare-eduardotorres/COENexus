@@ -90,6 +90,13 @@ export const IPC_CHANNELS = {
   REPORT_GET_SYNC_STATUS: 'report:get-sync-status',
   REPORT_GET_FEEDBACK_CATALOG: 'report:get-feedback-catalog',
 
+  PRR_GET_ALL: 'prr:get-all',
+  PRR_GET_DETAIL: 'prr:get-detail',
+  PRR_UPDATE_COE_STATUS: 'prr:update-coe-status',
+  PRR_ADD_COMMENT: 'prr:add-comment',
+  PRR_DELETE: 'prr:delete',
+  PRR_GET_SYNC_STATUS: 'prr:get-sync-status',
+
   PATH_GET_DEVELOPER_DASHBOARD: 'path:get-developer-dashboard',
   PATH_LIST_LEARNING_PATHS: 'path:list-learning-paths',
   PATH_GET_LEARNING_PATH: 'path:get-learning-path',

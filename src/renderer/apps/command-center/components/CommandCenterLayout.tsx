@@ -63,7 +63,7 @@ const OVERVIEW_ITEM: SidebarItem = {
 const REPORT_ITEMS: SidebarItem[] = [
   { label: 'Open Positions', path: '/command-center/open-positions', active: true, icon: <BarChartIcon /> },
   { label: 'Placements', path: '/command-center/placements', active: false, icon: <UsersIcon /> },
-  { label: 'Project Reallocation', path: '/command-center/reallocation', active: false, icon: <ArrowsIcon /> },
+  { label: 'Project Reallocation', path: '/command-center/reallocation', active: true, icon: <ArrowsIcon /> },
 ];
 
 export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayoutProps) {

@@ -62,7 +62,7 @@ function displayReason(record: SyncRecord): string {
   return detail || record.reason || '';
 }
 
-type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations' | 'account' | 'coe' | 'stakeholder' | 'countries' | 'seniorities' | 'aging' | 'hasJobDescription' | 'candidatesCount';
+type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations' | 'account' | 'coe' | 'stakeholder' | 'countries' | 'seniorities' | 'aging' | 'hasJobDescription' | 'candidatesCount' | 'team' | 'transitionStatus' | 'location' | 'impact' | 'attritionRisk' | 'presentationsCount';
 type SortDirection = 'asc' | 'desc';
 
 const PIPELINE_ORDER: Record<PipelineStatus, number> = {
@@ -250,6 +250,30 @@ const SyncRecordTable = memo(function SyncRecordTable({
           valA = a.candidatesCount ?? 0;
           valB = b.candidatesCount ?? 0;
           break;
+        case 'team':
+          valA = a.team;
+          valB = b.team;
+          break;
+        case 'transitionStatus':
+          valA = a.transitionStatus;
+          valB = b.transitionStatus;
+          break;
+        case 'location':
+          valA = a.location;
+          valB = b.location;
+          break;
+        case 'impact':
+          valA = a.impact;
+          valB = b.impact;
+          break;
+        case 'attritionRisk':
+          valA = a.attritionRisk;
+          valB = b.attritionRisk;
+          break;
+        case 'presentationsCount':
+          valA = a.presentationsCount ?? 0;
+          valB = b.presentationsCount ?? 0;
+          break;
       }
 
       const result = compareValues(valA, valB);
@@ -309,7 +333,22 @@ const SyncRecordTable = memo(function SyncRecordTable({
         { header: 'Reason', accessor: (r) => displayReason(r as unknown as SyncRecord) },
       ];
 
-      const columns = source === 'open-positions' ? openPositionColumns : source === 'candidates' ? candidateColumns : employeeColumns;
+      const prrColumns: ColumnDef[] = [
+        { header: 'Pipeline Status', accessor: (r) => PIPELINE_LABELS[(r as unknown as SyncRecord).pipelineStatus] },
+        { header: 'Employee', accessor: (r) => (r as unknown as SyncRecord).name || '' },
+        { header: 'Client', accessor: (r) => (r as unknown as SyncRecord).account },
+        { header: 'Team', accessor: (r) => (r as unknown as SyncRecord).team },
+        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
+        { header: 'Seniority', accessor: (r) => (r as unknown as SyncRecord).seniority },
+        { header: 'PRR Status', accessor: (r) => (r as unknown as SyncRecord).transitionStatus },
+        { header: 'Location', accessor: (r) => (r as unknown as SyncRecord).location },
+        { header: 'Impact', accessor: (r) => (r as unknown as SyncRecord).impact },
+        { header: 'Attrition Risk', accessor: (r) => (r as unknown as SyncRecord).attritionRisk },
+        { header: 'Presentations', accessor: (r) => (r as unknown as SyncRecord).presentationsCount ?? 0 },
+        { header: 'Reason', accessor: (r) => displayReason(r as unknown as SyncRecord) },
+      ];
+
+      const columns = source === 'project-reallocations' ? prrColumns : source === 'open-positions' ? openPositionColumns : source === 'candidates' ? candidateColumns : employeeColumns;
       const statusLabel = statusFilter === 'all' ? 'All' : statusFilter === 'excluded' ? 'Excluded' : PIPELINE_LABELS[statusFilter as PipelineStatus] ?? statusFilter;
       const filename = `${source}-${statusLabel}-${new Date().toISOString().slice(0, 10)}`;
       await exportToExcel(filtered as unknown as Record<string, unknown>[], columns, filename);
@@ -333,8 +372,8 @@ const SyncRecordTable = memo(function SyncRecordTable({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={source === 'open-positions' ? 'Search by position or account...' : 'Search by name or email...'}
-              aria-label={source === 'open-positions' ? 'Search records by position or account' : 'Search records by name or email'}
+              placeholder={source === 'open-positions' ? 'Search by position or account...' : source === 'project-reallocations' ? 'Search by employee or account...' : 'Search by name or email...'}
+              aria-label={source === 'open-positions' ? 'Search records by position or account' : source === 'project-reallocations' ? 'Search records by employee or account' : 'Search records by name or email'}
               className="w-full pl-9 pr-4 py-2 bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border rounded-xl text-sm text-primary placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-400/60 dark:focus:border-accent-500/40 transition-all duration-200"
             />
           </div>
@@ -367,7 +406,19 @@ const SyncRecordTable = memo(function SyncRecordTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 dark:border-dark-border/30">
-                {(source === 'open-positions' ? [
+                {(source === 'project-reallocations' ? [
+                  { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
+                  { key: 'name' as SortKey, label: 'Employee', className: '' },
+                  { key: 'account' as SortKey, label: 'Client', className: 'hidden md:table-cell' },
+                  { key: 'team' as SortKey, label: 'Team', className: 'hidden lg:table-cell' },
+                  { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
+                  { key: 'seniority' as SortKey, label: 'Seniority', className: 'hidden lg:table-cell' },
+                  { key: 'transitionStatus' as SortKey, label: 'PRR Status', className: 'hidden md:table-cell' },
+                  { key: 'location' as SortKey, label: 'Location', className: 'hidden lg:table-cell' },
+                  { key: 'impact' as SortKey, label: 'Impact', className: 'hidden lg:table-cell' },
+                  { key: 'attritionRisk' as SortKey, label: 'Attrition Risk', className: 'hidden lg:table-cell' },
+                  { key: 'presentationsCount' as SortKey, label: 'Presentations', className: '' },
+                ] : source === 'open-positions' ? [
                   { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
                   { key: 'name' as SortKey, label: 'Position', className: '' },
                   { key: 'account' as SortKey, label: 'Account', className: 'hidden md:table-cell' },
@@ -449,7 +500,43 @@ const SyncRecordTable = memo(function SyncRecordTable({
                       <span className="text-muted">—</span>
                     )}
                   </td>
-                  {source === 'open-positions' ? (
+                  {source === 'project-reallocations' ? (
+                    <>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.account || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.team || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniority || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+                          {record.transitionStatus || '—'}
+                        </span>
+                      </td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.location || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3">
+                        {record.impact ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            record.impact === 'High' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                              : record.impact === 'Medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                          }`}>
+                            {record.impact}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="hidden lg:table-cell px-4 py-3">
+                        {record.attritionRisk ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            record.attritionRisk === 'High' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                              : record.attritionRisk === 'Medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                          }`}>
+                            {record.attritionRisk}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-secondary">{record.presentationsCount ?? 0}</td>
+                    </>
+                  ) : source === 'open-positions' ? (
                     <>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.account || '—'}</td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
@@ -509,7 +596,7 @@ const SyncRecordTable = memo(function SyncRecordTable({
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.country || '—'}</td>
                     </>
                   )}
-                  {source !== 'open-positions' && (
+                  {source !== 'open-positions' && source !== 'project-reallocations' && (
                     <td className="px-4 py-3">
                       {record.hasResume ? (
                         <span className="inline-flex items-center gap-1.5">

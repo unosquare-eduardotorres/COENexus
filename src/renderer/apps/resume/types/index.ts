@@ -474,7 +474,7 @@ export interface BatchResult {
   resumeId?: string;
 }
 
-export type SyncSourceType = 'employees' | 'candidates' | 'open-positions';
+export type SyncSourceType = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations';
 export type PipelineStatus =
   | 'not-processed' | 'incomplete' | 'synced' | 'extracted' | 'vectorized'
   | 'sync_failed' | 'extract_failed' | 'vectorize_failed';
@@ -519,6 +519,13 @@ export interface SyncRecord {
   aging?: number;
   hasJobDescription?: boolean;
   candidatesCount?: number;
+  team?: string;
+  transitionStatus?: string;
+  location?: string;
+  impact?: string;
+  attritionRisk?: string;
+  presentationsCount?: number;
+  employee?: string;
 }
 
 export interface SyncProgress {

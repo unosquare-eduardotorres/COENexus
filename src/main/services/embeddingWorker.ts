@@ -139,4 +139,8 @@ export const embeddingWorker = {
   stop(): void {
     stopRequested = true
   },
+
+  get isRunning(): boolean {
+    return running
+  },
 }

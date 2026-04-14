@@ -153,6 +153,82 @@ function runMigrations(database: Database.Database): void {
       "INSERT INTO schema_migrations (version, name) VALUES (3, 'open_position_report_fields')"
     ).run()
   }
+
+  if (currentVersion < 4) {
+    log.info('Running migration 004: candidate analysis cache')
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS candidate_analysis_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        candidate_upstream_id INTEGER NOT NULL,
+        candidate_source_type TEXT NOT NULL,
+        jd_hash TEXT NOT NULL,
+        analysis_json TEXT NOT NULL,
+        model_used TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(candidate_upstream_id, candidate_source_type, jd_hash)
+      );
+      CREATE INDEX IF NOT EXISTS idx_analysis_cache_lookup
+        ON candidate_analysis_cache(candidate_upstream_id, candidate_source_type, jd_hash);
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (4, 'candidate_analysis_cache')"
+    ).run()
+  }
+
+  if (currentVersion < 5) {
+    log.info('Running migration 005: project reallocations tables')
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS synced_project_reallocations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        upstream_id INTEGER NOT NULL UNIQUE,
+        employee TEXT NOT NULL DEFAULT '',
+        account TEXT NOT NULL DEFAULT '',
+        team TEXT NOT NULL DEFAULT '',
+        main_skill TEXT NOT NULL DEFAULT '',
+        seniority TEXT NOT NULL DEFAULT '',
+        transition_status TEXT NOT NULL DEFAULT '',
+        transition_sub_type TEXT NOT NULL DEFAULT '',
+        location TEXT NOT NULL DEFAULT '',
+        request_date TEXT,
+        days_since_last_interview TEXT NOT NULL DEFAULT '',
+        impact TEXT NOT NULL DEFAULT '',
+        attrition_risk TEXT NOT NULL DEFAULT '',
+        comments TEXT NOT NULL DEFAULT '',
+        presentations_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'synced',
+        status_reason TEXT,
+        synced_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS prr_presentations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        prr_id INTEGER NOT NULL,
+        open_position_id INTEGER NOT NULL,
+        account TEXT NOT NULL DEFAULT '',
+        open_position_status TEXT NOT NULL DEFAULT '',
+        location TEXT NOT NULL DEFAULT '',
+        presented_on TEXT,
+        candidate_status TEXT NOT NULL DEFAULT '',
+        synced_at TEXT NOT NULL,
+        UNIQUE(prr_id, open_position_id, presented_on)
+      );
+      CREATE INDEX IF NOT EXISTS idx_prr_presentations_prr_id ON prr_presentations(prr_id);
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (5, 'project_reallocations')"
+    ).run()
+  }
+
+  if (currentVersion < 6) {
+    log.info('Running migration 006: PRR COE status and comments fields')
+    database.exec(`
+      ALTER TABLE synced_project_reallocations ADD COLUMN coe_status TEXT NOT NULL DEFAULT 'Undefined';
+      ALTER TABLE synced_project_reallocations ADD COLUMN coe_comments TEXT NOT NULL DEFAULT '[]';
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (6, 'prr_coe_fields')"
+    ).run()
+  }
 }
 
 function getInlineSchema(): string {
@@ -379,6 +455,44 @@ function getInlineSchema(): string {
     );
     CREATE INDEX IF NOT EXISTS idx_analysis_cache_lookup
       ON candidate_analysis_cache(candidate_upstream_id, candidate_source_type, jd_hash);
+
+    CREATE TABLE IF NOT EXISTS synced_project_reallocations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      upstream_id INTEGER NOT NULL UNIQUE,
+      employee TEXT NOT NULL DEFAULT '',
+      account TEXT NOT NULL DEFAULT '',
+      team TEXT NOT NULL DEFAULT '',
+      main_skill TEXT NOT NULL DEFAULT '',
+      seniority TEXT NOT NULL DEFAULT '',
+      transition_status TEXT NOT NULL DEFAULT '',
+      transition_sub_type TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      request_date TEXT,
+      days_since_last_interview TEXT NOT NULL DEFAULT '',
+      impact TEXT NOT NULL DEFAULT '',
+      attrition_risk TEXT NOT NULL DEFAULT '',
+      comments TEXT NOT NULL DEFAULT '',
+      presentations_count INTEGER NOT NULL DEFAULT 0,
+      coe_status TEXT NOT NULL DEFAULT 'Undefined',
+      coe_comments TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'synced',
+      status_reason TEXT,
+      synced_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS prr_presentations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      prr_id INTEGER NOT NULL,
+      open_position_id INTEGER NOT NULL,
+      account TEXT NOT NULL DEFAULT '',
+      open_position_status TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      presented_on TEXT,
+      candidate_status TEXT NOT NULL DEFAULT '',
+      synced_at TEXT NOT NULL,
+      UNIQUE(prr_id, open_position_id, presented_on)
+    );
+    CREATE INDEX IF NOT EXISTS idx_prr_presentations_prr_id ON prr_presentations(prr_id);
 
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,

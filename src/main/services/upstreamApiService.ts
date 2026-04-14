@@ -2,7 +2,7 @@ import { getConfig } from '../config'
 import { createLogger } from './logger'
 import { fetchAuthorized, fetchPaged, type PagedResponse } from './upstream/upstreamApiClient'
 import { getString, getNullableString, getInt, getDecimal, getBool, getDateTime, getNullableDateTime } from './upstream/upstreamRowParsers'
-import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns } from './upstream/upstreamColumnDefs'
+import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns, buildPrrColumns, buildPrrPresentationColumns } from './upstream/upstreamColumnDefs'
 import { mapKeysToCamelCase } from './upstream/caseMapper'
 
 export type { ColumnDefinition, PagedRequest, PagedResponse } from './upstream/upstreamApiClient'
@@ -147,6 +147,32 @@ export interface CandidateRequisitionDetailItem {
   comments: string
   rate: number
   actionDate: string
+}
+
+export interface PrrListItem {
+  id: number
+  employee: string
+  account: string
+  team: string
+  mainSkill: string
+  seniority: string
+  transitionStatus: string
+  transitionSubType: string
+  location: string
+  requestDate: string
+  daysSinceLastInterview: string
+  impact: string
+  attritionRisk: string
+  comments: string
+}
+
+export interface PrrPresentationItem {
+  openPositionId: number
+  account: string
+  openPositionStatus: string
+  location: string
+  presentedOn: string
+  candidateStatus: string
 }
 
 function mapNoteRows(paged: PagedResponse): PersonaNote[] {
@@ -418,6 +444,55 @@ export const upstreamApiService = {
     } catch (err) {
       log.error(`savePersonaNote failed for personId=${personId}`, err instanceof Error ? err : new Error(String(err)), { personId, noteType, fileName })
       throw err
+    }
+  },
+
+  async getPrrsPaged(token: string, skip: number, take: number): Promise<{ items: PrrListItem[]; totalRecords: number }> {
+    const { upstream } = getConfig()
+    const paged = await fetchPaged(
+      `${upstream.apiUrl}ProjectTransition/paged?ProjectTransitionType=3&active=true`,
+      token,
+      { skip, take, columns: buildPrrColumns() }
+    )
+    const items = paged.payload.map(row => ({
+      id: getInt(row, 0),
+      employee: getString(row, 1),
+      account: getString(row, 2),
+      team: getString(row, 3),
+      mainSkill: getString(row, 4),
+      seniority: getString(row, 5),
+      transitionStatus: getString(row, 6),
+      transitionSubType: getString(row, 7),
+      location: getString(row, 8),
+      requestDate: getDateTime(row, 9),
+      daysSinceLastInterview: getString(row, 10),
+      impact: getString(row, 11),
+      attritionRisk: getString(row, 12),
+      comments: getString(row, 13),
+    }))
+    log.debug('getPrrsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
+    return { items, totalRecords: paged.filteredRecordCount }
+  },
+
+  async getPrrPresentations(token: string, prrId: number): Promise<PrrPresentationItem[]> {
+    const { upstream } = getConfig()
+    try {
+      const paged = await fetchPaged(
+        `${upstream.apiUrl}projectTransition/presentations/${prrId}`,
+        token,
+        { skip: 0, take: 100, columns: buildPrrPresentationColumns(), counter: 1 }
+      )
+      return paged.payload.map(row => ({
+        openPositionId: getInt(row, 0),
+        account: getString(row, 1),
+        openPositionStatus: getString(row, 2),
+        location: getString(row, 3),
+        presentedOn: getString(row, 4),
+        candidateStatus: getString(row, 5),
+      }))
+    } catch (err) {
+      log.error(`Failed to fetch PRR presentations for ${prrId}`, err instanceof Error ? err : new Error(String(err)))
+      return []
     }
   },
 }

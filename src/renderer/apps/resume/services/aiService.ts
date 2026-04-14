@@ -51,7 +51,7 @@ const enhancementResponseSchema = z.object({
   cloudSkills: z.array(z.string()).optional(),
 });
 
-function parseAiJson<T>(raw: string, schema: z.ZodSchema<T>, context: string): T {
+function parseAiJson<T>(raw: string, schema: z.ZodType<T>, context: string): T {
   try {
     const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleaned);

@@ -143,3 +143,46 @@ export const DEFAULT_THRESHOLDS: StalledThresholds = CRITERIA_CONFIG.reduce(
   (acc, config) => ({ ...acc, [config.key]: config.defaultThreshold }),
   {} as StalledThresholds
 )
+
+export type PrrCoeStatus = 'Undefined' | 'Active' | 'Idle' | 'Not Apply' | 'Closed'
+export const PRR_COE_STATUSES: PrrCoeStatus[] = ['Undefined', 'Active', 'Idle', 'Not Apply', 'Closed']
+
+export interface PrrReportItem {
+  upstreamId: number
+  employee: string
+  account: string
+  team: string
+  mainSkill: string
+  seniority: string
+  transitionStatus: string
+  transitionSubType: string
+  location: string
+  requestDate: string | null
+  daysSinceLastInterview: string
+  impact: string
+  attritionRisk: string
+  comments: string
+  presentationsCount: number
+  coeStatus: PrrCoeStatus
+  coeComments: PrrCommentEntry[]
+  daysOpened: number
+  syncedAt: string
+}
+
+export interface PrrCommentEntry {
+  text: string
+  author: string
+  createdAt: string
+}
+
+export interface PrrDetailResult {
+  prr: PrrReportItem
+  presentations: Array<{
+    openPositionId: number
+    account: string
+    openPositionStatus: string
+    location: string
+    presentedOn: string | null
+    candidateStatus: string
+  }>
+}

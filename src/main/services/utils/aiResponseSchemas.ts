@@ -15,7 +15,7 @@ export const opusAnalysisSchema = z.object({
   location: z.string().optional(),
   salary: z.string().optional(),
   availability: z.string().optional(),
-  scores: z.record(z.unknown()).default({}),
+  scores: z.record(z.string(), z.unknown()).default({}),
   summary: z.string().default(''),
   skills: z.array(z.unknown()).default([]),
   domains: z.array(z.unknown()).default([]),

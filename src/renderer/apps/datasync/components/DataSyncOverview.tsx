@@ -100,7 +100,7 @@ export default function DataSyncOverview({ onNavigate }: DataSyncOverviewProps) 
 
       <div className="grid gap-4 md:grid-cols-3">
         {sources.map(source => {
-          const count = dbStatus?.recordCounts[source.table] ?? 0
+          const count = dbStatus?.recordCounts?.[source.table] ?? 0
           return (
             <button
               key={source.id}

@@ -27,7 +27,7 @@ vi.mock('../services/pdfExportService', () => ({
   },
 }));
 
-vi.mock('../components/shared/ToastContext', () => ({
+vi.mock('../../../shared/components/ToastContext', () => ({
   useToast: () => ({
     showToast: vi.fn(),
   }),
@@ -50,100 +50,100 @@ describe('useRecruiterDashboard', () => {
   it('should initialize with default state', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.selectedResumeId).toBeNull();
-    expect(result.current.selectedResume).toBeNull();
-    expect(result.current.filterStatus).toBe('all');
-    expect(result.current.searchQuery).toBe('');
-    expect(result.current.isValidating).toBe(false);
-    expect(result.current.isGeneratingSuggestions).toBe(false);
-    expect(result.current.showPreview).toBe(true);
+    expect(result.current.resumes.selectedResumeId).toBeNull();
+    expect(result.current.resumes.selectedResume).toBeNull();
+    expect(result.current.filter.filterStatus).toBe('all');
+    expect(result.current.filter.searchQuery).toBe('');
+    expect(result.current.validation.isValidating).toBe(false);
+    expect(result.current.review.isGeneratingSuggestions).toBe(false);
+    expect(result.current.ui.showPreview).toBe(true);
   });
 
   it('should update search query', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
     act(() => {
-      result.current.setSearchQuery('John');
+      result.current.filter.setSearchQuery('John');
     });
 
-    expect(result.current.searchQuery).toBe('John');
+    expect(result.current.filter.searchQuery).toBe('John');
   });
 
   it('should update filter status', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
     act(() => {
-      result.current.setFilterStatus('approved');
+      result.current.filter.setFilterStatus('approved');
     });
 
-    expect(result.current.filterStatus).toBe('approved');
+    expect(result.current.filter.filterStatus).toBe('approved');
   });
 
   it('should toggle drawer', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.isDrawerOpen).toBe(false);
+    expect(result.current.ui.isDrawerOpen).toBe(false);
 
     act(() => {
-      result.current.setIsDrawerOpen(true);
+      result.current.ui.setIsDrawerOpen(true);
     });
 
-    expect(result.current.isDrawerOpen).toBe(true);
+    expect(result.current.ui.isDrawerOpen).toBe(true);
   });
 
   it('should toggle preview visibility', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.showPreview).toBe(true);
+    expect(result.current.ui.showPreview).toBe(true);
 
     act(() => {
-      result.current.setShowPreview(false);
+      result.current.ui.setShowPreview(false);
     });
 
-    expect(result.current.showPreview).toBe(false);
+    expect(result.current.ui.showPreview).toBe(false);
   });
 
   it('should manage reject modal state', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.showRejectModal).toBe(false);
+    expect(result.current.reject.showRejectModal).toBe(false);
 
     act(() => {
-      result.current.setShowRejectModal(true);
+      result.current.reject.setShowRejectModal(true);
     });
 
-    expect(result.current.showRejectModal).toBe(true);
+    expect(result.current.reject.showRejectModal).toBe(true);
   });
 
   it('should update reject reason', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
     act(() => {
-      result.current.setRejectReason('Not qualified');
+      result.current.reject.setRejectReason('Not qualified');
     });
 
-    expect(result.current.rejectReason).toBe('Not qualified');
+    expect(result.current.reject.rejectReason).toBe('Not qualified');
   });
 
   it('should compute completeness as zero when no resume selected', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.completeness.percentage).toBe(0);
+    expect(result.current.validation.completeness.percentage).toBe(0);
   });
 
   it('should return empty filtered resumes when no resumes loaded', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
-    expect(result.current.filteredResumes).toEqual([]);
+    expect(result.current.resumes.filteredResumes).toEqual([]);
   });
 
   it('should manage validation filter', () => {
     const { result } = renderHook(() => useRecruiterDashboard());
 
     act(() => {
-      result.current.setValidationFilter('warning');
+      result.current.validation.setValidationFilter('warning');
     });
 
-    expect(result.current.validationFilter).toBe('warning');
+    expect(result.current.validation.validationFilter).toBe('warning');
   });
 });
