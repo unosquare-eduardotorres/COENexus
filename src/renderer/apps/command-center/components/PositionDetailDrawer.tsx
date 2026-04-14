@@ -115,8 +115,8 @@ export default function PositionDetailDrawer({ upstreamId, onClose }: PositionDe
   return (
     <>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-dark-bg border-l border-white/5 z-50 overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-dark-bg/95 backdrop-blur border-b border-white/5 px-6 py-4">
+      <div className="fixed right-0 top-10 bottom-0 w-full max-w-2xl bg-dark-bg border-l border-t border-white/5 z-50 overflow-y-auto">
+        <div className="sticky top-0 z-10 bg-dark-bg/95 backdrop-blur border-b border-white/5 px-6 py-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               {detail ? (

@@ -1,5 +1,6 @@
 {
   "name": "operation-nexus",
+  "productName": "COE Nexus",
   "version": "1.0.0",
   "main": "./out/main/index.js",
   "scripts": {

@@ -283,7 +283,7 @@ export default function PrrReport() {
         </div>
       )}
 
-      <div className="glass-panel-subtle rounded-xl p-3 space-y-3">
+      <div className="glass-panel-subtle rounded-xl p-3 space-y-3 relative z-10">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[220px] max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"><SearchIcon /></span>

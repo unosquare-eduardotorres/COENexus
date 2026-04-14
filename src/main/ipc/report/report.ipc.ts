@@ -5,6 +5,8 @@ import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExport
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
+import { syncRepository } from '../../db/repositories/syncRepository'
+import { matchEngineService } from '../../services/matchEngineService'
 import { catalogService } from '../../services/catalogService'
 import { createLogger } from '../../services/logger'
 
@@ -57,6 +59,17 @@ export function registerReportHandlers(): void {
       validateSender(event)
       const feedbacks = await catalogService.getCandidatePositionFeedbacks(token)
       return Object.fromEntries(feedbacks)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_DELETE_POSITION,
+    async (event, upstreamId: number): Promise<{ deleted: boolean }> => {
+      validateSender(event)
+      log.info('Delete position requested', { upstreamId })
+      syncRepository.deleteOpenPosition(upstreamId)
+      matchEngineService.invalidateFilterCache()
+      return { deleted: true }
     }
   )
 }

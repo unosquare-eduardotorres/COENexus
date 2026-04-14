@@ -20,4 +20,8 @@ export const reportService = {
   getFeedbackCatalog(token: string): Promise<Record<number, string>> {
     return window.api.report.getFeedbackCatalog(token)
   },
+
+  deletePosition(upstreamId: number): Promise<{ deleted: boolean }> {
+    return window.api.report.deletePosition(upstreamId)
+  },
 }

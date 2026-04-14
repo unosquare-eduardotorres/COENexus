@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenPositionReport } from '../hooks/useOpenPositionReport'
+import { reportService } from '../services/reportService'
 import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
 import PositionDetailDrawer from '../components/PositionDetailDrawer'
 
@@ -88,6 +89,14 @@ function ColumnsIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   )
 }
@@ -435,6 +444,20 @@ export default function OpenPositionsReport() {
     setColumnConfig({ visible: defaultVisible, order: COLUMN_DEFINITIONS.map(c => c.key) })
   }, [])
 
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+  const handleDeletePosition = useCallback(async (upstreamId: number) => {
+    setDeletingId(upstreamId)
+    try {
+      await reportService.deletePosition(upstreamId)
+      report.evaluate()
+    } catch (err) {
+      console.error('Failed to delete position:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }, [report])
+
   const activeResults = report.filteredResults.filter(r => !isInactiveStatus(r.position.position_status))
   const inactiveResults = report.filteredResults.filter(r => isInactiveStatus(r.position.position_status))
   const flaggedResults = activeResults.filter(r => r.matchingCriteria.length > 0)
@@ -473,7 +496,7 @@ export default function OpenPositionsReport() {
       <h1 className="text-base font-semibold text-primary">Open Positions</h1>
 
       {!report.isLoading && report.results.length > 0 && (
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-6 gap-2">
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Total</p>
             <p className="text-lg font-bold text-primary font-mono">{report.results.length}</p>
@@ -489,6 +512,12 @@ export default function OpenPositionsReport() {
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Inactive</p>
             <p className="text-lg font-bold text-gray-400 font-mono">{report.results.filter(r => isInactiveStatus(r.position.position_status)).length}</p>
+          </div>
+          <div className="glass-panel-subtle rounded-xl px-3 py-2">
+            <p className="text-[11px] text-muted uppercase tracking-wide">Closed</p>
+            <p className="text-lg font-bold text-red-400 font-mono">
+              {report.results.filter(r => r.position.position_status === 'Closed').length}
+            </p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Avg. Aging</p>
@@ -676,7 +705,7 @@ export default function OpenPositionsReport() {
         </div>
 
         {showFilters && (
-          <div className="glass-panel-subtle rounded-xl p-3 space-y-3">
+          <div className="glass-panel-subtle rounded-xl p-3 space-y-3 relative z-10">
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-primary uppercase tracking-wider">Criteria</p>
               {report.hasActiveFilters && (
@@ -865,23 +894,33 @@ export default function OpenPositionsReport() {
               </p>
               <div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-3">
                 {inactiveResults.map(r => (
-                  <button
+                  <div
                     key={r.position.upstream_id}
-                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                    className="glass-card-hover p-2.5 text-left transition-all border-l-[3px] border-l-gray-500/40 opacity-40 hover:opacity-70"
+                    className="glass-card-hover p-2.5 text-left transition-all border-l-[3px] border-l-gray-500/40 opacity-40 hover:opacity-70 flex items-center justify-between"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
-                          {r.position.position_status}
-                        </span>
-                        <p className="text-sm font-medium text-primary truncate">{r.position.account}</p>
-                        <span className="text-xs text-muted">·</span>
-                        <span className="text-xs text-muted truncate">{r.position.main_skill}</span>
-                      </div>
+                    <button
+                      onClick={() => setSelectedPositionId(r.position.upstream_id)}
+                      className="flex-1 min-w-0 flex items-center gap-2"
+                    >
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
+                        {r.position.position_status}
+                      </span>
+                      <p className="text-sm font-medium text-primary truncate">{r.position.account}</p>
+                      <span className="text-xs text-muted">·</span>
+                      <span className="text-xs text-muted truncate">{r.position.main_skill}</span>
                       <span className="shrink-0 text-xs font-mono text-muted">{r.position.aging}d</span>
-                    </div>
-                  </button>
+                    </button>
+                    {r.position.position_status === 'Closed' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeletePosition(r.position.upstream_id) }}
+                        disabled={deletingId === r.position.upstream_id}
+                        title="Remove closed position from database"
+                        className="ml-2 shrink-0 p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                      >
+                        <TrashIcon />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </>
@@ -899,6 +938,7 @@ export default function OpenPositionsReport() {
                     {col.label}
                   </th>
                 ))}
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
@@ -915,6 +955,18 @@ export default function OpenPositionsReport() {
                         {col.render(r)}
                       </td>
                     ))}
+                    <td className="px-2 py-2.5">
+                      {r.position.position_status === 'Closed' && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeletePosition(r.position.upstream_id) }}
+                          disabled={deletingId === r.position.upstream_id}
+                          title="Remove closed position from database"
+                          className="p-1 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                        >
+                          <TrashIcon />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )
               })}

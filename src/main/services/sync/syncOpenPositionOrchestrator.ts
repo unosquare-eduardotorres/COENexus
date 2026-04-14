@@ -19,6 +19,7 @@ export const syncOpenPositionOrchestrator = {
     let fetchedRecords = 0
     let processedInRun = 0
     const maxToProcess = options.limit ?? Infinity
+    const syncedUpstreamIds = new Set<number>()
 
     while (processedInRun < maxToProcess) {
       if (signal.aborted) break
@@ -90,6 +91,7 @@ export const syncOpenPositionOrchestrator = {
           }
 
           syncRepository.upsertOpenPosition(entity)
+          syncedUpstreamIds.add(pos.id)
           syncedCount++
 
           for (const cand of candidates) {
@@ -171,6 +173,21 @@ export const syncOpenPositionOrchestrator = {
 
       pageOffset += items.length
       if (pageOffset >= totalRecords) break
+    }
+
+    if (!signal.aborted) {
+      const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
+      const closedDate = new Date().toISOString()
+      let closedCount = 0
+      for (const local of allLocalPositions) {
+        if (!syncedUpstreamIds.has(local.upstream_id) && local.position_status !== 'Closed') {
+          syncRepository.markPositionClosed(local.upstream_id, closedDate)
+          closedCount++
+        }
+      }
+      if (closedCount > 0) {
+        log.info('Marked positions as Closed (not in upstream)', { closedCount })
+      }
     }
 
     matchEngineService.invalidateFilterCache()

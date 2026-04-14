@@ -118,6 +118,7 @@ function setupPermissions(): void {
 }
 
 app.whenReady().then(async () => {
+  app.setName('COE Nexus')
   setupCSP()
   setupPermissions()
 

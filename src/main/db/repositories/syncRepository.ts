@@ -420,4 +420,18 @@ export const syncRepository = {
     const db = getDatabase()
     return (db.prepare('SELECT COUNT(*) as c FROM prr_presentations WHERE prr_id = ?').get(prrId) as { c: number }).c
   },
+
+  markPositionClosed(upstreamId: number, closedDate: string): void {
+    const db = getDatabase()
+    db.prepare(
+      "UPDATE synced_open_positions SET position_status = 'Closed', closed_date = ? WHERE upstream_id = ?"
+    ).run(closedDate, upstreamId)
+  },
+
+  deleteOpenPosition(upstreamId: number): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM open_position_discussions WHERE open_position_id = ?').run(upstreamId)
+    db.prepare('DELETE FROM open_position_candidates WHERE open_position_id = ?').run(upstreamId)
+    db.prepare('DELETE FROM synced_open_positions WHERE upstream_id = ?').run(upstreamId)
+  },
 }

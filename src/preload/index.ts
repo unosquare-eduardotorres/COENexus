@@ -225,6 +225,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_SYNC_STATUS),
     getFeedbackCatalog: (token: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG, token),
+    deletePosition: (upstreamId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_DELETE_POSITION, upstreamId),
   },
 
   prr: {

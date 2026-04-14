@@ -89,6 +89,7 @@ export const IPC_CHANNELS = {
   REPORT_EXPORT_CSV: 'report:export-csv',
   REPORT_GET_SYNC_STATUS: 'report:get-sync-status',
   REPORT_GET_FEEDBACK_CATALOG: 'report:get-feedback-catalog',
+  REPORT_DELETE_POSITION: 'report:delete-position',
 
   PRR_GET_ALL: 'prr:get-all',
   PRR_GET_DETAIL: 'prr:get-detail',
