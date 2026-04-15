@@ -39,6 +39,9 @@ export function upsertWithChangeDetection<TRow extends BaseRow>(
         (existing.status !== entity.status)
       if (needsStatusFix) {
         syncRepository.updateStatus(config.tableName, existing.id, entity.status)
+      } else {
+        entity.status = existing.status
+        entity.status_reason = existing.status_reason
       }
       return { dbId: existing.id, resumeChanged: false, syncDetail: 'unchanged' }
     }
@@ -46,6 +49,11 @@ export function upsertWithChangeDetection<TRow extends BaseRow>(
     if (resumeChanged) {
       log.info('Resume changed — clearing embeddings for re-index', { source: config.source, dbId: existing.id })
       embeddingRepository.deleteBySource(config.source, existing.id)
+    }
+
+    if (!resumeChanged && (existing.status === 'extracted' || existing.status === 'vectorized')) {
+      entity.status = existing.status
+      entity.status_reason = existing.status_reason
     }
 
     config.upsert(entity)

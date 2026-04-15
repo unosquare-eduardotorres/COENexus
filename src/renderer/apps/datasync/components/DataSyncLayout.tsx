@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import GlobalTitleBar from '../../../components/GlobalTitleBar';
 
-export type DataSyncPanel = 'overview' | 'employees' | 'candidates' | 'open-positions' | 'project-reallocations' | 'vectorization' | 'database-sharing';
+export type DataSyncPanel = 'overview' | 'employees' | 'candidates' | 'open-positions' | 'project-reallocations' | 'vectorization';
 
 interface DataSyncLayoutProps {
   children: ReactNode;
@@ -72,15 +72,7 @@ const configItems: Array<{ id: DataSyncPanel; label: string; icon: JSX.Element }
       </svg>
     ),
   },
-  {
-    id: 'database-sharing',
-    label: 'Database Sharing',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-      </svg>
-    ),
-  },
+
 ];
 
 export default function DataSyncLayout({

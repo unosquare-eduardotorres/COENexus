@@ -10,6 +10,7 @@ import type {
   ProcessingVectorizeSingleParams,
   ProcessingStartExtractionParams,
   ProcessingStartVectorizationParams,
+  ProcessingProcessAllParams,
   ProcessingResetStatusParams,
   MatchSearchRequest,
   MatchConfirmHaikuParams,
@@ -99,6 +100,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_RETRY_FAILED, params),
     retryFailedVectorization: (params: ProcessingStartVectorizationParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_RETRY_FAILED_VECTORIZATION, params),
+    processAll: (params: ProcessingProcessAllParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_PROCESS_ALL, params),
     resetStatus: (params: ProcessingResetStatusParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.PROCESSING_RESET_STATUS, params),
     addVoyageKey: (params: { apiKey: string }) =>
@@ -227,6 +230,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG, token),
     deletePosition: (upstreamId: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_DELETE_POSITION, upstreamId),
+    exportPdf: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_PDF),
   },
 
   prr: {
@@ -395,6 +400,10 @@ const api = {
     },
     readBundledFile: (relativePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_READ_BUNDLED_FILE, relativePath),
+    showItemInFolder: (filePath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER, filePath),
+    openPath: (filePath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_PATH, filePath),
   },
 } as const
 

@@ -98,7 +98,7 @@ export const syncPrrOrchestrator = {
           emitEvent({ type: 'record', record: { id: `prr-${prr.id}`, source: 'project-reallocations', status: 'sync_failed', name: prr.employee || 'Unknown', email: '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: prr.id, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
         }
 
-        emitEvent({ type: 'progress', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, currentRecord: prr.employee, status: 'syncing' } })
+        emitEvent({ type: 'progress', progress: { source: 'project-reallocations', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, currentRecord: prr.employee, status: 'syncing' } })
 
         if (processedInRun >= maxToProcess) break
       }
@@ -134,6 +134,6 @@ export const syncPrrOrchestrator = {
     }
 
     log.info('PRR sync finished', { totalRecords, fetchedRecords, syncedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
+    emitEvent({ type: 'complete', progress: { source: 'project-reallocations', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
   },
 }

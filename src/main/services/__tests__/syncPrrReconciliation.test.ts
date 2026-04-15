@@ -88,7 +88,7 @@ describe('syncPrrOrchestrator reconciliation', () => {
           attrition_risk: '',
           comments: '',
           presentations_count: 0,
-          coe_status: 'Active',
+          coe_status: 'Pending Evaluation',
           coe_comments: '[]',
           status: 'synced',
           status_reason: null,

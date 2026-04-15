@@ -21,6 +21,7 @@ export const IPC_CHANNELS = {
   PROCESSING_PAUSE_VECTORIZATION: 'processing:pause-vectorization',
   PROCESSING_RETRY_FAILED: 'processing:retry-failed',
   PROCESSING_RETRY_FAILED_VECTORIZATION: 'processing:retry-failed-vectorization',
+  PROCESSING_PROCESS_ALL: 'processing:process-all',
   PROCESSING_RESET_STATUS: 'processing:reset-status',
   PROCESSING_ADD_VOYAGE_KEY: 'processing:add-voyage-key',
   PROCESSING_REMOVE_VOYAGE_KEY: 'processing:remove-voyage-key',
@@ -83,6 +84,8 @@ export const IPC_CHANNELS = {
   APP_UPDATE_AVAILABLE: 'app:update-available',
   APP_UPDATE_DOWNLOADED: 'app:update-downloaded',
   APP_READ_BUNDLED_FILE: 'app:read-bundled-file',
+  APP_SHOW_ITEM_IN_FOLDER: 'app:show-item-in-folder',
+  APP_OPEN_PATH: 'app:open-path',
 
   REPORT_EVALUATE_POSITIONS: 'report:evaluate-positions',
   REPORT_POSITION_DETAIL: 'report:position-detail',
@@ -90,6 +93,7 @@ export const IPC_CHANNELS = {
   REPORT_GET_SYNC_STATUS: 'report:get-sync-status',
   REPORT_GET_FEEDBACK_CATALOG: 'report:get-feedback-catalog',
   REPORT_DELETE_POSITION: 'report:delete-position',
+  REPORT_EXPORT_PDF: 'report:export-pdf',
 
   PRR_GET_ALL: 'prr:get-all',
   PRR_GET_DETAIL: 'prr:get-detail',

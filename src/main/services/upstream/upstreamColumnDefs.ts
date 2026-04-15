@@ -48,7 +48,7 @@ export function buildEmployeeColumns(): ColumnDefinition[] {
 }
 
 export function buildCandidateColumns(year?: number): ColumnDefinition[] {
-  const statusUpdateColumn = col('StatusUpdate', 'Status Update', { dataType: 'datetimeutc' })
+  const statusUpdateColumn = col('StatusUpdate', 'Status Update', { dataType: 'datetimeutc', sortDirection: 'Descending', sortOrder: 1 })
 
   if (year != null) {
     statusUpdateColumn.filterOperator = 'Between'
@@ -63,7 +63,7 @@ export function buildCandidateColumns(year?: number): ColumnDefinition[] {
 
   return [
     col('CandidateId', 'Actions', { dataType: 'numeric', isKey: true, filterable: false, exportable: false, filterOperator: 'Equals' }),
-    col('Candidate', 'Candidate', { searchable: true, sortDirection: 'Ascending', sortOrder: 1 }),
+    col('Candidate', 'Candidate', { searchable: true }),
     col('Recruiter', 'Recruiter', { searchable: true }),
     col('CandidateStatusName', 'Status', { filterable: false }),
     col('JobBoard', 'Job Board'),

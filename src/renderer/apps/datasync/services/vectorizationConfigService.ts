@@ -34,12 +34,19 @@ export const vectorizationConfigService = {
     source?: string
   }> {
     try {
-      return await window.api.processing.getVoyageKeyStatus() as {
+      const result = await window.api.processing.getVoyageKeyStatus() as {
         configured: boolean
         keyCount?: number
         maskedKeys?: Array<{ index: number; masked: string }>
         source?: string
+        __ipcError?: boolean
+        message?: string
       };
+      if (result.__ipcError) {
+        log.error('[VectorizationConfig] IPC error checking Voyage key status:', result.message);
+        return { configured: false };
+      }
+      return result;
     } catch (error) {
       log.error('[VectorizationConfig] Failed to check Voyage key status:', error);
       return { configured: false };
@@ -47,10 +54,18 @@ export const vectorizationConfigService = {
   },
 
   async addVoyageKey(apiKey: string): Promise<{ saved: boolean }> {
-    return await window.api.processing.addVoyageKey({ apiKey }) as { saved: boolean };
+    const result = await window.api.processing.addVoyageKey({ apiKey }) as { saved?: boolean; __ipcError?: boolean; message?: string };
+    if (result.__ipcError) {
+      throw new Error(result.message || 'Failed to save API key');
+    }
+    return { saved: result.saved ?? false };
   },
 
   async removeVoyageKey(index: number): Promise<{ deleted: boolean }> {
-    return await window.api.processing.removeVoyageKey({ index }) as { deleted: boolean };
+    const result = await window.api.processing.removeVoyageKey({ index }) as { deleted?: boolean; __ipcError?: boolean; message?: string };
+    if (result.__ipcError) {
+      throw new Error(result.message || 'Failed to remove API key');
+    }
+    return { deleted: result.deleted ?? false };
   },
 };

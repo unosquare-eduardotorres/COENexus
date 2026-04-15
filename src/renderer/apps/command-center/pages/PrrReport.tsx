@@ -1,15 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePrrReport } from '../hooks/usePrrReport'
 import PrrDetailDrawer from '../components/PrrDetailDrawer'
 import { PRR_COE_STATUSES, type PrrCoeStatus } from '../types'
 
 type SortKey = 'employee' | 'account' | 'team' | 'mainSkill' | 'seniority' | 'transitionStatus' | 'coeStatus' | 'location' | 'daysOpened'
-
-interface SortOption {
-  key: SortKey
-  label: string
-}
 
 interface MultiSelectProps {
   label: string
@@ -30,14 +25,6 @@ function XIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  )
-}
-
-function SortIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" />
     </svg>
   )
 }
@@ -134,14 +121,15 @@ function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
 
 function getCoeStatusSelectStyle(status: PrrCoeStatus): string {
   const styleMap: Record<PrrCoeStatus, string> = {
-    Active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/30',
-    Idle: 'bg-amber-500/15 text-amber-400 border-amber-500/30 focus:ring-amber-500/30',
-    Closed: 'bg-red-500/15 text-red-400 border-red-500/30 focus:ring-red-500/30',
-    Undefined: 'bg-gray-500/10 text-gray-400 border-gray-500/20 focus:ring-gray-500/20',
-    'Not Apply': 'bg-slate-500/10 text-slate-400 border-slate-500/20 focus:ring-slate-500/20',
+    'Not Set': 'bg-gray-500/10 text-gray-400 border-gray-500/20 focus:ring-gray-500/20',
+    'Pending Evaluation': 'bg-amber-500/15 text-amber-400 border-amber-500/30 focus:ring-amber-500/30',
+    'Ready to Present': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/30',
+    'Not Applies': 'bg-slate-500/10 text-slate-400 border-slate-500/20 focus:ring-slate-500/20',
+    'Other': 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 focus:ring-indigo-500/30',
+    'Closed': 'bg-red-500/15 text-red-400 border-red-500/30 focus:ring-red-500/30',
   }
 
-  return styleMap[status] ?? styleMap.Undefined
+  return styleMap[status] ?? styleMap['Not Set']
 }
 
 function getDaysOpenedStyle(daysOpened: number): string {
@@ -151,17 +139,17 @@ function getDaysOpenedStyle(daysOpened: number): string {
   return 'text-emerald-400'
 }
 
-const SORT_OPTIONS: SortOption[] = [
-  { key: 'daysOpened', label: 'Days Opened' },
-  { key: 'employee', label: 'Employee' },
-  { key: 'account', label: 'Client' },
-  { key: 'team', label: 'Team' },
-  { key: 'mainSkill', label: 'Main Skill' },
-  { key: 'seniority', label: 'Seniority' },
-  { key: 'transitionStatus', label: 'PRR Status' },
-  { key: 'coeStatus', label: 'CoE Status' },
-  { key: 'location', label: 'Location' },
-]
+const COLUMN_SORT_MAP: Record<string, SortKey> = {
+  'Employee': 'employee',
+  'Client': 'account',
+  'Team': 'team',
+  'Main Skill': 'mainSkill',
+  'Seniority': 'seniority',
+  'PRR Status': 'transitionStatus',
+  'CoE Status': 'coeStatus',
+  'Location': 'location',
+  'Days Opened': 'daysOpened',
+}
 
 export default function PrrReport() {
   const navigate = useNavigate()
@@ -169,19 +157,20 @@ export default function PrrReport() {
   const [selectedUpstreamId, setSelectedUpstreamId] = useState<number | null>(null)
   const [savingStatusIds, setSavingStatusIds] = useState<number[]>([])
   const [deletingIds, setDeletingIds] = useState<number[]>([])
+  const [pdfToast, setPdfToast] = useState<{ filePath: string } | null>(null)
 
   const summary = useMemo(() => {
     const total = report.filteredResults.length
-    const active = report.filteredResults.filter(item => item.coeStatus === 'Active').length
-    const idle = report.filteredResults.filter(item => item.coeStatus === 'Idle').length
+    const pendingEval = report.filteredResults.filter(item => item.coeStatus === 'Pending Evaluation').length
+    const readyToPresent = report.filteredResults.filter(item => item.coeStatus === 'Ready to Present').length
     const closed = report.filteredResults.filter(item => item.coeStatus === 'Closed').length
 
-    return { total, active, idle, closed }
+    return { total, pendingEval, readyToPresent, closed }
   }, [report.filteredResults])
 
-  const sortLabel = useMemo(() => {
-    return SORT_OPTIONS.find(option => option.key === report.sortKey)?.label ?? 'Days Opened'
-  }, [report.sortKey])
+  const hasClosedItems = useMemo(() => {
+    return report.filteredResults.some(item => item.coeStatus === 'Closed')
+  }, [report.filteredResults])
 
   const handleStatusChange = useCallback(async (upstreamId: number, nextStatus: PrrCoeStatus) => {
     setSavingStatusIds(prev => (prev.includes(upstreamId) ? prev : [...prev, upstreamId]))
@@ -209,12 +198,14 @@ export default function PrrReport() {
   }, [report, selectedUpstreamId])
 
   const exportToExcel = useCallback(() => {
-    const headers = ['Employee', 'Client', 'Team', 'Main Skill', 'Seniority', 'PRR Status', 'Sub Type', 'CoE Status', 'Location', 'Request Date', 'Days Opened', 'Days Since Last Interview', 'Impact', 'Attrition Risk', 'Presentations', 'Comments']
+    const headers = ['Employee', 'Client', 'Team', 'Main Skill', 'Seniority', 'PRR Status', 'Sub Type', 'CoE Status', 'Location', 'Request Date', 'Days Opened', 'Days Since Last Interview', 'Impact', 'Attrition Risk', 'Presentations', 'Upstream Comments', 'COE Comments']
     const rows = report.filteredResults.map(item => [
       item.employee, item.account, item.team, item.mainSkill, item.seniority,
       item.transitionStatus, item.transitionSubType, item.coeStatus, item.location,
       item.requestDate ?? '', String(item.daysOpened), item.daysSinceLastInterview,
-      item.impact, item.attritionRisk, String(item.presentationsCount), item.comments,
+      item.impact, item.attritionRisk, String(item.presentationsCount),
+      item.comments,
+      item.coeComments.map(c => `${c.author}: ${c.text}`).join(' | '),
     ])
 
     const escape = (v: string) => (v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v)
@@ -269,12 +260,12 @@ export default function PrrReport() {
             <p className="text-lg font-bold text-primary font-mono">{summary.total}</p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Active</p>
-            <p className="text-lg font-bold text-emerald-400 font-mono">{summary.active}</p>
+            <p className="text-[11px] text-muted uppercase tracking-wide">Pending Eval</p>
+            <p className="text-lg font-bold text-amber-400 font-mono">{summary.pendingEval}</p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Idle</p>
-            <p className="text-lg font-bold text-amber-400 font-mono">{summary.idle}</p>
+            <p className="text-[11px] text-muted uppercase tracking-wide">Ready to Present</p>
+            <p className="text-lg font-bold text-emerald-400 font-mono">{summary.readyToPresent}</p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Closed</p>
@@ -283,7 +274,7 @@ export default function PrrReport() {
         </div>
       )}
 
-      <div className="glass-panel-subtle rounded-xl p-3 space-y-3 relative z-10">
+      <div className="glass-panel-subtle rounded-xl p-3 space-y-3 relative z-10 print-filters">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[220px] max-w-sm">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"><SearchIcon /></span>
@@ -314,27 +305,6 @@ export default function PrrReport() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted uppercase tracking-wider">Sort</span>
-            <select
-              value={report.sortKey}
-              onChange={event => report.setSortKey(event.target.value as SortKey)}
-              className="glass-input h-8 text-xs min-w-[140px]"
-            >
-              {SORT_OPTIONS.map(option => (
-                <option key={option.key} value={option.key}>{option.label}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => report.setSortDirection(report.sortDirection === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-secondary hover:text-primary hover:bg-white/5 border border-white/5 transition-all"
-            >
-              <span className={`transition-transform ${report.sortDirection === 'asc' ? 'rotate-180' : ''}`}><SortIcon /></span>
-              {sortLabel}
-            </button>
-          </div>
-
           <div className="ml-auto flex items-center gap-2">
             {report.activeFilterCount > 0 && (
               <span className="px-2 py-1 rounded-full text-[10px] bg-emerald-500/25 text-emerald-400 font-medium uppercase tracking-wider">
@@ -353,9 +323,22 @@ export default function PrrReport() {
               type="button"
               onClick={exportToExcel}
               disabled={report.filteredResults.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed no-print"
             >
               <DownloadIcon /> Export CSV
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const result = await window.api.report.exportPdf()
+                if (result.saved && result.filePath) {
+                  setPdfToast({ filePath: result.filePath })
+                  setTimeout(() => setPdfToast(null), 8000)
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-blue-600/80 hover:bg-blue-500 text-white transition-all no-print"
+            >
+              <DownloadIcon /> Export PDF
             </button>
           </div>
         </div>
@@ -379,71 +362,134 @@ export default function PrrReport() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-dark-bg/95 backdrop-blur">
               <tr className="border-b border-white/10">
-                {['Employee', 'Client', 'Team', 'Main Skill', 'Seniority', 'PRR Status', 'CoE Status', 'Location', 'Days Opened', 'Actions'].map(column => (
-                  <th key={column} className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted px-3 py-3 first:pl-4 last:pr-4">
-                    {column}
-                  </th>
-                ))}
+                {[
+                  'Employee', 'Client', 'Team', 'Main Skill', 'Seniority',
+                  'PRR Status', 'CoE Status', 'Location', 'Days Opened',
+                  ...(hasClosedItems ? ['Actions'] : []),
+                ].map(column => {
+                  const columnSortKey = COLUMN_SORT_MAP[column]
+                  const isSorted = columnSortKey && report.sortKey === columnSortKey
+
+                  return (
+                    <th
+                      key={column}
+                      className={`text-left text-[11px] font-semibold uppercase tracking-wider px-3 py-3 first:pl-4 last:pr-4 ${
+                        columnSortKey ? 'cursor-pointer select-none hover:text-secondary transition-colors' : ''
+                      } ${isSorted ? 'text-emerald-400' : 'text-muted'}`}
+                      onClick={columnSortKey ? () => {
+                        if (report.sortKey === columnSortKey) {
+                          report.setSortDirection(report.sortDirection === 'asc' ? 'desc' : 'asc')
+                        } else {
+                          report.setSortKey(columnSortKey)
+                          report.setSortDirection('desc')
+                        }
+                      } : undefined}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {column}
+                        {isSorted && (
+                          <span className={`transition-transform ${report.sortDirection === 'asc' ? 'rotate-180' : ''}`}>
+                            ▾
+                          </span>
+                        )}
+                      </span>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
               {report.filteredResults.map((item, index) => {
                 const isSavingStatus = savingStatusIds.includes(item.upstreamId)
                 const isDeleting = deletingIds.includes(item.upstreamId)
+                const stripe = index % 2 === 0 ? '' : 'bg-white/[0.02]'
+                const hasComments = !!(item.comments || item.coeComments.length > 0)
+                const columnCount = 9 + (hasClosedItems ? 1 : 0)
 
                 return (
-                  <tr
-                    key={item.upstreamId}
-                    className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${index % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
-                    onClick={() => setSelectedUpstreamId(item.upstreamId)}
-                  >
-                    <td className="px-3 py-2.5 first:pl-4 text-primary font-medium">{item.employee || '—'}</td>
-                    <td className="px-3 py-2.5 text-secondary">{item.account || '—'}</td>
-                    <td className="px-3 py-2.5 text-secondary">{item.team || '—'}</td>
-                    <td className="px-3 py-2.5 text-secondary">{item.mainSkill || '—'}</td>
-                    <td className="px-3 py-2.5 text-secondary">{item.seniority || '—'}</td>
-                    <td className="px-3 py-2.5 text-secondary">{item.transitionStatus || '—'}</td>
-                    <td className="px-3 py-2.5">
-                      <select
-                        value={item.coeStatus}
-                        disabled={isSavingStatus}
-                        onClick={event => event.stopPropagation()}
-                        onChange={event => {
-                          event.stopPropagation()
-                          void handleStatusChange(item.upstreamId, event.target.value as PrrCoeStatus)
-                        }}
-                        className={`h-7 px-2 pr-7 rounded-md text-xs font-medium border appearance-none cursor-pointer transition-colors focus:outline-none focus:ring-1 ${getCoeStatusSelectStyle(item.coeStatus)}`}
-                        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                      >
-                        {PRR_COE_STATUSES.map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2.5 text-secondary">{item.location || '—'}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`font-mono font-bold ${getDaysOpenedStyle(item.daysOpened)}`}>
-                        {item.daysOpened}d
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 last:pr-4">
-                      {item.coeStatus === 'Closed' ? (
-                        <button
-                          type="button"
-                          onClick={event => {
+                  <Fragment key={item.upstreamId}>
+                    <tr
+                      className={`hover:bg-white/[0.04] cursor-pointer transition-colors ${stripe}`}
+                      onClick={() => setSelectedUpstreamId(item.upstreamId)}
+                    >
+                      <td className="px-3 py-2.5 first:pl-4 text-primary font-medium align-top">{item.employee || '—'}</td>
+                      <td className="px-3 py-2.5 text-secondary align-top">{item.account || '—'}</td>
+                      <td className="px-3 py-2.5 text-secondary align-top">{item.team || '—'}</td>
+                      <td className="px-2 py-2.5 text-secondary whitespace-nowrap align-top">{item.mainSkill || '—'}</td>
+                      <td className="px-2 py-2.5 text-secondary whitespace-nowrap align-top">{item.seniority || '—'}</td>
+                      <td className="px-2 py-2.5 text-secondary whitespace-nowrap align-top">{item.transitionStatus || '—'}</td>
+                      <td className="px-3 py-2.5 align-top">
+                        <select
+                          value={item.coeStatus}
+                          disabled={isSavingStatus}
+                          onClick={event => event.stopPropagation()}
+                          onChange={event => {
                             event.stopPropagation()
-                            void handleDelete(item.upstreamId)
+                            void handleStatusChange(item.upstreamId, event.target.value as PrrCoeStatus)
                           }}
-                          disabled={isDeleting}
-                          className="px-2 py-1 rounded-md text-[11px] font-semibold uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className={`h-7 px-2 pr-7 rounded-md text-xs font-medium border appearance-none cursor-pointer transition-colors focus:outline-none focus:ring-1 ${getCoeStatusSelectStyle(item.coeStatus)}`}
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
                         >
-                          {isDeleting ? 'Deleting...' : 'Delete'}
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-muted uppercase tracking-wider">—</span>
+                          {PRR_COE_STATUSES.map(status => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2.5 text-secondary whitespace-nowrap align-top">{item.location || '—'}</td>
+                      <td className="px-2 py-2.5 whitespace-nowrap text-center align-top">
+                        <span className={`font-mono font-bold ${getDaysOpenedStyle(item.daysOpened)}`}>
+                          {item.daysOpened}d
+                        </span>
+                      </td>
+                      {hasClosedItems && (
+                        <td className="px-3 py-2.5 last:pr-4 align-top">
+                          {item.coeStatus === 'Closed' ? (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                event.stopPropagation()
+                                void handleDelete(item.upstreamId)
+                              }}
+                              disabled={isDeleting}
+                              className="px-2 py-1 rounded-md text-[11px] font-semibold uppercase tracking-wider bg-red-500/15 text-red-400 border border-red-500/25 hover:bg-red-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {isDeleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-muted uppercase tracking-wider">—</span>
+                          )}
+                        </td>
                       )}
-                    </td>
-                  </tr>
+                    </tr>
+
+                    {hasComments && (
+                      <tr
+                        className="cursor-pointer transition-colors bg-white/[0.015]"
+                        onClick={() => setSelectedUpstreamId(item.upstreamId)}
+                      >
+                        <td colSpan={columnCount} className="pl-5 pr-4 pb-2.5 pt-1 text-xs">
+                          <div className="flex gap-8">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] uppercase tracking-wider bg-amber-500/10 text-amber-400/80 px-1.5 py-0.5 rounded mr-2">Upstream</span>
+                              <span className="break-words text-muted">{item.comments || '—'}</span>
+                            </div>
+                            <div className="w-px bg-white/5 self-stretch" />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-400/80 px-1.5 py-0.5 rounded mr-2">COE</span>
+                              <span className="break-words text-muted">
+                                {item.coeComments.length > 0 ? item.coeComments.map(c => c.text).join(' | ') : '—'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* Separator row between people */}
+                    <tr className="h-1.5 bg-[#0a0a0f]" aria-hidden="true">
+                      <td colSpan={columnCount} className="p-0" />
+                    </tr>
+                  </Fragment>
                 )
               })}
             </tbody>
@@ -464,7 +510,59 @@ export default function PrrReport() {
         </div>
       )}
 
-      <PrrDetailDrawer upstreamId={selectedUpstreamId} onClose={() => setSelectedUpstreamId(null)} />
+      <PrrDetailDrawer upstreamId={selectedUpstreamId} onClose={() => setSelectedUpstreamId(null)} onDataChanged={report.loadData} />
+
+      {pdfToast && (
+        <div className="fixed bottom-6 right-6 z-50 w-80 glass-panel border border-emerald-500/20 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 no-print">
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <span className="text-emerald-400 text-xs">✓</span>
+              </div>
+              <span className="text-sm font-medium text-primary">PDF Exported</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPdfToast(null)}
+              className="text-muted hover:text-primary transition-colors"
+            >
+              <XIcon />
+            </button>
+          </div>
+
+          <div className="px-4 pb-3">
+            <p className="text-xs text-muted truncate" title={pdfToast.filePath}>
+              {pdfToast.filePath.split('/').pop()}
+            </p>
+          </div>
+
+          <div className="flex border-t border-white/5">
+            <button
+              type="button"
+              onClick={async () => {
+                const filePath = pdfToast.filePath
+                setPdfToast(null)
+                await window.api.app.openPath(filePath)
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+            >
+              Open File
+            </button>
+            <div className="w-px bg-white/5" />
+            <button
+              type="button"
+              onClick={async () => {
+                const filePath = pdfToast.filePath
+                setPdfToast(null)
+                await window.api.app.showItemInFolder(filePath)
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-blue-400 hover:bg-blue-500/10 transition-colors"
+            >
+              Show in Folder
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

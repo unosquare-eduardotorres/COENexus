@@ -12,6 +12,7 @@ interface ProcessActionButtonsProps {
   label: string;
   icon: JSX.Element;
   disabled?: boolean;
+  title?: string;
 }
 
 export default function ProcessActionButtons({
@@ -26,6 +27,7 @@ export default function ProcessActionButtons({
   label,
   icon,
   disabled,
+  title,
 }: ProcessActionButtonsProps) {
   const status = progress?.status ?? 'idle';
   const isRunning = status === 'processing';
@@ -87,7 +89,18 @@ export default function ProcessActionButtons({
     );
   }
 
-  if (isCompleted && onStart) {
+  if (isCompleted && !hasEligible) {
+    return (
+      <span className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        All processed
+      </span>
+    );
+  }
+
+  if (isCompleted && hasEligible && onStart) {
     return (
       <button
         onClick={onStart}
@@ -109,6 +122,7 @@ export default function ProcessActionButtons({
       <button
         onClick={onStart}
         disabled={disabled}
+        title={title}
         className={`inline-flex items-center gap-2 px-5 py-2.5 ${bgClass} text-white rounded-xl ${hoverBgClass} transition-colors duration-200 font-semibold text-sm ${
           disabled ? 'opacity-60 cursor-not-allowed' : ''
         }`}

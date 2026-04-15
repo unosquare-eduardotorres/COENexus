@@ -226,6 +226,12 @@ export interface ProcessingStartVectorizationParams {
   model?: string
 }
 
+export interface ProcessingProcessAllParams {
+  source: string
+  token: string
+  model?: string
+}
+
 export interface ProcessingResetStatusParams {
   source: string
 }
@@ -487,6 +493,11 @@ export interface ReportSyncStatus {
 }
 
 export interface ReportExportCsvResult {
+  saved: boolean
+  filePath?: string
+}
+
+export interface ReportExportPdfResult {
   saved: boolean
   filePath?: string
 }
@@ -991,7 +1002,7 @@ export interface Scout9ReportDetail {
   candidates: Scout9ReportCandidate[]
 }
 
-export type PrrCoeStatus = 'Undefined' | 'Active' | 'Idle' | 'Not Apply' | 'Closed'
+export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Not Applies' | 'Other' | 'Closed'
 
 export interface PrrCommentDto {
   text: string
@@ -1073,6 +1084,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.PROCESSING_PAUSE_VECTORIZATION]: { request: void; response: { paused: boolean } }
   [IPC_CHANNELS.PROCESSING_RETRY_FAILED]: { request: ProcessingStartExtractionParams; response: { started: boolean } }
   [IPC_CHANNELS.PROCESSING_RETRY_FAILED_VECTORIZATION]: { request: ProcessingStartVectorizationParams; response: { started: boolean } }
+  [IPC_CHANNELS.PROCESSING_PROCESS_ALL]: { request: ProcessingProcessAllParams; response: { started: boolean } }
   [IPC_CHANNELS.PROCESSING_RESET_STATUS]: { request: ProcessingResetStatusParams; response: { reset: boolean } }
   [IPC_CHANNELS.PROCESSING_ADD_VOYAGE_KEY]: { request: AddVoyageKeyParams; response: { saved: boolean } }
   [IPC_CHANNELS.PROCESSING_REMOVE_VOYAGE_KEY]: { request: RemoveVoyageKeyParams; response: { deleted: boolean } }
@@ -1127,6 +1139,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_GET_SYNC_STATUS]: { request: void; response: ReportSyncStatus }
   [IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG]: { request: string; response: Record<number, string> }
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
+  [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
 
   [IPC_CHANNELS.PRR_GET_ALL]: { request: void; response: { results: PrrReportItem[]; lastSyncedAt: string | null } }
   [IPC_CHANNELS.PRR_GET_DETAIL]: { request: number; response: PrrDetailResult | null }
@@ -1201,6 +1214,9 @@ export interface IpcContracts {
   [IPC_CHANNELS.APP_CHECK_FOR_UPDATES]: { request: void; response: AppUpdateInfo | null }
   [IPC_CHANNELS.APP_DOWNLOAD_UPDATE]: { request: void; response: { success: boolean } }
   [IPC_CHANNELS.APP_INSTALL_UPDATE]: { request: void; response: void }
+  [IPC_CHANNELS.APP_READ_BUNDLED_FILE]: { request: string; response: string }
+  [IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER]: { request: string; response: void }
+  [IPC_CHANNELS.APP_OPEN_PATH]: { request: string; response: void }
 }
 
 export interface IpcEventContracts {

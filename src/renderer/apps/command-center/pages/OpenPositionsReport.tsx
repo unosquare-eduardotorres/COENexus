@@ -445,6 +445,7 @@ export default function OpenPositionsReport() {
   }, [])
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [pdfToast, setPdfToast] = useState<{ filePath: string } | null>(null)
 
   const handleDeletePosition = useCallback(async (upstreamId: number) => {
     setDeletingId(upstreamId)
@@ -697,9 +698,21 @@ export default function OpenPositionsReport() {
             <button
               onClick={report.exportCsv}
               disabled={report.filteredResults.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed no-print"
             >
               <DownloadIcon /> Export CSV
+            </button>
+            <button
+              onClick={async () => {
+                const result = await window.api.report.exportPdf()
+                if (result.saved && result.filePath) {
+                  setPdfToast({ filePath: result.filePath })
+                  setTimeout(() => setPdfToast(null), 8000)
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-blue-600/80 hover:bg-blue-500 text-white transition-all no-print"
+            >
+              <DownloadIcon /> Export PDF
             </button>
           </div>
         </div>
@@ -1066,6 +1079,30 @@ export default function OpenPositionsReport() {
         upstreamId={selectedPositionId}
         onClose={() => setSelectedPositionId(null)}
       />
+
+      {pdfToast && (
+        <div className="fixed bottom-6 right-6 z-50 glass-panel border border-emerald-500/30 rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl animate-in slide-in-from-bottom-4 no-print">
+          <span className="text-xs text-emerald-400">✓ PDF saved</span>
+          <button
+            type="button"
+            onClick={async () => {
+              const filePath = pdfToast.filePath
+              setPdfToast(null)
+              await window.api.app.showItemInFolder(filePath)
+            }}
+            className="text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2 truncate max-w-[300px]"
+          >
+            {pdfToast.filePath}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPdfToast(null)}
+            className="text-muted hover:text-primary ml-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { SyncSourceType, SyncProgress, SyncRecord, ProcessingProgress } from '../types';
 import SyncRecordTable from './SyncRecordTable';
 import DangerConfirmModal from './DangerConfirmModal';
@@ -25,6 +25,7 @@ interface SyncDashboardProps {
   onResumeVectorization?: () => void;
   vectorizationProgress?: ProcessingProgress;
   vectorizingUpstreamId?: number;
+  onProcessAll?: () => void;
   onRefreshRecord?: (upstreamId: number) => void;
   onVectorizeRecord?: (upstreamId: number) => void;
   refreshingId?: number;
@@ -35,6 +36,7 @@ interface SyncDashboardProps {
   selectedYear?: number | null;
   onYearChange?: (year: number) => void;
   isSyncDisabled?: boolean;
+  isVoyageKeyConfigured?: boolean;
 }
 
 function formatLastSynced(isoString?: string): string {
@@ -66,6 +68,7 @@ const SyncDashboard = memo(function SyncDashboard({
   onResumeVectorization,
   vectorizationProgress,
   vectorizingUpstreamId,
+  onProcessAll,
   onRefreshRecord,
   onVectorizeRecord,
   refreshingId,
@@ -76,9 +79,34 @@ const SyncDashboard = memo(function SyncDashboard({
   selectedYear,
   onYearChange,
   isSyncDisabled,
+  isVoyageKeyConfigured,
 }: SyncDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<StatusCardKey>('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showExtractionResult, setShowExtractionResult] = useState(false);
+  const [showVectorizationResult, setShowVectorizationResult] = useState(false);
+
+  useEffect(() => {
+    if (extractionProgress?.status === 'completed') {
+      setShowExtractionResult(true);
+      const timer = setTimeout(() => setShowExtractionResult(false), 3000);
+      return () => clearTimeout(timer);
+    }
+    if (extractionProgress?.status === 'processing') {
+      setShowExtractionResult(false);
+    }
+  }, [extractionProgress?.status]);
+
+  useEffect(() => {
+    if (vectorizationProgress?.status === 'completed') {
+      setShowVectorizationResult(true);
+      const timer = setTimeout(() => setShowVectorizationResult(false), 3000);
+      return () => clearTimeout(timer);
+    }
+    if (vectorizationProgress?.status === 'processing') {
+      setShowVectorizationResult(false);
+    }
+  }, [vectorizationProgress?.status]);
 
   const sourceLabel = source === 'open-positions' ? 'Open Positions' : source === 'project-reallocations' ? 'Project Reallocations' : source.charAt(0).toUpperCase() + source.slice(1);
   const isActiveOrPaused = progress.status === 'syncing' || progress.status === 'paused';
@@ -289,6 +317,30 @@ const SyncDashboard = memo(function SyncDashboard({
             </>
           )}
 
+          {source !== 'project-reallocations' && (
+            <ProcessActionButtons
+              progress={extractionProgress}
+              hasEligible={records.some((r) =>
+                (r.pipelineStatus === 'synced' || r.pipelineStatus === 'extracted'
+                  || r.pipelineStatus === 'extract_failed' || r.pipelineStatus === 'vectorize_failed')
+                && (source === 'open-positions' ? r.hasJobDescription : r.hasResume)
+              )}
+              onStart={onProcessAll}
+              onPause={onPauseExtraction}
+              bgClass="bg-emerald-500"
+              hoverBgClass="hover:bg-emerald-600"
+              gradientClass="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+              label="Process All"
+              icon={
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              }
+              disabled={isSyncInProgress || isSyncDisabled || isVoyageKeyConfigured === false}
+              title={isVoyageKeyConfigured === false ? 'Voyage API key required — configure in Vectorization settings' : undefined}
+            />
+          )}
+
           {source !== 'project-reallocations' && (statusFilter === 'synced' || statusFilter === 'extracted' || statusFilter === 'extract_failed') && (
             <ProcessActionButtons
               progress={extractionProgress}
@@ -325,30 +377,66 @@ const SyncDashboard = memo(function SyncDashboard({
         </div>
       </div>
 
-      {isExtracting && extractionProgress && (
-        <ProgressBar
-          label={source === 'open-positions' ? 'Extracting JDs' : 'Extracting resumes'}
-          progress={extractionProgress}
-          percent={extractionPercent}
-          dotColor="bg-blue-500"
-          barGradient="bg-gradient-to-r from-blue-500 to-cyan-500"
-          textColor="text-blue-500"
-          onPause={onPauseExtraction}
-          onResume={onResumeExtraction}
-        />
+      {(isExtracting || showExtractionResult) && extractionProgress && (
+        extractionProgress.status === 'completed' ? (
+          <div className="glass-panel-subtle rounded-xl p-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-sm font-medium text-secondary">
+                {extractionProgress.totalRecords === 0
+                  ? 'No records to extract — all resumes already processed'
+                  : `Extraction complete — ${extractionProgress.successCount} extracted, ${extractionProgress.failedCount} failed`}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-200 dark:bg-dark-border rounded-full overflow-hidden mt-2">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: '100%' }} />
+            </div>
+          </div>
+        ) : (
+          <ProgressBar
+            label={source === 'open-positions' ? 'Extracting JDs' : 'Extracting resumes'}
+            progress={extractionProgress}
+            percent={extractionPercent}
+            dotColor="bg-blue-500"
+            barGradient="bg-gradient-to-r from-blue-500 to-cyan-500"
+            textColor="text-blue-500"
+            onPause={onPauseExtraction}
+            onResume={onResumeExtraction}
+          />
+        )
       )}
 
-      {isVectorizing && vectorizationProgress && (
-        <ProgressBar
-          label={source === 'open-positions' ? 'Vectorizing JDs' : 'Vectorizing resumes'}
-          progress={vectorizationProgress}
-          percent={vectorizationPercent}
-          dotColor="bg-violet-500"
-          barGradient="bg-gradient-to-r from-violet-500 to-violet-500"
-          textColor="text-violet-500"
-          onPause={onPauseVectorization}
-          onResume={onResumeVectorization}
-        />
+      {(isVectorizing || showVectorizationResult) && vectorizationProgress && (
+        vectorizationProgress.status === 'completed' ? (
+          <div className="glass-panel-subtle rounded-xl p-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-sm font-medium text-secondary">
+                {vectorizationProgress.totalRecords === 0
+                  ? 'No records to vectorize — all extracted resumes already vectorized'
+                  : `Vectorization complete — ${vectorizationProgress.successCount} vectorized, ${vectorizationProgress.failedCount} failed`}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-200 dark:bg-dark-border rounded-full overflow-hidden mt-2">
+              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: '100%' }} />
+            </div>
+          </div>
+        ) : (
+          <ProgressBar
+            label={source === 'open-positions' ? 'Vectorizing JDs' : 'Vectorizing resumes'}
+            progress={vectorizationProgress}
+            percent={vectorizationPercent}
+            dotColor="bg-violet-500"
+            barGradient="bg-gradient-to-r from-violet-500 to-violet-500"
+            textColor="text-violet-500"
+            onPause={onPauseVectorization}
+            onResume={onResumeVectorization}
+          />
+        )
       )}
 
       <div

@@ -52,8 +52,8 @@ function computeProgressFromRecords(records: SyncRecord[], existing: SyncProgres
   }, existing.lastSyncedAt);
   return {
     ...existing,
-    totalRecords: hasStaleProgress ? totalFromRecords : Math.max(existing.totalRecords, totalFromRecords),
-    fetchedRecords: hasStaleProgress ? totalFromRecords : Math.max(existing.fetchedRecords, totalFromRecords),
+    totalRecords: hasStaleProgress ? totalFromRecords : existing.totalRecords,
+    fetchedRecords: hasStaleProgress ? totalFromRecords : existing.fetchedRecords,
     syncedCount, extractedCount, vectorizedCount, incompleteCount, notProcessedCount,
     status: existing.status === SYNC_STATUS.IDLE && totalFromRecords > 0 ? SYNC_STATUS.COMPLETED : existing.status,
     lastSyncedAt,
@@ -117,7 +117,10 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
   useEffect(() => {
     if (!recordsQuery.data) return;
     setRecords(recordsQuery.data);
-    setProgress((prev) => computeProgressFromRecords(recordsQuery.data, prev));
+    setProgress((prev) => {
+      if (prev.status === SYNC_STATUS.SYNCING) return prev;
+      return computeProgressFromRecords(recordsQuery.data, prev);
+    });
   }, [recordsQuery.data]);
 
   useEffect(() => {
@@ -127,11 +130,14 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
 
   useEffect(() => {
     if (!syncStatusQuery.data) return;
-    setProgress((prev) => ({
-      ...prev,
-      totalRecords: Math.max(prev.totalRecords ?? 0, syncStatusQuery.data.totalRecords ?? 0),
-      fetchedRecords: Math.max(prev.fetchedRecords ?? 0, syncStatusQuery.data.fetchedRecords ?? 0),
-    }));
+    setProgress((prev) => {
+      if (prev.status === SYNC_STATUS.SYNCING) return prev;
+      return {
+        ...prev,
+        totalRecords: Math.max(prev.totalRecords ?? 0, syncStatusQuery.data.totalRecords ?? 0),
+        fetchedRecords: Math.max(prev.fetchedRecords ?? 0, syncStatusQuery.data.fetchedRecords ?? 0),
+      };
+    });
   }, [syncStatusQuery.data]);
 
   useEffect(() => {
@@ -194,6 +200,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
         syncedCount: 0, incompleteCount: 0, notProcessedCount: 0,
         extractedCount: 0, vectorizedCount: 0, skippedCount: 0,
       });
+      localStorage.removeItem(`datasync-${storageKey(source)}-progress`);
     } else {
       setProgress((prev) => ({ ...prev, status: SYNC_STATUS.SYNCING }));
     }
@@ -239,7 +246,11 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
 
     setExtractionProgress(finalProgress);
     setExtractingUpstreamId(undefined);
-  }, [source, token, handleRecordExtracted]);
+
+    if (finalProgress.successCount > 0) {
+      await invalidateRecordQueries();
+    }
+  }, [source, token, handleRecordExtracted, invalidateRecordQueries]);
 
   const handlePauseExtraction = useCallback(() => {
     extractionAbortRef.current?.abort();
@@ -262,11 +273,50 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
 
     setVectorizationProgress(finalProgress);
     setVectorizingUpstreamId(undefined);
-  }, [source, handleRecordVectorized]);
+
+    if (finalProgress.successCount > 0) {
+      await invalidateRecordQueries();
+    }
+  }, [source, handleRecordVectorized, invalidateRecordQueries]);
 
   const handlePauseVectorization = useCallback(() => {
     vectorizationAbortRef.current?.abort();
   }, []);
+
+  const handleProcessAll = useCallback(async () => {
+    extractionAbortRef.current?.abort();
+    vectorizationAbortRef.current?.abort();
+    const controller = new AbortController();
+    extractionAbortRef.current = controller;
+
+    setExtractionProgress({
+      source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
+      processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
+    });
+
+    const handleRecord = (processed: ProcessingRecord) => {
+      if (processed.status === 'extracted') {
+        handleRecordExtracted(processed);
+      } else if (processed.status === 'vectorized') {
+        handleRecordVectorized(processed);
+      } else if (processed.status === 'failed') {
+        handleRecordExtracted(processed);
+      }
+    };
+
+    const finalProgress = await resumeProcessingService.processAll(
+      source, token, (p) => setExtractionProgress(p),
+      handleRecord, controller.signal,
+    );
+
+    setExtractionProgress(finalProgress);
+    setExtractingUpstreamId(undefined);
+    setVectorizingUpstreamId(undefined);
+
+    if (finalProgress.successCount > 0) {
+      await invalidateRecordQueries();
+    }
+  }, [source, token, handleRecordExtracted, handleRecordVectorized, invalidateRecordQueries]);
 
   const doClearData = useCallback(async () => {
     setIsClearing(true);
@@ -333,6 +383,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     handlePauseExtraction,
     handleStartVectorization,
     handlePauseVectorization,
+    handleProcessAll,
     handleClearData: useCallback(() => { clearDataMutation.mutate(); }, [clearDataMutation]),
     handleRefreshRecord: useCallback((upstreamId: number) => { refreshRecordMutation.mutate(upstreamId); }, [refreshRecordMutation]),
     handleVectorizeRecord: useCallback((upstreamId: number) => { vectorizeRecordMutation.mutate(upstreamId); }, [vectorizeRecordMutation]),

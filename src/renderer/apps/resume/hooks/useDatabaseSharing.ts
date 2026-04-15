@@ -62,6 +62,7 @@ export function useDatabaseSharing() {
 
   useEffect(() => {
     if (!configData) return;
+    if ((configData as any).__ipcError) return;
     setConfig(configData);
     setSharedPath(configData.sharedPath || '');
     setExporterName(configData.exporterName || '');
@@ -69,6 +70,7 @@ export function useDatabaseSharing() {
 
   useEffect(() => {
     if (!statusData) return;
+    if ((statusData as any).__ipcError) return;
     setStatus(statusData);
   }, [statusData]);
 
@@ -146,7 +148,7 @@ export function useDatabaseSharing() {
   }, [refetchSnapshots]);
 
   const hasNewSnapshots = snapshots.some(snapshot => snapshot.isNew);
-  const recordCounts = status ? Object.entries(status.recordCounts) : [];
+  const recordCounts = status?.recordCounts ? Object.entries(status.recordCounts) : [];
 
   return {
     state: {

@@ -274,6 +274,6 @@ export function useExternalCandidateToOp(parentReset: () => void) {
     search: { progress, error, executeSearch },
     results: { results, handleExportToExcel },
     detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick },
+    actions: { handleReset, handleStepClick, handleBackToIntents },
   };
 }

@@ -3,6 +3,7 @@ import type { Browser, Page } from '@playwright/test';
 import {
   connectToApp,
   navigateTo,
+  clickIntentCard,
   assertNoError,
   collectConsoleErrors,
   filterRealErrors,
@@ -72,6 +73,23 @@ test('Resume: transform history page', async () => {
 test('Resume: match engine page', async () => {
   await navigateTo(page, '/resume/match');
   await expect(page).toHaveURL(/#\/resume\/match/);
+});
+
+// ── Match Engine Sub-Flows (conditional renders inside /resume/match) ──
+
+test('Resume: match engine → Bench Burn sub-flow', async () => {
+  await clickIntentCard(page, 'Bench Burn');
+  await expect(page.locator('text=Back to Match Engine')).toBeVisible();
+});
+
+test('Resume: match engine → Delivery Professional to OP sub-flow', async () => {
+  await clickIntentCard(page, 'Delivery Professional to OP');
+  await expect(page.locator('text=Back to Match Engine')).toBeVisible();
+});
+
+test('Resume: match engine → External Candidate to OP sub-flow', async () => {
+  await clickIntentCard(page, 'External Candidate to OP');
+  await expect(page.locator('text=Back to Match Engine')).toBeVisible();
 });
 
 test('Resume: batch page', async () => {

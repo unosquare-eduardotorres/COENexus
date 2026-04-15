@@ -20,8 +20,13 @@ function ipcProcessingStream(
       skippedCount: 0,
     };
 
+    const sourcePrefix = source === 'open-positions' ? 'pos-' : `${source}-`;
     const cleanup = window.api.processing.onProgress((data: any) => {
+      if (data.type === 'progress' || data.type === 'complete') {
+        if (data.progress?.source && data.progress.source !== source) return;
+      }
       if (data.type === 'record') {
+        if (data.record?.id && !data.record.id.startsWith(sourcePrefix)) return;
         onRecordProcessed(data.record as ProcessingRecord);
       } else if (data.type === 'progress') {
         lastProgress = data.progress as ProcessingProgress;
@@ -113,6 +118,24 @@ export const resumeProcessingService = {
       source,
       () => window.api.processing.retryFailedVectorization({ source, model: config.model }),
       () => window.api.processing.pauseVectorization(),
+      onProgress,
+      onRecordProcessed,
+      signal,
+    );
+  },
+
+  processAll(
+    source: SyncSourceType,
+    token: string,
+    onProgress: (progress: ProcessingProgress) => void,
+    onRecordProcessed: (record: ProcessingRecord) => void,
+    signal: AbortSignal,
+  ): Promise<ProcessingProgress> {
+    const config = vectorizationConfigService.getConfig();
+    return ipcProcessingStream(
+      source,
+      () => window.api.processing.processAll({ source, token, model: config.model }),
+      () => window.api.processing.pauseExtraction(),
       onProgress,
       onRecordProcessed,
       signal,

@@ -278,12 +278,12 @@ export function useBenchBurn(parentReset?: () => void) {
 
 
   return {
-    wizard: { currentStep, completedSteps },
+    wizard: { currentStep, completedSteps, stepSummaries },
     employees: { selectedEmployees, handleEmployeesNext },
-    positions: { selectedPositions, handlePositionsNext },
+    positions: { selectedPositions, customPositions, handlePositionsNext },
     search: { progress, error, handleSearchDepthNext, executeBenchBurn, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     results: { results, handleRetryFallbacks, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, setDetailEmployee, detailPosition, setDetailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick },
+    detail: { detailMatch, setDetailMatch, detailEmployee, setDetailEmployee, detailPosition, setDetailPosition, handleShowDetail, handleSelectMatch },
+    actions: { handleReset, handleStepClick, handleBackToIntents },
   };
 }

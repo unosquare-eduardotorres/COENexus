@@ -434,4 +434,28 @@ export const syncRepository = {
     db.prepare('DELETE FROM open_position_candidates WHERE open_position_id = ?').run(upstreamId)
     db.prepare('DELETE FROM synced_open_positions WHERE upstream_id = ?').run(upstreamId)
   },
+
+  updateResumeFields(
+    id: number,
+    fields: {
+      has_resume: number
+      resume_note_id: number | null
+      resume_date_created: string | null
+      resume_filename: string | null
+      status: string
+      status_reason: string | null
+      synced_at: string
+    }
+  ): void {
+    const db = getDatabase()
+    db.prepare(`
+      UPDATE synced_candidates
+      SET has_resume = ?, resume_note_id = ?, resume_date_created = ?,
+          resume_filename = ?, status = ?, status_reason = ?, synced_at = ?
+      WHERE id = ?
+    `).run(
+      fields.has_resume, fields.resume_note_id, fields.resume_date_created,
+      fields.resume_filename, fields.status, fields.status_reason, fields.synced_at, id
+    )
+  },
 }

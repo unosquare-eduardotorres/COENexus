@@ -297,6 +297,6 @@ export function useDeliveryToOp(parentReset: () => void) {
     search: { progress, error, executeDeliveryToOp },
     results: { results, handleRetryFallbacks, handleExportToExcel },
     detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick },
+    actions: { handleReset, handleStepClick, handleBackToIntents },
   };
 }

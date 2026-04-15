@@ -19,13 +19,17 @@ const VectorizationPanel = memo(function VectorizationPanel({
 }: VectorizationPanelProps) {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (!apiKeyInput.trim()) return;
     setSaving(true);
+    setError(null);
     try {
       await onAddVoyageKey(apiKeyInput.trim());
       setApiKeyInput('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save API key');
     } finally {
       setSaving(false);
     }
@@ -96,6 +100,10 @@ const VectorizationPanel = memo(function VectorizationPanel({
             {saving ? 'Saving...' : '+ Add Key'}
           </button>
         </div>
+
+        {error && (
+          <p className="text-xs text-red-500 dark:text-red-400 mt-2">{error}</p>
+        )}
 
         <p className="text-xs text-muted mt-3 flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

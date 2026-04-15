@@ -43,6 +43,12 @@ export const processingStartVectorizationSchema = z.object({
   model: z.string().optional(),
 })
 
+export const processingProcessAllSchema = z.object({
+  source: z.string().min(1),
+  token: z.string().min(1),
+  model: z.string().optional(),
+})
+
 export const matchSearchSchema = z.object({
   name: z.string().min(1),
   matchFlowType: z.enum(['find-for-position', 'match-to-positions', 'delivery-to-op', 'bench-burn', 'external-candidate-to-op']),

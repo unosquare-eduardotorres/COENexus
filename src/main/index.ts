@@ -146,11 +146,8 @@ app.whenReady().then(async () => {
     log.error('IPC handler registration failed', err instanceof Error ? err : new Error(String(err)))
   }
 
-  try {
-    embeddingWorker.start()
-  } catch (err) {
-    log.error('Embedding worker start failed', err instanceof Error ? err : new Error(String(err)))
-  }
+  // Embedding worker is NOT auto-started — extraction and vectorization
+  // are user-initiated steps via the Data Sync pipeline UI
 
   try {
     initAutoUpdater()

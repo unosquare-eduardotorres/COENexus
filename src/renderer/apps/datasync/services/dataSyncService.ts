@@ -64,6 +64,9 @@ export const dataSyncService = {
       let lastResult = { total: 0, retried: 0 };
 
       const cleanup = window.api.sync.onProgress((data: any) => {
+        if (data.type === 'record' && data.record?.source && data.record.source !== source) return;
+        if (data.type === 'progress' && data.progress?.source && data.progress.source !== source) return;
+        if (data.type === 'complete' && data.progress?.source && data.progress.source !== source) return;
         if (data.type === 'record') {
           const record: SyncRecord = { ...data.record, pipelineStatus: data.record.status };
           onRecordRetried(record);
@@ -101,6 +104,9 @@ export const dataSyncService = {
       let lastResult = { total: 0, retried: 0 };
 
       const cleanup = window.api.sync.onProgress((data: any) => {
+        if (data.type === 'record' && data.record?.source && data.record.source !== source) return;
+        if (data.type === 'progress' && data.progress?.source && data.progress.source !== source) return;
+        if (data.type === 'complete' && data.progress?.source && data.progress.source !== source) return;
         if (data.type === 'record') {
           const record: SyncRecord = { ...data.record, pipelineStatus: data.record.status };
           onRecordRetried(record);
@@ -164,6 +170,9 @@ export const dataSyncService = {
       };
 
       const cleanup = window.api.sync.onProgress((data: any) => {
+        if (data.type === 'record' && data.record?.source && data.record.source !== source) return;
+        if (data.type === 'progress' && data.progress?.source && data.progress.source !== source) return;
+        if (data.type === 'complete' && data.progress?.source && data.progress.source !== source) return;
         if (data.type === 'record') {
           const record: SyncRecord = { ...data.record, pipelineStatus: data.record.status };
           onRecordSynced(record);

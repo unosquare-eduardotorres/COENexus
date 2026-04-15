@@ -13,7 +13,10 @@ function getKeysPath(): string {
 function readKeys(): string[] {
   const path = getKeysPath()
   if (!existsSync(path)) return []
-  if (!safeStorage.isEncryptionAvailable()) return []
+  if (!safeStorage.isEncryptionAvailable()) {
+    log.warn('safeStorage encryption not available — cannot read Voyage keys')
+    return []
+  }
   try {
     const encrypted = readFileSync(path)
     const decrypted = safeStorage.decryptString(encrypted)

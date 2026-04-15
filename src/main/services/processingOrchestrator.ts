@@ -45,7 +45,8 @@ interface EligibleRecord {
   isBench: boolean
 }
 
-let activeController: AbortController | null = null
+let extractionController: AbortController | null = null
+let vectorizationController: AbortController | null = null
 
 function makeProgress(source: string, total: number, processed: number, success: number, failed: number, skipped: number, status = 'processing'): ProcessingEvent {
   return { type: 'progress', progress: { source, status, totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } }
@@ -57,7 +58,8 @@ function getEligibleEmployeesForExtraction(): EligibleRecord[] {
     SELECT e.id, e.upstream_id, e.full_name, e.resume_note_id, e.resume_filename, e.is_bench
     FROM synced_employees e
     LEFT JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
-    WHERE e.has_resume = 1 AND e.status IN ('synced', 'incomplete', 'extract_failed')
+    WHERE e.has_resume = 1
+      AND e.status NOT IN ('not-processed')
       AND (re.id IS NULL OR re.resume_text IS NULL OR re.resume_text = '')
     ORDER BY e.full_name
   `).all() as { id: number; upstream_id: number; full_name: string; resume_note_id: number | null; resume_filename: string | null; is_bench: number }[]
@@ -71,7 +73,8 @@ function getEligibleCandidatesForExtraction(): EligibleRecord[] {
     SELECT c.id, c.upstream_id, c.full_name, c.resume_note_id, c.resume_filename
     FROM synced_candidates c
     LEFT JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
-    WHERE c.has_resume = 1 AND c.status IN ('synced', 'incomplete', 'extract_failed')
+    WHERE c.has_resume = 1
+      AND c.status NOT IN ('not-processed')
       AND (re.id IS NULL OR re.resume_text IS NULL OR re.resume_text = '')
     ORDER BY c.full_name
   `).all() as { id: number; upstream_id: number; full_name: string; resume_note_id: number | null; resume_filename: string | null }[]
@@ -114,12 +117,142 @@ function buildEnrichedText(source: string, dbId: number, resumeText: string): st
       return parts.join('\n')
     }
   }
+  if (source === 'candidates') {
+    const db = getDatabase()
+    const row = db.prepare('SELECT * FROM synced_candidates WHERE id = ?').get(dbId) as { full_name: string; main_skill: string | null; seniority: string | null; country: string | null } | undefined
+    if (row) {
+      const parts = [`Name: ${row.full_name}`]
+      if (row.main_skill) parts.push(`Main Skill: ${row.main_skill}`)
+      if (row.seniority) parts.push(`Seniority: ${row.seniority}`)
+      if (row.country) parts.push(`Country: ${row.country}`)
+      parts.push('', 'Resume:', resumeText)
+      return parts.join('\n')
+    }
+  }
   return resumeText
 }
 
+async function runExtraction(source: string, token: string, eligible: EligibleRecord[], emitEvent: (event: ProcessingEvent) => void, signal: AbortSignal): Promise<{ success: number; failed: number }> {
+  const total = eligible.length
+  let processed = 0, success = 0, failed = 0, skipped = 0
+
+  emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+
+  const batchSize = 5
+
+  for (let i = 0; i < eligible.length; i += batchSize) {
+    if (signal.aborted) break
+
+    const batch = eligible.slice(i, i + batchSize)
+
+    const results = await Promise.allSettled(batch.map(async (item) => {
+      if (!item.noteId) {
+        return { item, text: null as string | null, error: 'No resume note ID', fileSize: 0 }
+      }
+
+      const fileBytes = await upstreamApiService.getNoteFile(token, item.noteId)
+      const buffer = Buffer.from(fileBytes)
+      const text = await resumeTextExtractor.extractText(buffer, item.filename ?? 'resume.pdf')
+      return { item, text: sanitizeUnicode(text), error: null as string | null, fileSize: buffer.length }
+    }))
+
+    for (const result of results) {
+      processed++
+
+      if (result.status === 'rejected') {
+        failed++
+        log.error('Extraction failed for record', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Extraction failed'), { source })
+        emitEvent({ type: 'record', record: { id: `${source}-0`, upstreamId: 0, name: 'Unknown', status: 'failed', error: result.reason?.message ?? 'Extraction failed' } })
+        emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+        continue
+      }
+
+      const { item, text, error, fileSize } = result.value
+
+      if (error || !text?.trim()) {
+        failed++
+        const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
+        syncRepository.markFailed(table, item.dbId, 'extract_failed', error ?? 'Empty text after extraction')
+        emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: error ?? 'Empty text' } })
+      } else {
+        const enrichedText = buildEnrichedText(source, item.dbId, text)
+
+        embeddingRepository.upsertTextOnly({
+          sourceType: source,
+          sourceId: item.dbId,
+          upstreamId: item.upstreamId,
+          resumeText: enrichedText,
+          isBench: item.isBench,
+        })
+
+        const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
+        syncRepository.updateStatus(table, item.dbId, 'extracted')
+        success++
+
+        emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'extracted', resumeSizeKb: Math.round(fileSize / 1024), extractedChunks: text.length } })
+      }
+
+      emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+    }
+  }
+
+  log.info('Text extraction complete', { source, total, success, failed, skipped, paused: signal.aborted })
+  return { success, failed }
+}
+
+async function runVectorization(source: string, model: string, eligible: { dbId: number; upstreamId: number; name: string; resumeText: string; isBench: boolean }[], emitEvent: (event: ProcessingEvent) => void, signal: AbortSignal): Promise<{ success: number; failed: number }> {
+  const total = eligible.length
+  let processed = 0, success = 0, failed = 0, skipped = 0
+
+  emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
+
+  for (const item of eligible) {
+    if (signal.aborted) break
+    processed++
+
+    try {
+      const vector = await voyageEmbeddingService.generateEmbedding(item.resumeText, model)
+
+      embeddingRepository.upsert({
+        sourceType: source,
+        sourceId: item.dbId,
+        upstreamId: item.upstreamId,
+        embedding: vector,
+        resumeText: item.resumeText,
+        isBench: item.isBench,
+      })
+
+      const table = source === 'employees' ? 'synced_employees' as const
+        : source === 'candidates' ? 'synced_candidates' as const
+        : 'synced_open_positions' as const
+      syncRepository.updateStatus(table, item.dbId, 'vectorized')
+      success++
+
+      emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'vectorized', vectorDimensions: vector.length } })
+    } catch (err) {
+      failed++
+      log.error('Vectorization failed for record', err instanceof Error ? err : new Error(String(err)), { source, upstreamId: item.upstreamId })
+      const table = source === 'employees' ? 'synced_employees' as const
+        : source === 'candidates' ? 'synced_candidates' as const
+        : 'synced_open_positions' as const
+      syncRepository.markFailed(table, item.dbId, 'vectorize_failed', err instanceof Error ? err.message : 'Vectorization failed')
+      emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: err instanceof Error ? err.message : 'Vectorization failed' } })
+    }
+
+    emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
+  }
+
+  log.info('Vectorization complete', { source, total, success, failed, paused: signal.aborted })
+  return { success, failed }
+}
+
 export const processingOrchestrator = {
-  requestPause(): void {
-    activeController?.abort()
+  requestPauseExtraction(): void {
+    extractionController?.abort()
+  },
+
+  requestPauseVectorization(): void {
+    vectorizationController?.abort()
   },
 
   getStatus(): { employees: { total: number; extracted: number; vectorized: number; failed: number }; candidates: { total: number; extracted: number; vectorized: number; failed: number }; positions: { total: number; extracted: number; vectorized: number; failed: number } } {
@@ -148,8 +281,8 @@ export const processingOrchestrator = {
   },
 
   async extractAsync(source: string, token: string, emitEvent: (event: ProcessingEvent) => void): Promise<void> {
-    activeController = new AbortController()
-    const { signal } = activeController
+    extractionController = new AbortController()
+    const { signal } = extractionController
     log.info('Text extraction started', { source })
 
     try {
@@ -162,135 +295,77 @@ export const processingOrchestrator = {
         ? getEligibleEmployeesForExtraction()
         : getEligibleCandidatesForExtraction()
 
-      const total = eligible.length
-      let processed = 0, success = 0, failed = 0, skipped = 0
+      const result = await runExtraction(source, token, eligible, emitEvent, signal)
 
-      emitEvent(makeProgress(source, total, processed, success, failed, skipped))
-
-      const batchSize = 5
-
-      for (let i = 0; i < eligible.length; i += batchSize) {
-        if (signal.aborted) break
-
-        const batch = eligible.slice(i, i + batchSize)
-
-        const results = await Promise.allSettled(batch.map(async (item) => {
-          if (!item.noteId) {
-            return { item, text: null as string | null, error: 'No resume note ID', fileSize: 0 }
-          }
-
-          const fileBytes = await upstreamApiService.getNoteFile(token, item.noteId)
-          const buffer = Buffer.from(fileBytes)
-          const text = await resumeTextExtractor.extractText(buffer, item.filename ?? 'resume.pdf')
-          return { item, text: sanitizeUnicode(text), error: null as string | null, fileSize: buffer.length }
-        }))
-
-        for (const result of results) {
-          processed++
-
-          if (result.status === 'rejected') {
-            failed++
-            log.error('Extraction failed for record', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Extraction failed'), { source })
-            emitEvent({ type: 'record', record: { id: `${source}-0`, upstreamId: 0, name: 'Unknown', status: 'failed', error: result.reason?.message ?? 'Extraction failed' } })
-            emitEvent(makeProgress(source, total, processed, success, failed, skipped))
-            continue
-          }
-
-          const { item, text, error, fileSize } = result.value
-
-          if (error || !text?.trim()) {
-            failed++
-            const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
-            syncRepository.markFailed(table, item.dbId, 'extract_failed', error ?? 'Empty text after extraction')
-            emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: error ?? 'Empty text' } })
-          } else {
-            const enrichedText = buildEnrichedText(source, item.dbId, text)
-
-            embeddingRepository.upsertTextOnly({
-              sourceType: source,
-              sourceId: item.dbId,
-              upstreamId: item.upstreamId,
-              resumeText: enrichedText,
-              isBench: item.isBench,
-            })
-
-            const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
-            syncRepository.updateStatus(table, item.dbId, 'extracted')
-            success++
-
-            emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'extracted', resumeSizeKb: Math.round(fileSize / 1024), extractedChunks: text.length } })
-          }
-
-          emitEvent(makeProgress(source, total, processed, success, failed, skipped))
-        }
-      }
-
-      log.info('Text extraction complete', { source, total, success, failed, skipped, paused: signal.aborted })
-      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
+      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: eligible.length, processedRecords: result.success + result.failed, successCount: result.success, failedCount: result.failed, skippedCount: 0 } })
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Extraction failed' })
     } finally {
-      activeController = null
+      extractionController = null
     }
   },
 
   async vectorizeAsync(source: string, model: string, emitEvent: (event: ProcessingEvent) => void): Promise<void> {
-    activeController = new AbortController()
-    const { signal } = activeController
+    vectorizationController = new AbortController()
+    const { signal } = vectorizationController
     log.info('Vectorization started', { source, model })
 
     try {
       const eligible = getEligibleForVectorization(source)
-      const total = eligible.length
       log.info('Vectorization eligible records', { source, eligible: eligible.length })
-      let processed = 0, success = 0, failed = 0, skipped = 0
 
-      emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
+      const result = await runVectorization(source, model, eligible, emitEvent, signal)
 
-      for (const item of eligible) {
-        if (signal.aborted) break
-        processed++
-
-        try {
-          const vector = await voyageEmbeddingService.generateEmbedding(item.resumeText, model)
-
-          embeddingRepository.upsert({
-            sourceType: source,
-            sourceId: item.dbId,
-            upstreamId: item.upstreamId,
-            embedding: vector,
-            resumeText: item.resumeText,
-            isBench: item.isBench,
-          })
-
-          const table = source === 'employees' ? 'synced_employees' as const
-            : source === 'candidates' ? 'synced_candidates' as const
-            : 'synced_open_positions' as const
-          syncRepository.updateStatus(table, item.dbId, 'vectorized')
-          success++
-
-          emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'vectorized', vectorDimensions: vector.length } })
-        } catch (err) {
-          failed++
-          log.error('Vectorization failed for record', err instanceof Error ? err : new Error(String(err)), { source, upstreamId: item.upstreamId })
-          const table = source === 'employees' ? 'synced_employees' as const
-            : source === 'candidates' ? 'synced_candidates' as const
-            : 'synced_open_positions' as const
-          syncRepository.markFailed(table, item.dbId, 'vectorize_failed', err instanceof Error ? err.message : 'Vectorization failed')
-          emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: err instanceof Error ? err.message : 'Vectorization failed' } })
-        }
-
-        emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
-      }
-
-      log.info('Vectorization complete', { source, total, success, failed, paused: signal.aborted })
-      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } })
+      emitEvent({ type: 'complete', progress: { source, status: signal.aborted ? 'paused' : 'completed', totalRecords: eligible.length, processedRecords: result.success + result.failed, successCount: result.success, failedCount: result.failed, skippedCount: 0 } })
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Vectorization failed' })
     } finally {
-      activeController = null
+      vectorizationController = null
+    }
+  },
+
+  async processAllAsync(source: string, token: string, model: string, emitEvent: (event: ProcessingEvent) => void): Promise<void> {
+    extractionController = new AbortController()
+    const extractSignal = extractionController.signal
+    log.info('Process All started', { source })
+
+    try {
+      if (source === 'open-positions') {
+        await extractOpenPositions(emitEvent, extractSignal)
+      } else {
+        const extractEligible = source === 'employees'
+          ? getEligibleEmployeesForExtraction()
+          : getEligibleCandidatesForExtraction()
+
+        if (extractEligible.length > 0) {
+          await runExtraction(source, token, extractEligible, emitEvent, extractSignal)
+        }
+      }
+
+      extractionController = null
+
+      if (extractSignal.aborted) {
+        emitEvent({ type: 'complete', progress: { source, status: 'paused', totalRecords: 0, processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0 } })
+        return
+      }
+
+      vectorizationController = new AbortController()
+      const vecSignal = vectorizationController.signal
+
+      const vecEligible = getEligibleForVectorization(source === 'open-positions' ? 'positions' : source)
+      if (vecEligible.length > 0) {
+        await runVectorization(source === 'open-positions' ? 'positions' : source, model, vecEligible, emitEvent, vecSignal)
+      }
+
+      emitEvent({ type: 'complete', progress: { source, status: vecSignal.aborted ? 'paused' : 'completed', totalRecords: 0, processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0 } })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Processing failed' })
+    } finally {
+      extractionController = null
+      vectorizationController = null
     }
   },
 

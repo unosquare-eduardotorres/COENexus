@@ -118,22 +118,31 @@ function runMigrations(database: Database.Database): void {
 
   if (currentVersion < 3) {
     log.info('Running migration 003: add open position report fields + discussions table')
+    const existingCols = new Set(
+      (database.prepare("PRAGMA table_info(synced_open_positions)").all() as { name: string }[]).map(c => c.name)
+    )
+    const columnsToAdd: [string, string][] = [
+      ['vertical_industry', "TEXT NOT NULL DEFAULT ''"],
+      ['in_office', 'INTEGER NOT NULL DEFAULT 0'],
+      ['csu', "TEXT NOT NULL DEFAULT ''"],
+      ['cs', "TEXT NOT NULL DEFAULT ''"],
+      ['closed_date', 'TEXT'],
+      ['closed_reason', 'TEXT'],
+      ['is_ready', 'INTEGER NOT NULL DEFAULT 0'],
+      ['is_promotion', 'INTEGER NOT NULL DEFAULT 0'],
+      ['maximum_rate', 'REAL'],
+      ['minimum_rate', 'REAL'],
+      ['additional_skills', "TEXT NOT NULL DEFAULT '[]'"],
+      ['created_with_assignments_tool', 'INTEGER'],
+      ['candidates_presented', 'INTEGER NOT NULL DEFAULT 0'],
+      ['last_discussion_date', 'TEXT'],
+    ]
+    for (const [col, def] of columnsToAdd) {
+      if (!existingCols.has(col)) {
+        database.exec(`ALTER TABLE synced_open_positions ADD COLUMN ${col} ${def}`)
+      }
+    }
     database.exec(`
-      ALTER TABLE synced_open_positions ADD COLUMN vertical_industry TEXT NOT NULL DEFAULT '';
-      ALTER TABLE synced_open_positions ADD COLUMN in_office INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE synced_open_positions ADD COLUMN csu TEXT NOT NULL DEFAULT '';
-      ALTER TABLE synced_open_positions ADD COLUMN cs TEXT NOT NULL DEFAULT '';
-      ALTER TABLE synced_open_positions ADD COLUMN closed_date TEXT;
-      ALTER TABLE synced_open_positions ADD COLUMN closed_reason TEXT;
-      ALTER TABLE synced_open_positions ADD COLUMN is_ready INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE synced_open_positions ADD COLUMN is_promotion INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE synced_open_positions ADD COLUMN maximum_rate REAL;
-      ALTER TABLE synced_open_positions ADD COLUMN minimum_rate REAL;
-      ALTER TABLE synced_open_positions ADD COLUMN additional_skills TEXT NOT NULL DEFAULT '[]';
-      ALTER TABLE synced_open_positions ADD COLUMN created_with_assignments_tool INTEGER;
-      ALTER TABLE synced_open_positions ADD COLUMN candidates_presented INTEGER NOT NULL DEFAULT 0;
-      ALTER TABLE synced_open_positions ADD COLUMN last_discussion_date TEXT;
-
       CREATE TABLE IF NOT EXISTS open_position_discussions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         open_position_id INTEGER NOT NULL,
@@ -221,12 +230,73 @@ function runMigrations(database: Database.Database): void {
 
   if (currentVersion < 6) {
     log.info('Running migration 006: PRR COE status and comments fields')
-    database.exec(`
-      ALTER TABLE synced_project_reallocations ADD COLUMN coe_status TEXT NOT NULL DEFAULT 'Undefined';
-      ALTER TABLE synced_project_reallocations ADD COLUMN coe_comments TEXT NOT NULL DEFAULT '[]';
-    `)
+    const prrCols = new Set(
+      (database.prepare("PRAGMA table_info(synced_project_reallocations)").all() as { name: string }[]).map(c => c.name)
+    )
+    if (!prrCols.has('coe_status')) {
+      database.exec("ALTER TABLE synced_project_reallocations ADD COLUMN coe_status TEXT NOT NULL DEFAULT 'Not Set'")
+    }
+    if (!prrCols.has('coe_comments')) {
+      database.exec("ALTER TABLE synced_project_reallocations ADD COLUMN coe_comments TEXT NOT NULL DEFAULT '[]'")
+    }
     database.prepare(
       "INSERT INTO schema_migrations (version, name) VALUES (6, 'prr_coe_fields')"
+    ).run()
+  }
+
+  if (currentVersion < 7) {
+    log.info('Running migration 007: rename COE statuses')
+    database.exec(`
+      UPDATE synced_project_reallocations SET coe_status = 'Not Set' WHERE coe_status = 'Undefined';
+      UPDATE synced_project_reallocations SET coe_status = 'Pending Evaluation' WHERE coe_status = 'Active';
+      UPDATE synced_project_reallocations SET coe_status = 'Ready to Present' WHERE coe_status = 'Idle';
+      UPDATE synced_project_reallocations SET coe_status = 'Not Applies' WHERE coe_status = 'Not Apply';
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (7, 'rename_coe_statuses')"
+    ).run()
+  }
+
+  if (currentVersion < 8) {
+    log.info('Running migration 008: reconcile pipeline status with embedding reality')
+    database.exec(`
+      UPDATE synced_employees SET status = 'vectorized', status_reason = NULL
+      WHERE id IN (
+        SELECT e.id FROM synced_employees e
+        JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
+        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NOT NULL
+          AND e.status NOT IN ('vectorized', 'vectorize_failed')
+      );
+
+      UPDATE synced_candidates SET status = 'vectorized', status_reason = NULL
+      WHERE id IN (
+        SELECT c.id FROM synced_candidates c
+        JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
+        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NOT NULL
+          AND c.status NOT IN ('vectorized', 'vectorize_failed')
+      );
+
+      UPDATE synced_employees SET status = 'extracted', status_reason = NULL
+      WHERE id IN (
+        SELECT e.id FROM synced_employees e
+        JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
+        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NULL
+          AND e.status NOT IN ('extracted', 'extract_failed', 'vectorize_failed')
+      );
+
+      UPDATE synced_candidates SET status = 'extracted', status_reason = NULL
+      WHERE id IN (
+        SELECT c.id FROM synced_candidates c
+        JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
+        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NULL
+          AND c.status NOT IN ('extracted', 'extract_failed', 'vectorize_failed')
+      );
+
+      UPDATE synced_employees SET status = 'synced' WHERE status = 'processing';
+      UPDATE synced_candidates SET status = 'synced' WHERE status = 'processing';
+    `)
+    database.prepare(
+      "INSERT INTO schema_migrations (version, name) VALUES (8, 'reconcile_pipeline_status')"
     ).run()
   }
 }
@@ -473,7 +543,7 @@ function getInlineSchema(): string {
       attrition_risk TEXT NOT NULL DEFAULT '',
       comments TEXT NOT NULL DEFAULT '',
       presentations_count INTEGER NOT NULL DEFAULT 0,
-      coe_status TEXT NOT NULL DEFAULT 'Undefined',
+      coe_status TEXT NOT NULL DEFAULT 'Not Set',
       coe_comments TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'synced',
       status_reason TEXT,

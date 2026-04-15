@@ -52,7 +52,7 @@ export const embeddingRepository = {
     const now = new Date().toISOString()
     const embeddingBuffer = Buffer.from(row.embedding.buffer)
 
-    const result = db.prepare(`
+    const resultRow = db.prepare(`
       INSERT INTO resume_embeddings (source_type, source_id, upstream_id, embedding, resume_text, is_bench, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(source_type, source_id) DO UPDATE SET
@@ -60,19 +60,20 @@ export const embeddingRepository = {
         resume_text = excluded.resume_text,
         is_bench = excluded.is_bench,
         updated_at = excluded.updated_at
-    `).run(
+      RETURNING id
+    `).get(
       row.sourceType, row.sourceId, row.upstreamId,
       embeddingBuffer,
       row.resumeText, row.isBench ? 1 : 0, now, now
-    )
+    ) as { id: number }
 
-    const embeddingId = Number(result.lastInsertRowid) || this.findBySource(row.sourceType, row.sourceId)!.id
+    if (row.embedding.length > 0) {
+      db.prepare(
+        'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
+      ).run(resultRow.id, embeddingBuffer)
+    }
 
-    db.prepare(
-      'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
-    ).run(embeddingId, embeddingBuffer)
-
-    return embeddingId
+    return resultRow.id
   },
 
   upsertTextOnly(row: {
@@ -85,19 +86,20 @@ export const embeddingRepository = {
     const db = getDatabase()
     const now = new Date().toISOString()
 
-    const result = db.prepare(`
+    const resultRow = db.prepare(`
       INSERT INTO resume_embeddings (source_type, source_id, upstream_id, embedding, resume_text, is_bench, created_at, updated_at)
       VALUES (?, ?, ?, NULL, ?, ?, ?, ?)
       ON CONFLICT(source_type, source_id) DO UPDATE SET
         resume_text = excluded.resume_text,
         is_bench = excluded.is_bench,
         updated_at = excluded.updated_at
-    `).run(
+      RETURNING id
+    `).get(
       row.sourceType, row.sourceId, row.upstreamId,
       row.resumeText, row.isBench ? 1 : 0, now, now
-    )
+    ) as { id: number }
 
-    return Number(result.lastInsertRowid) || this.findBySource(row.sourceType, row.sourceId)!.id
+    return resultRow.id
   },
 
   deleteBySource(sourceType: string, sourceId: number): void {

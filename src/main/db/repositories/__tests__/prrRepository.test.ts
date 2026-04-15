@@ -35,7 +35,7 @@ const SCHEMA = `
     attrition_risk TEXT NOT NULL DEFAULT '',
     comments TEXT NOT NULL DEFAULT '',
     presentations_count INTEGER NOT NULL DEFAULT 0,
-    coe_status TEXT NOT NULL DEFAULT 'Undefined',
+    coe_status TEXT NOT NULL DEFAULT 'Not Set',
     coe_comments TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'synced',
     status_reason TEXT,
@@ -59,7 +59,7 @@ const SCHEMA = `
 function insertPrr(overrides: Partial<{ upstreamId: number; employee: string; coeStatus: string; coeComments: string; syncedAt: string }> = {}): void {
   const upstreamId = overrides.upstreamId ?? 100
   const employee = overrides.employee ?? 'John Doe'
-  const coeStatus = overrides.coeStatus ?? 'Undefined'
+  const coeStatus = overrides.coeStatus ?? 'Not Set'
   const coeComments = overrides.coeComments ?? '[]'
   const syncedAt = overrides.syncedAt ?? new Date().toISOString()
 
@@ -103,17 +103,17 @@ describe('prrRepository', () => {
   })
 
   it('updateCoeStatus updates an existing record and returns true', () => {
-    insertPrr({ upstreamId: 20, coeStatus: 'Undefined' })
+    insertPrr({ upstreamId: 20, coeStatus: 'Not Set' })
 
-    const updated = prrRepository.updateCoeStatus(20, 'Active')
+    const updated = prrRepository.updateCoeStatus(20, 'Pending Evaluation')
     const row = prrRepository.getByUpstreamId(20)
 
     expect(updated).toBe(true)
-    expect(row?.coe_status).toBe('Active')
+    expect(row?.coe_status).toBe('Pending Evaluation')
   })
 
   it('updateCoeStatus returns false when record does not exist', () => {
-    expect(prrRepository.updateCoeStatus(999, 'Active')).toBe(false)
+    expect(prrRepository.updateCoeStatus(999, 'Pending Evaluation')).toBe(false)
   })
 
   it('addComment appends and getComments returns parsed list', () => {
@@ -170,7 +170,7 @@ describe('prrRepository', () => {
   })
 
   it('markClosed sets coe_status to Closed', () => {
-    insertPrr({ upstreamId: 70, coeStatus: 'Idle' })
+    insertPrr({ upstreamId: 70, coeStatus: 'Ready to Present' })
 
     const changed = prrRepository.markClosed(70)
 

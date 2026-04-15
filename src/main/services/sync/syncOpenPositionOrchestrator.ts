@@ -166,7 +166,7 @@ export const syncOpenPositionOrchestrator = {
           emitEvent({ type: 'record', record: { id: `pos-${pos.id}`, source: 'open-positions', status: 'sync_failed', name: pos.account || 'Unknown', email: '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: pos.id, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
         }
 
-        emitEvent({ type: 'progress', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, currentRecord: pos.account, status: 'syncing' } })
+        emitEvent({ type: 'progress', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, currentRecord: pos.account, status: 'syncing' } })
 
         if (processedInRun >= maxToProcess) break
       }
@@ -192,6 +192,6 @@ export const syncOpenPositionOrchestrator = {
 
     matchEngineService.invalidateFilterCache()
     log.info('Open positions sync finished', { totalRecords, fetchedRecords, syncedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
+    emitEvent({ type: 'complete', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
   },
 }

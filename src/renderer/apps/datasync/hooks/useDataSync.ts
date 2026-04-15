@@ -83,6 +83,9 @@ export function useDataSync(activePanel: DataSyncPanel) {
       handlePauseExtraction: activePipeline.handlePauseExtraction,
       extractingUpstreamId: activePipeline.extractingUpstreamId,
     },
+    processAll: {
+      handleProcessAll: activePipeline.handleProcessAll,
+    },
     vectorization: {
       handleStartVectorization: activePipeline.handleStartVectorization,
       handlePauseVectorization: activePipeline.handlePauseVectorization,

@@ -4,7 +4,6 @@ import DataSyncLayout from '../components/DataSyncLayout';
 import DataSyncOverview from '../components/DataSyncOverview';
 import SyncDashboard from '../components/SyncDashboard';
 import VectorizationPanel from '../components/VectorizationPanel';
-import DatabaseSharingPanel from '../components/DatabaseSharingPanel';
 import { useDataSync } from '../hooks/useDataSync';
 import { useDataSyncSettings } from '../hooks/useDataSyncSettings';
 import { useNexusStatus } from '../../../contexts/NexusStatusContext';
@@ -68,6 +67,7 @@ export default function DataSyncPage() {
     processing: { activeExtractionProgress, activeVectorizationProgress },
     extraction: { handleStartExtraction, handlePauseExtraction, extractingUpstreamId },
     vectorization: { handleStartVectorization, handlePauseVectorization, vectorizingUpstreamId },
+    processAll: { handleProcessAll },
     singleRecord: { refreshingId, vectorizingId, handleRefreshRecord, handleVectorizeRecord },
     year: { selectedYear, handleYearChange },
     clear: { isClearing, handleClearData },
@@ -93,10 +93,6 @@ export default function DataSyncPage() {
           onRemoveVoyageKey={settings.handleRemoveVoyageKey}
         />
       );
-    }
-
-    if (activePanel === 'database-sharing') {
-      return <DatabaseSharingPanel />;
     }
 
     return (
@@ -177,12 +173,14 @@ export default function DataSyncPage() {
           onVectorizeRecord={handleVectorizeRecord}
           refreshingId={refreshingId}
           vectorizingId={vectorizingId}
+          onProcessAll={handleProcessAll}
           onClearData={handleClearData}
           isLoadingRecords={isLoadingRecords}
           isClearing={isClearing}
           selectedYear={selectedYear}
           onYearChange={handleYearChange}
           isSyncDisabled={!isTokenValid}
+          isVoyageKeyConfigured={settings.voyageKeyConfigured}
         />
       </>
     );

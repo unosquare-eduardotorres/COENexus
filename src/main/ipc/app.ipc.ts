@@ -77,6 +77,27 @@ export function registerAppHandlers(): void {
       }
     })
 
+  registerIpcHandler(IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER,
+    async (event: IpcMainInvokeEvent, filePath: string) => {
+      validateSender(event)
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error('File path is required')
+      }
+      shell.showItemInFolder(filePath)
+    })
+
+  registerIpcHandler(IPC_CHANNELS.APP_OPEN_PATH,
+    async (event: IpcMainInvokeEvent, filePath: string) => {
+      validateSender(event)
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error('File path is required')
+      }
+      const errorMessage = await shell.openPath(filePath)
+      if (errorMessage) {
+        throw new Error(errorMessage)
+      }
+    })
+
   registerIpcHandler(IPC_CHANNELS.APP_READ_BUNDLED_FILE,
     async (event: IpcMainInvokeEvent, relativePath: string) => {
       validateSender(event)

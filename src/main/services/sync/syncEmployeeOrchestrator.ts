@@ -2,7 +2,7 @@ import { upstreamApiService, type EmployeeDetail, type EmployeeContract, type Em
 import { syncRepository, type SyncedEmployeeRow } from '../../db/repositories/syncRepository'
 import { createLogger } from '../logger'
 import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeDetection'
-import { enqueueEmbeddingIfEligible, type EmbeddingCandidate } from './embeddingEligibility'
+
 import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
 import type { SyncRecordDto, SyncEvent, SyncOptions, EmployeeSyncRecord } from './syncTypes'
@@ -131,19 +131,6 @@ function mapEmployeeToDto(entity: Omit<SyncedEmployeeRow, 'id'> & { id?: number 
   }
 }
 
-function buildEmbeddingCandidate(entity: Omit<SyncedEmployeeRow, 'id'>, dbId: number): EmbeddingCandidate {
-  return {
-    source: 'employees',
-    dbId,
-    upstreamId: entity.upstream_id,
-    name: entity.full_name,
-    resumeNoteId: entity.resume_note_id,
-    resumeFilename: entity.resume_filename,
-    isBench: entity.is_bench === 1,
-    hasResume: entity.has_resume,
-    status: entity.status,
-  }
-}
 
 export const syncEmployeeOrchestrator = {
   async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
@@ -157,7 +144,6 @@ export const syncEmployeeOrchestrator = {
     const basicFallback: EmployeeDetail = { userId: upstreamId, fullName: '', email: '', seniority: 0, mainSkillId: 0, countryId: 0, accountName: '', jobTitle: '', mainSkillName: '', officeName: '' }
     const entity = buildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicFallback)
     const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
-    enqueueEmbeddingIfEligible(buildEmbeddingCandidate(entity, dbId), token)
     matchEngineService.invalidateFilterCache()
 
     return mapEmployeeToDto(entity, resumeChanged, syncDetail)
@@ -233,8 +219,6 @@ export const syncEmployeeOrchestrator = {
           try {
             const entity = buildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicEmp)
             const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
-            enqueueEmbeddingIfEligible(buildEmbeddingCandidate(entity, dbId), token)
-
             if (entity.status === 'incomplete') incompleteCount++
             else if (entity.status === 'not-processed') notProcessedCount++
             else {
@@ -250,7 +234,7 @@ export const syncEmployeeOrchestrator = {
             emitEvent({ type: 'record', record: { id: `emp-${basicEmp.userId}`, source: 'employees', status: 'sync_failed', name: basicEmp.fullName || 'Unknown', email: basicEmp.email || '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicEmp.userId, syncDetail: 'upsert_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error', seniority: '', mainSkill: '', country: '' } })
           }
 
-          emitEvent({ type: 'progress', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, currentRecord: basicEmp.fullName, status: 'syncing' } })
+          emitEvent({ type: 'progress', progress: { source: 'employees', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, currentRecord: basicEmp.fullName, status: 'syncing' } })
 
           if (processedInRun >= maxToProcess) break
         }
@@ -262,6 +246,6 @@ export const syncEmployeeOrchestrator = {
 
     matchEngineService.invalidateFilterCache()
     log.info('Employee sync finished', { totalRecords, fetchedRecords, syncedCount, updatedCount, unchangedCount, incompleteCount, notProcessedCount, excludedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, status: signal.aborted ? 'paused' : 'completed' } })
+    emitEvent({ type: 'complete', progress: { source: 'employees', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, status: signal.aborted ? 'paused' : 'completed' } })
   },
 }

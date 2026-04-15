@@ -6,6 +6,7 @@ import { PRR_COE_STATUSES } from '../types'
 interface PrrDetailDrawerProps {
   upstreamId: number | null
   onClose: () => void
+  onDataChanged?: () => void
 }
 
 type DrawerTab = 'overview' | 'presentations' | 'comments'
@@ -55,13 +56,14 @@ function formatRelativeTime(dateStr: string): string {
 
 function getCoeStatusBadgeStyle(status: PrrCoeStatus): string {
   const styles: Record<PrrCoeStatus, string> = {
-    Active: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
-    Idle: 'bg-amber-500/15 text-amber-400 border-amber-500/25',
-    Closed: 'bg-red-500/15 text-red-400 border-red-500/25',
-    Undefined: 'bg-gray-500/15 text-gray-300 border-gray-500/25',
-    'Not Apply': 'bg-slate-500/15 text-slate-300 border-slate-500/25',
+    'Not Set': 'bg-gray-500/15 text-gray-300 border-gray-500/25',
+    'Pending Evaluation': 'bg-amber-500/15 text-amber-400 border-amber-500/25',
+    'Ready to Present': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
+    'Not Applies': 'bg-slate-500/15 text-slate-300 border-slate-500/25',
+    'Other': 'bg-indigo-500/15 text-indigo-400 border-indigo-500/25',
+    'Closed': 'bg-red-500/15 text-red-400 border-red-500/25',
   }
-  return styles[status] ?? styles.Undefined
+  return styles[status] ?? styles['Not Set']
 }
 
 function getImpactBadgeStyle(impact: string): string {
@@ -80,7 +82,7 @@ function getRiskBadgeStyle(risk: string): string {
   return 'bg-white/5 text-secondary border-white/10'
 }
 
-export default function PrrDetailDrawer({ upstreamId, onClose }: PrrDetailDrawerProps) {
+export default function PrrDetailDrawer({ upstreamId, onClose, onDataChanged }: PrrDetailDrawerProps) {
   const [detail, setDetail] = useState<PrrDetailResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -142,6 +144,7 @@ export default function PrrDetailDrawer({ upstreamId, onClose }: PrrDetailDrawer
     setDetail({ ...detail, prr: { ...detail.prr, coeStatus: nextStatus } })
     try {
       await prrService.updateCoeStatus(detail.prr.upstreamId, nextStatus)
+      onDataChanged?.()
     } catch {
       setDetail({ ...detail, prr: { ...detail.prr, coeStatus: previousStatus } })
     } finally {
@@ -158,6 +161,7 @@ export default function PrrDetailDrawer({ upstreamId, onClose }: PrrDetailDrawer
       await prrService.addComment(detail.prr.upstreamId, text, 'COE User')
       setCommentText('')
       await loadDetail(detail.prr.upstreamId)
+      onDataChanged?.()
     } finally {
       setSavingComment(false)
     }

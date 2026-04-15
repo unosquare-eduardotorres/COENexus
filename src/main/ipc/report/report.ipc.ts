@@ -1,7 +1,7 @@
-import { dialog } from 'electron'
+import { BrowserWindow, dialog } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus } from '../../../shared/ipc-types'
+import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus } from '../../../shared/ipc-types'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
@@ -70,6 +70,34 @@ export function registerReportHandlers(): void {
       syncRepository.deleteOpenPosition(upstreamId)
       matchEngineService.invalidateFilterCache()
       return { deleted: true }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_EXPORT_PDF,
+    async (event): Promise<ReportExportPdfResult> => {
+      validateSender(event)
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win) return { saved: false }
+
+      const pdfBuffer = await win.webContents.printToPDF({
+        landscape: true,
+        printBackground: true,
+        preferCSSPageSize: false,
+        pageSize: 'Tabloid',
+        scale: 0.82,
+        margins: { top: 0.3, bottom: 0.3, left: 0.3, right: 0.3 },
+      })
+
+      const { filePath, canceled } = await dialog.showSaveDialog(win, {
+        defaultPath: `report-${new Date().toISOString().slice(0, 10)}.pdf`,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      })
+      if (canceled || !filePath) return { saved: false }
+
+      writeFileSync(filePath, pdfBuffer)
+      log.info('PDF exported', { filePath })
+      return { saved: true, filePath }
     }
   )
 }

@@ -70,7 +70,7 @@ export default function DeliveryToOpPage({ onReset: parentReset }: { onReset: ()
     search: { progress, error, executeDeliveryToOp },
     results: { results, handleRetryFallbacks, handleExportToExcel },
     detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick },
+    actions: { handleReset, handleStepClick, handleBackToIntents },
   } = useDeliveryToOp(parentReset);
 
   return (

@@ -74,7 +74,7 @@ export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayou
     <div className="min-h-screen pb-8 gradient-subtle transition-colors duration-300">
       <GlobalTitleBar />
 
-      <aside className="fixed top-10 left-0 bottom-0 z-50 flex flex-col w-[220px] border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl">
+      <aside className="fixed top-10 left-0 bottom-0 z-50 flex flex-col w-[220px] border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl no-print">
         <div className="flex items-center h-12 px-4 gap-2.5 border-b border-gray-200/30 dark:border-dark-border/30">
           <Link to="/command-center" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/15 dark:bg-emerald-400/15 flex-shrink-0 flex items-center justify-center text-emerald-500 dark:text-emerald-400">

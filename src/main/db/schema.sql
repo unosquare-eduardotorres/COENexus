@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS synced_project_reallocations (
   attrition_risk TEXT NOT NULL DEFAULT '',
   comments TEXT NOT NULL DEFAULT '',
   presentations_count INTEGER NOT NULL DEFAULT 0,
-  coe_status TEXT NOT NULL DEFAULT 'Undefined',
+  coe_status TEXT NOT NULL DEFAULT 'Not Set',
   coe_comments TEXT NOT NULL DEFAULT '[]',
   status TEXT NOT NULL DEFAULT 'synced',
   status_reason TEXT,

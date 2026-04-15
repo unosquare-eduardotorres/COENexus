@@ -1,8 +1,10 @@
 import { upstreamApiService, type CandidateDetail } from '../upstreamApiService'
 import { syncRepository, type SyncedCandidateRow } from '../../db/repositories/syncRepository'
+import { embeddingRepository } from '../../db/repositories/embeddingRepository'
+import { getDatabase } from '../../db/connection'
 import { createLogger } from '../logger'
 import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeDetection'
-import { enqueueEmbeddingIfEligible, type EmbeddingCandidate } from './embeddingEligibility'
+
 import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
 import type { SyncRecordDto, SyncEvent, SyncOptions, CandidateSyncRecord } from './syncTypes'
@@ -115,19 +117,6 @@ function mapCandidateToDto(entity: Omit<SyncedCandidateRow, 'id'> & { id?: numbe
   }
 }
 
-function buildEmbeddingCandidate(entity: Omit<SyncedCandidateRow, 'id'>, dbId: number): EmbeddingCandidate {
-  return {
-    source: 'candidates',
-    dbId,
-    upstreamId: entity.upstream_id,
-    name: entity.full_name,
-    resumeNoteId: entity.resume_note_id,
-    resumeFilename: entity.resume_filename,
-    isBench: false,
-    hasResume: entity.has_resume,
-    status: entity.status,
-  }
-}
 
 export const syncCandidateOrchestrator = {
   async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
@@ -139,7 +128,6 @@ export const syncCandidateOrchestrator = {
     const basicFallback: CandidateDetail = { candidateId: upstreamId, fullName: '' }
     const entity = buildCandidateEntity(detail, notes, seniorities, mainSkills, countries, basicFallback)
     const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, candidateChangeConfig)
-    enqueueEmbeddingIfEligible(buildEmbeddingCandidate(entity, dbId), token)
     matchEngineService.invalidateFilterCache()
 
     return mapCandidateToDto(entity, resumeChanged, syncDetail)
@@ -150,11 +138,12 @@ export const syncCandidateOrchestrator = {
 
     const { seniorities, mainSkills, countries } = await loadCatalogs(token)
 
-    const batchSize = 20
+    const pageSize = 100
+    const chunkSize = 15
     let pageOffset = options.skip ?? 0
     let totalRecords = 0
     let syncedCount = 0, incompleteCount = 0, notProcessedCount = 0
-    let updatedCount = 0, unchangedCount = 0
+    let updatedCount = 0, unchangedCount = 0, skippedDetailCount = 0
     let fetchedRecords = options.skip ?? 0
     const maxToProcess = options.limit ?? Infinity
     let processedInRun = 0
@@ -162,53 +151,106 @@ export const syncCandidateOrchestrator = {
     while (processedInRun < maxToProcess) {
       if (signal.aborted) break
 
-      const take = Math.min(batchSize, maxToProcess - processedInRun)
+      const take = Math.min(pageSize, maxToProcess - processedInRun)
       const { items: batch, totalRecords: total } = await upstreamApiService.getCandidatesPaged(token, pageOffset, take, options.year)
       totalRecords = total
       if (batch.length === 0) break
 
-      const fetchResults = await Promise.allSettled(batch.map(async (basicCand) => {
-        const [detail, notes] = await Promise.all([
-          upstreamApiService.getCandidateDetail(token, basicCand.candidateId),
-          loadOrEmpty('Notes', () => upstreamApiService.getCandidateNotes(token, basicCand.candidateId)),
-        ])
-        return { basicCand, detail, notes }
-      }))
+      for (let chunkStart = 0; chunkStart < batch.length; chunkStart += chunkSize) {
+        if (signal.aborted) break
+        const chunk = batch.slice(chunkStart, chunkStart + chunkSize)
 
-      for (const result of fetchResults) {
-        fetchedRecords++
-        processedInRun++
+        const fetchResults = await Promise.allSettled(chunk.map(async (basicCand) => {
+          const existing = syncRepository.findCandidateByUpstreamId(basicCand.candidateId)
+          const statusUnchanged = existing
+            && existing.last_status_update === (basicCand.statusUpdate ?? null)
 
-        if (result.status === 'rejected') {
-          log.error('Candidate detail fetch failed', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Fetch failed'), { pageOffset })
-          notProcessedCount++
-          emitEvent({ type: 'progress', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: 0, status: 'syncing' } })
-          continue
-        }
-
-        const { basicCand, detail, notes } = result.value
-
-        try {
-          const entity = buildCandidateEntity(detail, notes, seniorities, mainSkills, countries, basicCand)
-          const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, candidateChangeConfig)
-          enqueueEmbeddingIfEligible(buildEmbeddingCandidate(entity, dbId), token)
-
-          if (entity.status === 'incomplete') incompleteCount++
-          else if (entity.status === 'not-processed') notProcessedCount++
-          else {
-            if (syncDetail === 'new') syncedCount++
-            else if (syncDetail === 'updated') updatedCount++
-            else unchangedCount++
+          if (statusUnchanged) {
+            const notes = await loadOrEmpty('Notes', () =>
+              upstreamApiService.getCandidateNotes(token, basicCand.candidateId))
+            return { basicCand, detail: null as CandidateDetail | null, notes, existing, skippedDetail: true }
           }
 
-          emitEvent({ type: 'record', record: mapCandidateToDto(entity, resumeChanged, syncDetail) })
-        } catch (err) {
-          log.error(`Candidate upsert failed: ${basicCand.fullName} (${basicCand.candidateId})`, err instanceof Error ? err : new Error(String(err)), { upstreamId: basicCand.candidateId })
-          notProcessedCount++
-          emitEvent({ type: 'record', record: { id: `cand-${basicCand.candidateId}`, source: 'candidates', status: 'sync_failed', name: basicCand.fullName || 'Unknown', email: basicCand.email ?? '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicCand.candidateId, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
-        }
+          const [detail, notes] = await Promise.all([
+            upstreamApiService.getCandidateDetail(token, basicCand.candidateId),
+            loadOrEmpty('Notes', () =>
+              upstreamApiService.getCandidateNotes(token, basicCand.candidateId)),
+          ])
+          return { basicCand, detail, notes, existing, skippedDetail: false }
+        }))
 
-        emitEvent({ type: 'progress', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: 0, currentRecord: basicCand.fullName, status: 'syncing' } })
+        const db = getDatabase()
+        const processChunk = db.transaction(() => {
+          for (const result of fetchResults) {
+            fetchedRecords++
+            processedInRun++
+
+            if (result.status === 'rejected') {
+              log.error('Candidate fetch failed', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Fetch failed'), { pageOffset })
+              notProcessedCount++
+              emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, status: 'syncing' } })
+              continue
+            }
+
+            const { basicCand, detail, notes, existing, skippedDetail } = result.value
+
+            try {
+              if (skippedDetail && existing) {
+                const resumeNote = findResumeNote(notes)
+                const resumeChanged = !!resumeNote
+                  && !!resumeNote.dateCreated
+                  && (!existing.resume_date_created || resumeNote.dateCreated > existing.resume_date_created)
+
+                if (resumeChanged) {
+                  const resumeFields = {
+                    has_resume: 1,
+                    resume_note_id: resumeNote.personaNoteId,
+                    resume_date_created: resumeNote.dateCreated,
+                    resume_filename: resumeNote.filename,
+                    status: 'synced',
+                    status_reason: null,
+                    synced_at: new Date().toISOString(),
+                  }
+                  syncRepository.updateResumeFields(existing.id, resumeFields)
+                  embeddingRepository.deleteBySource('candidates', existing.id)
+                  updatedCount++
+                  skippedDetailCount++
+                  emitEvent({ type: 'record', record: mapCandidateToDto(
+                    { ...existing, ...resumeFields }, true, 'updated') })
+                } else {
+                  unchangedCount++
+                  skippedDetailCount++
+                }
+
+                emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, currentRecord: basicCand.fullName, status: 'syncing' } })
+
+                if (processedInRun >= maxToProcess) break
+                continue
+              }
+
+              const entity = buildCandidateEntity(detail!, notes, seniorities, mainSkills, countries, basicCand)
+              const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, candidateChangeConfig)
+              if (entity.status === 'incomplete') incompleteCount++
+              else if (entity.status === 'not-processed') notProcessedCount++
+              else {
+                if (syncDetail === 'new') syncedCount++
+                else if (syncDetail === 'updated') updatedCount++
+                else unchangedCount++
+              }
+
+              emitEvent({ type: 'record', record: mapCandidateToDto(entity, resumeChanged, syncDetail) })
+            } catch (err) {
+              log.error(`Candidate upsert failed: ${basicCand.fullName} (${basicCand.candidateId})`, err instanceof Error ? err : new Error(String(err)), { upstreamId: basicCand.candidateId })
+              notProcessedCount++
+              emitEvent({ type: 'record', record: { id: `cand-${basicCand.candidateId}`, source: 'candidates', status: 'sync_failed', name: basicCand.fullName || 'Unknown', email: basicCand.email ?? '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicCand.candidateId, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
+            }
+
+            emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, currentRecord: basicCand.fullName, status: 'syncing' } })
+
+            if (processedInRun >= maxToProcess) break
+          }
+        })
+        processChunk()
 
         if (processedInRun >= maxToProcess) break
       }
@@ -218,7 +260,7 @@ export const syncCandidateOrchestrator = {
     }
 
     matchEngineService.invalidateFilterCache()
-    log.info('Candidate sync finished', { totalRecords, fetchedRecords, syncedCount, updatedCount, unchangedCount, incompleteCount, notProcessedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
+    log.info('Candidate sync finished', { totalRecords, fetchedRecords, syncedCount, updatedCount, unchangedCount, skippedDetailCount, incompleteCount, notProcessedCount, status: signal.aborted ? 'paused' : 'completed' })
+    emitEvent({ type: 'complete', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, status: signal.aborted ? 'paused' : 'completed' } })
   },
 }

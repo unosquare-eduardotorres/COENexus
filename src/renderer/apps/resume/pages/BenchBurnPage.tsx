@@ -1,12 +1,12 @@
-import { useState, useCallback, useMemo, useEffect, ReactNode } from 'react';
-import {
-  BenchBurnStepKey,
-  BenchEmployee,
-  BenchOpenPosition,
-  CrossMatchResult,
-  SearchProgress as SearchProgressType,
-} from '../types';
-import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
+import { ReactNode } from 'react';
+import { BenchBurnStepKey } from '../types';
+import StepperBar from '../../../shared/components/StepperBar';
+import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
+import BenchPositionSelector from '../components/match/BenchPositionSelector';
+import BenchBurnSearchDepth from '../components/match/BenchBurnSearchDepth';
+import SearchProgressComponent from '../components/match/SearchProgress';
+import BenchBurnResults from '../components/match/BenchBurnResults';
+import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { useBenchBurn } from '../hooks/useBenchBurn';
 
 interface BenchBurnPageProps {
@@ -64,13 +64,13 @@ const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] =
 
 export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPageProps) {
   const {
-    wizard: { currentStep, completedSteps },
+    wizard: { currentStep, completedSteps, stepSummaries },
     employees: { selectedEmployees, handleEmployeesNext },
-    positions: { selectedPositions, handlePositionsNext },
+    positions: { selectedPositions, customPositions, handlePositionsNext },
     search: { progress, error, handleSearchDepthNext, executeBenchBurn, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     results: { results, handleRetryFallbacks, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail, handleSelectMatch },
+    actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   } = useBenchBurn(parentReset);
 
   return (

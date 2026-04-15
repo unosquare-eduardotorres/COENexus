@@ -28,6 +28,13 @@ export async function navigateTo(page: Page, hash: string): Promise<void> {
   await page.waitForTimeout(SETTLE_MS);
 }
 
+export async function clickIntentCard(page: Page, title: string): Promise<void> {
+  await navigateTo(page, '/resume/match');
+  const card = page.locator(`button:has-text("${title}")`);
+  await card.click();
+  await page.waitForTimeout(SETTLE_MS);
+}
+
 export async function assertNoError(page: Page): Promise<void> {
   const errorBoundary = page.locator('text=Something went wrong');
   const isVisible = await errorBoundary.isVisible().catch(() => false);

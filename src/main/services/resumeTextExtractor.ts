@@ -72,15 +72,28 @@ async function extractFromPdf(fileBytes: Buffer): Promise<string> {
     const meaningfulChars = fullText.replace(/[^a-zA-Z0-9]/g, '').length
 
     if (meaningfulChars < 50 && PDFTOPPM_PATH && TESSERACT_PATH) {
-      const ocrText = await extractWithOcr(fileBytes)
-      if (ocrText.trim()) return ocrText
+      try {
+        const ocrText = await extractWithOcr(fileBytes)
+        if (ocrText.trim()) return ocrText
+      } catch (ocrErr) {
+        log.warn('OCR fallback failed, using pdfjs text', {
+          meaningfulChars,
+          error: ocrErr instanceof Error ? ocrErr.message : String(ocrErr),
+        })
+      }
     }
 
     return fullText
   } catch (err) {
     if (PDFTOPPM_PATH && TESSERACT_PATH) {
-      const ocrText = await extractWithOcr(fileBytes)
-      if (ocrText.trim()) return ocrText
+      try {
+        const ocrText = await extractWithOcr(fileBytes)
+        if (ocrText.trim()) return ocrText
+      } catch (ocrErr) {
+        log.warn('OCR last-resort also failed', {
+          error: ocrErr instanceof Error ? ocrErr.message : String(ocrErr),
+        })
+      }
     }
     throw err
   }

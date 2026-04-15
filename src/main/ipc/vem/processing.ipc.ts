@@ -1,11 +1,11 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { ProcessingVectorizeSingleParams, ProcessingStartExtractionParams, ProcessingStartVectorizationParams, ProcessingResetStatusParams, AddVoyageKeyParams, RemoveVoyageKeyParams } from '../../../shared/ipc-types'
+import type { ProcessingVectorizeSingleParams, ProcessingStartExtractionParams, ProcessingStartVectorizationParams, ProcessingProcessAllParams, ProcessingResetStatusParams, AddVoyageKeyParams, RemoveVoyageKeyParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
 import { processingOrchestrator } from '../../services/processingOrchestrator'
 import { getConfig } from '../../config'
-import { validatePayload, processingVectorizeSingleSchema, processingStartExtractionSchema, processingStartVectorizationSchema, addVoyageKeySchema, removeVoyageKeySchema } from '../schemas'
+import { validatePayload, processingVectorizeSingleSchema, processingStartExtractionSchema, processingStartVectorizationSchema, processingProcessAllSchema, addVoyageKeySchema, removeVoyageKeySchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { keychainService } from '../../services/keychainService'
 import { createLogger } from '../../services/logger'
@@ -72,7 +72,7 @@ export function registerProcessingHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.PROCESSING_PAUSE_EXTRACTION,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      processingOrchestrator.requestPause()
+      processingOrchestrator.requestPauseExtraction()
       return { paused: true }
     })
 
@@ -81,8 +81,22 @@ export function registerProcessingHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.PROCESSING_PAUSE_VECTORIZATION,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      processingOrchestrator.requestPause()
+      processingOrchestrator.requestPauseVectorization()
       return { paused: true }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.PROCESSING_PROCESS_ALL,
+    async (event: IpcMainInvokeEvent, params: ProcessingProcessAllParams) => {
+      validateSender(event)
+      const p = validatePayload(processingProcessAllSchema, params, IPC_CHANNELS.PROCESSING_PROCESS_ALL)
+      const { voyage } = getConfig()
+      log.info('Process All requested', { source: p.source })
+      const win = getMainWindow()
+      processingOrchestrator.processAllAsync(
+        p.source, p.token, p.model ?? voyage.defaultModel,
+        (evt) => win?.webContents.send(IPC_CHANNELS.PROCESSING_PROGRESS_EVENT, evt)
+      )
+      return { started: true }
     })
 
   registerIpcHandler(IPC_CHANNELS.PROCESSING_RETRY_FAILED, handleStartExtraction)
