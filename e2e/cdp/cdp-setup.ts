@@ -1,6 +1,8 @@
 import { chromium, type Browser, type Page } from '@playwright/test';
 
-const CDP_ENDPOINT = 'http://127.0.0.1:9222';
+const CDP_ENDPOINT = process.env.CDP_PORT
+  ? `http://127.0.0.1:${process.env.CDP_PORT}`
+  : 'http://127.0.0.1:9222';
 const SETTLE_MS = 1500;
 
 export async function connectToApp(): Promise<{ browser: Browser; page: Page }> {
