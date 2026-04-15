@@ -1002,6 +1002,126 @@ export interface Scout9ReportDetail {
   candidates: Scout9ReportCandidate[]
 }
 
+export type VigilSource = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations'
+export type VigilRunTriggerType = 'manual' | 'scheduled'
+export type VigilRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
+export type VigilActivityEventType = 'run_started' | 'run_progress' | 'run_completed' | 'run_failed' | 'chat' | 'system'
+export type VigilActivitySeverity = 'info' | 'warning' | 'error'
+export type VigilChatRole = 'system' | 'user' | 'assistant' | 'tool'
+
+export interface VigilRun {
+  id: string
+  trigger_type: VigilRunTriggerType
+  status: VigilRunStatus
+  sources_json: string
+  results_json: string | null
+  started_at: string
+  completed_at: string | null
+  token_hash: string | null
+}
+
+export interface VigilActivityLog {
+  id: string
+  run_id: string | null
+  event_type: VigilActivityEventType
+  source: VigilSource | 'system'
+  severity: VigilActivitySeverity
+  message: string
+  details_json: string | null
+  created_at: string
+}
+
+export interface VigilChatMessage {
+  id: string
+  role: VigilChatRole
+  content: string
+  metadata_json: string | null
+  created_at: string
+}
+
+export interface VigilConfig {
+  id: 1
+  schedule_enabled: 0 | 1
+  schedule_hour: number
+  schedule_minute: number
+  sync_sources_json: string
+  candidate_year_filter: number
+}
+
+export interface VigilRunParams {
+  token: string
+  sources?: VigilSource[]
+  options?: { limit?: number; skip?: number; year?: number }
+}
+
+export interface VigilSyncSourceParams {
+  token: string
+  source: VigilSource
+  options?: { limit?: number; skip?: number; year?: number }
+}
+
+export interface VigilCancelRunParams {
+  run_id: string
+}
+
+export interface VigilListRunsParams {
+  status?: VigilRunStatus
+  limit?: number
+  offset?: number
+}
+
+export interface VigilGetActivityLogParams {
+  run_id?: string
+  source?: VigilSource
+  severity?: VigilActivitySeverity
+  limit?: number
+  offset?: number
+}
+
+export interface VigilUpdateConfigParams {
+  schedule_enabled?: 0 | 1
+  schedule_hour?: number
+  schedule_minute?: number
+  sync_sources_json?: string
+  candidate_year_filter?: number
+}
+
+export interface VigilSendChatMessageParams {
+  content: string
+  metadata_json?: string
+}
+
+export interface VigilListChatMessagesParams {
+  limit?: number
+  offset?: number
+}
+
+export interface VigilToolsDryRunParams {
+  input: string
+}
+
+export interface VigilResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+export interface VigilActivityEvent {
+  run_id: string | null
+  event_type: VigilActivityEventType
+  source: VigilSource | 'system'
+  severity: VigilActivitySeverity
+  message: string
+  details_json?: string | null
+  timestamp: string
+}
+
+export interface VigilStatusEvent {
+  status: VigilRunStatus | 'idle'
+  run_id: string | null
+  timestamp: string
+}
+
 export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Not Applies' | 'Other' | 'Closed'
 
 export interface PrrCommentDto {
@@ -1208,6 +1328,21 @@ export interface IpcContracts {
   [IPC_CHANNELS.SCOUT9_SETTINGS_ACTIVATE_PROMPT]: { request: Scout9ActivatePromptVersionParams; response: Scout9Response<Scout9PromptVersion> }
   [IPC_CHANNELS.SCOUT9_GET_BRAIN_SNAPSHOT]: { request: void; response: Scout9Response<Scout9BrainSnapshot | null> }
 
+  [IPC_CHANNELS.VIGIL_RUN]: { request: VigilRunParams; response: VigilResponse<VigilRun> }
+  [IPC_CHANNELS.VIGIL_CANCEL_RUN]: { request: VigilCancelRunParams; response: VigilResponse<{ canceled: boolean }> }
+  [IPC_CHANNELS.VIGIL_GET_STATUS]: { request: void; response: VigilResponse<{ active_run: VigilRun | null }> }
+  [IPC_CHANNELS.VIGIL_LIST_RUNS]: { request: VigilListRunsParams | void; response: VigilResponse<VigilRun[]> }
+  [IPC_CHANNELS.VIGIL_GET_RUN]: { request: string; response: VigilResponse<VigilRun | null> }
+  [IPC_CHANNELS.VIGIL_GET_ACTIVITY_LOG]: { request: VigilGetActivityLogParams | void; response: VigilResponse<VigilActivityLog[]> }
+  [IPC_CHANNELS.VIGIL_CLEAR_ACTIVITY_LOG]: { request: void; response: VigilResponse<{ cleared: boolean }> }
+  [IPC_CHANNELS.VIGIL_GET_CONFIG]: { request: void; response: VigilResponse<VigilConfig> }
+  [IPC_CHANNELS.VIGIL_UPDATE_CONFIG]: { request: VigilUpdateConfigParams; response: VigilResponse<VigilConfig> }
+  [IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]: { request: VigilSendChatMessageParams; response: VigilResponse<VigilChatMessage> }
+  [IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]: { request: VigilListChatMessagesParams | void; response: VigilResponse<VigilChatMessage[]> }
+  [IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES]: { request: void; response: VigilResponse<{ cleared: boolean }> }
+  [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
+  [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
+
   [IPC_CHANNELS.APP_GET_VERSION]: { request: void; response: string }
   [IPC_CHANNELS.APP_GET_PLATFORM]: { request: void; response: string }
   [IPC_CHANNELS.APP_OPEN_EXTERNAL]: { request: string; response: { opened: boolean } }
@@ -1226,6 +1361,8 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.MATCH_BENCH_BURN_EVENT]: BenchBurnEvent
   [IPC_CHANNELS.SCOUT9_PIPELINE_EVENT]: Scout9PipelineEvent
   [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
+  [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
+  [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
 }

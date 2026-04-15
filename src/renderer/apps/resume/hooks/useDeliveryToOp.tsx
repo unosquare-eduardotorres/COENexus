@@ -293,10 +293,10 @@ export function useDeliveryToOp(parentReset: () => void) {
     wizard: { currentStep, completedSteps, stepSummaries },
     employee: { selectedEmployee, handleEmployeeNext },
     positions: { selectedPositions, handlePositionsNext },
-    summary: { customPositions, setCustomPositions, handleStartAnalysis, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
+    summary: { customPositions, setCustomPositions, handleSummaryNext, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     search: { progress, error, executeDeliveryToOp },
-    results: { results, handleRetryFallbacks, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick, handleBackToIntents },
+    results: { results, handleRetryFallbacks },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch },
+    actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   };
 }

@@ -1,7 +1,7 @@
-import { knowledgeRepository } from '../db/scout9/repositories/knowledgeRepository'
-import { patternRepository } from '../db/scout9/repositories/patternRepository'
-import { brainRepository } from '../db/scout9/repositories/brainRepository'
-import * as configRepository from '../db/scout9/repositories/configRepository'
+import { knowledgeRepository } from '../db/agents/repositories/knowledgeRepository'
+import { patternRepository } from '../db/agents/repositories/patternRepository'
+import { brainRepository } from '../db/agents/repositories/brainRepository'
+import * as configRepository from '../db/agents/repositories/configRepository'
 import { countKnowledgeTokens } from './tokenCountService'
 import { createLogger } from './logger'
 

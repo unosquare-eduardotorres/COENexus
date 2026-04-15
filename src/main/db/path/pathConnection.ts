@@ -42,7 +42,11 @@ function runInitialSchema(database: Database.Database): void {
   ).get()
 
   if (!hasSeniorityLevels) {
-    const schemaPath = join(__dirname, 'schema.sql')
+    const schemaCandidates = [
+      join(__dirname, 'schema.sql'),
+      join(__dirname, 'db', 'path', 'schema.sql'),
+    ]
+    const schemaPath = schemaCandidates.find(existsSync) ?? schemaCandidates[0]
     if (!existsSync(schemaPath)) {
       log.warn('schema.sql not found at expected PATH database location; skipping schema initialization')
       database.exec(`

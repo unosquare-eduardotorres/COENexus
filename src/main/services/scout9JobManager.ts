@@ -1,7 +1,7 @@
-import { jobRepository } from '../db/scout9/repositories/jobRepository'
+import { jobRepository } from '../db/agents/repositories/jobRepository'
 import { runScout9Pipeline } from './scout9PipelineService'
 import { fetchPositions, gatherCandidates, crossReference, runAgenticPhase } from './scout9Steps'
-import * as configRepository from '../db/scout9/repositories/configRepository'
+import * as configRepository from '../db/agents/repositories/configRepository'
 import { createLogger } from './logger'
 import type { Scout9PipelineEvent, Scout9RunParams } from './scout9PipelineService'
 

@@ -5,6 +5,7 @@ import AgentsLandingPage from './pages/AgentsLandingPage'
 import AgentDetailPage from './pages/AgentDetailPage'
 
 const Scout9Page = lazy(() => import('./pages/Scout9Page'))
+const VigilPage = lazy(() => import('./pages/VigilPage'))
 const PipelineTab = lazy(() => import('./pages/scout9/PipelineTab'))
 const ReportsTab = lazy(() => import('./pages/scout9/ReportsTab'))
 const KnowledgeBaseTab = lazy(() => import('./pages/scout9/KnowledgeBaseTab'))
@@ -33,6 +34,7 @@ export default function AgentsApp() {
             <Route path="brain" element={<KnowledgeBaseTab />} />
             <Route path="settings" element={<SettingsTab />} />
           </Route>
+          <Route path="vigil" element={<VigilPage />} />
           <Route path=":agentId" element={<AgentDetailPage />} />
         </Route>
       </Routes>

@@ -19,11 +19,11 @@ import type {
   Scout9UpdateNoteParams,
   Scout9UpdateRuleParams,
 } from '../../shared/ipc-types'
-import { knowledgeRepository } from '../db/scout9/repositories/knowledgeRepository'
-import { reportRepository } from '../db/scout9/repositories/reportRepository'
-import { patternRepository } from '../db/scout9/repositories/patternRepository'
-import { brainRepository } from '../db/scout9/repositories/brainRepository'
-import * as configRepository from '../db/scout9/repositories/configRepository'
+import { knowledgeRepository } from '../db/agents/repositories/knowledgeRepository'
+import { reportRepository } from '../db/agents/repositories/reportRepository'
+import { patternRepository } from '../db/agents/repositories/patternRepository'
+import { brainRepository } from '../db/agents/repositories/brainRepository'
+import * as configRepository from '../db/agents/repositories/configRepository'
 import { scout9JobManager } from '../services/scout9JobManager'
 import { getScopeOptions } from '../services/scout9ScopeService'
 import { getTokenBudgetBreakdown } from '../services/scout9BrainService'

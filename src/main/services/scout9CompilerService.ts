@@ -1,4 +1,4 @@
-import { knowledgeRepository } from '../db/scout9/repositories/knowledgeRepository'
+import { knowledgeRepository } from '../db/agents/repositories/knowledgeRepository'
 import { countKnowledgeTokens } from './tokenCountService'
 import { createLogger } from './logger'
 

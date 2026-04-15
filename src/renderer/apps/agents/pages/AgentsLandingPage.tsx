@@ -13,6 +13,14 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   Shuffle: <Shuffle size={20} />,
   GraduationCap: <GraduationCap size={20} />,
   Trophy: <Trophy size={20} />,
+  Radar: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19.07 4.93A10 10 0 1 0 21 12" />
+      <path d="M12 12 7 7" />
+      <path d="M12 8a4 4 0 0 1 4 4" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 }
 
 export default function AgentsLandingPage() {

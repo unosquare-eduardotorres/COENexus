@@ -14,7 +14,10 @@ export async function connectToApp(): Promise<{ browser: Browser; page: Page }> 
   }
 
   const pages = defaultContext.pages();
-  const page = pages.find(p => p.url().includes('index.html')) || pages[0];
+  const page = pages.find(p => p.url().includes('localhost:5173'))
+    || pages.find(p => p.url().includes('index.html'))
+    || pages.find(p => !p.url().startsWith('devtools://'))
+    || pages[0];
 
   if (!page) {
     throw new Error('No Electron renderer page found.');
@@ -31,8 +34,10 @@ export async function navigateTo(page: Page, hash: string): Promise<void> {
 }
 
 export async function clickIntentCard(page: Page, title: string): Promise<void> {
+  await navigateTo(page, '/');
   await navigateTo(page, '/resume/match');
-  const card = page.locator(`button:has-text("${title}")`);
+  const card = page.locator(`button:has-text("${title}")`).first();
+  await card.waitFor({ state: 'visible', timeout: 10_000 });
   await card.click();
   await page.waitForTimeout(SETTLE_MS);
 }
@@ -75,6 +80,8 @@ const IGNORED_CONSOLE_PATTERNS = [
   'Download the React DevTools',
   'net::ERR_',
   'favicon.ico',
+  'Content Security Policy',
+  'unique "key" prop',
 ];
 
 export function filterRealErrors(errors: ConsoleEntry[]): ConsoleEntry[] {

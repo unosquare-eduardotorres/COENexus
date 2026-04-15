@@ -18,12 +18,6 @@ vi.mock('../catalogService', () => ({
   },
 }))
 
-vi.mock('../embeddingJobQueue', () => ({
-  embeddingJobQueue: {
-    enqueue: vi.fn(),
-  },
-}))
-
 vi.mock('../../db/repositories/syncRepository', () => ({
   syncRepository: {
     findEmployeeByUpstreamId: vi.fn(),
@@ -51,7 +45,6 @@ vi.mock('../../config', () => ({
 import { syncOrchestrator } from '../syncOrchestrator'
 import { upstreamApiService } from '../upstreamApiService'
 import { catalogService } from '../catalogService'
-import { embeddingJobQueue } from '../embeddingJobQueue'
 import { syncRepository } from '../../db/repositories/syncRepository'
 
 describe('syncOrchestrator', () => {
@@ -98,7 +91,6 @@ describe('syncOrchestrator', () => {
 
     expect(upstreamApiService.getEmployeeDetail).toHaveBeenCalledWith('token-1', 7)
     expect(syncRepository.upsertEmployee).toHaveBeenCalledTimes(1)
-    expect(embeddingJobQueue.enqueue).toHaveBeenCalledTimes(1)
     expect(result).toMatchObject({
       id: 'emp-7',
       source: 'employees',

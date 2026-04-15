@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/connection'
-import { getScout9Database } from '../db/scout9/scout9Connection'
+import { getAgentsDatabase } from '../db/agents/agentsConnection'
 import { createLogger } from './logger'
 
 const log = createLogger('Scout9Tools')
@@ -145,7 +145,7 @@ export function createScout9Tools(tracker: ToolCallTracker, toolTimeoutMs: numbe
         tracker.record('get_knowledge_notes')
 
         return withTimeout(async () => {
-          const db = getScout9Database()
+          const db = getAgentsDatabase()
           let query = 'SELECT note_title, note_text, tags_json FROM knowledge_notes WHERE is_active = 1'
           const params: unknown[] = []
 

@@ -381,6 +381,47 @@ const api = {
     },
   },
 
+  vigil: {
+    run: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_RUN]['response']>,
+    cancelRun: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_CANCEL_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CANCEL_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CANCEL_RUN]['response']>,
+    getStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_GET_STATUS) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_STATUS]['response']>,
+    listRuns: (params?: IpcContracts[typeof IPC_CHANNELS.VIGIL_LIST_RUNS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_LIST_RUNS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_LIST_RUNS]['response']>,
+    getRun: (runId: IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_GET_RUN, runId) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_RUN]['response']>,
+    getActivityLog: (params?: IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_ACTIVITY_LOG]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_GET_ACTIVITY_LOG, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_ACTIVITY_LOG]['response']>,
+    clearActivityLog: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CLEAR_ACTIVITY_LOG) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CLEAR_ACTIVITY_LOG]['response']>,
+    getConfig: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_GET_CONFIG) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_CONFIG]['response']>,
+    updateConfig: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_UPDATE_CONFIG]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_UPDATE_CONFIG, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_UPDATE_CONFIG]['response']>,
+    sendMessage: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]['response']>,
+    listMessages: (params?: IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]['response']>,
+    clearMessages: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES]['response']>,
+    toolsDryRun: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]['response']>,
+    syncSource: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_SYNC_SOURCE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_SYNC_SOURCE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_SYNC_SOURCE]['response']>,
+    onActivityEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.VIGIL_ACTIVITY_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_ACTIVITY_EVENT, handler)
+    },
+    onStatusEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_STATUS_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_STATUS_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
+    },
+  },
+
   app: {
     getVersion: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
     getPlatform: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PLATFORM),

@@ -1,13 +1,40 @@
 import { app, BrowserWindow, shell, session, nativeImage } from 'electron'
 import { join } from 'path'
+import { IPC_CHANNELS } from '../shared/ipc-channels'
 import { registerAllHandlers } from './ipc'
 import { createMenu } from './menu'
 import { initDatabase, closeDatabase } from './db/connection'
 import { initPathDatabase, closePathDatabase } from './db/path/pathConnection'
-import { initScout9Database, closeScout9Database } from './db/scout9/scout9Connection'
+import { initAgentsDatabase, closeAgentsDatabase } from './db/agents/agentsConnection'
 import { embeddingWorker } from './services/embeddingWorker'
+import { vigilScheduler } from './services/vigilScheduler'
+import { vigilExecutor } from './services/vigilExecutor'
+import { getVigilToken } from './services/vigilTokenStore'
+import type { VigilStatusEvent } from '../shared/ipc-types'
+import { toVigilActivityEvent } from './services/vigilEventMapper'
 import { initAutoUpdater, stopAutoUpdater } from './updater'
 import { createLogger } from './services/logger'
+
+function validateNativeModules(): void {
+  try {
+    require('better-sqlite3')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.includes('NODE_MODULE_VERSION')) {
+      const fix = 'Run: npm run rebuild'
+      console.error(`\n❌ Native module ABI mismatch!\n${message}\n\nFix: ${fix}\n`)
+      const { dialog } = require('electron')
+      dialog.showErrorBox(
+        'Native Module Error',
+        `better-sqlite3 was compiled for the wrong Node.js version.\n\n${fix}`
+      )
+      process.exit(1)
+    }
+    throw err
+  }
+}
+
+validateNativeModules()
 
 const log = createLogger('Main')
 
@@ -117,6 +144,15 @@ function setupPermissions(): void {
   })
 }
 
+function emitToRenderer(channel: string, payload: unknown): void {
+  const win = getMainWindow()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send(channel, payload)
+  }
+}
+
+
+
 app.whenReady().then(async () => {
   app.setName('COE Nexus')
   setupCSP()
@@ -135,9 +171,9 @@ app.whenReady().then(async () => {
   }
 
   try {
-    initScout9Database()
+    initAgentsDatabase()
   } catch (err) {
-    log.error('Scout-9 database initialization failed', err instanceof Error ? err : new Error(String(err)))
+    log.error('Agents database initialization failed', err instanceof Error ? err : new Error(String(err)))
   }
 
   try {
@@ -162,6 +198,45 @@ app.whenReady().then(async () => {
 
   createWindow()
   createMenu()
+  vigilScheduler.start({
+    getToken: () => getVigilToken(),
+    run: async ({ token, sources, options }) => {
+      const runningStatus: VigilStatusEvent = {
+        status: 'running',
+        run_id: null,
+        timestamp: new Date().toISOString(),
+      }
+      emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, runningStatus)
+
+      try {
+        const run = await vigilExecutor.run({
+          token,
+          triggerType: 'scheduled',
+          sources,
+          options,
+          emitEvent: (syncEvent) => {
+            emitToRenderer(IPC_CHANNELS.VIGIL_ACTIVITY_EVENT, toVigilActivityEvent(syncEvent))
+          },
+        })
+
+        const completedStatus: VigilStatusEvent = {
+          status: run.status,
+          run_id: run.id,
+          timestamp: new Date().toISOString(),
+        }
+        emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, completedStatus)
+        return run
+      } catch (error) {
+        const failedStatus: VigilStatusEvent = {
+          status: 'failed',
+          run_id: null,
+          timestamp: new Date().toISOString(),
+        }
+        emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, failedStatus)
+        throw error
+      }
+    },
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -174,10 +249,11 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   embeddingWorker.stop()
+  vigilScheduler.stop()
   stopAutoUpdater()
   closeDatabase()
   closePathDatabase()
-  closeScout9Database()
+  closeAgentsDatabase()
 })
 
 app.on('web-contents-created', (_event, contents) => {

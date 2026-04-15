@@ -5,6 +5,7 @@ import { registerPrrHandlers } from './prr'
 import { registerAppHandlers } from './app.ipc'
 import { registerPathHandlers } from './path.ipc'
 import { registerScout9Handlers } from './scout9.ipc'
+import { registerVigilHandlers } from './vigil.ipc'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -14,4 +15,5 @@ export function registerAllHandlers(): void {
   registerPrrHandlers()
   registerPathHandlers()
   registerScout9Handlers()
+  registerVigilHandlers()
 }

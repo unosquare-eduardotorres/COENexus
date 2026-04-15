@@ -154,13 +154,13 @@ const BenchEmployeeSelector = memo(function BenchEmployeeSelector({ onNext, init
               </tr>
             </thead>
             <tbody>
-              {sorted.map(emp => {
+              {sorted.map((emp, idx) => {
                 const isSelected = selected.has(emp.upstreamId);
                 const disabled = !emp.isVectorized;
 
                 return (
                   <tr
-                    key={emp.upstreamId}
+                    key={`${emp.upstreamId}-${idx}`}
                     onClick={() => toggleSelect(emp)}
                     className={`border-b border-gray-100/20 dark:border-dark-border/20 transition-colors ${
                       disabled

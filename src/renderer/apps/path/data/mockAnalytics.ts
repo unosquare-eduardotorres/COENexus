@@ -13,7 +13,7 @@ export const atRiskCandidates: AtRiskCandidate[] = [
   {
     id: 'dev-003',
     name: 'Lucia Bernal',
-    avatarUrl: 'https://i.pravatar.cc/150?img=49',
+    avatarUrl: undefined,
     fromLevel: 'Mid II',
     toLevel: 'Senior I',
     bandLimitPercent: 94,
@@ -22,7 +22,7 @@ export const atRiskCandidates: AtRiskCandidate[] = [
   {
     id: 'dev-004',
     name: 'Jorge Salgado',
-    avatarUrl: 'https://i.pravatar.cc/150?img=12',
+    avatarUrl: undefined,
     fromLevel: 'Senior I',
     toLevel: 'Senior II',
     bandLimitPercent: 88,

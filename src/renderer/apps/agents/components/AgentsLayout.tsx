@@ -24,6 +24,14 @@ const ICON_MAP: Record<string, React.ReactNode> = {
       <path d="M6 9H4.5a2.5 2.5 0 010-5H6" /><path d="M18 9h1.5a2.5 2.5 0 000-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0012 0V2Z" />
     </svg>
   ),
+  Radar: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 12 19 5" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
 };
 
 interface SidebarAgent {
@@ -36,6 +44,7 @@ interface SidebarAgent {
 
 const SIDEBAR_AGENTS: SidebarAgent[] = [
   { id: 'scout-9', label: 'Scout-9', icon: 'Search', accentColor: '#3b82f6', status: 'online' },
+  { id: 'vigil', label: 'Vigil', icon: 'Radar', accentColor: '#94a3b8', status: 'online' },
   { id: 'switchboard', label: 'Switchboard', icon: 'Shuffle', accentColor: '#f59e0b', status: 'coming-soon' },
   { id: 'sensei', label: 'Sensei', icon: 'GraduationCap', accentColor: '#10b981', status: 'coming-soon' },
   { id: 'payday', label: 'Payday', icon: 'Trophy', accentColor: '#ec4899', status: 'coming-soon' },
@@ -61,7 +70,7 @@ function useScout9LiveStatus(): AgentLiveStatus {
   useEffect(() => {
     let mounted = true;
 
-    window.api.scout9.getStatus().then((res) => {
+    window.api?.scout9?.getStatus().then((res) => {
       if (!mounted) return;
       if (res?.success && res.data?.active_job) {
         const jobStatus = res.data.active_job.status;
@@ -73,7 +82,7 @@ function useScout9LiveStatus(): AgentLiveStatus {
       }
     }).catch(() => {});
 
-    const unsubscribe = window.api.scout9.onStatusEvent((event) => {
+    const unsubscribe = window.api?.scout9?.onStatusEvent((event) => {
       if (!mounted) return;
       if (event.status === 'running') {
         setStatus('running');
@@ -90,7 +99,49 @@ function useScout9LiveStatus(): AgentLiveStatus {
 
     return () => {
       mounted = false;
-      unsubscribe();
+      unsubscribe?.();
+    };
+  }, []);
+
+  return status;
+}
+
+function useVigilLiveStatus(): AgentLiveStatus {
+  const [status, setStatus] = useState<AgentLiveStatus>('online');
+
+  useEffect(() => {
+    let mounted = true;
+
+    window.api?.vigil?.getStatus().then((res) => {
+      if (!mounted) return;
+      if (res?.success && res.data?.active_run) {
+        const runStatus = res.data.active_run.status;
+        if (runStatus === 'running' || runStatus === 'queued') {
+          setStatus('running');
+        } else if (runStatus === 'failed') {
+          setStatus('failed');
+        } else {
+          setStatus('online');
+        }
+      } else {
+        setStatus('online');
+      }
+    }).catch(() => {});
+
+    const unsubscribe = window.api?.vigil?.onStatusEvent((event) => {
+      if (!mounted) return;
+      if (event.status === 'running' || event.status === 'queued') {
+        setStatus('running');
+      } else if (event.status === 'failed') {
+        setStatus('failed');
+      } else {
+        setStatus('online');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe?.();
     };
   }, []);
 
@@ -119,6 +170,7 @@ export default function AgentsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const scout9Status = useScout9LiveStatus();
+  const vigilStatus = useVigilLiveStatus();
 
   return (
     <div className="min-h-screen pb-8 gradient-subtle transition-colors duration-300">
@@ -166,11 +218,15 @@ export default function AgentsLayout() {
                     className={`h-1.5 w-1.5 rounded-full ${
                       agent.id === 'scout-9'
                         ? getStatusDotClass(scout9Status)
+                        : agent.id === 'vigil'
+                        ? getStatusDotClass(vigilStatus)
                         : getStatusDotClass(agent.status as AgentLiveStatus)
                     }`}
                     title={
                       agent.id === 'scout-9'
                         ? getStatusTitle(scout9Status)
+                        : agent.id === 'vigil'
+                        ? getStatusTitle(vigilStatus)
                         : getStatusTitle(agent.status as AgentLiveStatus)
                     }
                   />
@@ -213,9 +269,15 @@ export default function AgentsLayout() {
 
         <div className="border-t border-gray-200/30 dark:border-dark-border/30 px-4 py-3">
           <div className="flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${getStatusDotClass(scout9Status)}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${getStatusDotClass(
+              scout9Status === 'running' || vigilStatus === 'running'
+                ? 'running'
+                : scout9Status === 'failed' || vigilStatus === 'failed'
+                ? 'failed'
+                : 'online'
+            )}`} />
             <span className="text-[10px] text-muted font-mono">
-              {scout9Status === 'running' ? '1 running' : '1 online'} • 3 coming soon
+              2 online • 3 coming soon
             </span>
           </div>
         </div>

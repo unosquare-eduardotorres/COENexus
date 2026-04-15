@@ -12,11 +12,12 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test --config=e2e/playwright.config.ts",
     "test:e2e:cdp": "npx playwright test --config=e2e/cdp/playwright.config.ts",
-    "rebuild": "electron-rebuild -f -w better-sqlite3",
-    "postinstall": "npx tsx scripts/download-sqlite-vec.ts"
+    "rebuild": "npx electron-rebuild -f -w better-sqlite3",
+    "postinstall": "npx tsx scripts/download-sqlite-vec.ts && npx electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.96",
@@ -56,12 +57,13 @@
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
     "electron": "^41.0.0",
-    "electron-rebuild": "^3.2.9",
+    "@electron/rebuild": "^4.0.0",
     "electron-vite": "^5.0.0",
     "jsdom": "^29.0.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^6.0.0",
+    "@vitest/coverage-v8": "^4.0.0",
     "vitest": "^4.0.0"
   }
 }

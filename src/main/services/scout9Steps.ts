@@ -1,5 +1,5 @@
 import { getDatabase } from '../db/connection'
-import { reportRepository } from '../db/scout9/repositories/reportRepository'
+import { reportRepository } from '../db/agents/repositories/reportRepository'
 import { assembleBrain } from './scout9BrainService'
 import { createLogger } from './logger'
 import type { PipelineContext, Scout9PipelineEvent } from './scout9PipelineService'

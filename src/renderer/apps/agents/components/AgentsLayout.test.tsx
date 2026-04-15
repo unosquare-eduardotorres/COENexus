@@ -10,6 +10,10 @@ vi.stubGlobal('window', {
       getStatus: vi.fn().mockResolvedValue({ success: true, data: {} }),
       onStatusEvent: vi.fn().mockReturnValue(() => {}),
     },
+    vigil: {
+      getStatus: vi.fn().mockResolvedValue({ success: true, data: {} }),
+      onStatusEvent: vi.fn().mockReturnValue(() => {}),
+    },
   },
 })
 

@@ -19,6 +19,15 @@ export const AGENTS_DATA: Agent[] = [
     icon: 'Search',
   },
   {
+    id: 'vigil',
+    name: 'Vigil',
+    description: 'Autonomous data synchronization sentinel...',
+    skills: ['scheduled-sync', 'data-freshness', 'activity-monitoring'],
+    status: 'active',
+    accentColor: '#94a3b8',
+    icon: 'Radar',
+  },
+  {
     id: 'switchboard',
     name: 'Switchboard',
     description: 'Routes talent across projects — reallocations, transfers, and team rebalancing. Optimizes resource distribution and manages transition workflows.',

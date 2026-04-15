@@ -64,13 +64,13 @@ const STEP_LABELS: { key: ExternalCandidateToOpStepKey; title: string; icon: Rea
 export default function ExternalCandidateToOpPage({ onReset: parentReset }: ExternalCandidateToOpPageProps) {
   const {
     wizard: { currentStep, completedSteps, stepSummaries },
-    upload: { uploadedFiles, handleFilesUploaded },
-    positions: { selectedPositions, customPosition, handlePositionsNext },
-    summary: { handleStartAnalysis, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
-    search: { progress, error, executeSearch },
-    results: { results, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail },
-    actions: { handleReset, handleStepClick, handleBackToIntents },
+    upload: { uploadedResumes, handleUploadNext },
+    positions: { selectedPosition, customPosition, handlePositionNext, effectivePosition },
+    summary: { handleSummaryNext, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
+    search: { progress, error, executeExternalCandidateMatch },
+    results: { results },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch },
+    actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   } = useExternalCandidateToOp(parentReset);
 
   return (
