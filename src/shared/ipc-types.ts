@@ -1122,7 +1122,7 @@ export interface VigilStatusEvent {
   timestamp: string
 }
 
-export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Not Applies' | 'Other' | 'Closed'
+export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
 
 export interface PrrCommentDto {
   text: string

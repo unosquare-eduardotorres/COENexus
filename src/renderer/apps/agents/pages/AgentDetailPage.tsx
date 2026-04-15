@@ -1,29 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { AGENTS_DATA } from '../types'
+import { AGENT_IMAGES } from '../assets'
 import {
-  Search,
-  Shuffle,
-  GraduationCap,
-  Trophy,
   ArrowLeft,
   Zap,
   Shield,
 } from 'lucide-react'
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Search: <Search size={32} />,
-  Shuffle: <Shuffle size={32} />,
-  GraduationCap: <GraduationCap size={32} />,
-  Trophy: <Trophy size={32} />,
-  Radar: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19.07 4.93A10 10 0 1 0 21 12" />
-      <path d="M12 12 7 7" />
-      <path d="M12 8a4 4 0 0 1 4 4" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-}
 
 export default function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>()
@@ -56,20 +38,35 @@ export default function AgentDetailPage() {
           All agents
         </button>
 
-        <div className="glass-card p-8 text-center">
-          <div className="mx-auto w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center">
-            {ICON_MAP[agent.icon]}
+        <div className="glass-card relative overflow-hidden">
+          <div className="h-40 w-full overflow-hidden">
+            <img
+              src={AGENT_IMAGES[agent.id]?.banner}
+              alt={`${agent.name} banner`}
+              className="w-full h-full object-cover opacity-60"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-white/90 dark:from-dark-bg/90 to-transparent" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-primary">{agent.name}</h1>
-          <p className="mt-2 text-sm text-secondary max-w-lg mx-auto">
-            {agent.name} is being assembled and will be available in a later release cycle.
-          </p>
-          <button
-            onClick={() => navigate('/agents/scout-9')}
-            className="mt-5 glass-button px-4 py-2 text-xs font-semibold text-primary"
-          >
-            Open Scout-9 Workspace
-          </button>
+          <div className="relative px-6 pb-6 -mt-10">
+            <div className="flex items-end gap-4">
+              <img
+                src={AGENT_IMAGES[agent.id]?.avatar}
+                alt={agent.name}
+                className="h-20 w-20 rounded-2xl object-cover border-4 border-white dark:border-dark-bg shadow-lg"
+              />
+              <div className="pb-1">
+                <h1 className="text-2xl font-bold text-primary">{agent.name}</h1>
+                <p className="mt-2 text-sm text-secondary max-w-lg">{agent.description}</p>
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium mt-2"
+                  style={{ backgroundColor: `${agent.accentColor}15`, color: agent.accentColor }}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: agent.accentColor }} />
+                  Coming Soon
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -85,26 +82,28 @@ export default function AgentDetailPage() {
         All agents
       </button>
 
-      <div className="glass-card p-6 relative overflow-hidden">
-        <div
-          className="absolute -left-10 -top-10 h-40 w-40 rounded-full blur-3xl opacity-20"
-          style={{ background: agent.accentColor }}
-        />
+      <div className="glass-card relative overflow-hidden">
+        <div className="h-40 w-full overflow-hidden">
+          <img
+            src={AGENT_IMAGES[agent.id]?.banner}
+            alt={`${agent.name} banner`}
+            className="w-full h-full object-cover opacity-60"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-white/90 dark:from-dark-bg/90 to-transparent" />
+        </div>
 
-        <div className="relative flex items-start gap-5">
-          <div
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${agent.accentColor}20` }}
-          >
-            <div style={{ color: agent.accentColor }}>{ICON_MAP[agent.icon]}</div>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-primary">{agent.name}</h1>
-            <p className="mt-2 text-sm text-secondary leading-relaxed">{agent.description}</p>
-
-            <div className="mt-4 flex items-center gap-3">
+        <div className="relative px-6 pb-6 -mt-10">
+          <div className="flex items-end gap-4">
+            <img
+              src={AGENT_IMAGES[agent.id]?.avatar}
+              alt={agent.name}
+              className="h-20 w-20 rounded-2xl object-cover border-4 border-white dark:border-dark-bg shadow-lg"
+            />
+            <div className="pb-1">
+              <h1 className="text-2xl font-bold text-primary">{agent.name}</h1>
+              <p className="mt-1 text-sm text-secondary leading-relaxed max-w-lg">{agent.description}</p>
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium mt-2"
                 style={{
                   backgroundColor: `${agent.accentColor}15`,
                   color: agent.accentColor,

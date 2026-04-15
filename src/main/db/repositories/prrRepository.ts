@@ -3,7 +3,7 @@ import { createLogger } from '../../services/logger'
 
 const log = createLogger('PrrRepository')
 
-export type CoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Not Applies' | 'Other' | 'Closed'
+export type CoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
 
 export interface PrrCommentEntry {
   text: string

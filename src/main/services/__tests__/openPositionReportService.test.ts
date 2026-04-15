@@ -155,16 +155,30 @@ describe('openPositionReportService', () => {
   })
 
   describe('generateCsv', () => {
-    it('should generate CSV with headers and data rows', () => {
+    it('should generate CSV with BOM prefix and CRLF line endings', () => {
       const position = makePosition()
       const csv = openPositionReportService.generateCsv([
         { position, matchingCriteria: ['stalled-position'], actors: ['Stakeholder'] } as Parameters<typeof openPositionReportService.generateCsv>[0][0],
       ])
 
-      const lines = csv.split('\n')
+      expect(csv.charCodeAt(0)).toBe(0xFEFF)
+
+      const content = csv.slice(1)
+      const lines = content.split('\r\n')
       expect(lines).toHaveLength(2)
       expect(lines[0]).toContain('Account')
       expect(lines[1]).toContain('Acme')
+    })
+
+    it('should strip newlines from cell values', () => {
+      const position = makePosition({ account: 'Acme\nCorp', stakeholder: 'John\r\nDoe' })
+      const csv = openPositionReportService.generateCsv([
+        { position, matchingCriteria: ['stalled-position'], actors: ['Stakeholder'] } as Parameters<typeof openPositionReportService.generateCsv>[0][0],
+      ])
+
+      expect(csv).not.toMatch(/(?<!")\n(?!")/)
+      expect(csv).toContain('Acme Corp')
+      expect(csv).toContain('John Doe')
     })
   })
 })

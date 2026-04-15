@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import { ToastProvider } from '../../shared/components/ToastContext';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TransformPage = lazy(() => import('./pages/TransformPage'));
@@ -33,20 +32,18 @@ function SettingsWrapper() {
 
 export default function ResumeApp() {
   return (
-    <ToastProvider>
-      <Layout>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/enhance" element={<TransformPage />} />
-            <Route path="/history" element={<TransformHistoryPage />} />
-            <Route path="/match" element={<MatchEnginePage />} />
-            <Route path="/batch" element={<BatchPage />} />
-            <Route path="/review" element={<RecruiterDashboard />} />
-            <Route path="/settings" element={<SettingsWrapper />} />
-          </Routes>
-        </Suspense>
-      </Layout>
-    </ToastProvider>
+    <Layout>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/enhance" element={<TransformPage />} />
+          <Route path="/history" element={<TransformHistoryPage />} />
+          <Route path="/match" element={<MatchEnginePage />} />
+          <Route path="/batch" element={<BatchPage />} />
+          <Route path="/review" element={<RecruiterDashboard />} />
+          <Route path="/settings" element={<SettingsWrapper />} />
+        </Routes>
+      </Suspense>
+    </Layout>
   );
 }

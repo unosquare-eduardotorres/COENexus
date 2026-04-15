@@ -60,13 +60,13 @@ describe('databaseSharingService integration', () => {
     databaseSharingService.saveConfig({ sharedPath: sharedDir, exporterName: 'admin' })
 
     const result = databaseSharingService.listSnapshots()
-    expect(result.snapshots).toEqual([])
+    expect(result).toEqual([])
   })
 
   it('should list empty snapshots when sharedPath does not exist', () => {
     databaseSharingService.saveConfig({ sharedPath: '/nonexistent', exporterName: 'admin' })
     const result = databaseSharingService.listSnapshots()
-    expect(result.snapshots).toEqual([])
+    expect(result).toEqual([])
   })
 
   it('should report database status', () => {

@@ -26,10 +26,12 @@ import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import { useIpcQuery, useInvalidateQueries } from '../../../shared/hooks/useIpcQuery';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useStepWizard } from './useStepWizard';
+import { useToast } from '../../../shared/components/ToastContext';
 
 const log = createRendererLogger('useMatchEngine');
 
 export function useMatchEngine() {
+  const { showToast } = useToast();
   const { currentStep: currentStepKey, completedSteps, navigateStep: navigateToStep, completeStep, setCurrentStep: setCurrentStepKey, setCompletedSteps, resetWizard } = useStepWizard<MatchStepKey>('intent', {
     historyKey: 'matchStep',
   });
@@ -289,7 +291,8 @@ export function useMatchEngine() {
         : `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Candidates.aspx?CandidateId=${c.id}`,
     }));
     exportToExcel(data, columns, `match-results-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }, [candidates]);
+    showToast('Match results exported to Excel', 'success');
+  }, [candidates, showToast]);
 
   const handleBackToResults = useCallback(() => { navigateToStep('results'); }, [navigateToStep]);
   const handleStepClick = useCallback((step: MatchStepKey) => { navigateToStep(step); }, [navigateToStep]);

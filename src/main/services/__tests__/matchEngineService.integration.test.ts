@@ -103,9 +103,12 @@ describe('matchEngineService integration', () => {
     expect(sessions).toEqual([])
   })
 
-  it('should get resume text from embedding repository', () => {
+  it('should get resume text from database', () => {
+    mockDb.prepare.mockReturnValueOnce({
+      get: vi.fn().mockReturnValue({ resume_text: 'Resume content' }),
+    })
     const text = matchEngineService.getResumeText('candidate', 42)
-    expect(embeddingRepository.getResumeText).toHaveBeenCalledWith('candidate', 42)
-    expect(text).toBe('Resume text')
+    expect(mockDb.prepare).toHaveBeenCalled()
+    expect(text).toBe('Resume content')
   })
 })

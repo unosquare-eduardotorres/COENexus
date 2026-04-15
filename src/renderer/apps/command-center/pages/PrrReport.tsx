@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePrrReport } from '../hooks/usePrrReport'
 import PrrDetailDrawer from '../components/PrrDetailDrawer'
 import { PRR_COE_STATUSES, type PrrCoeStatus } from '../types'
+import { useToast } from '../../../shared/components/ToastContext'
 
 type SortKey = 'employee' | 'account' | 'team' | 'mainSkill' | 'seniority' | 'transitionStatus' | 'coeStatus' | 'location' | 'daysOpened'
 
@@ -124,6 +125,8 @@ function getCoeStatusSelectStyle(status: PrrCoeStatus): string {
     'Not Set': 'bg-gray-500/10 text-gray-400 border-gray-500/20 focus:ring-gray-500/20',
     'Pending Evaluation': 'bg-amber-500/15 text-amber-400 border-amber-500/30 focus:ring-amber-500/30',
     'Ready to Present': 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 focus:ring-emerald-500/30',
+    'Presented': 'bg-teal-500/15 text-teal-400 border-teal-500/30 focus:ring-teal-500/30',
+    'Needs Attention': 'bg-rose-500/15 text-rose-400 border-rose-500/30 focus:ring-rose-500/30',
     'Not Applies': 'bg-slate-500/10 text-slate-400 border-slate-500/20 focus:ring-slate-500/20',
     'Other': 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30 focus:ring-indigo-500/30',
     'Closed': 'bg-red-500/15 text-red-400 border-red-500/30 focus:ring-red-500/30',
@@ -157,15 +160,17 @@ export default function PrrReport() {
   const [selectedUpstreamId, setSelectedUpstreamId] = useState<number | null>(null)
   const [savingStatusIds, setSavingStatusIds] = useState<number[]>([])
   const [deletingIds, setDeletingIds] = useState<number[]>([])
-  const [pdfToast, setPdfToast] = useState<{ filePath: string } | null>(null)
+  const { showToast } = useToast()
 
   const summary = useMemo(() => {
     const total = report.filteredResults.length
     const pendingEval = report.filteredResults.filter(item => item.coeStatus === 'Pending Evaluation').length
     const readyToPresent = report.filteredResults.filter(item => item.coeStatus === 'Ready to Present').length
+    const presented = report.filteredResults.filter(item => item.coeStatus === 'Presented').length
+    const needsAttention = report.filteredResults.filter(item => item.coeStatus === 'Needs Attention').length
     const closed = report.filteredResults.filter(item => item.coeStatus === 'Closed').length
 
-    return { total, pendingEval, readyToPresent, closed }
+    return { total, pendingEval, readyToPresent, presented, needsAttention, closed }
   }, [report.filteredResults])
 
   const hasClosedItems = useMemo(() => {
@@ -218,7 +223,8 @@ export default function PrrReport() {
     a.download = `project-reallocations-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [report.filteredResults])
+    showToast('CSV exported successfully', 'success')
+  }, [report.filteredResults, showToast])
 
   if (report.hasData === null) {
     return (
@@ -254,7 +260,7 @@ export default function PrrReport() {
       <h1 className="text-base font-semibold text-primary">Project Reallocations</h1>
 
       {!report.isLoading && report.results.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Total</p>
             <p className="text-lg font-bold text-primary font-mono">{summary.total}</p>
@@ -266,6 +272,14 @@ export default function PrrReport() {
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Ready to Present</p>
             <p className="text-lg font-bold text-emerald-400 font-mono">{summary.readyToPresent}</p>
+          </div>
+          <div className="glass-panel-subtle rounded-xl px-3 py-2">
+            <p className="text-[11px] text-muted uppercase tracking-wide">Presented</p>
+            <p className="text-lg font-bold text-teal-400 font-mono">{summary.presented}</p>
+          </div>
+          <div className="glass-panel-subtle rounded-xl px-3 py-2">
+            <p className="text-[11px] text-muted uppercase tracking-wide">Needs Attention</p>
+            <p className="text-lg font-bold text-rose-400 font-mono">{summary.needsAttention}</p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Closed</p>
@@ -331,9 +345,16 @@ export default function PrrReport() {
               type="button"
               onClick={async () => {
                 const result = await window.api.report.exportPdf()
-                if (result.saved && result.filePath) {
-                  setPdfToast({ filePath: result.filePath })
-                  setTimeout(() => setPdfToast(null), 8000)
+                if (result.saved) {
+                  showToast(
+                    `PDF exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
+                    'success',
+                    8000,
+                    result.filePath ? [
+                      { label: 'Open File', onClick: () => window.api.app.openPath(result.filePath!) },
+                      { label: 'Show in Folder', onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+                    ] : undefined,
+                  )
                 }
               }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-blue-600/80 hover:bg-blue-500 text-white transition-all no-print"
@@ -512,57 +533,6 @@ export default function PrrReport() {
 
       <PrrDetailDrawer upstreamId={selectedUpstreamId} onClose={() => setSelectedUpstreamId(null)} onDataChanged={report.loadData} />
 
-      {pdfToast && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 glass-panel border border-emerald-500/20 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 no-print">
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <span className="text-emerald-400 text-xs">✓</span>
-              </div>
-              <span className="text-sm font-medium text-primary">PDF Exported</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setPdfToast(null)}
-              className="text-muted hover:text-primary transition-colors"
-            >
-              <XIcon />
-            </button>
-          </div>
-
-          <div className="px-4 pb-3">
-            <p className="text-xs text-muted truncate" title={pdfToast.filePath}>
-              {pdfToast.filePath.split('/').pop()}
-            </p>
-          </div>
-
-          <div className="flex border-t border-white/5">
-            <button
-              type="button"
-              onClick={async () => {
-                const filePath = pdfToast.filePath
-                setPdfToast(null)
-                await window.api.app.openPath(filePath)
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-            >
-              Open File
-            </button>
-            <div className="w-px bg-white/5" />
-            <button
-              type="button"
-              onClick={async () => {
-                const filePath = pdfToast.filePath
-                setPdfToast(null)
-                await window.api.app.showItemInFolder(filePath)
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium text-blue-400 hover:bg-blue-500/10 transition-colors"
-            >
-              Show in Folder
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

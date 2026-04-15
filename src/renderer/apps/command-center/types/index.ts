@@ -144,8 +144,8 @@ export const DEFAULT_THRESHOLDS: StalledThresholds = CRITERIA_CONFIG.reduce(
   {} as StalledThresholds
 )
 
-export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Not Applies' | 'Other' | 'Closed'
-export const PRR_COE_STATUSES: PrrCoeStatus[] = ['Not Set', 'Pending Evaluation', 'Ready to Present', 'Not Applies', 'Other', 'Closed']
+export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
+export const PRR_COE_STATUSES: PrrCoeStatus[] = ['Not Set', 'Pending Evaluation', 'Ready to Present', 'Presented', 'Needs Attention', 'Not Applies', 'Other', 'Closed']
 
 export interface PrrReportItem {
   upstreamId: number

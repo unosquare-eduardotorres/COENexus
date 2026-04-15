@@ -1,38 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Workflow, FileSearch, Brain, Settings } from 'lucide-react';
+import { Workflow, FileSearch, Brain, Settings, Home } from 'lucide-react';
 import GlobalTitleBar from '../../../components/GlobalTitleBar';
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Search: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-    </svg>
-  ),
-  Shuffle: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H20" /><path d="m18 2 4 4-4 4" /><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" /><path d="M20 18h-3.9c-1.3 0-2.5-.6-3.3-1.7l-.5-.8" /><path d="m18 14 4 4-4 4" />
-    </svg>
-  ),
-  GraduationCap: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c0 1.1 2.7 2 6 2s6-.9 6-2v-5" />
-    </svg>
-  ),
-  Trophy: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4.5a2.5 2.5 0 010-5H6" /><path d="M18 9h1.5a2.5 2.5 0 000-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0012 0V2Z" />
-    </svg>
-  ),
-  Radar: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <path d="M12 12 19 5" />
-      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-};
+import { AGENT_IMAGES } from '../assets';
 
 interface SidebarAgent {
   id: string;
@@ -195,6 +165,20 @@ export default function AgentsLayout() {
         </Link>
 
         <nav className="flex-1 py-2 overflow-y-auto">
+          <button
+            onClick={() => navigate('/agents')}
+            className={`
+              w-full flex items-center gap-2.5 mx-2 my-0.5 rounded-lg px-3 py-2 text-xs font-medium transition-all text-left
+              ${location.pathname === '/agents'
+                ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
+              }
+            `}
+            style={{ maxWidth: 'calc(100% - 16px)' }}
+          >
+            <Home size={16} className="flex-shrink-0" />
+            <span className="truncate flex-1">Home</span>
+          </button>
           <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Specialist Agents</p>
           {SIDEBAR_AGENTS.map(agent => {
             const agentPath = `/agents/${agent.id}`;
@@ -212,7 +196,11 @@ export default function AgentsLayout() {
                   `}
                   style={{ maxWidth: 'calc(100% - 16px)' }}
                 >
-                  <span className="flex-shrink-0">{ICON_MAP[agent.icon]}</span>
+                  <img
+                    src={AGENT_IMAGES[agent.id]?.avatar}
+                    alt={agent.label}
+                    className="h-7 w-7 rounded-lg object-cover flex-shrink-0"
+                  />
                   <span className="truncate flex-1">{agent.label}</span>
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${

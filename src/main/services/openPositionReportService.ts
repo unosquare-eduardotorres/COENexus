@@ -240,8 +240,13 @@ export const openPositionReportService = {
       r.matchingCriteria.map(c => CRITERIA_CONFIG.find(cfg => cfg.key === c)?.label ?? c).join(', '),
     ])
 
-    return [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
-      .join('\n')
+    const csvBody = [headers, ...rows]
+      .map(row => row.map(cell => {
+        const str = String(cell ?? '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ')
+        return `"${str}"`
+      }).join(','))
+      .join('\r\n')
+
+    return '\uFEFF' + csvBody
   },
 }

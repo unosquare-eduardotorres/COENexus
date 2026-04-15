@@ -98,7 +98,8 @@ export function useRecruiterDashboard() {
   const handleExportPdf = useCallback(async () => {
     if (!selectedResume) return;
     await pdfExportService.downloadPdf(selectedResume, `${selectedResume.candidateName}_Resume.pdf`);
-  }, [selectedResume]);
+    showToast('PDF export opened', 'success');
+  }, [selectedResume, showToast]);
 
   const handleApprove = useCallback(() => {
     if (!selectedResume) return;

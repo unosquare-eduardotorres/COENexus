@@ -4,6 +4,7 @@ import { formatSalary } from '../../resume/utils/formatSalary';
 import { exportToExcel, ColumnDef } from '../../resume/utils/exportToExcel';
 import ErrorDetailModal from './ErrorDetailModal';
 import { CheckIcon, ChevronIcon, CloseIcon, DocumentIcon, SearchIcon, SpinnerIcon } from '../../../shared/components/icons';
+import { useToast } from '../../../shared/components/ToastContext';
 
 const PAGE_SIZE = 50;
 
@@ -119,6 +120,7 @@ const SyncRecordTable = memo(function SyncRecordTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [errorDetail, setErrorDetail] = useState<{ name: string; error: string } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const { showToast } = useToast();
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -352,6 +354,7 @@ const SyncRecordTable = memo(function SyncRecordTable({
       const statusLabel = statusFilter === 'all' ? 'All' : statusFilter === 'excluded' ? 'Excluded' : PIPELINE_LABELS[statusFilter as PipelineStatus] ?? statusFilter;
       const filename = `${source}-${statusLabel}-${new Date().toISOString().slice(0, 10)}`;
       await exportToExcel(filtered as unknown as Record<string, unknown>[], columns, filename);
+      showToast(`${filtered.length} records exported to Excel`, 'success');
     } finally {
       setExporting(false);
     }

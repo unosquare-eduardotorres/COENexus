@@ -1,8 +1,10 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import Toast, { ToastItem, ToastSeverity } from './Toast';
+import Toast, { ToastAction, ToastItem, ToastSeverity } from './Toast';
+
+export type { ToastAction };
 
 interface ToastContextValue {
-  showToast: (message: string, severity: ToastSeverity, duration?: number) => void;
+  showToast: (message: string, severity: ToastSeverity, duration?: number, actions?: ToastAction[]) => void;
 }
 
 interface ToastProviderProps {
@@ -53,9 +55,9 @@ export function ToastProvider({ children }: ToastProviderProps) {
   );
 
   const showToast = useCallback(
-    (message: string, severity: ToastSeverity, duration = DEFAULT_DURATION) => {
+    (message: string, severity: ToastSeverity, duration = DEFAULT_DURATION, actions?: ToastAction[]) => {
       const id = Date.now() + Math.floor(Math.random() * 10000);
-      setToasts((previous) => [{ id, message, severity, duration, isVisible: true }, ...previous]);
+      setToasts((previous) => [{ id, message, severity, duration, isVisible: true, actions }, ...previous]);
 
       if (duration > 0) {
         timersRef.current[id] = window.setTimeout(() => {
@@ -83,7 +85,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-full max-w-sm flex-col gap-3">
+      <div className="pointer-events-none fixed right-4 bottom-4 z-[100] flex w-full max-w-sm flex-col-reverse gap-3">
         {toasts.map((toast) => (
           <Toast
             key={toast.id}
@@ -92,6 +94,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
             severity={toast.severity}
             isVisible={toast.isVisible}
             onDismiss={dismissToast}
+            actions={toast.actions}
           />
         ))}
       </div>

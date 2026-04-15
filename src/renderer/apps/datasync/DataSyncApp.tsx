@@ -1,6 +1,5 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { ToastProvider } from '../../shared/components/ToastContext';
 
 const DataSyncPage = lazy(() => import('./pages/DataSyncPage'));
 
@@ -17,12 +16,10 @@ function RouteFallback() {
 
 export default function DataSyncApp() {
   return (
-    <ToastProvider>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route path="/" element={<DataSyncPage />} />
-        </Routes>
-      </Suspense>
-    </ToastProvider>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/" element={<DataSyncPage />} />
+      </Routes>
+    </Suspense>
   );
 }

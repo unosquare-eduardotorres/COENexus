@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NexusStatusProvider } from './contexts/NexusStatusContext';
+import { ToastProvider } from './shared/components/ToastContext';
 import NexusLanding from './hub/NexusLanding';
 import ResumeApp from './apps/resume/ResumeApp';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -32,6 +33,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ErrorBoundary>
+          <ToastProvider>
           <HashRouter>
             <NexusStatusProvider>
               <Routes>
@@ -49,6 +51,7 @@ function App() {
               <SharePointTokenModal />
             </NexusStatusProvider>
           </HashRouter>
+          </ToastProvider>
         </ErrorBoundary>
       </ThemeProvider>
     </QueryClientProvider>

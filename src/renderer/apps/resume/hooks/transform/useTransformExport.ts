@@ -69,16 +69,19 @@ export function useTransformExport({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      showToast('DOCX exported successfully', 'success');
     } catch (err) {
       log.error('DOCX export error:', err);
+      showToast('DOCX export failed', 'error');
     }
-  }, [activeExportResume, activeResume, getFileName]);
+  }, [activeExportResume, activeResume, getFileName, showToast]);
 
   const handleExportPdf = useCallback((resume?: StructuredResume) => {
     const resumeToExport = resume ?? activeExportResume ?? activeResume;
     if (!resumeToExport) return;
     pdfExportService.downloadPdf(resumeToExport);
-  }, [activeExportResume, activeResume]);
+    showToast('PDF export opened', 'success');
+  }, [activeExportResume, activeResume, showToast]);
 
   const handleDownload = useCallback((resume: StructuredResume) => {
     if (generatedDocx) {
@@ -90,6 +93,7 @@ export function useTransformExport({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      showToast('Resume downloaded', 'success');
       return;
     }
 
@@ -103,7 +107,8 @@ export function useTransformExport({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [generatedDocx, getFileName]);
+    showToast('Resume downloaded', 'success');
+  }, [generatedDocx, getFileName, showToast]);
 
   const handlePresentToPosition = useCallback((resume: StructuredResume) => {
     if (selectedPosition && isCandidateAlreadyPresented(selectedPosition)) {

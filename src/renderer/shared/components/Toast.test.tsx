@@ -25,6 +25,22 @@ describe('Toast', () => {
     expect(onDismiss).toHaveBeenCalledWith(42)
   })
 
+  it('should render action buttons when actions are provided', () => {
+    const action = { label: 'Open File', onClick: vi.fn() }
+    const onDismiss = vi.fn()
+    render(<Toast id={1} message="Exported" severity="success" isVisible={true} onDismiss={onDismiss} actions={[action]} />)
+    const btn = screen.getByText('Open File')
+    expect(btn).toBeInTheDocument()
+    fireEvent.click(btn)
+    expect(action.onClick).toHaveBeenCalled()
+    expect(onDismiss).toHaveBeenCalledWith(1)
+  })
+
+  it('should not render action row when no actions provided', () => {
+    render(<Toast id={1} message="No actions" severity="info" isVisible={true} onDismiss={() => {}} />)
+    expect(screen.queryByRole('button', { name: /open/i })).not.toBeInTheDocument()
+  })
+
   it('should render all severity types without crashing', () => {
     const severities = ['success', 'warning', 'error', 'info'] as const
     severities.forEach((severity) => {

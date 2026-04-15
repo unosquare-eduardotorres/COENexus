@@ -7,6 +7,15 @@ function TestConsumer() {
   return <button onClick={() => showToast('Test message', 'success')}>Show Toast</button>
 }
 
+function ActionConsumer() {
+  const { showToast } = useToast()
+  return (
+    <button onClick={() => showToast('Exported', 'success', 8000, [{ label: 'Open', onClick: () => {} }])}>
+      Show
+    </button>
+  )
+}
+
 describe('ToastContext', () => {
   it('should render provider without crashing', () => {
     render(
@@ -29,5 +38,19 @@ describe('ToastContext', () => {
     })
 
     expect(screen.getByText('Test message')).toBeInTheDocument()
+  })
+
+  it('should pass actions to rendered toast', () => {
+    render(
+      <ToastProvider>
+        <ActionConsumer />
+      </ToastProvider>
+    )
+
+    act(() => {
+      screen.getByText('Show').click()
+    })
+
+    expect(screen.getByText('Open')).toBeInTheDocument()
   })
 })

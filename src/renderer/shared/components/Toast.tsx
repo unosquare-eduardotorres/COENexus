@@ -1,10 +1,16 @@
 export type ToastSeverity = 'success' | 'warning' | 'error' | 'info';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastItem {
   id: number;
   message: string;
   severity: ToastSeverity;
   isVisible: boolean;
+  actions?: ToastAction[];
 }
 
 interface ToastProps extends ToastItem {
@@ -87,7 +93,7 @@ function SeverityIcon({ severity }: { severity: ToastSeverity }) {
   }
 }
 
-export default function Toast({ id, message, severity, isVisible, onDismiss }: ToastProps) {
+export default function Toast({ id, message, severity, isVisible, onDismiss, actions }: ToastProps) {
   const styles = severityStyles[severity];
   const ariaRole = severity === 'error' ? 'alert' : 'status';
   const ariaLive = severity === 'error' ? 'assertive' : 'polite';
@@ -97,7 +103,7 @@ export default function Toast({ id, message, severity, isVisible, onDismiss }: T
       role={ariaRole}
       aria-live={ariaLive}
       className={`glass-card pointer-events-auto w-full rounded-2xl border p-4 shadow-lg backdrop-blur-xl transition-all duration-300 ease-out ${styles.border} ${
-        isVisible ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
+        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -122,6 +128,20 @@ export default function Toast({ id, message, severity, isVisible, onDismiss }: T
           </svg>
         </button>
       </div>
+      {actions && actions.length > 0 && (
+        <div className="mt-2 flex gap-2 border-t border-white/5 pt-2">
+          {actions.map((action, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => { action.onClick(); onDismiss(id); }}
+              className="text-xs font-medium text-accent-400 hover:text-accent-300 transition-colors"
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={`mt-3 h-1 rounded-full ${styles.accent}`} />
     </div>
   );

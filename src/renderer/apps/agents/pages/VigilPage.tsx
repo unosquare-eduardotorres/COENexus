@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import AgentBanner from '../components/AgentBanner'
 import type {
   VigilActivityLog,
   VigilActivitySeverity,
@@ -345,7 +346,9 @@ export default function VigilPage() {
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+    <div className="space-y-4">
+      <AgentBanner agentId="vigil" agentName="Vigil" compact />
+      <div className="flex gap-4 h-[calc(100vh-15rem)]">
       <div className="flex-[7] overflow-y-auto space-y-4 pr-1">
         <StatusBanner
           status={status}
@@ -380,6 +383,7 @@ export default function VigilPage() {
           onClear={handleClearChat}
           isLoading={chatLoading}
         />
+      </div>
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { VigilChatMessage } from '../../../../../shared/ipc-types'
+import { AGENT_IMAGES } from '../../assets'
 
 interface ChatPanelProps {
   messages: VigilChatMessage[]
@@ -48,7 +49,10 @@ export default function ChatPanel({ messages, onSend, onClear, isLoading }: Chat
   return (
     <section className="glass-panel h-full rounded-2xl p-4 flex flex-col">
       <div className="flex items-center justify-between pb-3 border-b minimal-divider">
-        <h3 className="text-sm font-semibold text-primary">👁 Vigil Chat</h3>
+        <div className="flex items-center gap-2">
+          <img src={AGENT_IMAGES['vigil']?.avatar} alt="Vigil" className="h-5 w-5 rounded-full object-cover" />
+          <h3 className="text-sm font-semibold text-primary">Vigil Chat</h3>
+        </div>
         <button onClick={onClear} className="glass-button h-8 px-3 text-xs text-secondary" disabled={isLoading}>
           Clear
         </button>
@@ -65,8 +69,15 @@ export default function ChatPanel({ messages, onSend, onClear, isLoading }: Chat
           const proposedAction = metadata?.proposedAction
 
           return (
-            <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[90%] rounded-2xl px-3 py-2 ${isUser ? 'glass-button text-primary' : 'glass-panel-subtle text-secondary'}`}>
+            <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'gap-2 justify-start'}`}>
+              {!isUser && (
+                <img
+                  src={AGENT_IMAGES['vigil']?.avatar}
+                  alt="Vigil"
+                  className="h-6 w-6 rounded-full object-cover mt-1 flex-shrink-0"
+                />
+              )}
+              <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${isUser ? 'glass-button text-primary' : 'glass-panel-subtle text-secondary'}`}>
                 <p className="text-xs whitespace-pre-wrap break-words">{message.content}</p>
                 <p className="text-[10px] text-muted mt-1">
                   {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -84,7 +95,12 @@ export default function ChatPanel({ messages, onSend, onClear, isLoading }: Chat
         })}
 
         {isLoading && (
-          <div className="flex justify-start">
+          <div className="flex gap-2 justify-start">
+            <img
+              src={AGENT_IMAGES['vigil']?.avatar}
+              alt="Vigil"
+              className="h-6 w-6 rounded-full object-cover mt-1 flex-shrink-0"
+            />
             <div className="glass-panel-subtle rounded-2xl px-3 py-2 text-xs text-secondary">
               {loadingDots()}
             </div>

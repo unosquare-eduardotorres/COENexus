@@ -1,27 +1,7 @@
 import AgentLandingHero from '../components/AgentLandingHero'
 import { AGENTS_DATA } from '../types'
-import {
-  Search,
-  Shuffle,
-  GraduationCap,
-  Trophy,
-} from 'lucide-react'
+import { AGENT_IMAGES } from '../assets'
 import { useNavigate } from 'react-router-dom'
-
-const ICON_MAP: Record<string, React.ReactNode> = {
-  Search: <Search size={20} />,
-  Shuffle: <Shuffle size={20} />,
-  GraduationCap: <GraduationCap size={20} />,
-  Trophy: <Trophy size={20} />,
-  Radar: (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19.07 4.93A10 10 0 1 0 21 12" />
-      <path d="M12 12 7 7" />
-      <path d="M12 8a4 4 0 0 1 4 4" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-}
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate()
@@ -44,12 +24,11 @@ export default function AgentsLandingPage() {
                 style={{ background: agent.accentColor }}
               />
               <div className="relative flex items-start gap-3">
-                <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: `${agent.accentColor}20` }}
-                >
-                  <div style={{ color: agent.accentColor }}>{ICON_MAP[agent.icon]}</div>
-                </div>
+                <img
+                  src={AGENT_IMAGES[agent.id]?.avatar}
+                  alt={agent.name}
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                />
                 <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-semibold text-primary">{agent.name}</h3>
                   <p className="mt-1 text-xs text-muted line-clamp-2">{agent.description}</p>

@@ -7,6 +7,7 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
+import { exportToExcel, ColumnDef } from '../utils/exportToExcel';
 import StepperBar from '../../../shared/components/StepperBar';
 import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
@@ -18,8 +19,10 @@ import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
 import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
+import { useToast } from '../../../shared/components/ToastContext';
 
 export function useBenchBurn(parentReset?: () => void) {
+  const { showToast } = useToast();
   const initialSessionId = useMemo(() => {
     const rawSessionId = new URLSearchParams(window.location.search).get('session');
     if (!rawSessionId) return null;
@@ -176,7 +179,45 @@ export function useBenchBurn(parentReset?: () => void) {
     }
   }, [results, navigateStep]);
 
-  const handleExportToExcel = useCallback(() => {}, []);
+  const handleExportToExcel = useCallback(() => {
+    if (!results) return;
+    const allMatches: CrossMatchResult[] = [
+      ...Object.values(results.employeeResults).flat(),
+    ];
+    const seen = new Set<string>();
+    const uniqueMatches = allMatches.filter((m) => {
+      const key = `${m.employeeUpstreamId}-${m.positionUpstreamId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const columns: ColumnDef[] = [
+      { header: 'Employee', key: 'employeeName' },
+      { header: 'Position', key: 'positionLabel' },
+      { header: 'Match Score', key: 'matchScore', type: 'score' },
+      { header: 'Cosine Similarity', key: 'cosineSimilarity', type: 'score' },
+      { header: 'Technical %', key: 'technical', type: 'score' },
+      { header: 'Domain %', key: 'domain', type: 'score' },
+      { header: 'Leadership %', key: 'leadership', type: 'score' },
+      { header: 'Soft Skills %', key: 'softSkills', type: 'score' },
+      { header: 'Availability %', key: 'availability', type: 'score' },
+      { header: 'Summary', key: 'summary' },
+    ];
+    const data = uniqueMatches.map((m) => ({
+      employeeName: m.employeeName,
+      positionLabel: m.positionLabel,
+      matchScore: m.matchScore,
+      cosineSimilarity: m.cosineSimilarity,
+      technical: m.scores.technical,
+      domain: m.scores.domain,
+      leadership: m.scores.leadership,
+      softSkills: m.scores.softSkills,
+      availability: m.scores.availability,
+      summary: m.summary,
+    }));
+    exportToExcel(data, columns, `bench-burn-results-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast('Bench burn results exported to Excel', 'success');
+  }, [results, showToast]);
 
   const handleShowDetail = useCallback((match: CrossMatchResult, emp: BenchEmployee, pos: BenchOpenPosition) => {
     setDetailMatch(match);

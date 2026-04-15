@@ -9,10 +9,12 @@ import {
   ImportResult,
 } from '../services/databaseSharingService';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+import { useToast } from '../../../shared/components/ToastContext';
 
 const log = createRendererLogger('useDatabaseSharing');
 
 export function useDatabaseSharing() {
+  const { showToast } = useToast();
   const [config, setConfig] = useState<DatabaseSharingConfig | null>(null);
   const [status, setStatus] = useState<DatabaseStatus | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
@@ -114,13 +116,14 @@ export function useDatabaseSharing() {
     try {
       const result = await databaseSharingService.exportSnapshot();
       setExportResult(result);
+      showToast(`Snapshot exported: ${result.filename}`, 'success');
       await Promise.all([refetchSnapshots(), refetchStatus()]);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to export snapshot');
     } finally {
       setIsExporting(false);
     }
-  }, [refetchSnapshots, refetchStatus]);
+  }, [refetchSnapshots, refetchStatus, showToast]);
 
   const handleImportSnapshot = useCallback(
     async (filename: string) => {
