@@ -1,5 +1,7 @@
+import { BrowserWindow, dialog } from 'electron'
+import { writeFileSync } from 'node:fs'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { PrrAddCommentParams, PrrCommentDto, PrrDetailResult, PrrReportItem, PrrUpdateCoeStatusParams } from '../../../shared/ipc-types'
+import type { PrrAddCommentParams, PrrCommentDto, PrrDetailResult, PrrReportItem, PrrUpdateCoeStatusParams, ExcelExportResult } from '../../../shared/ipc-types'
 import { prrRepository, type PrrReportRow } from '../../db/repositories/prrRepository'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { registerIpcHandler } from '../registerIpcHandler'
@@ -107,6 +109,61 @@ export function registerPrrHandlers(): void {
     async (event): Promise<{ total: number; lastSyncedAt: string | null }> => {
       validateSender(event)
       return prrRepository.getSyncStatus()
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.PRR_EXPORT_XLSX,
+    async (event, items: PrrReportItem[]): Promise<ExcelExportResult> => {
+      validateSender(event)
+      const { generateExcelBuffer } = await import('../../services/excelExportService')
+
+      const COE_STATUS_COLORS: Record<string, { bg: string; font: string }> = {
+        'Pending Evaluation': { bg: 'FF3d2e00', font: 'FFfbbf24' },
+        'Ready to Present':   { bg: 'FF0d3320', font: 'FF34d399' },
+        'Presented':          { bg: 'FF0d3332', font: 'FF2dd4bf' },
+        'Needs Attention':    { bg: 'FF3d1014', font: 'FFfb7185' },
+        'Not Set':            { bg: 'FF1e1e2e', font: 'FF9ca3af' },
+        'Not Applies':        { bg: 'FF1e1e2e', font: 'FF94a3b8' },
+        'Closed':             { bg: 'FF2d0f0f', font: 'FFf87171' },
+      }
+
+      const buffer = await generateExcelBuffer({
+        sheetName: 'Project Reallocations',
+        columns: [
+          { header: 'Employee', key: 'employee' },
+          { header: 'Client', key: 'account' },
+          { header: 'Team', key: 'team' },
+          { header: 'Main Skill', key: 'mainSkill' },
+          { header: 'Seniority', key: 'seniority' },
+          { header: 'PRR Status', key: 'transitionStatus' },
+          { header: 'Sub Type', key: 'transitionSubType' },
+          { header: 'CoE Status', key: 'coeStatus' },
+          { header: 'Location', key: 'location' },
+          { header: 'Request Date', key: 'requestDate' },
+          { header: 'Days Opened', key: 'daysOpened', width: 14 },
+          { header: 'Days Since Last Interview', key: 'daysSinceLastInterview', width: 18 },
+          { header: 'Impact', key: 'impact' },
+          { header: 'Attrition Risk', key: 'attritionRisk' },
+          { header: 'Presentations', key: 'presentationsCount', width: 14 },
+          { header: 'Upstream Comments', key: 'comments', width: 40 },
+          { header: 'COE Comments', key: 'coeCommentsText', width: 40 },
+        ],
+        rows: items.map(item => ({
+          ...item,
+          coeCommentsText: item.coeComments.map(c => `${c.author}: ${c.text}`).join(' | '),
+        })),
+        statusColumn: { key: 'coeStatus', colorMap: COE_STATUS_COLORS },
+      })
+
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const { filePath, canceled } = await dialog.showSaveDialog(win!, {
+        defaultPath: `project-reallocations-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }],
+      })
+      if (canceled || !filePath) return { saved: false }
+      writeFileSync(filePath, buffer)
+      return { saved: true, filePath }
     }
   )
 }

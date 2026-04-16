@@ -13,6 +13,10 @@ export const reportService = {
     return window.api.report.exportCsv(results)
   },
 
+  exportXlsx(results: StalledPositionResult[]): Promise<{ saved: boolean; filePath?: string }> {
+    return window.api.report.exportXlsx(results)
+  },
+
   getSyncStatus(): Promise<{ total: number; lastSyncedAt: string | null }> {
     return window.api.report.getSyncStatus()
   },

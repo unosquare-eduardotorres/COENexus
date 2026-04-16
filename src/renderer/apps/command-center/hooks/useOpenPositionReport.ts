@@ -251,7 +251,7 @@ export function useOpenPositionReport() {
   }, [results, searchText, criteriaFilter, filterActors, filterHealthStatus, filterCoes, filterPractices, filterSkills, filterPositionStatuses, sortOrder])
 
   const exportCsv = useCallback(async () => {
-    return reportService.exportCsv(filteredResults)
+    return reportService.exportXlsx(filteredResults)
   }, [filteredResults])
 
   return {

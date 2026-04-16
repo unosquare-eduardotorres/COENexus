@@ -45,6 +45,20 @@ function BotIcon() {
   );
 }
 
+function BugIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2l1.88 1.88" /><path d="M14.12 3.88L16 2" />
+      <path d="M9 7.13v-1a3.003 3.003 0 116 0v1" />
+      <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 014-4h4a4 4 0 014 4v3c0 3.3-2.7 6-6 6" />
+      <path d="M12 20v-9" /><path d="M6.53 9C4.6 8.8 3 7.1 3 5" />
+      <path d="M6 13H2" /><path d="M3 21c0-2.1 1.7-3.9 3.8-4" />
+      <path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" /><path d="M22 13h-4" />
+      <path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" />
+    </svg>
+  );
+}
+
 function AccentLetter({ children, color }: { children: string; color: string }) {
   return <span style={{ color, fontWeight: 700 }}>{children}</span>;
 }
@@ -55,6 +69,7 @@ export default function NexusLanding() {
   const coreColor = '#10b981';
   const pathColor = '#8b5cf6';
   const agentColor = '#a855f7';
+  const bugColor = '#ef4444';
 
   return (
     <div className="relative flex min-h-screen pb-8 flex-col gradient-subtle transition-colors duration-300">
@@ -148,6 +163,16 @@ export default function NexusLanding() {
             tagline=""
             description={<><AccentLetter color={agentColor}>A</AccentLetter>utonomous. <AccentLetter color={agentColor}>G</AccentLetter>enerative. <AccentLetter color={agentColor}>E</AccentLetter>xpert. <AccentLetter color={agentColor}>N</AccentLetter>etwork. <AccentLetter color={agentColor}>T</AccentLetter>eam. Multi-agent AI workforce for code, design, and operations.</>}
             icon={<BotIcon />}
+          />
+          <AppCard
+            name="B.U.G."
+            codename="Bug Unified Guardian"
+            status="experimental"
+            href="/bug"
+            accentColor={bugColor}
+            tagline=""
+            description={<><AccentLetter color={bugColor}>B</AccentLetter>ug. <AccentLetter color={bugColor}>U</AccentLetter>nified. <AccentLetter color={bugColor}>G</AccentLetter>uardian. Track, triage, and resolve application errors with AI-powered diagnostics.</>}
+            icon={<BugIcon />}
           />
         </div>
       </section>

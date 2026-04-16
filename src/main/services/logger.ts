@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import type { ErrorScope } from '../../shared/ipc-types'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -53,6 +54,25 @@ function writeLog(entry: LogEntry): void {
       fs.appendFileSync(logFile, line + '\n')
     }
   } catch { /* logging must never crash the app */ }
+
+  if (entry.level === 'error') {
+    try {
+      const { captureError } = require('./errorTransport')
+      captureError({
+        message: entry.message,
+        stack: entry.error?.stack,
+        scope: inferScope(entry.module),
+        source: entry.module,
+        severity: 'error' as const,
+      })
+    } catch { /* never crash */ }
+  }
+}
+
+function inferScope(module: string): ErrorScope {
+  if (module.startsWith('IPC') || module.includes('ipc')) return 'IPC'
+  if (module.includes('DB') || module.includes('database') || module.includes('Repository')) return 'DB'
+  return 'Main'
 }
 
 function buildLogger(module: string, correlationId?: string): Logger {

@@ -24,6 +24,15 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
     console.error('[ErrorBoundary] Render error:', error, info.componentStack);
+    try {
+      window.api?.bug?.report({
+        message: error.message,
+        stack: error.stack,
+        componentStack: info.componentStack,
+        scope: 'ErrorBoundary',
+        url: window.location.hash,
+      })
+    } catch { /* never crash error boundary */ }
   }
 
   handleRetry = () => {

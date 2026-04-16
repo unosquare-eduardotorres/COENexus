@@ -20,6 +20,56 @@ import type {
   HaikuConfirmPayload,
 } from '../renderer/apps/resume/types'
 
+export type ErrorSeverity = 'warning' | 'error' | 'critical'
+export type ErrorScope = 'IPC' | 'Main' | 'DB' | 'Renderer' | 'ErrorBoundary' | 'Preload' | 'Unknown'
+export type ErrorStatus = 'new' | 'reported'
+
+export interface ErrorEntry {
+  id: string
+  timestamp: string
+  scope: ErrorScope
+  message: string
+  stack?: string
+  componentStack?: string
+  platform: string
+  version: string
+  severity: ErrorSeverity
+  fingerprint: string
+  occurrences: number
+  lastOccurrence: string
+  status: ErrorStatus
+  source?: string
+  aiDescription?: string
+  url?: string
+  userAgent?: string
+}
+
+export interface ErrorListResponse {
+  errors: ErrorEntry[]
+  totalCount: number
+  fileSize: number
+}
+
+export interface ErrorGenerateDescriptionRequest {
+  errorId: string
+}
+
+export interface ErrorGenerateDescriptionResponse {
+  description: string
+}
+
+export interface ErrorReportRequest {
+  message: string
+  stack?: string
+  componentStack?: string
+  scope: ErrorScope
+  url?: string
+}
+
+export interface ErrorNewEvent {
+  entry: ErrorEntry
+}
+
 export interface SyncStartParams {
   source: string
   token: string
@@ -498,6 +548,11 @@ export interface ReportExportCsvResult {
 }
 
 export interface ReportExportPdfResult {
+  saved: boolean
+  filePath?: string
+}
+
+export interface ExcelExportResult {
   saved: boolean
   filePath?: string
 }
@@ -1260,6 +1315,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG]: { request: string; response: Record<number, string> }
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
   [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
+  [IPC_CHANNELS.REPORT_EXPORT_XLSX]: { request: readonly [ReportStalledPositionResult[]]; response: ExcelExportResult }
 
   [IPC_CHANNELS.PRR_GET_ALL]: { request: void; response: { results: PrrReportItem[]; lastSyncedAt: string | null } }
   [IPC_CHANNELS.PRR_GET_DETAIL]: { request: number; response: PrrDetailResult | null }
@@ -1267,6 +1323,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.PRR_ADD_COMMENT]: { request: PrrAddCommentParams; response: { success: boolean } }
   [IPC_CHANNELS.PRR_DELETE]: { request: number; response: { success: boolean } }
   [IPC_CHANNELS.PRR_GET_SYNC_STATUS]: { request: void; response: PrrSyncStatus }
+  [IPC_CHANNELS.PRR_EXPORT_XLSX]: { request: PrrReportItem[]; response: ExcelExportResult }
 
   [IPC_CHANNELS.PATH_GET_DEVELOPER_DASHBOARD]: { request: PathIdParams; response: PathDeveloperDashboard | null }
   [IPC_CHANNELS.PATH_LIST_LEARNING_PATHS]: { request: PathPaginationParams; response: PathLearningPathSummary[] }
@@ -1352,6 +1409,13 @@ export interface IpcContracts {
   [IPC_CHANNELS.APP_READ_BUNDLED_FILE]: { request: string; response: string }
   [IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER]: { request: string; response: void }
   [IPC_CHANNELS.APP_OPEN_PATH]: { request: string; response: void }
+
+  [IPC_CHANNELS.ERRORS_LIST]: { request: void; response: ErrorListResponse }
+  [IPC_CHANNELS.ERRORS_CLEAR]: { request: void; response: { cleared: boolean } }
+  [IPC_CHANNELS.ERRORS_MARK_REPORTED]: { request: string; response: { updated: boolean } }
+  [IPC_CHANNELS.ERRORS_GENERATE_DESCRIPTION]: { request: ErrorGenerateDescriptionRequest; response: ErrorGenerateDescriptionResponse }
+  [IPC_CHANNELS.ERRORS_REPORT]: { request: ErrorReportRequest; response: { captured: boolean } }
+  [IPC_CHANNELS.ERRORS_GET_LOG_PATH]: { request: void; response: string }
 }
 
 export interface IpcEventContracts {
@@ -1365,4 +1429,5 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
+  [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent
 }

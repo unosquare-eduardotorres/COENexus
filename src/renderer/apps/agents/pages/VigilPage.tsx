@@ -302,20 +302,52 @@ export default function VigilPage() {
     setChatLoading(true)
     setError(null)
 
+    const now = new Date().toISOString()
+    const optimisticUserMessage: VigilChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      role: 'user',
+      content: content.trim(),
+      metadata_json: null,
+      created_at: now,
+    }
+    setMessages(prev => [...prev, optimisticUserMessage])
+
     try {
+      console.log('[Vigil Chat] Sending message via IPC...')
       const response = await vigilService.sendMessage({ content: content.trim() })
+      console.log('[Vigil Chat] sendMessage response:', JSON.stringify(response).slice(0, 300))
+
       if (!response.success) {
         throw new Error(response.error ?? 'Message failed')
       }
 
+      console.log('[Vigil Chat] Fetching updated message list...')
       const listResponse = await vigilService.listMessages({ limit: 100, offset: 0 })
-      if (listResponse.success) {
-        setMessages((listResponse.data ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
+      console.log('[Vigil Chat] listMessages returned', listResponse.data?.length ?? 0, 'messages, success:', listResponse.success)
+
+      if (listResponse.success && listResponse.data && listResponse.data.length > 0) {
+        setMessages(listResponse.data.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
       } else if (response.data) {
-        setMessages(prev => [...prev, response.data as VigilChatMessage])
+        setMessages(prev => {
+          const withoutOptimistic = prev.filter(m => m.id !== optimisticUserMessage.id)
+          return [...withoutOptimistic, response.data as VigilChatMessage]
+        })
+      } else {
+        console.warn('[Vigil Chat] listMessages returned empty — keeping optimistic message')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send chat message')
+      const errorMsg = err instanceof Error ? err.message : 'Unable to send chat message'
+      console.error('[Vigil Chat] Error:', errorMsg)
+      setError(errorMsg)
+
+      const errorBubble: VigilChatMessage = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: `⚠️ Failed to get a response: ${errorMsg}`,
+        metadata_json: JSON.stringify({ error: true }),
+        created_at: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, errorBubble])
     } finally {
       setChatLoading(false)
     }

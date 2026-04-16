@@ -1,7 +1,7 @@
 import { BrowserWindow, dialog } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus } from '../../../shared/ipc-types'
+import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus, ExcelExportResult } from '../../../shared/ipc-types'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
@@ -97,6 +97,23 @@ export function registerReportHandlers(): void {
 
       writeFileSync(filePath, pdfBuffer)
       log.info('PDF exported', { filePath })
+      return { saved: true, filePath }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_EXPORT_XLSX,
+    async (event, results: ReportStalledPositionResult[]): Promise<ExcelExportResult> => {
+      validateSender(event)
+      const buffer = await openPositionReportService.generateExcel(results)
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const { filePath, canceled } = await dialog.showSaveDialog(win!, {
+        defaultPath: `open-positions-report-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        filters: [{ name: 'Excel Files', extensions: ['xlsx'] }],
+      })
+      if (canceled || !filePath) return { saved: false }
+      writeFileSync(filePath, buffer)
+      log.info('XLSX exported', { filePath, recordCount: results.length })
       return { saved: true, filePath }
     }
   )

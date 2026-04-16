@@ -3,6 +3,7 @@ export type ToastSeverity = 'success' | 'warning' | 'error' | 'info';
 export interface ToastAction {
   label: string;
   onClick: () => void;
+  icon?: 'file' | 'folder';
 }
 
 export interface ToastItem {
@@ -129,14 +130,26 @@ export default function Toast({ id, message, severity, isVisible, onDismiss, act
         </button>
       </div>
       {actions && actions.length > 0 && (
-        <div className="mt-2 flex gap-2 border-t border-white/5 pt-2">
+        <div className="mt-3 flex items-stretch overflow-hidden rounded-lg border border-white/10 dark:border-white/[0.06]">
           {actions.map((action, i) => (
             <button
               key={i}
               type="button"
               onClick={() => { action.onClick(); onDismiss(id); }}
-              className="text-xs font-medium text-accent-400 hover:text-accent-300 transition-colors"
+              className={`flex flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors ${
+                i > 0 ? 'border-l border-white/10 dark:border-white/[0.06]' : ''
+              }`}
             >
+              {action.icon === 'file' && (
+                <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M4.75 3A1.75 1.75 0 003 4.75v10.5c0 .966.784 1.75 1.75 1.75h10.5A1.75 1.75 0 0017 15.25V7.372a1.75 1.75 0 00-.513-1.237l-2.622-2.622A1.75 1.75 0 0012.628 3H4.75zM10 12.25a.75.75 0 01-.75-.75V8.75a.75.75 0 011.5 0v2.75a.75.75 0 01-.75.75zm-2-3a.75.75 0 01.75-.75h2.5a.75.75 0 010 1.5h-2.5A.75.75 0 018 9.25z" />
+                </svg>
+              )}
+              {action.icon === 'folder' && (
+                <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M3.75 3A1.75 1.75 0 002 4.75v3.26a3.235 3.235 0 011.75-.51h12.5c.644 0 1.245.188 1.75.51V6.75A1.75 1.75 0 0016.25 5h-4.836a.25.25 0 01-.177-.073L9.823 3.513A1.75 1.75 0 008.586 3H3.75zM3.75 9A1.75 1.75 0 002 10.75v4.5c0 .966.784 1.75 1.75 1.75h12.5A1.75 1.75 0 0018 15.25v-4.5A1.75 1.75 0 0016.25 9H3.75z" />
+                </svg>
+              )}
               {action.label}
             </button>
           ))}

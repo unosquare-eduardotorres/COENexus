@@ -94,6 +94,7 @@ export const IPC_CHANNELS = {
   REPORT_GET_FEEDBACK_CATALOG: 'report:get-feedback-catalog',
   REPORT_DELETE_POSITION: 'report:delete-position',
   REPORT_EXPORT_PDF: 'report:export-pdf',
+  REPORT_EXPORT_XLSX: 'report:export-xlsx',
 
   PRR_GET_ALL: 'prr:get-all',
   PRR_GET_DETAIL: 'prr:get-detail',
@@ -101,6 +102,7 @@ export const IPC_CHANNELS = {
   PRR_ADD_COMMENT: 'prr:add-comment',
   PRR_DELETE: 'prr:delete',
   PRR_GET_SYNC_STATUS: 'prr:get-sync-status',
+  PRR_EXPORT_XLSX: 'prr:export-xlsx',
 
   PATH_GET_DEVELOPER_DASHBOARD: 'path:get-developer-dashboard',
   PATH_LIST_LEARNING_PATHS: 'path:list-learning-paths',
@@ -180,6 +182,14 @@ export const IPC_CHANNELS = {
   SCOUT9_GET_BRAIN_SNAPSHOT: 'scout9:get-brain-snapshot',
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
+
+  ERRORS_LIST: 'errors:list',
+  ERRORS_CLEAR: 'errors:clear',
+  ERRORS_MARK_REPORTED: 'errors:mark-reported',
+  ERRORS_GENERATE_DESCRIPTION: 'errors:generate-description',
+  ERRORS_REPORT: 'errors:report',
+  ERRORS_GET_LOG_PATH: 'errors:get-log-path',
+  ERRORS_NEW_EVENT: 'errors:new-event',
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

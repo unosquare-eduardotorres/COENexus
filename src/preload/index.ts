@@ -26,6 +26,7 @@ import type {
   ReportStalledPositionResult,
   PrrUpdateCoeStatusParams,
   PrrAddCommentParams,
+  PrrReportItem,
   Scout9RunParams,
   Scout9ListReportsParams,
   Scout9UpdateCandidateParams,
@@ -47,6 +48,7 @@ import type {
   IpcEventContracts,
 } from '../shared/ipc-types'
 import type { CreateOrUpdateTransformSession, BenchBurnRequest, ExternalCandidateMatchRequest } from '../renderer/apps/resume/types'
+import type { ErrorReportRequest, ErrorNewEvent } from '../shared/ipc-types'
 
 const api = {
   sync: {
@@ -232,6 +234,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_DELETE_POSITION, upstreamId),
     exportPdf: () =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_PDF),
+    exportXlsx: (results: ReportStalledPositionResult[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_XLSX, results) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_EXPORT_XLSX]['response']>,
   },
 
   prr: {
@@ -247,6 +251,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.PRR_DELETE, upstreamId),
     getSyncStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.PRR_GET_SYNC_STATUS),
+    exportXlsx: (items: PrrReportItem[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRR_EXPORT_XLSX, items) as Promise<IpcContracts[typeof IPC_CHANNELS.PRR_EXPORT_XLSX]['response']>,
   },
 
   path: {
@@ -419,6 +425,26 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_STATUS_EVENT]) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
+    },
+  },
+
+  bug: {
+    list: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_LIST),
+    clear: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_CLEAR),
+    markReported: (errorId: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_MARK_REPORTED, errorId),
+    generateDescription: (params: { errorId: string }) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_GENERATE_DESCRIPTION, params),
+    report: (params: ErrorReportRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_REPORT, params),
+    getLogPath: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ERRORS_GET_LOG_PATH),
+    onNewError: (callback: (data: ErrorNewEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: ErrorNewEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.ERRORS_NEW_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.ERRORS_NEW_EVENT, handler)
     },
   },
 

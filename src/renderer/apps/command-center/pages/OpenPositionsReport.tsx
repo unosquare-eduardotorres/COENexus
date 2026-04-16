@@ -700,13 +700,21 @@ export default function OpenPositionsReport() {
               onClick={async () => {
                 const result = await report.exportCsv()
                 if (result?.saved) {
-                  showToast('CSV exported successfully', 'success')
+                  showToast(
+                    `Excel exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
+                    'success',
+                    8000,
+                    result.filePath ? [
+                      { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+                      { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+                    ] : undefined,
+                  )
                 }
               }}
               disabled={report.filteredResults.length === 0}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed no-print"
             >
-              <DownloadIcon /> Export CSV
+              <DownloadIcon /> Export Excel
             </button>
             <button
               onClick={async () => {
@@ -717,8 +725,8 @@ export default function OpenPositionsReport() {
                     'success',
                     8000,
                     result.filePath ? [
-                      { label: 'Open File', onClick: () => window.api.app.openPath(result.filePath!) },
-                      { label: 'Show in Folder', onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+                      { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+                      { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
                     ] : undefined,
                   )
                 }

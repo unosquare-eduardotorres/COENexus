@@ -202,28 +202,19 @@ export default function PrrReport() {
     }
   }, [report, selectedUpstreamId])
 
-  const exportToExcel = useCallback(() => {
-    const headers = ['Employee', 'Client', 'Team', 'Main Skill', 'Seniority', 'PRR Status', 'Sub Type', 'CoE Status', 'Location', 'Request Date', 'Days Opened', 'Days Since Last Interview', 'Impact', 'Attrition Risk', 'Presentations', 'Upstream Comments', 'COE Comments']
-    const rows = report.filteredResults.map(item => [
-      item.employee, item.account, item.team, item.mainSkill, item.seniority,
-      item.transitionStatus, item.transitionSubType, item.coeStatus, item.location,
-      item.requestDate ?? '', String(item.daysOpened), item.daysSinceLastInterview,
-      item.impact, item.attritionRisk, String(item.presentationsCount),
-      item.comments,
-      item.coeComments.map(c => `${c.author}: ${c.text}`).join(' | '),
-    ])
-
-    const escape = (v: string) => (v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v)
-    const csv = [headers.join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
-    const bom = '\uFEFF'
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `project-reallocations-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    showToast('CSV exported successfully', 'success')
+  const exportToExcel = useCallback(async () => {
+    const result = await window.api.prr.exportXlsx(report.filteredResults)
+    if (result.saved) {
+      showToast(
+        `Excel exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
+        'success',
+        8000,
+        result.filePath ? [
+          { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+          { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+        ] : undefined,
+      )
+    }
   }, [report.filteredResults, showToast])
 
   if (report.hasData === null) {
@@ -339,7 +330,7 @@ export default function PrrReport() {
               disabled={report.filteredResults.length === 0}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed no-print"
             >
-              <DownloadIcon /> Export CSV
+              <DownloadIcon /> Export Excel
             </button>
             <button
               type="button"
@@ -351,8 +342,8 @@ export default function PrrReport() {
                     'success',
                     8000,
                     result.filePath ? [
-                      { label: 'Open File', onClick: () => window.api.app.openPath(result.filePath!) },
-                      { label: 'Show in Folder', onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+                      { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+                      { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
                     ] : undefined,
                   )
                 }

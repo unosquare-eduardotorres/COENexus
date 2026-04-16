@@ -249,4 +249,33 @@ export const openPositionReportService = {
 
     return '\uFEFF' + csvBody
   },
+
+  async generateExcel(results: StalledPositionResult[]): Promise<Buffer> {
+    const { generateExcelBuffer } = await import('./excelExportService')
+    return generateExcelBuffer({
+      sheetName: 'Open Positions',
+      columns: [
+        { header: 'ID', key: 'id', width: 10 },
+        { header: 'Account', key: 'account' },
+        { header: 'Stakeholder', key: 'stakeholder' },
+        { header: 'COE', key: 'coe' },
+        { header: 'Practice', key: 'practice' },
+        { header: 'Main Skill', key: 'mainSkill' },
+        { header: 'Aging', key: 'aging', width: 10 },
+        { header: 'Action Needed', key: 'actionNeeded' },
+        { header: 'Criteria', key: 'criteria', width: 35 },
+      ],
+      rows: results.map(r => ({
+        id: r.position.upstream_id,
+        account: r.position.account,
+        stakeholder: r.position.stakeholder,
+        coe: r.position.coe,
+        practice: r.position.practice,
+        mainSkill: r.position.main_skill,
+        aging: r.position.aging,
+        actionNeeded: r.actors.join(' / '),
+        criteria: r.matchingCriteria.map(c => CRITERIA_CONFIG.find(cfg => cfg.key === c)?.label ?? c).join(', '),
+      })),
+    })
+  },
 }

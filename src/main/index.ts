@@ -13,6 +13,7 @@ import { getVigilToken } from './services/vigilTokenStore'
 import type { VigilStatusEvent } from '../shared/ipc-types'
 import { toVigilActivityEvent } from './services/vigilEventMapper'
 import { initAutoUpdater, stopAutoUpdater } from './updater'
+import { initErrorTransport } from './services/errorTransport'
 import { createLogger } from './services/logger'
 
 function validateNativeModules(): void {
@@ -175,6 +176,10 @@ app.whenReady().then(async () => {
   } catch (err) {
     log.error('Agents database initialization failed', err instanceof Error ? err : new Error(String(err)))
   }
+
+  try {
+    initErrorTransport()
+  } catch { /* never crash */ }
 
   try {
     registerAllHandlers()
