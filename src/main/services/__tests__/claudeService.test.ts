@@ -64,6 +64,40 @@ describe('claudeService', () => {
       await expect(claudeService.chatAsync('claude-3-haiku', 'prompt')).rejects.toThrow('Empty response from Claude SDK')
     })
 
+    it('should recover accumulated text when SDK throws max turns error', async () => {
+      const { query } = await import('@anthropic-ai/claude-agent-sdk')
+      const mockQuery = vi.mocked(query)
+
+      async function* mockGenerator() {
+        yield {
+          type: 'assistant',
+          message: {
+            content: [{ type: 'text', text: 'Vigil response text' }],
+          },
+        }
+        throw new Error('Claude Code returned an error result: Reached maximum number of turns (1)')
+      }
+      mockQuery.mockReturnValue(mockGenerator() as any)
+
+      const { claudeService } = await import('../claudeService')
+      const result = await claudeService.chatAsync('claude-3-haiku', 'prompt')
+
+      expect(result).toBe('Vigil response text')
+    })
+
+    it('should re-throw max turns error when no text was accumulated', async () => {
+      const { query } = await import('@anthropic-ai/claude-agent-sdk')
+      const mockQuery = vi.mocked(query)
+
+      async function* mockGenerator() {
+        throw new Error('Claude Code returned an error result: Reached maximum number of turns (1)')
+      }
+      mockQuery.mockReturnValue(mockGenerator() as any)
+
+      const { claudeService } = await import('../claudeService')
+      await expect(claudeService.chatAsync('claude-3-haiku', 'prompt')).rejects.toThrow('maximum number of turns')
+    })
+
     it('should accumulate text blocks from assistant messages', async () => {
       const { query } = await import('@anthropic-ai/claude-agent-sdk')
       const mockQuery = vi.mocked(query)

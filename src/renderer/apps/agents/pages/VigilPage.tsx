@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { reportError } from '../../../shared/utils/reportError'
 import AgentBanner from '../components/AgentBanner'
 import type {
   VigilActivityLog,
@@ -313,18 +314,12 @@ export default function VigilPage() {
     setMessages(prev => [...prev, optimisticUserMessage])
 
     try {
-      console.log('[Vigil Chat] Sending message via IPC...')
       const response = await vigilService.sendMessage({ content: content.trim() })
-      console.log('[Vigil Chat] sendMessage response:', JSON.stringify(response).slice(0, 300))
-
       if (!response.success) {
         throw new Error(response.error ?? 'Message failed')
       }
 
-      console.log('[Vigil Chat] Fetching updated message list...')
       const listResponse = await vigilService.listMessages({ limit: 100, offset: 0 })
-      console.log('[Vigil Chat] listMessages returned', listResponse.data?.length ?? 0, 'messages, success:', listResponse.success)
-
       if (listResponse.success && listResponse.data && listResponse.data.length > 0) {
         setMessages(listResponse.data.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
       } else if (response.data) {
@@ -332,12 +327,9 @@ export default function VigilPage() {
           const withoutOptimistic = prev.filter(m => m.id !== optimisticUserMessage.id)
           return [...withoutOptimistic, response.data as VigilChatMessage]
         })
-      } else {
-        console.warn('[Vigil Chat] listMessages returned empty — keeping optimistic message')
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unable to send chat message'
-      console.error('[Vigil Chat] Error:', errorMsg)
+      const errorMsg = reportError(err)
       setError(errorMsg)
 
       const errorBubble: VigilChatMessage = {

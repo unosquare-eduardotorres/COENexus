@@ -40,30 +40,41 @@ export const claudeService = {
       },
     })
 
-    for await (const message of q) {
-      const msg = message as Record<string, unknown>
+    try {
+      for await (const message of q) {
+        const msg = message as Record<string, unknown>
 
-      if (msg.type === 'assistant' && typeof msg.message === 'object') {
-        const m = msg.message as Record<string, unknown>
-        const content = m.content as Array<Record<string, unknown>> | undefined
-        content?.forEach(block => {
-          if (block.type === 'text' && typeof block.text === 'string') {
-            result += block.text
+        if (msg.type === 'assistant' && typeof msg.message === 'object') {
+          const m = msg.message as Record<string, unknown>
+          const content = m.content as Array<Record<string, unknown>> | undefined
+          content?.forEach(block => {
+            if (block.type === 'text' && typeof block.text === 'string') {
+              result += block.text
+            }
+          })
+        }
+
+        if (msg.type === 'result' && typeof msg.result === 'string') {
+          result = msg.result
+        }
+
+        if (msg.type === 'result') {
+          const usage = msg.usage as Record<string, number> | undefined
+          if (usage) {
+            inputTokens = usage.input_tokens ?? usage.input ?? 0
+            outputTokens = usage.output_tokens ?? usage.output ?? 0
           }
-        })
-      }
-
-      if (msg.type === 'result' && typeof msg.result === 'string') {
-        result = msg.result
-      }
-
-      if (msg.type === 'result') {
-        const usage = msg.usage as Record<string, number> | undefined
-        if (usage) {
-          inputTokens = usage.input_tokens ?? usage.input ?? 0
-          outputTokens = usage.output_tokens ?? usage.output ?? 0
         }
       }
+    } catch (streamError) {
+      const isMaxTurns = streamError instanceof Error
+        && streamError.message.includes('maximum number of turns')
+      if (!isMaxTurns || !result) {
+        throw streamError
+      }
+      log.warn('SDK max turns reached — using accumulated response', {
+        model, resultLength: result.length,
+      })
     }
 
     cumulativeUsage.inputTokens += inputTokens
