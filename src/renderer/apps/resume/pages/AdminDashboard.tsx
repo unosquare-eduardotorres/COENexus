@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { type RefinementMode } from '../types';
 import { getPrompts } from '../data/defaultPrompts';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
@@ -7,6 +7,7 @@ import { useAdminDashboard, type AdminTab } from '../hooks/useAdminDashboard';
 import PromptsTab from '../components/settings/PromptsTab';
 import AITab from '../components/settings/AITab';
 import ValidationRulesTab from '../components/settings/ValidationRulesTab';
+import DataMaintenanceTab from '../components/settings/DataMaintenanceTab';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('AdminDashboard');
