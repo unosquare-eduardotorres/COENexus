@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StepperBar from '../../../shared/components/StepperBar';
 import IntentStep from '../components/transform/IntentStep';
@@ -12,6 +13,9 @@ import { TransformProvider } from '../contexts/TransformContext';
 import { useTransformWizard } from '../hooks/useTransformWizard';
 import { aiService } from '../services/aiService';
 import PdfPreviewPanel from '../components/PdfPreviewPanel';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('TransformPage');
 
 export default function TransformPage() {
   const navigate = useNavigate();
@@ -27,6 +31,10 @@ export default function TransformPage() {
     transform: { transformedResumes },
     review: { editedResumes },
   } = wizard;
+
+  useEffect(() => {
+    log.info('Transform page viewed');
+  }, []);
 
   return (
     <TransformProvider value={wizard}>

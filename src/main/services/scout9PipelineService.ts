@@ -43,7 +43,10 @@ export async function runScout9Pipeline(
   jobId: string,
   emit: (e: Scout9PipelineEvent) => void,
   signal: AbortSignal,
-  steps: PipelineStep[]
+  steps: PipelineStep[],
+  emitter?: {
+    narrate: (context: string, fallback: string, status: string, metadata?: Record<string, unknown>) => Promise<void>
+  } | null
 ): Promise<void> {
   let context: PipelineContext = { params, jobId, signal }
 
@@ -56,12 +59,24 @@ export async function runScout9Pipeline(
 
     emit({ type: 'step-update', step: i + 1, stepName: step.name, status: 'running' })
     emit({ type: 'log', message: `Starting: ${step.name}` })
+    await emitter?.narrate(
+      `Starting step ${i + 1}/${steps.length}: ${step.name}`,
+      `Running ${step.name}...`,
+      'thinking',
+      { step: i + 1, totalSteps: steps.length, stepName: step.name, phase: 'start' }
+    )
 
     try {
       context = await step.fn(context, emit)
       const elapsed = Date.now() - startMs
       emit({ type: 'step-update', step: i + 1, stepName: step.name, status: 'completed', elapsed, data: context.stepData })
       emit({ type: 'log', message: `Completed: ${step.name} (${elapsed}ms)` })
+      await emitter?.narrate(
+        `Completed step ${i + 1}/${steps.length}: ${step.name}`,
+        `Finished ${step.name}.`,
+        'done',
+        { step: i + 1, totalSteps: steps.length, stepName: step.name, phase: 'complete', elapsed }
+      )
       log.info(`Step ${i + 1} complete: ${step.name}`, { jobId, elapsed })
     } catch (err) {
       emit({ type: 'step-update', step: i + 1, stepName: step.name, status: 'failed' })

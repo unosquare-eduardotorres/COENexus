@@ -1,8 +1,12 @@
 import { SyncSourceType, SyncProgress, SyncRecord } from '../types';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('dataSyncService');
 
 export const dataSyncService = {
   async validateToken(token: string): Promise<{ valid: boolean; error?: string }> {
     try {
+      log.info('Sync token validation requested');
       const result = await window.api.sync.validateToken(token) as {
         valid?: boolean;
         message?: string;
@@ -17,6 +21,7 @@ export const dataSyncService = {
         error: result.valid ? undefined : (result.error || result.message || 'Token validation failed'),
       };
     } catch (err) {
+      log.error('Sync token validation failed', err);
       return { valid: false, error: err instanceof Error ? err.message : 'Validation failed' };
     }
   },
@@ -34,6 +39,7 @@ export const dataSyncService = {
   },
 
   async clearRecords(source: 'employees' | 'candidates' | 'open-positions' | 'all'): Promise<void> {
+    log.warn('Sync records clear requested', { source });
     if (source === 'all') {
       await window.api.sync.clear('employees');
       await window.api.sync.clear('candidates');
@@ -49,6 +55,7 @@ export const dataSyncService = {
     token: string,
     upstreamId: number
   ): Promise<SyncRecord> {
+    log.info('Sync single record requested', { source, upstreamId });
     const raw = await window.api.sync.syncSingle({ source, token, upstreamId }) as SyncRecord & { status: string };
     return { ...raw, pipelineStatus: raw.status };
   },
@@ -84,11 +91,13 @@ export const dataSyncService = {
       });
 
       signal.addEventListener('abort', () => {
+        log.warn('Sync retry-not-processed aborted', { source });
         window.api.sync.pause();
         cleanup();
         resolve(lastResult);
       });
 
+      log.info('Sync retry-not-processed started', { source });
       window.api.sync.retryNotProcessed({ source, token });
     });
   },
@@ -124,11 +133,13 @@ export const dataSyncService = {
       });
 
       signal.addEventListener('abort', () => {
+        log.warn('Sync retry-failed aborted', { source });
         window.api.sync.pause();
         cleanup();
         resolve(lastResult);
       });
 
+      log.info('Sync retry-failed started', { source });
       window.api.sync.retryFailed({ source, token });
     });
   },
@@ -140,6 +151,7 @@ export const dataSyncService = {
     file: Blob,
     fileName: string
   ): Promise<{ personaNoteId: number; success: boolean }> {
+    log.info('Sync note upload requested', { personId, noteType, fileName });
     const buffer = await file.arrayBuffer();
     const result = await window.api.sync.uploadNote({ token, personId, noteType, fileName, fileContent: buffer });
     return result as { personaNoteId: number; success: boolean };
@@ -190,11 +202,13 @@ export const dataSyncService = {
       });
 
       signal.addEventListener('abort', () => {
+        log.warn('Sync stream aborted', { source });
         window.api.sync.pause();
         cleanup();
         resolve({ ...lastProgress, status: 'paused' });
       });
 
+      log.info('Sync stream start requested', { source, limit: limit ?? null, skip: skip ?? null, year: year ?? null });
       window.api.sync.start({ source, token, limit, skip, year });
     });
   },

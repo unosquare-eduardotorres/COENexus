@@ -123,3 +123,71 @@ export function fillTemplate(template: string, replacements: Record<string, stri
   }
   return result
 }
+
+export const PRESENTATION_INTRO = `You are a senior technical recruiting writer.
+
+Write one warm, professional intro paragraph for a candidate presentation email.
+
+Candidate Names: {{candidateNames}}
+Position Title: {{positionTitle}}
+Account Name: {{accountName}}
+Main Skill: {{mainSkill}}
+Job Description:
+{{jobDescription}}
+
+Rules:
+- Keep it to one paragraph, 90-140 words.
+- Mention the role context and why this shortlist is relevant.
+- Keep tone professional, concise, and human.
+- Do not use markdown, bullets, or salutations.
+
+Return plain text only.`
+
+export const PRESENTATION_CANDIDATE_PROFILE = `You are an expert technical resume analyst.
+
+Resume Text:
+{{resumeText}}
+
+Candidate Name: {{fullName}}
+Main Skill: {{mainSkill}}
+Position Title: {{positionTitle}}
+Job Description:
+{{jobDescription}}
+
+Extract and return a JSON object with this exact structure:
+{
+  "professionalSummary": "string",
+  "techStack": ["string"],
+  "domainExperience": "string",
+  "yearsOfExperience": "string"
+}
+
+Rules:
+- Use only information supported by the resume text.
+- Keep professionalSummary concise (2-4 sentences).
+- techStack must be deduplicated and ordered by relevance.
+- If a field is unavailable, return an empty string or empty array.
+- Return only valid JSON.`
+
+export const RESUME_FORMAT_CHECK = `You are validating whether a resume follows the Unosquare expected format.
+
+Resume Text:
+{{resumeText}}
+
+Check for these required sections:
+1. Profile Summary
+2. Technical Skills table
+3. Experience
+4. Education
+5. Certifications
+
+Return a JSON object with this exact structure:
+{
+  "isFormatted": true,
+  "details": ["string"]
+}
+
+Rules:
+- isFormatted must be true only if all required sections are clearly present.
+- details must list findings, including missing or weak sections.
+- Return only valid JSON.`

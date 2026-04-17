@@ -5,6 +5,9 @@ import { reportService } from '../services/reportService'
 import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
 import PositionDetailDrawer from '../components/PositionDetailDrawer'
 import { useToast } from '../../../shared/components/ToastContext'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('OpenPositionsReport')
 
 function SearchIcon() {
   return (
@@ -448,12 +451,18 @@ export default function OpenPositionsReport() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const { showToast } = useToast()
 
+  useEffect(() => {
+    log.info('Open positions report viewed')
+  }, [])
+
   const handleDeletePosition = useCallback(async (upstreamId: number) => {
+    log.info('Open position delete requested', { upstreamId })
     setDeletingId(upstreamId)
     try {
       await reportService.deletePosition(upstreamId)
       report.evaluate()
     } catch (err) {
+      log.error('Open position delete failed', err)
       console.error('Failed to delete position:', err)
     } finally {
       setDeletingId(null)
@@ -475,7 +484,10 @@ export default function OpenPositionsReport() {
             Open position data needs to be synced before this report can be generated. Go to D.A.T.A. to sync open positions.
           </p>
           <button
-            onClick={() => navigate('/datasync')}
+            onClick={() => {
+              log.info('Open positions report redirected to Data Sync')
+              navigate('/datasync')
+            }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             Go to D.A.T.A.

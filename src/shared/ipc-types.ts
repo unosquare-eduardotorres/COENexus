@@ -330,6 +330,81 @@ export interface MatchResumeTextParams {
   upstreamId: number
 }
 
+export interface PresentCreateSessionParams {
+  name?: string
+  mode?: string
+  openPositionId?: number
+  positionTitle?: string
+  accountName?: string
+  positionUpstreamId?: number
+  jobDescription?: string
+}
+
+export interface PresentUpdateSessionParams {
+  name?: string
+  mode?: string
+  introText?: string
+  status?: string
+  openPositionId?: number
+  positionTitle?: string
+  accountName?: string
+  positionUpstreamId?: number
+  jobDescription?: string
+}
+
+export interface PresentAddEntryParams {
+  sessionId: number
+  sourceType: string
+  upstreamId: number
+  fullName: string
+  mainSkill: string
+  seniority: string
+  country: string
+  yearsOfExperience?: string
+  availability?: string
+  recommendedRate?: string
+  techStack?: string[]
+  professionalSummary?: string
+  domainExperience?: string
+  resumeFormatStatus?: string
+  transformSessionId?: number
+  individualIntroText?: string
+  sortOrder?: number
+}
+
+export interface PresentUpdateEntryParams extends Partial<Omit<PresentAddEntryParams, 'sessionId'>> {}
+
+export interface PresentCheckResumeFormatParams {
+  resumeText: string
+}
+
+export interface PresentTransformResumeParams {
+  resumeText: string
+  fullName: string
+  jobDescription?: string
+}
+
+export interface PresentGenerateIntroParams {
+  candidateNames: string[]
+  positionTitle?: string
+  accountName?: string
+  jobDescription?: string
+  mainSkill?: string
+}
+
+export interface PresentGenerateCandidateProfileParams {
+  resumeText: string
+  fullName: string
+  mainSkill: string
+  jobDescription?: string
+  positionTitle?: string
+}
+
+export interface PresentGenerateHtmlParams {
+  sessionId: number
+  mode: string
+}
+
 export interface AiChatParams {
   model: string
   messages: { role: string; content: string }[]
@@ -378,6 +453,7 @@ export interface DatabaseStatus {
   recordCounts: Record<string, number>
   lastImportedAt: string | null
   lastImportedFile: string | null
+  localDbHash: string | null
 }
 
 export interface DatabaseExportResult {
@@ -385,12 +461,14 @@ export interface DatabaseExportResult {
   sizeBytes: number
   recordCounts: Record<string, number>
   exportedAt: string
+  hash: string
 }
 
 export interface DatabaseImportResult {
   success: boolean
   tablesRestored: number
   recordCounts: Record<string, number>
+  vecEntriesRebuilt: number
 }
 
 export interface DatabaseImportFileResult {
@@ -412,6 +490,37 @@ export interface DatabaseHealthResult {
   foreignKeys: boolean
   recordCounts: Record<string, number>
   tableCount: number
+}
+
+export interface SyncManifest {
+  latestSnapshot: string
+  latestHash: string
+  exportedAt: string
+  exportedBy: string
+  schemaVersion: number
+  recordCounts: Record<string, number>
+  sizeBytes: number
+  previousSnapshots: Array<{
+    filename: string
+    hash: string
+    exportedAt: string
+    exportedBy: string
+  }>
+}
+
+export interface SyncCheckResult {
+  hasUpdate: boolean
+  manifest: SyncManifest | null
+  localHash: string | null
+}
+
+export interface SyncWatcherStatus {
+  isWatching: boolean
+  sharedPath: string | null
+  lastKnownManifestHash: string | null
+  lastCheckedAt: string | null
+  hasUpdate: boolean
+  remoteManifest: SyncManifest | null
 }
 
 export interface VoyageKeyStatus {
@@ -1177,6 +1286,17 @@ export interface VigilStatusEvent {
   timestamp: string
 }
 
+export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday'
+
+export interface AgentStepEvent {
+  agentId: AgentId
+  step: string
+  status: 'started' | 'running' | 'completed' | 'failed'
+  message: string
+  narration?: string
+  timestamp: string
+}
+
 export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
 
 export interface PrrCommentDto {
@@ -1236,6 +1356,47 @@ export interface PrrSyncStatus {
   lastSyncedAt: string | null
 }
 
+export interface NomicoreCalculateParams {
+  country: string
+  contractType: string
+  grossMonthly: number
+  year?: number
+}
+
+export interface NomicoreCalculationResult {
+  params: NomicoreCalculateParams
+  payroll: Record<string, string>
+  cost: Record<string, string>
+  profitability: Record<string, string>
+  rateCard: Record<string, string>
+  rawHtml?: string
+  screenshotBase64?: string
+  calculatedAt: string
+}
+
+export interface MailSmtpConfig {
+  senderEmail: string
+  displayName: string
+  appPassword: string
+  smtpHost: string
+  smtpPort: number
+  useTls: boolean
+}
+
+export interface MailMaskedConfig {
+  senderEmail: string
+  displayName: string
+  passwordConfigured: boolean
+  smtpHost: string
+  smtpPort: number
+  useTls: boolean
+}
+
+export interface MailTestResult {
+  success: boolean
+  message: string
+}
+
 export interface IpcContracts {
   [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: string; response: { valid: boolean; message: string } }
   [IPC_CHANNELS.SYNC_GET_STATUS]: { request: SyncDataSource; response: SyncCountByStatus }
@@ -1293,6 +1454,20 @@ export interface IpcContracts {
   [IPC_CHANNELS.SESSIONS_LIST]: { request: void; response: TransformSessionSummary[] }
   [IPC_CHANNELS.SESSIONS_DELETE]: { request: number; response: { deleted: boolean } }
 
+  [IPC_CHANNELS.PRESENT_CREATE_SESSION]: { request: PresentCreateSessionParams; response: { id: number } }
+  [IPC_CHANNELS.PRESENT_UPDATE_SESSION]: { request: [id: number, data: PresentUpdateSessionParams]; response: { success: boolean } }
+  [IPC_CHANNELS.PRESENT_GET_SESSION]: { request: number; response: Record<string, unknown> | null }
+  [IPC_CHANNELS.PRESENT_LIST_SESSIONS]: { request: void; response: Record<string, unknown>[] }
+  [IPC_CHANNELS.PRESENT_DELETE_SESSION]: { request: number; response: { deleted: boolean } }
+  [IPC_CHANNELS.PRESENT_ADD_ENTRY]: { request: PresentAddEntryParams; response: { id: number } }
+  [IPC_CHANNELS.PRESENT_UPDATE_ENTRY]: { request: [id: number, data: PresentUpdateEntryParams]; response: { success: boolean } }
+  [IPC_CHANNELS.PRESENT_DELETE_ENTRY]: { request: number; response: { deleted: boolean } }
+  [IPC_CHANNELS.PRESENT_CHECK_RESUME_FORMAT]: { request: PresentCheckResumeFormatParams; response: { isFormatted: boolean; details: string[] } }
+  [IPC_CHANNELS.PRESENT_TRANSFORM_RESUME]: { request: PresentTransformResumeParams; response: { transformedResumeText: string } }
+  [IPC_CHANNELS.PRESENT_GENERATE_INTRO]: { request: PresentGenerateIntroParams; response: { introText: string } }
+  [IPC_CHANNELS.PRESENT_GENERATE_CANDIDATE_PROFILE]: { request: PresentGenerateCandidateProfileParams; response: { professionalSummary?: string; techStack?: string[]; domainExperience?: string; yearsOfExperience?: string } }
+  [IPC_CHANNELS.PRESENT_GENERATE_HTML]: { request: PresentGenerateHtmlParams; response: { html: string } }
+
   [IPC_CHANNELS.DATABASE_GET_CONFIG]: { request: void; response: DatabaseConfig }
   [IPC_CHANNELS.DATABASE_SAVE_CONFIG]: { request: DatabaseSaveConfigParams; response: { saved: boolean } }
   [IPC_CHANNELS.DATABASE_EXPORT]: { request: void; response: DatabaseExportResult }
@@ -1301,6 +1476,9 @@ export interface IpcContracts {
   [IPC_CHANNELS.DATABASE_STATUS]: { request: void; response: DatabaseStatus }
   [IPC_CHANNELS.DATABASE_IMPORT_FILE]: { request: void; response: DatabaseImportFileResult }
   [IPC_CHANNELS.DATABASE_HEALTH]: { request: void; response: DatabaseHealthResult }
+  [IPC_CHANNELS.DATABASE_SYNC_CHECK]: { request: void; response: SyncCheckResult }
+  [IPC_CHANNELS.DATABASE_SYNC_STATUS]: { request: void; response: SyncWatcherStatus }
+  [IPC_CHANNELS.DATABASE_IMPORT_LATEST]: { request: void; response: DatabaseImportResult }
 
   [IPC_CHANNELS.AI_CHAT]: { request: AiChatParams; response: AiChatResponse }
   [IPC_CHANNELS.AI_CHECK_CONNECTION]: { request: void; response: { available: boolean } }
@@ -1400,6 +1578,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
   [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
 
+  [IPC_CHANNELS.AGENT_STUB_RUN]: { request: { agentId: AgentId; prompt?: string }; response: { success: boolean; runId: string } }
+
   [IPC_CHANNELS.APP_GET_VERSION]: { request: void; response: string }
   [IPC_CHANNELS.APP_GET_PLATFORM]: { request: void; response: string }
   [IPC_CHANNELS.APP_OPEN_EXTERNAL]: { request: string; response: { opened: boolean } }
@@ -1416,6 +1596,15 @@ export interface IpcContracts {
   [IPC_CHANNELS.ERRORS_GENERATE_DESCRIPTION]: { request: ErrorGenerateDescriptionRequest; response: ErrorGenerateDescriptionResponse }
   [IPC_CHANNELS.ERRORS_REPORT]: { request: ErrorReportRequest; response: { captured: boolean } }
   [IPC_CHANNELS.ERRORS_GET_LOG_PATH]: { request: void; response: string }
+
+  [IPC_CHANNELS.NOMICORE_LOGIN]: { request: void; response: { loggedIn: boolean } }
+  [IPC_CHANNELS.NOMICORE_CHECK_SESSION]: { request: void; response: { valid: boolean } }
+  [IPC_CHANNELS.NOMICORE_CALCULATE]: { request: NomicoreCalculateParams; response: NomicoreCalculationResult }
+
+  [IPC_CHANNELS.MAIL_GET_CONFIG]: { request: void; response: MailMaskedConfig | null }
+  [IPC_CHANNELS.MAIL_SAVE_CONFIG]: { request: MailSmtpConfig; response: { saved: boolean } }
+  [IPC_CHANNELS.MAIL_CLEAR_CONFIG]: { request: void; response: { cleared: boolean } }
+  [IPC_CHANNELS.MAIL_TEST_CONNECTION]: { request: MailSmtpConfig; response: MailTestResult }
 }
 
 export interface IpcEventContracts {
@@ -1427,6 +1616,7 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
   [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
+  [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
   [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent

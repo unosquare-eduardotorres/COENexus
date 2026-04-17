@@ -1,5 +1,8 @@
 import { SyncSourceType, ProcessingProgress, ProcessingRecord } from '../types';
 import { vectorizationConfigService } from './vectorizationConfigService';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('processingService');
 
 function ipcProcessingStream(
   source: SyncSourceType,
@@ -10,6 +13,7 @@ function ipcProcessingStream(
   signal: AbortSignal,
 ): Promise<ProcessingProgress> {
   return new Promise((resolve, reject) => {
+    log.info('Processing stream started', { source });
     let lastProgress: ProcessingProgress = {
       source,
       status: 'processing',
@@ -37,11 +41,13 @@ function ipcProcessingStream(
         resolve(finalProgress);
       } else if (data.type === 'error') {
         cleanup();
+        log.error('Processing stream error event received', new Error(`Processing failed for ${source}`));
         resolve({ ...lastProgress, status: 'error' });
       }
     });
 
     signal.addEventListener('abort', () => {
+      log.warn('Processing stream aborted', { source });
       pauseFn();
       cleanup();
       resolve({ ...lastProgress, status: 'paused' });
@@ -53,6 +59,7 @@ function ipcProcessingStream(
 
 export const resumeProcessingService = {
   async getProcessingStatus(): Promise<unknown> {
+    log.info('Processing status requested');
     return window.api.processing.getStatus();
   },
 
@@ -143,6 +150,7 @@ export const resumeProcessingService = {
   },
 
   async vectorizeSingle(source: string, upstreamId: number): Promise<{ success: boolean; error?: string }> {
+    log.info('Processing single vectorization requested', { source, upstreamId });
     const config = vectorizationConfigService.getConfig();
     return window.api.processing.vectorizeSingle({ source, upstreamId, model: config.model }) as Promise<{ success: boolean; error?: string }>;
   },

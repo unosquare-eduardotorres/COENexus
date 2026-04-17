@@ -6,6 +6,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { DatabaseSaveConfigParams, DatabaseImportParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { databaseSharingService } from '../../services/databaseSharingService'
+import { syncWatcherService } from '../../services/syncWatcherService'
 import { getDatabase } from '../../db/connection'
 import { getConfig, saveConfig } from '../../config'
 import { validatePayload, databaseSaveConfigSchema, databaseImportSchema } from '../schemas'
@@ -129,5 +130,26 @@ export function registerDatabaseHandlers(): void {
         recordCounts,
         tableCount: tables.length,
       }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.DATABASE_SYNC_CHECK,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return databaseSharingService.checkForUpdates()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.DATABASE_SYNC_STATUS,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return syncWatcherService.getState()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.DATABASE_IMPORT_LATEST,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      log.info('Import latest from manifest requested')
+      const result = databaseSharingService.importLatest()
+      syncWatcherService.clearUpdateFlag()
+      return result
     })
 }

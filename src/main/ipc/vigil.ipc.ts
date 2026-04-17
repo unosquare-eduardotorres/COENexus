@@ -107,6 +107,7 @@ export function registerVigilHandlers(): void {
         emitEvent: (syncEvent) => {
           emitActivityEvent(event, toVigilActivityEvent(syncEvent))
         },
+        event,
       })
 
       const executorStatus = vigilExecutor.getStatus()

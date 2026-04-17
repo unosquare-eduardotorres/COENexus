@@ -8,6 +8,9 @@ import { useDataSync } from '../hooks/useDataSync';
 import { useDataSyncSettings } from '../hooks/useDataSyncSettings';
 import { useNexusStatus } from '../../../contexts/NexusStatusContext';
 import { databaseSharingService } from '../services/databaseSharingService';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('DataSyncPage');
 
 export default function DataSyncPage() {
   const [activePanel, setActivePanel] = useState<DataSyncPanel>('overview');
@@ -33,25 +36,30 @@ export default function DataSyncPage() {
   }, []);
 
   useEffect(() => {
+    log.info('Data Sync page viewed');
     checkDatabaseEmpty();
   }, [checkDatabaseEmpty]);
 
   const handleImportDatabase = async () => {
+    log.info('Database import requested from Data Sync page');
     setIsImporting(true);
     setImportError(null);
     setImportSuccess(null);
     try {
       const result = await databaseSharingService.importFile();
       if (result.cancelled) {
+        log.info('Database import canceled from Data Sync page');
         setIsImporting(false);
         return;
       }
       if (result.success && result.recordCounts) {
+        log.info('Database import completed from Data Sync page', { recordCounts: result.recordCounts });
         setImportSuccess(result.recordCounts);
         setIsDatabaseEmpty(false);
         window.location.reload();
       }
     } catch (err) {
+      log.error('Database import failed from Data Sync page', err);
       setImportError(err instanceof Error ? err.message : 'Import failed');
     } finally {
       setIsImporting(false);

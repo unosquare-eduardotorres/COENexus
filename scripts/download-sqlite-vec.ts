@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { gunzipSync } from 'node:zlib'
@@ -144,10 +145,17 @@ function extractFromTarGz(archive: Buffer, fileName: string): Buffer {
 }
 
 async function main(): Promise<void> {
-  const release = await fetchLatestRelease()
-  const asset = selectAsset(release.assets)
   const { extension } = getTarget()
   const outputPath = resolve(OUTPUT_DIR, `vec0${extension}`)
+  const forceDownload = process.argv.includes('--force')
+
+  if (!forceDownload && existsSync(outputPath)) {
+    console.log(`sqlite-vec already exists at ${outputPath} — skipping download (use --force to re-download)`)
+    return
+  }
+
+  const release = await fetchLatestRelease()
+  const asset = selectAsset(release.assets)
 
   await mkdir(OUTPUT_DIR, { recursive: true })
   const downloaded = await downloadAsset(asset)

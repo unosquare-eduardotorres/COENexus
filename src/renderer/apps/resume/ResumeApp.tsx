@@ -9,6 +9,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const MatchEnginePage = lazy(() => import('./pages/MatchEnginePage'));
 const BatchPage = lazy(() => import('./pages/BatchPage'));
 const TransformHistoryPage = lazy(() => import('./pages/TransformHistoryPage'));
+const PresentationPage = lazy(() => import('./pages/PresentationPage'));
 
 function RouteFallback() {
   return (
@@ -41,6 +42,7 @@ export default function ResumeApp() {
           <Route path="/match" element={<MatchEnginePage />} />
           <Route path="/batch" element={<BatchPage />} />
           <Route path="/review" element={<RecruiterDashboard />} />
+          <Route path="/present" element={<PresentationPage />} />
           <Route path="/settings" element={<SettingsWrapper />} />
         </Routes>
       </Suspense>

@@ -1,8 +1,17 @@
+import { useEffect } from 'react'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('UnderConstruction')
+
 interface UnderConstructionProps {
   title: string
 }
 
 export default function UnderConstruction({ title }: UnderConstructionProps) {
+  useEffect(() => {
+    log.info('Under construction page viewed', { title })
+  }, [title])
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
       <div className="glass-panel p-12 max-w-md">

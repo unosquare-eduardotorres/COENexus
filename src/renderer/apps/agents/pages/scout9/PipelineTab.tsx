@@ -3,9 +3,13 @@ import { Play, Square, Zap, Clock, Users, BarChart3 } from 'lucide-react'
 import PipelineWorkflow from '../../components/scout9/PipelineWorkflow'
 import type { StepState } from '../../components/scout9/workflow/WorkflowNode'
 import LogStream from '../../components/scout9/LogStream'
+import AgentStepStream from '../../components/AgentStepStream'
 import ScopeSelector, { useScopeLabel } from '../../components/scout9/ScopeSelector'
 import RunConfirmModal from '../../components/scout9/RunConfirmModal'
 import type { LogEntry } from '../../components/scout9/LogStream'
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('Scout9PipelineTab')
 
 interface PipelineState {
   steps: StepState[]
@@ -79,6 +83,10 @@ export default function PipelineTab() {
   const scopeInfo = useScopeLabel(state.scopeParams)
 
   useEffect(() => {
+    log.info('Scout-9 pipeline tab viewed')
+  }, [])
+
+  useEffect(() => {
     const unsubscribe = window.api?.scout9?.onPipelineEvent?.((event: Record<string, unknown>) => {
       if (event.type === 'step-update') {
         dispatch({
@@ -103,27 +111,32 @@ export default function PipelineTab() {
   }, [])
 
   const handleRun = useCallback(() => {
+    log.info('Scout-9 run modal opened', { scopePreset: state.scopeParams.preset ?? 'custom' })
     setShowRunModal(true)
-  }, [])
+  }, [state.scopeParams.preset])
 
   const handleConfirmRun = useCallback(async () => {
+    log.info('Scout-9 run confirmed', { scopePreset: state.scopeParams.preset ?? 'custom' })
     setShowRunModal(false)
     dispatch({ type: 'START' })
     dispatch({ type: 'LOG', entry: { timestamp: nowTimestamp(), source: 'step', message: 'Starting Scout-9 pipeline...' } })
     try {
       await window.api?.scout9?.run?.(state.scopeParams)
     } catch (err) {
+      log.error('Scout-9 run failed from pipeline tab', err)
       dispatch({ type: 'LOG', entry: { timestamp: nowTimestamp(), source: 'error', message: `Run failed: ${err}` } })
       dispatch({ type: 'STOP' })
     }
   }, [state.scopeParams])
 
   const handleCancel = useCallback(async () => {
+    log.info('Scout-9 cancel requested')
     dispatch({ type: 'LOG', entry: { timestamp: nowTimestamp(), source: 'step', message: 'Cancelling...' } })
     try {
       await window.api?.scout9?.cancel?.()
       dispatch({ type: 'STOP' })
     } catch (err) {
+      log.error('Scout-9 cancel failed from pipeline tab', err)
       dispatch({ type: 'LOG', entry: { timestamp: nowTimestamp(), source: 'error', message: `Cancel failed: ${err}` } })
     }
   }, [])
@@ -141,7 +154,7 @@ export default function PipelineTab() {
         <div className="flex items-center gap-2 flex-shrink-0">
           {!state.isRunning ? (
             <button
-              onClick={handleRun}
+            onClick={handleRun}
               className="glass-button px-4 py-2 text-xs font-semibold inline-flex items-center gap-1.5 bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 transition-colors"
             >
               <Play size={14} />
@@ -167,6 +180,8 @@ export default function PipelineTab() {
       </div>
 
       <PipelineWorkflow steps={state.steps} stats={state.stats} />
+
+      <AgentStepStream agentId="scout-9" agentName="Scout-9" />
 
       <LogStream logs={state.logs} />
 

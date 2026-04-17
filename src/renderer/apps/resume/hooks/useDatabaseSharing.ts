@@ -7,6 +7,7 @@ import {
   DatabaseStatus,
   ExportResult,
   ImportResult,
+  SyncManifest,
 } from '../services/databaseSharingService';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useToast } from '../../../shared/components/ToastContext';
@@ -23,11 +24,14 @@ export function useDatabaseSharing() {
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImportingLatest, setIsImportingLatest] = useState(false);
   const [importingFilename, setImportingFilename] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [syncUpdateAvailable, setSyncUpdateAvailable] = useState(false);
+  const [syncManifest, setSyncManifest] = useState<SyncManifest | null>(null);
 
   const {
     data: configData,
@@ -93,6 +97,19 @@ export function useDatabaseSharing() {
     }
   }, [isLoadingConfig, isLoadingSnapshots, isLoadingStatus]);
 
+  useEffect(() => {
+    const cleanup = databaseSharingService.onSyncUpdate((manifest: SyncManifest) => {
+      setSyncUpdateAvailable(true);
+      setSyncManifest(manifest);
+      showToast(
+        `New database available from ${manifest.exportedBy}`,
+        'info',
+      );
+      void refetchSnapshots();
+    });
+    return cleanup;
+  }, [refetchSnapshots, showToast]);
+
   const handleSaveConfig = useCallback(async () => {
     setIsSavingConfig(true);
     setSaveSuccess(null);
@@ -134,6 +151,11 @@ export function useDatabaseSharing() {
       try {
         const result = await databaseSharingService.importSnapshot(filename);
         setImportResult(result);
+        setSyncUpdateAvailable(false);
+        setSyncManifest(null);
+        if (result.vecEntriesRebuilt > 0) {
+          showToast(`Imported with ${result.vecEntriesRebuilt} vector index entries rebuilt`, 'success');
+        }
         await Promise.all([refetchStatus(), refetchSnapshots()]);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to import snapshot');
@@ -141,14 +163,51 @@ export function useDatabaseSharing() {
         setImportingFilename(null);
       }
     },
-    [refetchSnapshots, refetchStatus]
+    [refetchSnapshots, refetchStatus, showToast]
   );
+
+  const handleImportLatest = useCallback(async () => {
+    setIsImportingLatest(true);
+    setErrorMessage(null);
+    setSaveSuccess(null);
+    setExportResult(null);
+    try {
+      const result = await databaseSharingService.importLatest();
+      setImportResult(result);
+      setSyncUpdateAvailable(false);
+      setSyncManifest(null);
+      showToast('Database updated to latest version', 'success');
+      if (result.vecEntriesRebuilt > 0) {
+        showToast(`${result.vecEntriesRebuilt} vector index entries rebuilt`, 'info');
+      }
+      await Promise.all([refetchStatus(), refetchSnapshots()]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to import latest snapshot');
+    } finally {
+      setIsImportingLatest(false);
+    }
+  }, [refetchSnapshots, refetchStatus, showToast]);
 
   const refreshSnapshots = useCallback(() => {
     void refetchSnapshots().catch(error => {
       log.error('[DatabaseSharingPanel] Failed to refresh snapshots:', error);
     });
   }, [refetchSnapshots]);
+
+  const handleCheckForUpdates = useCallback(async () => {
+    try {
+      const result = await databaseSharingService.syncCheck();
+      if (result.hasUpdate && result.manifest) {
+        setSyncUpdateAvailable(true);
+        setSyncManifest(result.manifest);
+        showToast(`Update available from ${result.manifest.exportedBy}`, 'info');
+      } else {
+        showToast('Database is up to date', 'success');
+      }
+    } catch (error) {
+      log.error('Failed to check for updates:', error);
+    }
+  }, [showToast]);
 
   const hasNewSnapshots = snapshots.some(snapshot => snapshot.isNew);
   const recordCounts = status?.recordCounts ? Object.entries(status.recordCounts) : [];
@@ -165,11 +224,14 @@ export function useDatabaseSharing() {
       isLoadingInitial,
       isSavingConfig,
       isExporting,
+      isImportingLatest,
       importingFilename,
       saveSuccess,
       errorMessage,
       exportResult,
       importResult,
+      syncUpdateAvailable,
+      syncManifest,
     },
     actions: {
       setSharedPath,
@@ -177,6 +239,8 @@ export function useDatabaseSharing() {
       handleSaveConfig,
       handleExportSnapshot,
       handleImportSnapshot,
+      handleImportLatest,
+      handleCheckForUpdates,
       refreshSnapshots,
     },
   };

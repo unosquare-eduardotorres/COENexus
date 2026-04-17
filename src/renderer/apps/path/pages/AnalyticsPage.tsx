@@ -4,6 +4,7 @@ import type { OrgAnalytics, PromotionVelocityDataPoint, AtRiskCandidate } from '
 import PromotionVelocityChart from '../components/PromotionVelocityChart';
 import SkillRadar from '../components/SkillRadar';
 import AssessmentQueueList from '../components/AssessmentQueueList';
+import { trackPathEvent } from '../services/pathAnalytics';
 
 const radarData = [
   { label: 'Backend', value: 75 },
@@ -30,6 +31,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    trackPathEvent('dashboard_viewed', { page: 'analytics' });
     Promise.all([
       adminService.getOrgAnalytics(),
       adminService.getPromotionVelocity(),

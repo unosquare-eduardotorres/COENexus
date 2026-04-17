@@ -33,9 +33,14 @@ function createRendererLogger(module: string) {
             : console.log;
     consoleFn(`[${entry.module}]`, message, data instanceof Error ? data : (data ?? ''));
 
-    if (level === 'error' && window.api?.app) {
+    if (level === 'error' && window.api?.bug) {
       try {
-        window.api.app.logError?.(entry);
+        window.api.bug.report?.({
+          message: `${module}: ${message}`,
+          stack: entry.error?.stack,
+          scope: 'Renderer',
+          url: window.location.hash,
+        });
       } catch {}
     }
   };

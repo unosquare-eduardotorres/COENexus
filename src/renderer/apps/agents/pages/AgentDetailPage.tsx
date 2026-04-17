@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AGENTS_DATA } from '../types'
 import { AGENT_IMAGES } from '../assets'
@@ -6,18 +7,28 @@ import {
   Zap,
   Shield,
 } from 'lucide-react'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('AgentDetailPage')
 
 export default function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>()
   const navigate = useNavigate()
   const agent = AGENTS_DATA.find(a => a.id === agentId)
 
+  useEffect(() => {
+    log.info('Agent detail page viewed', { agentId: agentId ?? 'unknown' })
+  }, [agentId])
+
   if (!agent) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <p className="text-sm text-muted">Agent not found</p>
         <button
-          onClick={() => navigate('/agents')}
+          onClick={() => {
+            log.info('Agent detail back to agents selected', { agentId: agentId ?? 'unknown' })
+            navigate('/agents')
+          }}
           className="text-xs text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-1.5"
         >
           <ArrowLeft size={14} />
@@ -31,7 +42,10 @@ export default function AgentDetailPage() {
     return (
       <div className="max-w-3xl mx-auto space-y-6">
         <button
-          onClick={() => navigate('/agents')}
+          onClick={() => {
+            log.info('Agent detail back to agents selected', { agentId: agent.id })
+            navigate('/agents')
+          }}
           className="text-xs text-secondary hover:text-primary transition-colors flex items-center gap-1.5"
         >
           <ArrowLeft size={14} />
@@ -75,7 +89,10 @@ export default function AgentDetailPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <button
-        onClick={() => navigate('/agents')}
+        onClick={() => {
+          log.info('Agent detail back to agents selected', { agentId: agent.id })
+          navigate('/agents')
+        }}
         className="text-xs text-secondary hover:text-primary transition-colors flex items-center gap-1.5"
       >
         <ArrowLeft size={14} />

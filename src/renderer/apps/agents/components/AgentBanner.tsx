@@ -15,7 +15,7 @@ export default function AgentBanner({ agentId, agentName, compact = false }: Age
       <img
         src={images.banner}
         alt={`${agentName} banner`}
-        className="absolute inset-0 w-full h-full object-cover object-top opacity-70"
+        className="absolute inset-0 w-full h-full object-cover object-[50%_30%] opacity-70"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-white/70 dark:from-dark-bg/80 via-transparent to-transparent" />
       <div className="absolute bottom-3 left-4 flex items-end gap-3">

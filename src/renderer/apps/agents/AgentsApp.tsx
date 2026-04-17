@@ -10,6 +10,7 @@ const PipelineTab = lazy(() => import('./pages/scout9/PipelineTab'))
 const ReportsTab = lazy(() => import('./pages/scout9/ReportsTab'))
 const KnowledgeBaseTab = lazy(() => import('./pages/scout9/KnowledgeBaseTab'))
 const SettingsTab = lazy(() => import('./pages/scout9/SettingsTab'))
+const StubAgentPage = lazy(() => import('./pages/StubAgentPage'))
 
 function RouteFallback() {
   return (
@@ -35,6 +36,9 @@ export default function AgentsApp() {
             <Route path="settings" element={<SettingsTab />} />
           </Route>
           <Route path="vigil" element={<VigilPage />} />
+          <Route path="switchboard" element={<StubAgentPage />} />
+          <Route path="sensei" element={<StubAgentPage />} />
+          <Route path="payday" element={<StubAgentPage />} />
           <Route path=":agentId" element={<AgentDetailPage />} />
         </Route>
       </Routes>

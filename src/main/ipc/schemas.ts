@@ -166,6 +166,98 @@ export const sessionsUpdateSchema = z.object({
   status: z.string().optional(),
 })
 
+export const presentCreateSessionSchema = z.object({
+  name: z.string().optional(),
+  mode: z.string().optional(),
+  openPositionId: z.number().int().positive().optional(),
+  positionTitle: z.string().optional(),
+  accountName: z.string().optional(),
+  positionUpstreamId: z.number().int().positive().optional(),
+  jobDescription: z.string().optional(),
+})
+
+export const presentUpdateSessionSchema = z.object({
+  name: z.string().optional(),
+  mode: z.string().optional(),
+  introText: z.string().optional(),
+  status: z.string().optional(),
+  openPositionId: z.number().int().positive().optional(),
+  positionTitle: z.string().optional(),
+  accountName: z.string().optional(),
+  positionUpstreamId: z.number().int().positive().optional(),
+  jobDescription: z.string().optional(),
+})
+
+export const presentAddEntrySchema = z.object({
+  sessionId: z.number().int().positive(),
+  sourceType: z.string().min(1),
+  upstreamId: z.number().int().positive(),
+  fullName: z.string().min(1),
+  mainSkill: z.string().min(1),
+  seniority: z.string().min(1),
+  country: z.string().min(1),
+  yearsOfExperience: z.string().optional(),
+  availability: z.string().optional(),
+  recommendedRate: z.string().optional(),
+  techStack: z.array(z.string()).optional(),
+  professionalSummary: z.string().optional(),
+  domainExperience: z.string().optional(),
+  resumeFormatStatus: z.string().optional(),
+  transformSessionId: z.number().int().positive().optional(),
+  individualIntroText: z.string().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+})
+
+export const presentUpdateEntrySchema = z.object({
+  sourceType: z.string().min(1).optional(),
+  upstreamId: z.number().int().positive().optional(),
+  fullName: z.string().min(1).optional(),
+  mainSkill: z.string().min(1).optional(),
+  seniority: z.string().min(1).optional(),
+  country: z.string().min(1).optional(),
+  yearsOfExperience: z.string().optional(),
+  availability: z.string().optional(),
+  recommendedRate: z.string().optional(),
+  techStack: z.array(z.string()).optional(),
+  professionalSummary: z.string().optional(),
+  domainExperience: z.string().optional(),
+  resumeFormatStatus: z.string().optional(),
+  transformSessionId: z.number().int().positive().optional(),
+  individualIntroText: z.string().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+})
+
+export const presentCheckResumeFormatSchema = z.object({
+  resumeText: z.string().min(1),
+})
+
+export const presentTransformResumeSchema = z.object({
+  resumeText: z.string().min(1),
+  fullName: z.string().min(1),
+  jobDescription: z.string().optional(),
+})
+
+export const presentGenerateIntroSchema = z.object({
+  candidateNames: z.array(z.string().min(1)).min(1),
+  positionTitle: z.string().optional(),
+  accountName: z.string().optional(),
+  jobDescription: z.string().optional(),
+  mainSkill: z.string().optional(),
+})
+
+export const presentGenerateCandidateProfileSchema = z.object({
+  resumeText: z.string().min(1),
+  fullName: z.string().min(1),
+  mainSkill: z.string().min(1),
+  jobDescription: z.string().optional(),
+  positionTitle: z.string().optional(),
+})
+
+export const presentGenerateHtmlSchema = z.object({
+  sessionId: z.number().int().positive(),
+  mode: z.string().min(1),
+})
+
 export const databaseSaveConfigSchema = z.object({
   sharing: z.object({
     sharedPath: z.string(),

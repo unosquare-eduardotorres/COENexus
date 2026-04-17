@@ -4,6 +4,7 @@ import type { DeveloperProfile, CareerLadder } from '../types';
 import ReadinessRing from '../components/ReadinessRing';
 import SkillRadar from '../components/SkillRadar';
 import PromotionGateCard from '../components/PromotionGateCard';
+import { trackPathEvent } from '../services/pathAnalytics';
 
 const radarData = [
   { label: 'Backend', value: 78 },
@@ -29,6 +30,7 @@ export default function DpPortalPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    trackPathEvent('dashboard_viewed', { page: 'dp_portal' });
     Promise.all([
       developerService.hydrateDeveloperProfile('dev-001'),
       learningPathService.listLearningPaths(),

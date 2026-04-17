@@ -1,4 +1,4 @@
-import { useMemo, ReactNode } from 'react';
+import { useEffect, useMemo, ReactNode } from 'react';
 import {
   MatchStepKey,
   MatchFlowType,
@@ -28,6 +28,9 @@ import HaikuConfirmModal from '../components/match/steps/HaikuConfirmModal';
 import AnalyzeDeeperModal from '../components/match/steps/AnalyzeDeeperModal';
 import { useMatchEngine } from '../hooks/useMatchEngine';
 import { MatchEngineProvider } from '../contexts/MatchEngineContext';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('MatchEnginePage');
 
 const SOURCE_LABELS: Record<DataSource, string> = {
   bench: 'Bench',
@@ -151,6 +154,10 @@ export default function MatchEnginePage() {
   // Workaround: need setPendingDataSource from depth but it's on search
   const { setPendingDataSource } = hookValue.search;
 
+  useEffect(() => {
+    log.info('Match engine page viewed');
+  }, []);
+
   return (
     <MatchEngineProvider value={hookValue}>
     <div className="min-h-screen py-8">
@@ -167,7 +174,10 @@ export default function MatchEnginePage() {
           {sessions.length > 0 && (
             <div className="flex justify-center mt-4">
               <button
-                onClick={() => setShowSessionHistory(!showSessionHistory)}
+                onClick={() => {
+                  log.info('Match engine session history toggled', { nextOpen: !showSessionHistory });
+                  setShowSessionHistory(!showSessionHistory);
+                }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                   showSessionHistory
                     ? 'bg-accent-500/15 text-accent-500'

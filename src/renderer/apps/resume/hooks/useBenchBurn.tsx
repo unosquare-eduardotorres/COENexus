@@ -20,6 +20,9 @@ import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
 import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 import { useToast } from '../../../shared/components/ToastContext';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('useBenchBurn');
 
 export function useBenchBurn(parentReset?: () => void) {
   const { showToast } = useToast();
@@ -64,6 +67,7 @@ export function useBenchBurn(parentReset?: () => void) {
 
   useEffect(() => {
     if (!initialSession) return;
+    log.info('Bench burn session loaded from URL', { sessionId: initialSession.sessionId });
     setResults(initialSession);
     setCompletedSteps(new Set<BenchBurnStepKey>(['data-source', 'positions', 'search-depth', 'searching']));
     setCurrentStep('results');
@@ -71,17 +75,20 @@ export function useBenchBurn(parentReset?: () => void) {
 
   useEffect(() => {
     if (!initialSessionError) return;
+    log.error('Bench burn session load failed', initialSessionError);
     setError(initialSessionError instanceof Error ? initialSessionError.message : 'Failed to load session');
   }, [initialSessionError]);
 
 
   const handleEmployeesNext = useCallback((employees: BenchEmployee[]) => {
+    log.info('Bench burn employees selected', { count: employees.length });
     setSelectedEmployees(employees);
     completeStep('data-source');
     navigateStep('positions');
   }, [completeStep, navigateStep]);
 
   const handlePositionsNext = useCallback((positions: BenchOpenPosition[], custom: { name: string; jd: string }[]) => {
+    log.info('Bench burn positions selected', { positions: positions.length, customPositions: custom.length });
     setSelectedPositions(positions);
     setCustomPositions(custom);
     completeStep('positions');
@@ -89,13 +96,22 @@ export function useBenchBurn(parentReset?: () => void) {
   }, [completeStep, navigateStep]);
 
   const handleSearchDepthNext = useCallback(() => {
+    log.info('Bench burn summary confirmed', {
+      employeeCount: selectedEmployees.length,
+      positionCount: selectedPositions.length + customPositions.length,
+    });
     const now = new Date();
     const defaultName = `Bench Burn — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     setSessionName(defaultName);
     setShowSessionNamePrompt(true);
-  }, []);
+  }, [customPositions.length, selectedEmployees.length, selectedPositions.length]);
 
   const executeBenchBurn = useCallback(async () => {
+    log.info('Bench burn analysis started', {
+      employeeCount: selectedEmployees.length,
+      positionCount: selectedPositions.length + customPositions.length,
+      sessionName,
+    });
     setShowSessionNamePrompt(false);
     completeStep('search-depth');
     navigateStep('searching');
@@ -128,9 +144,15 @@ export function useBenchBurn(parentReset?: () => void) {
         (p) => setProgress(p),
       );
       setResults(result);
+      log.info('Bench burn analysis completed', {
+        sessionId: result.sessionId,
+        employeeResultGroups: Object.keys(result.employeeResults).length,
+        positionResultGroups: Object.keys(result.positionResults).length,
+      });
       completeStep('searching');
       navigateStep('results');
     } catch (err) {
+      log.error('Bench burn analysis failed', err);
       setError(err instanceof Error ? err.message : 'Analysis failed');
       navigateStep('search-depth');
     }
@@ -160,6 +182,7 @@ export function useBenchBurn(parentReset?: () => void) {
     );
 
     if (uniquePairs.length === 0) return;
+    log.info('Bench burn fallback retry started', { pairCount: uniquePairs.length });
 
     navigateStep('searching');
     setProgress({ percent: 0, stage: '' });
@@ -172,8 +195,10 @@ export function useBenchBurn(parentReset?: () => void) {
         (p) => setProgress(p),
       );
       setResults(retryResult);
+      log.info('Bench burn fallback retry completed', { sessionId: retryResult.sessionId });
       navigateStep('results');
     } catch (err) {
+      log.error('Bench burn fallback retry failed', err);
       setError(err instanceof Error ? err.message : 'Retry failed');
       navigateStep('results');
     }
@@ -216,6 +241,7 @@ export function useBenchBurn(parentReset?: () => void) {
       summary: m.summary,
     }));
     exportToExcel(data, columns, `bench-burn-results-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    log.info('Bench burn results exported', { rowCount: data.length });
     showToast('Bench burn results exported to Excel', 'success');
   }, [results, showToast]);
 
@@ -243,6 +269,7 @@ export function useBenchBurn(parentReset?: () => void) {
   }, [detailMatch, handleBackFromDetail, navigateStep]);
 
   const handleFullReset = useCallback(() => {
+    log.info('Bench burn flow reset');
     resetWizard('data-source');
     setSelectedEmployees([]);
     setSelectedPositions([]);
@@ -256,6 +283,7 @@ export function useBenchBurn(parentReset?: () => void) {
   const handleReset = handleFullReset;
 
   const handleBackToIntents = useCallback(() => {
+    log.info('Bench burn flow returned to intents');
     parentReset();
   }, [parentReset]);
 

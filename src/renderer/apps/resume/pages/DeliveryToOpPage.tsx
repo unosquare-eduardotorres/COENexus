@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { DeliveryToOpStepKey } from '../types';
 import StepperBar from '../../../shared/components/StepperBar';
 import DeliveryEmployeeSelector from '../components/match/DeliveryEmployeeSelector';
@@ -8,6 +8,9 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import DeliveryToOpResults from '../components/match/DeliveryToOpResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { useDeliveryToOp } from '../hooks/useDeliveryToOp';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('DeliveryToOpPage');
 interface DeliveryToOpPageProps {
   onReset: () => void;
   initialSessionId?: number | null;
@@ -73,10 +76,17 @@ export default function DeliveryToOpPage({ onReset: parentReset }: { onReset: ()
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   } = useDeliveryToOp(parentReset);
 
+  useEffect(() => {
+    log.info('Delivery-to-OP page viewed');
+  }, []);
+
   return (
     <div className="space-y-4">
       <button
-        onClick={handleBackToIntents}
+        onClick={() => {
+          log.info('Delivery-to-OP flow exited to match engine');
+          handleBackToIntents();
+        }}
         className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,13 +162,19 @@ export default function DeliveryToOpPage({ onReset: parentReset }: { onReset: ()
             />
             <div className="flex items-center justify-end gap-3 mt-4">
               <button
-                onClick={() => setShowSessionNamePrompt(false)}
+                onClick={() => {
+                  log.info('Delivery-to-OP run prompt canceled');
+                  setShowSessionNamePrompt(false);
+                }}
                 className="px-4 py-2 text-sm text-muted hover:text-secondary transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={executeDeliveryToOp}
+                onClick={() => {
+                  log.info('Delivery-to-OP run confirmed', { sessionName });
+                  executeDeliveryToOp();
+                }}
                 className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25 transition-all"
               >
                 Start Analysis

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { StructuredResume } from '../types';
 import ResumeEditor from '../components/ResumeEditor';
 import OriginalResumeDrawer from '../components/OriginalResumeDrawer';
@@ -5,6 +6,9 @@ import ValidationPanel from '../components/ValidationPanel';
 import PdfPreviewPanel from '../components/PdfPreviewPanel';
 import { DocumentIcon, SearchIcon, SpinnerIcon } from '../../../shared/components/icons';
 import { useRecruiterDashboard } from '../hooks/useRecruiterDashboard';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('RecruiterDashboard');
 
 interface RejectResumeModalProps {
   candidateName: string;
@@ -76,6 +80,10 @@ export default function RecruiterDashboard() {
     ui: { isDrawerOpen, setIsDrawerOpen, showPreview, setShowPreview },
     reject: { showRejectModal, setShowRejectModal, rejectReason, setRejectReason, handleConfirmReject },
   } = useRecruiterDashboard();
+
+  useEffect(() => {
+    log.info('Recruiter dashboard viewed');
+  }, []);
 
   const isGenerating = isGeneratingSuggestions;
   const recruiterLiveMessage = isGenerating
@@ -202,6 +210,7 @@ export default function RecruiterDashboard() {
                     key={resume.id}
                     type="button"
                     onClick={() => {
+                      log.info('Recruiter resume selected', { resumeId: resume.id });
                       setSelectedResumeId(resume.id);
                       setValidationResults([]);
                       setAiSuggestions([]);

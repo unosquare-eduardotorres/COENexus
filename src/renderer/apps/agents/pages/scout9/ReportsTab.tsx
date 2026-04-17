@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, FileText } from 'lucide-react'
 import ReportRenderer from '../../components/scout9/ReportRenderer'
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('Scout9ReportsTab')
 
 interface ReportSummary {
   id: string
@@ -32,6 +35,7 @@ export default function ReportsTab() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    log.info('Scout-9 reports tab viewed')
     loadReports()
   }, [])
 
@@ -40,9 +44,11 @@ export default function ReportsTab() {
     try {
       const result = await window.api?.scout9?.listReports?.()
       if (result?.success && result.data) {
+        log.info('Scout-9 reports loaded', { count: result.data.length })
         setReports(result.data as ReportSummary[])
       }
-    } catch {
+    } catch (error) {
+      log.error('Scout-9 reports load failed', error)
     } finally {
       setLoading(false)
     }
@@ -52,14 +58,18 @@ export default function ReportsTab() {
     try {
       const result = await window.api?.scout9?.getReport?.(id)
       if (result?.success && result.data) {
+        log.info('Scout-9 report selected', { reportId: id })
         setSelectedReport(result.data as ReportDetail)
       }
-    } catch {}
+    } catch (error) {
+      log.error('Scout-9 report load failed', error)
+    }
   }
 
   const handleUpdateCandidate = useCallback(async (id: string, status: string) => {
     try {
       await window.api?.scout9?.updateCandidate?.({ id, status })
+      log.info('Scout-9 candidate status updated', { candidateId: id, status })
       if (selectedReport) {
         setSelectedReport({
           ...selectedReport,
@@ -68,20 +78,28 @@ export default function ReportsTab() {
           ),
         })
       }
-    } catch {}
+    } catch (error) {
+      log.error('Scout-9 candidate status update failed', error)
+    }
   }, [selectedReport])
 
   const handleSubmitSkip = useCallback(async (candidateId: string, reason: string, scope: string) => {
     try {
       await window.api?.scout9?.submitSkip?.({ candidate_id: candidateId, reason, notes: scope })
-    } catch {}
+      log.info('Scout-9 candidate skip submitted', { candidateId, reason })
+    } catch (error) {
+      log.error('Scout-9 candidate skip submit failed', error)
+    }
   }, [])
 
   if (selectedReport) {
     return (
       <div className="space-y-4">
         <button
-          onClick={() => setSelectedReport(null)}
+          onClick={() => {
+            log.info('Scout-9 report detail closed')
+            setSelectedReport(null)
+          }}
           className="text-xs text-secondary hover:text-primary transition-colors flex items-center gap-1.5"
         >
           <ArrowLeft size={14} />

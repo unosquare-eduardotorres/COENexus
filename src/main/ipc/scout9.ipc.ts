@@ -70,7 +70,8 @@ export function registerScout9Handlers(): void {
       const jobPromise = scout9JobManager.run(
         pipelineParams as never,
         pipelineEmit as never,
-        statusEmit as never
+        statusEmit as never,
+        event
       )
 
       jobPromise.then((id) => {

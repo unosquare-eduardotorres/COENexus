@@ -7,6 +7,9 @@ import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { SYNC_STATUS } from '../constants/syncStatus';
 import { safeJsonParse as safeParseJSON } from '../../../shared/utils/safeJsonParse';
 import { useNexusStatus } from '../../../contexts/NexusStatusContext';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('useDataSync');
 
 export function useDataSync(activePanel: DataSyncPanel) {
   const { sharepoint } = useNexusStatus();
@@ -16,6 +19,7 @@ export function useDataSync(activePanel: DataSyncPanel) {
   );
 
   const handleYearChange = useCallback((year: number) => {
+    log.info('Data Sync candidate year selected', { year });
     setSelectedYear(year);
     localStorage.setItem('datasync-candidate-year', JSON.stringify(year));
   }, []);

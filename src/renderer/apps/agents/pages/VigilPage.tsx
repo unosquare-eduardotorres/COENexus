@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { reportError } from '../../../shared/utils/reportError'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
 import AgentBanner from '../components/AgentBanner'
+import AgentStepStream from '../components/AgentStepStream'
 import type {
   VigilActivityLog,
   VigilActivitySeverity,
@@ -19,6 +21,7 @@ import ActivityTimeline from '../components/vigil/ActivityTimeline'
 import ChatPanel from '../components/vigil/ChatPanel'
 
 const SOURCE_ORDER: VigilSource[] = ['employees', 'candidates', 'open-positions', 'project-reallocations']
+const log = createRendererLogger('VigilPage')
 
 function getDayKey(date: Date): string {
   return date.toISOString().slice(0, 10)
@@ -139,6 +142,7 @@ export default function VigilPage() {
   const loadInitialData = useCallback(async () => {
     setLoading(true)
     setError(null)
+    log.info('Vigil page data load requested')
 
     try {
       const [statusRes, configRes, runsRes, activityRes, messagesRes] = await Promise.all([
@@ -161,6 +165,7 @@ export default function VigilPage() {
       setMessages((messagesRes.data ?? []).slice().sort((a, b) => a.created_at.localeCompare(b.created_at)))
       setTimelineHasMore((activityRes.data ?? []).length >= 50)
     } catch (err) {
+      log.error('Vigil page data load failed', err)
       setError(err instanceof Error ? err.message : 'Unable to load Vigil workspace')
     } finally {
       setLoading(false)
@@ -168,6 +173,7 @@ export default function VigilPage() {
   }, [])
 
   useEffect(() => {
+    log.info('Vigil page viewed')
     void loadInitialData()
   }, [loadInitialData])
 
@@ -214,6 +220,7 @@ export default function VigilPage() {
 
   const handleWakeNow = useCallback(async (token: string) => {
     if (!token.trim()) {
+      log.warn('Vigil wake requested without token')
       setError('Token is required to wake Vigil now')
       return
     }
@@ -393,6 +400,7 @@ export default function VigilPage() {
           tokenReady={tokenReady}
           loading={actionLoading}
         />
+        <AgentStepStream agentId="vigil" agentName="Vigil" />
         <ActivityTimeline
           entries={activity}
           hasMore={timelineHasMore}

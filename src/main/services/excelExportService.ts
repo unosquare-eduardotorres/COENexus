@@ -1,4 +1,7 @@
 import ExcelJS from 'exceljs'
+import { createLogger } from './logger'
+
+const log = createLogger('ExcelExportService')
 
 interface ExcelColumnDef {
   header: string
@@ -15,6 +18,11 @@ interface ExcelExportOptions {
 }
 
 export async function generateExcelBuffer(options: ExcelExportOptions): Promise<Buffer> {
+  log.info('Excel export generation started', {
+    sheetName: options.sheetName,
+    columnCount: options.columns.length,
+    rowCount: options.rows.length,
+  })
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet(options.sheetName)
 
@@ -67,5 +75,10 @@ export async function generateExcelBuffer(options: ExcelExportOptions): Promise<
     })
   })
 
-  return Buffer.from(await workbook.xlsx.writeBuffer())
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer())
+  log.info('Excel export generation completed', {
+    sheetName: options.sheetName,
+    byteLength: buffer.byteLength,
+  })
+  return buffer
 }

@@ -6,6 +6,9 @@ import { claudeService } from '../../services/claudeService'
 import { subscriptionService } from '../../services/subscriptionService'
 import { validatePayload, aiChatSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
+import { createLogger } from '../../services/logger'
+
+const log = createLogger('AiIPC')
 
 export function registerAiHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.AI_CHAT,
@@ -16,6 +19,13 @@ export function registerAiHandlers(): void {
       const systemMessage = validated.messages.find(m => m.role === 'system')
 
       if (!userMessage) throw new Error('No user message provided')
+
+      log.info('AI chat requested', {
+        model: validated.model,
+        maxTokens: validated.maxTokens ?? 4096,
+        messageCount: validated.messages.length,
+        hasSystemMessage: Boolean(systemMessage),
+      })
 
       const response = await claudeService.chatAsync(
         validated.model,
@@ -35,19 +45,23 @@ export function registerAiHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.AI_CHECK_CONNECTION,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
+      log.info('AI connection check requested')
       const available = await claudeService.checkAvailability()
+      log.info('AI connection check result', { available })
       return { available }
     })
 
   registerIpcHandler(IPC_CHANNELS.AI_TOKEN_USAGE,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
+      log.info('AI token usage requested')
       return claudeService.getTokenUsage()
     })
 
   registerIpcHandler(IPC_CHANNELS.AI_RESET_TOKEN_USAGE,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
+      log.warn('AI token usage reset requested')
       claudeService.resetTokenUsage()
       return { ok: true }
     })
@@ -55,6 +69,7 @@ export function registerAiHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.AI_SUBSCRIPTION_STATUS,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
+      log.info('AI subscription status requested')
       return subscriptionService.validateAll()
     })
 }

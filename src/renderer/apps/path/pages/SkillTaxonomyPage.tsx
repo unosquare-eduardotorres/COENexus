@@ -3,6 +3,7 @@ import { learningPathService } from '../services';
 import { seniorityLevels as fallbackLevels, coeUnits as fallbackCoeUnits } from '../data';
 import type { SeniorityLevel, CoeUnit, Practice, MainSkill, SkillDomain } from '../types';
 import TaxonomyBrowser from '../components/TaxonomyBrowser';
+import { trackPathEvent } from '../services/pathAnalytics';
 
 export default function SkillTaxonomyPage() {
   const [seniorityLevels, setSeniorityLevels] = useState<SeniorityLevel[]>([]);
@@ -13,6 +14,7 @@ export default function SkillTaxonomyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    trackPathEvent('dashboard_viewed', { page: 'skill_taxonomy' });
     Promise.all([
       learningPathService.getLearningPathBundle(),
       learningPathService.listSkillDomains(),

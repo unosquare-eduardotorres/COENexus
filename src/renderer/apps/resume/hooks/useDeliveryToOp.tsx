@@ -93,12 +93,14 @@ export function useDeliveryToOp(parentReset: () => void) {
 
 
   const handleEmployeeNext = useCallback((employee: BenchEmployee) => {
+    log.info('Delivery-to-OP employee selected', { upstreamId: employee.upstreamId });
     setSelectedEmployee(employee);
     completeStep('employee');
     navigateStep('positions');
   }, [completeStep, navigateStep]);
 
   const handlePositionsNext = useCallback((positions: BenchOpenPosition[], custom: { name: string; jd: string }[]) => {
+    log.info('Delivery-to-OP positions selected', { positions: positions.length, customPositions: custom.length });
     setSelectedPositions(positions);
     setCustomPositions(custom);
     completeStep('positions');
@@ -107,14 +109,23 @@ export function useDeliveryToOp(parentReset: () => void) {
 
   const handleSummaryNext = useCallback(() => {
     if (!selectedEmployee) return;
+    log.info('Delivery-to-OP summary confirmed', {
+      employeeId: selectedEmployee.upstreamId,
+      positionCount: selectedPositions.length + customPositions.length,
+    });
     const now = new Date();
     const defaultName = `Delivery Professional to OP — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     setSessionName(defaultName);
     setShowSessionNamePrompt(true);
-  }, [selectedEmployee]);
+  }, [customPositions.length, selectedEmployee, selectedPositions.length]);
 
   const executeDeliveryToOp = useCallback(async () => {
     if (!selectedEmployee) return;
+    log.info('Delivery-to-OP analysis started', {
+      employeeId: selectedEmployee.upstreamId,
+      positionCount: selectedPositions.length + customPositions.length,
+      sessionName,
+    });
     setShowSessionNamePrompt(false);
     completeStep('summary');
     navigateStep('analyzing');
@@ -149,9 +160,14 @@ export function useDeliveryToOp(parentReset: () => void) {
         (p) => setProgress(p),
       );
       setResults(result);
+      log.info('Delivery-to-OP analysis completed', {
+        sessionId: result.sessionId,
+        employeeGroups: Object.keys(result.employeeResults).length,
+      });
       completeStep('analyzing');
       navigateStep('results');
     } catch (err) {
+      log.error('Delivery-to-OP analysis failed', err);
       setError(err instanceof Error ? err.message : 'Analysis failed');
       navigateStep('summary');
     }
@@ -178,6 +194,7 @@ export function useDeliveryToOp(parentReset: () => void) {
     );
 
     if (uniquePairs.length === 0) return;
+    log.info('Delivery-to-OP fallback retry started', { pairCount: uniquePairs.length });
 
     navigateStep('analyzing');
     setProgress({ percent: 0, stage: '' });
@@ -190,8 +207,10 @@ export function useDeliveryToOp(parentReset: () => void) {
         (p) => setProgress(p),
       );
       setResults(retryResult);
+      log.info('Delivery-to-OP fallback retry completed', { sessionId: retryResult.sessionId });
       navigateStep('results');
     } catch (err) {
+      log.error('Delivery-to-OP fallback retry failed', err);
       setError(err instanceof Error ? err.message : 'Retry failed');
       navigateStep('results');
     }
@@ -215,6 +234,7 @@ export function useDeliveryToOp(parentReset: () => void) {
   }, [detailMatch, handleBackFromDetail, navigateStep]);
 
   const handleFullReset = useCallback(() => {
+    log.info('Delivery-to-OP flow reset');
     resetWizard('employee');
     setSelectedEmployee(null);
     setSelectedPositions([]);
@@ -227,6 +247,7 @@ export function useDeliveryToOp(parentReset: () => void) {
   }, [resetWizard]);
 
   const handleBackToIntents = useCallback(() => {
+    log.info('Delivery-to-OP flow returned to intents');
     parentReset();
   }, [parentReset]);
 

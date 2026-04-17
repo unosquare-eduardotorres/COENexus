@@ -1,4 +1,13 @@
+import { useEffect } from 'react';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('BatchPage');
+
 export default function BatchPage() {
+  useEffect(() => {
+    log.info('Batch page viewed');
+  }, []);
+
   return (
     <div className="min-h-screen py-8 relative">
       <div className="max-w-4xl mx-auto px-6 select-none pointer-events-none blur-sm opacity-40">

@@ -1,10 +1,18 @@
+import { useEffect } from 'react'
 import AgentLandingHero from '../components/AgentLandingHero'
 import { AGENTS_DATA } from '../types'
 import { AGENT_IMAGES } from '../assets'
 import { useNavigate } from 'react-router-dom'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('AgentsLandingPage')
 
 export default function AgentsLandingPage() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    log.info('Agents landing page viewed')
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -16,7 +24,10 @@ export default function AgentsLandingPage() {
           {AGENTS_DATA.map(agent => (
             <button
               key={agent.id}
-              onClick={() => navigate(`/agents/${agent.id}`)}
+              onClick={() => {
+                log.info('Agent selected from landing page', { agentId: agent.id })
+                navigate(`/agents/${agent.id}`)
+              }}
               className="glass-card-hover p-4 text-left group relative overflow-hidden"
             >
               <div

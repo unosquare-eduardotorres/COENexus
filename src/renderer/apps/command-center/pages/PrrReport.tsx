@@ -4,6 +4,9 @@ import { usePrrReport } from '../hooks/usePrrReport'
 import PrrDetailDrawer from '../components/PrrDetailDrawer'
 import { PRR_COE_STATUSES, type PrrCoeStatus } from '../types'
 import { useToast } from '../../../shared/components/ToastContext'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('PrrReport')
 
 type SortKey = 'employee' | 'account' | 'team' | 'mainSkill' | 'seniority' | 'transitionStatus' | 'coeStatus' | 'location' | 'daysOpened'
 
@@ -162,6 +165,10 @@ export default function PrrReport() {
   const [deletingIds, setDeletingIds] = useState<number[]>([])
   const { showToast } = useToast()
 
+  useEffect(() => {
+    log.info('PRR report page viewed')
+  }, [])
+
   const summary = useMemo(() => {
     const total = report.filteredResults.length
     const pendingEval = report.filteredResults.filter(item => item.coeStatus === 'Pending Evaluation').length
@@ -178,10 +185,12 @@ export default function PrrReport() {
   }, [report.filteredResults])
 
   const handleStatusChange = useCallback(async (upstreamId: number, nextStatus: PrrCoeStatus) => {
+    log.info('PRR status change requested', { upstreamId, nextStatus })
     setSavingStatusIds(prev => (prev.includes(upstreamId) ? prev : [...prev, upstreamId]))
     try {
       await report.updateCoeStatus(upstreamId, nextStatus)
-    } catch {
+    } catch (error) {
+      log.error('PRR status change failed', error)
       return
     } finally {
       setSavingStatusIds(prev => prev.filter(id => id !== upstreamId))
@@ -189,13 +198,15 @@ export default function PrrReport() {
   }, [report])
 
   const handleDelete = useCallback(async (upstreamId: number) => {
+    log.info('PRR delete requested from report page', { upstreamId })
     setDeletingIds(prev => (prev.includes(upstreamId) ? prev : [...prev, upstreamId]))
     try {
       await report.deleteRecord(upstreamId)
       if (selectedUpstreamId === upstreamId) {
         setSelectedUpstreamId(null)
       }
-    } catch {
+    } catch (error) {
+      log.error('PRR delete failed', error)
       return
     } finally {
       setDeletingIds(prev => prev.filter(id => id !== upstreamId))
@@ -203,8 +214,10 @@ export default function PrrReport() {
   }, [report, selectedUpstreamId])
 
   const exportToExcel = useCallback(async () => {
+    log.info('PRR Excel export requested', { rowCount: report.filteredResults.length })
     const result = await window.api.prr.exportXlsx(report.filteredResults)
     if (result.saved) {
+      log.info('PRR Excel export completed', { filePath: result.filePath ?? null })
       showToast(
         `Excel exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
         'success',

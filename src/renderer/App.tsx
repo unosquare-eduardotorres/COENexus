@@ -20,6 +20,7 @@ const AgentsApp = lazy(() => import('./apps/agents/AgentsApp'));
 const PathApp = lazy(() => import('./apps/path/PathApp'));
 const SettingsApp = lazy(() => import('./apps/settings/SettingsApp'));
 const BugApp = lazy(() => import('./apps/bug/BugApp'));
+const NomicoreApp = lazy(() => import('./apps/nomicore/NomicoreApp'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,7 @@ function App() {
                     <Route path="/path/*" element={<Suspense fallback={null}><PathApp /></Suspense>} />
                     <Route path="/settings/*" element={<Suspense fallback={null}><SettingsApp /></Suspense>} />
                     <Route path="/bug/*" element={<Suspense fallback={null}><BugApp /></Suspense>} />
+                    <Route path="/nomicore/*" element={<Suspense fallback={null}><NomicoreApp /></Suspense>} />
                   </Routes>
                   <NexusStatusBar />
                   <ClaudeStatusModal />

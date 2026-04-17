@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BenchBurnStepKey } from '../types';
 import StepperBar from '../../../shared/components/StepperBar';
 import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
@@ -8,6 +9,9 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import BenchBurnResults from '../components/match/BenchBurnResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { useBenchBurn } from '../hooks/useBenchBurn';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('BenchBurnPage');
 
 interface BenchBurnPageProps {
   onReset: () => void;
@@ -73,10 +77,19 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   } = useBenchBurn(parentReset);
 
+  const presentNavigate = useNavigate();
+
+  useEffect(() => {
+    log.info('Bench burn page viewed');
+  }, []);
+
   return (
     <div className="space-y-4">
       <button
-        onClick={handleBackToIntents}
+        onClick={() => {
+          log.info('Bench burn flow exited to match engine');
+          handleBackToIntents();
+        }}
         className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,14 +139,27 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
       )}
 
       {currentStep === 'results' && results && (
-        <BenchBurnResults
-          results={results}
-          employees={selectedEmployees}
-          positions={selectedPositions}
-          onReset={handleFullReset}
-          onSelectMatch={handleSelectMatch}
-          onRetryFallbacks={handleRetryFallbacks}
-        />
+        <>
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={() => {
+                const ids = selectedEmployees.map(e => e.upstreamId).join(',')
+                presentNavigate(`/resume/present?employees=${ids}`)
+              }}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 transition-all duration-200 inline-flex items-center gap-2"
+            >
+              📧 Present Employees
+            </button>
+          </div>
+          <BenchBurnResults
+            results={results}
+            employees={selectedEmployees}
+            positions={selectedPositions}
+            onReset={handleFullReset}
+            onSelectMatch={handleSelectMatch}
+            onRetryFallbacks={handleRetryFallbacks}
+          />
+        </>
       )}
 
       {showSessionNamePrompt && (
@@ -153,13 +179,19 @@ export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPagePro
             />
             <div className="flex items-center justify-end gap-3 mt-4">
               <button
-                onClick={() => setShowSessionNamePrompt(false)}
+                onClick={() => {
+                  log.info('Bench burn run prompt canceled');
+                  setShowSessionNamePrompt(false);
+                }}
                 className="px-4 py-2 text-sm text-muted hover:text-secondary transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={executeBenchBurn}
+                onClick={() => {
+                  log.info('Bench burn run confirmed', { sessionName });
+                  executeBenchBurn();
+                }}
                 className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-lg hover:shadow-orange-500/25 transition-all"
               >
                 Start Analysis

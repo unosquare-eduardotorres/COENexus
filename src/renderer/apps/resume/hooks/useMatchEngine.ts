@@ -76,6 +76,7 @@ export function useMatchEngine() {
 
   const handleIntentSelect = useCallback(
     (flow: MatchFlowType) => {
+      log.info('Match flow selected', { flow });
       setMatchFlow(flow);
       completeStep('intent');
       if (flow === 'bench-burn') { navigateToStep('bench-burn'); return; }
@@ -88,6 +89,7 @@ export function useMatchEngine() {
 
   const handleJdNext = useCallback(
     (jd: string, source: JdSource) => {
+      log.info('Match job description confirmed', { source, length: jd.length });
       setJobDescription(jd);
       setJdSource(source);
       completeStep('job-description');
@@ -98,6 +100,10 @@ export function useMatchEngine() {
 
   const handleFiltersNext = useCallback(
     (constraints: AdvancedConstraints) => {
+      log.info('Match filters confirmed', {
+        candidateFilters: constraints.candidateFilters.length,
+        employeeFilters: constraints.employeeFilters.length,
+      });
       setAdvancedConstraints(constraints);
       completeStep('filters');
       navigateToStep('search-depth');
@@ -107,6 +113,7 @@ export function useMatchEngine() {
 
   const handleSearchDepthNext = useCallback(
     (mode: SearchMode, selectedTopN: number) => {
+      log.info('Match search depth confirmed', { mode, topN: selectedTopN, dataSource });
       setSearchMode(mode);
       setTopN(selectedTopN as TopN);
       completeStep('search-depth');
@@ -122,6 +129,7 @@ export function useMatchEngine() {
 
   const handleDataSourceNext = useCallback(
     (source: DataSource) => {
+      log.info('Match data source selected', { source });
       setDataSource(source);
       completeStep('data-source');
       navigateToStep('job-description');
@@ -132,6 +140,13 @@ export function useMatchEngine() {
   const executeSearch = useCallback(async () => {
     if (!pendingDataSource) return;
     const { source, topN: selectedTopN } = pendingDataSource;
+    log.info('Match search started', {
+      source,
+      topN: selectedTopN,
+      searchMode,
+      matchFlow: matchFlow || 'find-for-position',
+      candidateUpstreamIds: candidateUpstreamIds?.length ?? 0,
+    });
     setShowSessionNamePrompt(false);
     setShowAiWarningModal(false);
     setDataSource(source);
@@ -171,6 +186,10 @@ export function useMatchEngine() {
       setStats(result.stats);
       if (result.pipelineStages) setPipelineStages(result.pipelineStages);
       if (result.sessionId) setSessionId(result.sessionId);
+      log.info('Match search completed', {
+        sessionId: result.sessionId ?? null,
+        candidateCount: result.candidates.length,
+      });
       completeStep('searching');
       navigateToStep('results');
       setTimeout(() => setAnimateIn(true), 50);
@@ -185,25 +204,35 @@ export function useMatchEngine() {
     if (!pendingDataSource) return;
     const { connected } = await matchEngineService.getProxyStatus();
     if (!connected) {
+      log.warn('Match search blocked by unavailable AI proxy');
       setShowSessionNamePrompt(false);
       setShowAiWarningModal(true);
       return;
     }
-    executeSearch();
+    void executeSearch();
   }, [pendingDataSource, executeSearch]);
 
-  const handleAiWarningContinue = useCallback(() => { executeSearch(); }, [executeSearch]);
-  const handleAiWarningCancel = useCallback(() => { setShowAiWarningModal(false); setPendingDataSource(null); }, []);
+  const handleAiWarningContinue = useCallback(() => {
+    log.info('Match AI warning override accepted');
+    void executeSearch();
+  }, [executeSearch]);
+  const handleAiWarningCancel = useCallback(() => {
+    log.info('Match AI warning canceled');
+    setShowAiWarningModal(false);
+    setPendingDataSource(null);
+  }, []);
 
   const handleConfirmDecision = useCallback(async (action: 'proceed' | 'include-all') => {
     if (!haikuConfirm) return;
     const id = haikuConfirm.searchId;
     setHaikuConfirm(null);
+    log.info('Haiku confirmation submitted', { searchId: id, action });
     await window.api.match.confirmHaiku({ searchId: id, action });
   }, [haikuConfirm]);
 
   const handleLoadSession = useCallback(async (id: number) => {
     try {
+      log.info('Match session load requested', { sessionId: id });
       const detail = await matchEngineService.getSession(id);
       setSessionId(detail.id);
       setMatchFlow(detail.matchFlowType);
@@ -291,6 +320,7 @@ export function useMatchEngine() {
         : `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Candidates.aspx?CandidateId=${c.id}`,
     }));
     exportToExcel(data, columns, `match-results-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    log.info('Match results exported', { rowCount: data.length });
     showToast('Match results exported to Excel', 'success');
   }, [candidates, showToast]);
 
@@ -298,6 +328,7 @@ export function useMatchEngine() {
   const handleStepClick = useCallback((step: MatchStepKey) => { navigateToStep(step); }, [navigateToStep]);
 
   const handleReset = useCallback(() => {
+    log.info('Match flow reset');
     navigateToStep('intent', true);
     setCompletedSteps(new Set());
     setMatchFlow(null);
@@ -321,6 +352,7 @@ export function useMatchEngine() {
 
   const handleStageClick = useCallback((stage: PipelineStageKey) => {
     if (stage === 'sonnetAnalyzed') return;
+    log.info('Match pipeline stage opened', { stage });
     setActiveStageDrawer(stage);
   }, []);
 

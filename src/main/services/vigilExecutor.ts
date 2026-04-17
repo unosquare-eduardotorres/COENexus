@@ -1,6 +1,8 @@
 import { createHash } from 'crypto'
+import type { IpcMainInvokeEvent } from 'electron'
 import { vigilRepository, type VigilRunRow } from '../db/agents/repositories/vigilRepository'
 import { syncOrchestrator, type SyncEvent, type SyncOptions } from './syncOrchestrator'
+import { createStepEmitter } from './agentStepEmitter'
 import { createLogger } from './logger'
 import type { VigilSource, VigilRunStatus, VigilRunTriggerType } from '../../shared/ipc-types'
 
@@ -13,6 +15,17 @@ interface SourceRunResult {
   success: boolean
   attempts: number
   errors: string[]
+  progress?: {
+    totalRecords: number
+    fetchedRecords: number
+    syncedCount: number
+    updatedCount: number
+    unchangedCount: number
+    incompleteCount: number
+    notProcessedCount: number
+    skippedCount: number
+    status: string
+  }
 }
 
 export interface VigilExecutorRunParams {
@@ -21,6 +34,7 @@ export interface VigilExecutorRunParams {
   sources?: VigilSource[]
   options?: SyncOptions
   emitEvent?: (event: SyncEvent) => void
+  event?: IpcMainInvokeEvent
 }
 
 export interface VigilExecutorStatus {
@@ -59,6 +73,10 @@ class VigilExecutor {
 
     this.activeRunId = run.id
 
+    const emitter = params.event
+      ? createStepEmitter({ agentId: 'vigil', runId: run.id, event: params.event })
+      : null
+
     vigilRepository.createActivityLog({
       run_id: run.id,
       event_type: 'run_started',
@@ -71,9 +89,32 @@ class VigilExecutor {
     const results: SourceRunResult[] = []
 
     try {
-      for (const source of sources) {
+      await emitter?.narrate(
+        'Starting Vigil sync run',
+        'Starting Vigil sync - I will process each source now.',
+        'thinking',
+        { sources }
+      )
+
+      for (const [index, source] of sources.entries()) {
+        await emitter?.narrate(
+          `Syncing source ${source}`,
+          `Working on ${source} (${index + 1}/${sources.length}).`,
+          'running',
+          { source, index: index + 1, total: sources.length }
+        )
+
         const sourceResult = await this.runSourceWithRetry(run.id, source, token, options, params.emitEvent)
         results.push(sourceResult)
+
+        await emitter?.narrate(
+          `Finished source ${source}`,
+          sourceResult.success
+            ? `${source} synced successfully.`
+            : `${source} sync finished with issues.`,
+          sourceResult.success ? 'running' : 'error',
+          { source, success: sourceResult.success, attempts: sourceResult.attempts }
+        )
       }
 
       const failed = results.some(result => !result.success)
@@ -100,6 +141,13 @@ class VigilExecutor {
         created_at: completedAt,
       })
 
+      await emitter?.narrate(
+        failed ? 'Vigil sync completed with failures' : 'Vigil sync completed successfully',
+        failed ? 'Run finished with some failures.' : 'All sources synced successfully.',
+        failed ? 'error' : 'done',
+        { failed, results }
+      )
+
       return vigilRepository.getRunById(run.id) ?? run
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -124,6 +172,10 @@ class VigilExecutor {
         message,
         details_json: JSON.stringify({ sources: results }),
         created_at: completedAt,
+      })
+
+      await emitter?.narrate('Vigil sync failed', 'Run failed before completion.', 'error', {
+        error: message,
       })
 
       throw error
@@ -192,6 +244,7 @@ class VigilExecutor {
     emitEvent?: (event: SyncEvent) => void
   ): Promise<SourceRunResult> {
     const errors: string[] = []
+    let lastProgress: SourceRunResult['progress'] | undefined
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       let failed = false
@@ -210,6 +263,20 @@ class VigilExecutor {
         if (event.type === 'error') {
           failed = true
           failureMessage = event.message
+        }
+
+        if (event.type === 'complete') {
+          lastProgress = {
+            totalRecords: event.progress.totalRecords,
+            fetchedRecords: event.progress.fetchedRecords,
+            syncedCount: event.progress.syncedCount,
+            updatedCount: event.progress.updatedCount,
+            unchangedCount: event.progress.unchangedCount,
+            incompleteCount: event.progress.incompleteCount,
+            notProcessedCount: event.progress.notProcessedCount,
+            skippedCount: event.progress.skippedCount,
+            status: event.progress.status,
+          }
         }
 
         if (emitEvent) {
@@ -232,6 +299,7 @@ class VigilExecutor {
           success: true,
           attempts: attempt,
           errors,
+          progress: lastProgress,
         }
       }
 
@@ -255,6 +323,7 @@ class VigilExecutor {
       success: false,
       attempts: 2,
       errors,
+      progress: lastProgress,
     }
   }
 }

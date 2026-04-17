@@ -27,6 +27,15 @@ import type {
   PrrUpdateCoeStatusParams,
   PrrAddCommentParams,
   PrrReportItem,
+  PresentCreateSessionParams,
+  PresentUpdateSessionParams,
+  PresentAddEntryParams,
+  PresentUpdateEntryParams,
+  PresentCheckResumeFormatParams,
+  PresentTransformResumeParams,
+  PresentGenerateIntroParams,
+  PresentGenerateCandidateProfileParams,
+  PresentGenerateHtmlParams,
   Scout9RunParams,
   Scout9ListReportsParams,
   Scout9UpdateCandidateParams,
@@ -44,11 +53,12 @@ import type {
   Scout9ActivatePromptVersionParams,
   Scout9PipelineEvent,
   Scout9StatusEvent,
+  AgentStepEvent,
   IpcContracts,
   IpcEventContracts,
 } from '../shared/ipc-types'
 import type { CreateOrUpdateTransformSession, BenchBurnRequest, ExternalCandidateMatchRequest } from '../renderer/apps/resume/types'
-import type { ErrorReportRequest, ErrorNewEvent } from '../shared/ipc-types'
+import type { ErrorReportRequest, ErrorNewEvent, NomicoreCalculateParams, MailSmtpConfig } from '../shared/ipc-types'
 
 const api = {
   sync: {
@@ -187,6 +197,35 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SESSIONS_DELETE, id),
   },
 
+  present: {
+    createSession: (params: PresentCreateSessionParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_CREATE_SESSION, params),
+    updateSession: (id: number, data: PresentUpdateSessionParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_UPDATE_SESSION, id, data),
+    getSession: (id: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_GET_SESSION, id),
+    listSessions: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_LIST_SESSIONS),
+    deleteSession: (id: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_DELETE_SESSION, id),
+    addEntry: (params: PresentAddEntryParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_ADD_ENTRY, params),
+    updateEntry: (id: number, data: PresentUpdateEntryParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_UPDATE_ENTRY, id, data),
+    deleteEntry: (id: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_DELETE_ENTRY, id),
+    checkResumeFormat: (params: PresentCheckResumeFormatParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_CHECK_RESUME_FORMAT, params),
+    transformResume: (params: PresentTransformResumeParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_TRANSFORM_RESUME, params),
+    generateIntro: (params: PresentGenerateIntroParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_GENERATE_INTRO, params),
+    generateCandidateProfile: (params: PresentGenerateCandidateProfileParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_GENERATE_CANDIDATE_PROFILE, params),
+    generateHtml: (params: PresentGenerateHtmlParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRESENT_GENERATE_HTML, params),
+  },
+
   database: {
     getConfig: () =>
       ipcRenderer.invoke(IPC_CHANNELS.DATABASE_GET_CONFIG),
@@ -204,6 +243,17 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.DATABASE_IMPORT_FILE),
     getHealth: () =>
       ipcRenderer.invoke(IPC_CHANNELS.DATABASE_HEALTH),
+    syncCheck: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATABASE_SYNC_CHECK),
+    syncStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATABASE_SYNC_STATUS),
+    importLatest: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATABASE_IMPORT_LATEST),
+    onSyncUpdate: (callback: (manifest: unknown) => void) => {
+      const handler = (_event: IpcRendererEvent, manifest: unknown) => callback(manifest)
+      ipcRenderer.on(IPC_CHANNELS.DATABASE_SYNC_UPDATE, handler)
+      return () => { ipcRenderer.removeListener(IPC_CHANNELS.DATABASE_SYNC_UPDATE, handler) }
+    },
   },
 
   ai: {
@@ -471,6 +521,35 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER, filePath),
     openPath: (filePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_PATH, filePath),
+  },
+
+  mail: {
+    getConfig: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MAIL_GET_CONFIG),
+    saveConfig: (params: MailSmtpConfig) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MAIL_SAVE_CONFIG, params),
+    clearConfig: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MAIL_CLEAR_CONFIG),
+    testConnection: (params: MailSmtpConfig) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MAIL_TEST_CONNECTION, params),
+  },
+
+  agents: {
+    runStub: (params: IpcContracts[typeof IPC_CHANNELS.AGENT_STUB_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AGENT_STUB_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.AGENT_STUB_RUN]['response']>,
+    onStepEvent: (callback: (data: AgentStepEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: AgentStepEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.AGENT_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_STEP_EVENT, handler)
+    },
+  },
+  nomicore: {
+    login: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOMICORE_LOGIN),
+    checkSession: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOMICORE_CHECK_SESSION),
+    calculate: (params: NomicoreCalculateParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NOMICORE_CALCULATE, params),
   },
 } as const
 

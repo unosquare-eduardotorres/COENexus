@@ -78,6 +78,7 @@ export function useExternalCandidateToOp(parentReset: () => void) {
 
 
   const handleUploadNext = useCallback((resumes: ExternalResumeFile[]) => {
+    log.info('External candidate resumes selected', { count: resumes.length, parsedCount: resumes.filter(r => r.status === 'parsed').length });
     setUploadedResumes(resumes);
     completeStep('upload');
     navigateStep('position');
@@ -87,6 +88,10 @@ export function useExternalCandidateToOp(parentReset: () => void) {
     position: BenchOpenPosition | null,
     custom: { name: string; jd: string } | null,
   ) => {
+    log.info('External candidate position selected', {
+      hasSavedPosition: Boolean(position),
+      hasCustomPosition: Boolean(custom),
+    });
     setSelectedPosition(position);
     setCustomPosition(custom);
     completeStep('position');
@@ -95,14 +100,23 @@ export function useExternalCandidateToOp(parentReset: () => void) {
 
   const handleSummaryNext = useCallback(() => {
     if (!selectedPosition && !customPosition) return;
+    log.info('External candidate summary confirmed', {
+      parsedResumeCount: uploadedResumes.filter(r => r.status === 'parsed').length,
+      hasSavedPosition: Boolean(selectedPosition),
+      hasCustomPosition: Boolean(customPosition),
+    });
     const now = new Date();
     const defaultName = `External Candidate to OP — ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     setSessionName(defaultName);
     setShowSessionNamePrompt(true);
-  }, [selectedPosition, customPosition]);
+  }, [customPosition, selectedPosition, uploadedResumes]);
 
   const executeExternalCandidateMatch = useCallback(async () => {
     if (!selectedPosition && !customPosition) return;
+    log.info('External candidate analysis started', {
+      parsedResumeCount: uploadedResumes.filter(r => r.status === 'parsed').length,
+      sessionName,
+    });
     setShowSessionNamePrompt(false);
     completeStep('summary');
     navigateStep('analyzing');
@@ -135,9 +149,14 @@ export function useExternalCandidateToOp(parentReset: () => void) {
         (p) => setProgress(p),
       );
       setResults(result);
+      log.info('External candidate analysis completed', {
+        sessionId: result.sessionId,
+        employeeGroups: Object.keys(result.employeeResults).length,
+      });
       completeStep('analyzing');
       navigateStep('results');
     } catch (err) {
+      log.error('External candidate analysis failed', err);
       setError(err instanceof Error ? err.message : 'Analysis failed');
       navigateStep('summary');
     }
@@ -189,6 +208,7 @@ export function useExternalCandidateToOp(parentReset: () => void) {
   }, [detailMatch, handleBackFromDetail, navigateStep]);
 
   const handleFullReset = useCallback(() => {
+    log.info('External candidate flow reset');
     resetWizard('upload');
     setUploadedResumes([]);
     setSelectedPosition(null);
@@ -203,6 +223,7 @@ export function useExternalCandidateToOp(parentReset: () => void) {
   }, [resetWizard]);
 
   const handleBackToIntents = useCallback(() => {
+    log.info('External candidate flow returned to intents');
     parentReset();
   }, [parentReset]);
 

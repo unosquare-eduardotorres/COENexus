@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BookOpen, BookText, StickyNote, Lightbulb, Settings2 } from 'lucide-react'
 import TokenBudgetMeter from '../../components/scout9/knowledge/TokenBudgetMeter'
 import BusinessRulesPanel from '../../components/scout9/knowledge/BusinessRulesPanel'
@@ -6,6 +6,9 @@ import GlossaryPanel from '../../components/scout9/knowledge/GlossaryPanel'
 import ContextNotesPanel from '../../components/scout9/knowledge/ContextNotesPanel'
 import LearnedPatternsPanel from '../../components/scout9/knowledge/LearnedPatternsPanel'
 import ClientOverridesPanel from '../../components/scout9/knowledge/ClientOverridesPanel'
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('Scout9KnowledgeBaseTab')
 
 type KBSubTab = 'rules' | 'glossary' | 'notes' | 'patterns' | 'overrides'
 
@@ -20,6 +23,10 @@ const SUB_TABS: { id: KBSubTab; label: string; icon: React.ReactNode }[] = [
 export default function KnowledgeBaseTab() {
   const [activeSubTab, setActiveSubTab] = useState<KBSubTab>('rules')
 
+  useEffect(() => {
+    log.info('Scout-9 knowledge base tab viewed')
+  }, [])
+
   return (
     <div className="space-y-4">
       <TokenBudgetMeter />
@@ -28,7 +35,10 @@ export default function KnowledgeBaseTab() {
         {SUB_TABS.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
+            onClick={() => {
+              log.info('Scout-9 knowledge sub-tab selected', { subTab: tab.id })
+              setActiveSubTab(tab.id)
+            }}
             className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all inline-flex items-center gap-1.5 ${
               activeSubTab === tab.id
                 ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20'

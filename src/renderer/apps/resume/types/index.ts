@@ -793,3 +793,63 @@ export interface CreateOrUpdateTransformSession {
   wizardStateJson?: string | null;
   status?: string;
 }
+
+export type PresentationStepKey = 'select-people' | 'position-context' | 'review-resumes' | 'generate' | 'finalize'
+export type PresentationMode = 'combined' | 'individual'
+export type ResumeFormatStatus = 'unknown' | 'formatted' | 'needs_formatting' | 'transformed'
+
+export interface SelectedPerson {
+  sourceType: 'candidate' | 'employee'
+  upstreamId: number
+  fullName: string
+  mainSkill: string
+  seniority: string
+  country: string
+  hasResume: boolean
+  resumeNoteId: number | null
+  resumeFilename: string | null
+  isBench?: boolean
+  rate?: number | null
+  candidateStatus?: string | null
+}
+
+export interface PresentationEntry {
+  id: number
+  sessionId: number
+  sourceType: 'candidate' | 'employee'
+  upstreamId: number
+  fullName: string
+  mainSkill: string
+  seniority: string
+  country: string
+  yearsOfExperience: string
+  availability: string
+  recommendedRate: string
+  techStack: string[]
+  professionalSummary: string
+  domainExperience: string
+  resumeFormatStatus: ResumeFormatStatus
+  transformSessionId?: number
+  individualIntroText?: string
+  sortOrder: number
+}
+
+export interface PresentationSessionSummary {
+  id: number
+  name: string
+  mode: PresentationMode
+  positionTitle: string
+  accountName: string
+  status: 'draft' | 'completed'
+  entryCount: number
+  createdAt: string
+}
+
+export interface PresentationSessionDetail extends PresentationSessionSummary {
+  openPositionId?: number
+  positionUpstreamId?: number
+  introText: string
+  jobDescription?: string
+  entries: PresentationEntry[]
+  updatedAt: string
+}

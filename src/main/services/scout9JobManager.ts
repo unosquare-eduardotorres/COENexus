@@ -1,8 +1,10 @@
+import type { IpcMainInvokeEvent } from 'electron'
 import { jobRepository } from '../db/agents/repositories/jobRepository'
 import { runScout9Pipeline } from './scout9PipelineService'
 import { fetchPositions, gatherCandidates, crossReference, runAgenticPhase } from './scout9Steps'
 import * as configRepository from '../db/agents/repositories/configRepository'
 import { createLogger } from './logger'
+import { createStepEmitter } from './agentStepEmitter'
 import type { Scout9PipelineEvent, Scout9RunParams } from './scout9PipelineService'
 
 const log = createLogger('Scout9JobManager')
@@ -23,7 +25,8 @@ class Scout9JobManager {
   async run(
     params: Scout9RunParams,
     emitPipeline: (e: Scout9PipelineEvent) => void,
-    emitStatus: (e: Scout9StatusEvent) => void
+    emitStatus: (e: Scout9StatusEvent) => void,
+    event?: IpcMainInvokeEvent
   ): Promise<string> {
     if (this.currentJob) {
       throw new Error('Scout-9 is already running — cancel the current run first')
@@ -51,10 +54,16 @@ class Scout9JobManager {
     this.currentJob = { id: job.id, abortController, timeoutId }
 
     const startTime = Date.now()
+    const emitter = event ? createStepEmitter({ agentId: 'scout-9', runId: job.id, event }) : null
 
     try {
       jobRepository.update(job.id, { status: 'running', started_at: new Date().toISOString() })
       emitStatus({ status: 'running', jobId: job.id })
+      await emitter?.narrate(
+        'Starting Scout-9 pipeline run',
+        'Starting the pipeline — let me scan what we have...',
+        'thinking'
+      )
 
       const steps = [
         { name: 'Fetch Positions', fn: fetchPositions },
@@ -63,7 +72,7 @@ class Scout9JobManager {
         { name: 'Agentic Analysis', fn: runAgenticPhase },
       ]
 
-      await runScout9Pipeline(params, job.id, emitPipeline, abortController.signal, steps)
+      await runScout9Pipeline(params, job.id, emitPipeline, abortController.signal, steps, emitter)
 
       const durationMs = Date.now() - startTime
       jobRepository.update(job.id, {
@@ -71,6 +80,7 @@ class Scout9JobManager {
         completed_at: new Date().toISOString(),
         metadata_json: JSON.stringify({ ...JSON.parse(job.metadata_json || '{}'), duration_ms: durationMs }),
       })
+      await emitter?.narrate('Pipeline completed successfully', 'All done — report is ready!', 'done')
       emitStatus({ status: 'completed', jobId: job.id, lastRunAt: new Date().toISOString() })
       log.info('Scout-9 run completed', { jobId: job.id, durationMs })
       return job.id

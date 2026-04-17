@@ -63,6 +63,10 @@ export const IPC_CHANNELS = {
   DATABASE_STATUS: 'database:status',
   DATABASE_IMPORT_FILE: 'database:import-file',
   DATABASE_HEALTH: 'database:health',
+  DATABASE_SYNC_CHECK: 'database:sync-check',
+  DATABASE_SYNC_STATUS: 'database:sync-status',
+  DATABASE_IMPORT_LATEST: 'database:import-latest',
+  DATABASE_SYNC_UPDATE: 'database:sync-update',
 
   SYNC_PROGRESS_EVENT: 'sync:progress-event',
   PROCESSING_PROGRESS_EVENT: 'processing:progress-event',
@@ -183,6 +187,9 @@ export const IPC_CHANNELS = {
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
 
+  AGENT_STEP_EVENT: 'agent:step-event',
+  AGENT_STUB_RUN: 'agent:stub-run',
+
   ERRORS_LIST: 'errors:list',
   ERRORS_CLEAR: 'errors:clear',
   ERRORS_MARK_REPORTED: 'errors:mark-reported',
@@ -190,6 +197,29 @@ export const IPC_CHANNELS = {
   ERRORS_REPORT: 'errors:report',
   ERRORS_GET_LOG_PATH: 'errors:get-log-path',
   ERRORS_NEW_EVENT: 'errors:new-event',
+
+  NOMICORE_LOGIN: 'nomicore:login',
+  NOMICORE_CHECK_SESSION: 'nomicore:check-session',
+  NOMICORE_CALCULATE: 'nomicore:calculate',
+
+  PRESENT_CREATE_SESSION: 'present:create-session',
+  PRESENT_UPDATE_SESSION: 'present:update-session',
+  PRESENT_GET_SESSION: 'present:get-session',
+  PRESENT_LIST_SESSIONS: 'present:list-sessions',
+  PRESENT_DELETE_SESSION: 'present:delete-session',
+  PRESENT_ADD_ENTRY: 'present:add-entry',
+  PRESENT_UPDATE_ENTRY: 'present:update-entry',
+  PRESENT_DELETE_ENTRY: 'present:delete-entry',
+  PRESENT_CHECK_RESUME_FORMAT: 'present:check-resume-format',
+  PRESENT_TRANSFORM_RESUME: 'present:transform-resume',
+  PRESENT_GENERATE_INTRO: 'present:generate-intro',
+  PRESENT_GENERATE_CANDIDATE_PROFILE: 'present:generate-candidate-profile',
+  PRESENT_GENERATE_HTML: 'present:generate-html',
+
+  MAIL_GET_CONFIG: 'mail:get-config',
+  MAIL_SAVE_CONFIG: 'mail:save-config',
+  MAIL_CLEAR_CONFIG: 'mail:clear-config',
+  MAIL_TEST_CONNECTION: 'mail:test-connection',
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

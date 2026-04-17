@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   DataSource,
   MatchCandidate,
@@ -37,6 +38,21 @@ interface MatchResultsStepProps {
   onToggleSessionHistory: () => void
   onLoadSession: (id: number) => void
   onAnalyzeDeeper: () => void
+}
+
+function PresentCandidatesButton({ candidates, dataSource }: { candidates: MatchCandidate[]; dataSource: DataSource }) {
+  const navigate = useNavigate()
+  if (candidates.length === 0) return null
+  const paramKey = dataSource === 'candidates' ? 'candidates' : 'employees'
+  const ids = candidates.map(c => c.upstreamId ?? c.id).join(',')
+  return (
+    <button
+      onClick={() => navigate(`/resume/present?${paramKey}=${ids}`)}
+      className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 transition-all duration-200 inline-flex items-center gap-2"
+    >
+      📧 Present Candidates
+    </button>
+  )
 }
 
 const SOURCE_LABELS: Record<DataSource, string> = {
@@ -135,6 +151,7 @@ export default function MatchResultsStep({
             </svg>
             Export to Excel
           </button>
+          <PresentCandidatesButton candidates={candidates} dataSource={dataSource} />
         </div>
       </div>
 

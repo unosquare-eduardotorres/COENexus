@@ -6,6 +6,9 @@ import { prrRepository, type PrrReportRow } from '../../db/repositories/prrRepos
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
+import { createLogger } from '../../services/logger'
+
+const log = createLogger('PrrIPC')
 
 function calculateDaysOpened(requestDate: string | null): number {
   if (!requestDate) return 0
@@ -55,6 +58,7 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_GET_ALL,
     async (event): Promise<PrrReportItem[]> => {
       validateSender(event)
+      log.info('PRR report requested')
       return prrRepository.getAll().map(mapRowToDto)
     }
   )
@@ -63,6 +67,7 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_GET_DETAIL,
     async (event, upstreamId: number): Promise<PrrDetailResult | null> => {
       validateSender(event)
+      log.info('PRR detail requested', { upstreamId })
       const prr = prrRepository.getByUpstreamId(upstreamId)
       if (!prr) return null
       const presentations = syncRepository.getPrrPresentationsByPrrId(upstreamId).map((presentation) => ({
@@ -81,6 +86,10 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_UPDATE_COE_STATUS,
     async (event, params: PrrUpdateCoeStatusParams): Promise<{ updated: boolean }> => {
       validateSender(event)
+      log.info('PRR CoE status update requested', {
+        upstreamId: params.upstreamId,
+        coeStatus: params.coeStatus,
+      })
       prrRepository.updateCoeStatus(params.upstreamId, params.coeStatus)
       return { updated: true }
     }
@@ -90,6 +99,10 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_ADD_COMMENT,
     async (event, params: PrrAddCommentParams): Promise<{ comments: PrrCommentDto[] }> => {
       validateSender(event)
+      log.info('PRR comment requested', {
+        upstreamId: params.upstreamId,
+        author: params.author,
+      })
       prrRepository.addComment(params.upstreamId, params.text, params.author)
       return { comments: prrRepository.getComments(params.upstreamId) }
     }
@@ -99,6 +112,7 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_DELETE,
     async (event, upstreamId: number): Promise<{ deleted: boolean }> => {
       validateSender(event)
+      log.warn('PRR delete requested', { upstreamId })
       const deleted = prrRepository.deleteByUpstreamId(upstreamId)
       return { deleted }
     }
@@ -108,6 +122,7 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_GET_SYNC_STATUS,
     async (event): Promise<{ total: number; lastSyncedAt: string | null }> => {
       validateSender(event)
+      log.info('PRR sync status requested')
       return prrRepository.getSyncStatus()
     }
   )
@@ -116,6 +131,7 @@ export function registerPrrHandlers(): void {
     IPC_CHANNELS.PRR_EXPORT_XLSX,
     async (event, items: PrrReportItem[]): Promise<ExcelExportResult> => {
       validateSender(event)
+      log.info('PRR export requested', { itemCount: items.length })
       const { generateExcelBuffer } = await import('../../services/excelExportService')
 
       const COE_STATUS_COLORS: Record<string, { bg: string; font: string }> = {
@@ -161,8 +177,12 @@ export function registerPrrHandlers(): void {
         defaultPath: `project-reallocations-${new Date().toISOString().slice(0, 10)}.xlsx`,
         filters: [{ name: 'Excel Files', extensions: ['xlsx'] }],
       })
-      if (canceled || !filePath) return { saved: false }
+      if (canceled || !filePath) {
+        log.info('PRR export canceled')
+        return { saved: false }
+      }
       writeFileSync(filePath, buffer)
+      log.info('PRR export saved', { filePath, itemCount: items.length })
       return { saved: true, filePath }
     }
   )

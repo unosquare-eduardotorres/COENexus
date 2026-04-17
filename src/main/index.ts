@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, session, nativeImage } from 'electron'
+import { app, BrowserWindow, shell, session, nativeImage, Notification } from 'electron'
 import { join } from 'path'
 import { IPC_CHANNELS } from '../shared/ipc-channels'
 import { registerAllHandlers } from './ipc'
@@ -14,6 +14,8 @@ import type { VigilStatusEvent } from '../shared/ipc-types'
 import { toVigilActivityEvent } from './services/vigilEventMapper'
 import { initAutoUpdater, stopAutoUpdater } from './updater'
 import { initErrorTransport } from './services/errorTransport'
+import { syncWatcherService } from './services/syncWatcherService'
+import { databaseSharingService } from './services/databaseSharingService'
 import { createLogger } from './services/logger'
 
 function validateNativeModules(): void {
@@ -145,6 +147,16 @@ function setupPermissions(): void {
   })
 }
 
+function formatTimeAgo(isoDate: string): string {
+  const diffMs = Date.now() - new Date(isoDate).getTime()
+  const minutes = Math.floor(diffMs / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 function emitToRenderer(channel: string, payload: unknown): void {
   const win = getMainWindow()
   if (win && !win.isDestroyed()) {
@@ -194,6 +206,38 @@ app.whenReady().then(async () => {
     initAutoUpdater()
   } catch (err) {
     log.error('Auto-updater initialization failed', err instanceof Error ? err : new Error(String(err)))
+  }
+
+  try {
+    const sharingConfig = databaseSharingService.getConfig()
+    if (sharingConfig.sharedPath) {
+      syncWatcherService.start(
+        sharingConfig.sharedPath,
+        () => databaseSharingService.getLocalDbHash(),
+      )
+      syncWatcherService.onUpdate((manifest) => {
+        emitToRenderer(IPC_CHANNELS.DATABASE_SYNC_UPDATE, manifest)
+
+        if (Notification.isSupported()) {
+          const timeAgo = formatTimeAgo(manifest.exportedAt)
+          const notification = new Notification({
+            title: 'Nexus Database Update',
+            body: `New data from ${manifest.exportedBy} (${timeAgo})`,
+            silent: false,
+          })
+          notification.on('click', () => {
+            const win = getMainWindow()
+            if (win) {
+              win.show()
+              win.focus()
+            }
+          })
+          notification.show()
+        }
+      })
+    }
+  } catch (err) {
+    log.error('Sync watcher initialization failed', err instanceof Error ? err : new Error(String(err)))
   }
 
   if (process.platform === 'darwin' && !app.isPackaged) {
@@ -255,6 +299,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   embeddingWorker.stop()
   vigilScheduler.stop()
+  syncWatcherService.stop()
   stopAutoUpdater()
   closeDatabase()
   closePathDatabase()

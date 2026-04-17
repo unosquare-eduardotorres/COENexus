@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { ExternalCandidateToOpStepKey } from '../types';
 import StepperBar from '../../../shared/components/StepperBar';
 import ExternalResumeUploader from '../components/match/ExternalResumeUploader';
@@ -8,6 +8,9 @@ import SearchProgressComponent from '../components/match/SearchProgress';
 import ExternalCandidateToOpResults from '../components/match/ExternalCandidateToOpResults';
 import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { useExternalCandidateToOp } from '../hooks/useExternalCandidateToOp';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('ExternalCandidateToOpPage');
 interface ExternalCandidateToOpPageProps {
   onReset: () => void;
   initialSessionId?: number | null;
@@ -73,10 +76,17 @@ export default function ExternalCandidateToOpPage({ onReset: parentReset }: Exte
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   } = useExternalCandidateToOp(parentReset);
 
+  useEffect(() => {
+    log.info('External candidate-to-OP page viewed');
+  }, []);
+
   return (
     <div className="space-y-4">
       <button
-        onClick={handleBackToIntents}
+        onClick={() => {
+          log.info('External candidate-to-OP flow exited to match engine');
+          handleBackToIntents();
+        }}
         className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,13 +161,19 @@ export default function ExternalCandidateToOpPage({ onReset: parentReset }: Exte
             />
             <div className="flex items-center justify-end gap-3 mt-4">
               <button
-                onClick={() => setShowSessionNamePrompt(false)}
+                onClick={() => {
+                  log.info('External candidate-to-OP run prompt canceled');
+                  setShowSessionNamePrompt(false);
+                }}
                 className="px-4 py-2 text-sm text-muted hover:text-secondary transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={executeExternalCandidateMatch}
+                onClick={() => {
+                  log.info('External candidate-to-OP run confirmed', { sessionName });
+                  executeExternalCandidateMatch();
+                }}
                 className="px-5 py-2 text-sm font-medium rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
               >
                 Start Analysis

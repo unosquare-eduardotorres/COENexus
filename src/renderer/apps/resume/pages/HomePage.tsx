@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import VemLogo from '../../../components/VemLogo';
 import ParticleBackground from '../../../components/ui/particle-background';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('ResumeHomePage');
 
 const primaryActions = [
   {
@@ -165,6 +168,10 @@ export default function HomePage() {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const activeSteps = activeWorkflow === 'resume' ? resumeSteps : matchSteps;
   const isMatch = activeWorkflow === 'match';
+
+  useEffect(() => {
+    log.info('Resume home page viewed');
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden">

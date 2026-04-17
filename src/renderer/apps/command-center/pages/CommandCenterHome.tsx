@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { reportService } from '../services/reportService'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('CommandCenterHome')
 
 function BarChartIcon() {
   return (
@@ -71,7 +74,15 @@ export default function CommandCenterHome() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
 
   useEffect(() => {
-    reportService.getSyncStatus().then(setSyncStatus).catch(() => {})
+    log.info('Command Center home viewed')
+    reportService.getSyncStatus()
+      .then((status) => {
+        log.info('Command Center sync status loaded', { total: status.total, hasLastSyncedAt: Boolean(status.lastSyncedAt) })
+        setSyncStatus(status)
+      })
+      .catch((error) => {
+        log.error('Command Center sync status load failed', error)
+      })
   }, [])
 
   return (
@@ -114,6 +125,9 @@ export default function CommandCenterHome() {
             {report.available ? (
               <Link
                 to={report.href}
+                onClick={() => {
+                  log.info('Command Center report selected', { href: report.href, title: report.title })
+                }}
                 className={`block glass-card-hover p-6 h-full border-t-2 ${report.borderColor} transition-all`}
               >
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${report.iconBg} flex items-center justify-center mb-4 ${report.iconText}`}>

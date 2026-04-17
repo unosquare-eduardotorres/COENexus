@@ -7,6 +7,9 @@ import { registerPathHandlers } from './path.ipc'
 import { registerScout9Handlers } from './scout9.ipc'
 import { registerVigilHandlers } from './vigil.ipc'
 import { registerBugHandlers } from './bug.ipc'
+import { registerAgentStubHandlers } from './agentStub.ipc'
+import { registerNomicoreHandlers } from './nomicore.ipc'
+import { registerMailHandlers } from './mail.ipc'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -18,4 +21,7 @@ export function registerAllHandlers(): void {
   registerScout9Handlers()
   registerVigilHandlers()
   registerBugHandlers()
+  registerAgentStubHandlers()
+  registerNomicoreHandlers()
+  registerMailHandlers()
 }

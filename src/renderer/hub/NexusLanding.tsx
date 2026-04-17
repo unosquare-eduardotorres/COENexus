@@ -45,6 +45,21 @@ function BotIcon() {
   );
 }
 
+function CalculatorIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+      <line x1="8" y1="10" x2="10" y2="10" />
+      <line x1="14" y1="10" x2="16" y2="10" />
+      <line x1="8" y1="14" x2="10" y2="14" />
+      <line x1="14" y1="14" x2="16" y2="14" />
+      <line x1="8" y1="18" x2="10" y2="18" />
+      <line x1="14" y1="18" x2="16" y2="18" />
+    </svg>
+  );
+}
+
 function BugIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -70,6 +85,7 @@ export default function NexusLanding() {
   const pathColor = '#8b5cf6';
   const agentColor = '#a855f7';
   const bugColor = '#ef4444';
+  const nomicoreColor = '#06b6d4';
 
   return (
     <div className="relative flex min-h-screen pb-8 flex-col gradient-subtle transition-colors duration-300">
@@ -173,6 +189,16 @@ export default function NexusLanding() {
             tagline=""
             description={<><AccentLetter color={bugColor}>B</AccentLetter>ug. <AccentLetter color={bugColor}>U</AccentLetter>nified. <AccentLetter color={bugColor}>G</AccentLetter>uardian. Track, triage, and resolve application errors with AI-powered diagnostics.</>}
             icon={<BugIcon />}
+          />
+          <AppCard
+            name="N.O.M.I."
+            codename="Nomicore Integration"
+            status="experimental"
+            href="/nomicore"
+            accentColor={nomicoreColor}
+            tagline=""
+            description={<><AccentLetter color={nomicoreColor}>N</AccentLetter>omicore. <AccentLetter color={nomicoreColor}>O</AccentLetter>n-demand. <AccentLetter color={nomicoreColor}>M</AccentLetter>exico. <AccentLetter color={nomicoreColor}>I</AccentLetter>ntelligence. Salary calculations powered by Nomicore browser automation.</>}
+            icon={<CalculatorIcon />}
           />
         </div>
       </section>

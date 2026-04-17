@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Save, RotateCcw, Plus, Check, FileText, Cpu, Brain, Wrench, Timer } from 'lucide-react'
 import type { Scout9AgentConfig } from '../../../../../shared/ipc-types'
+import { createRendererLogger } from '../../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('Scout9SettingsTab')
 
 interface PromptVersion {
   id: string
@@ -52,7 +55,10 @@ export default function SettingsTab() {
   const [showNewPrompt, setShowNewPrompt] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    log.info('Scout-9 settings tab viewed')
+    loadData()
+  }, [])
 
   async function loadData() {
     try {
@@ -82,20 +88,26 @@ export default function SettingsTab() {
       if (promptsResult?.success && promptsResult.data) {
         setPrompts(promptsResult.data as PromptVersion[])
       }
-    } catch {}
+    } catch (error) {
+      log.error('Scout-9 settings load failed', error)
+    }
   }
 
   async function handleSave() {
     setSaving(true)
     try {
       await window.api?.scout9?.updateConfig?.(formConfig)
+      log.info('Scout-9 settings saved')
       loadData()
-    } catch {} finally {
+    } catch (error) {
+      log.error('Scout-9 settings save failed', error)
+    } finally {
       setSaving(false)
     }
   }
 
   function handleReset() {
+    log.info('Scout-9 settings reset to defaults')
     setFormConfig({ ...DEFAULTS })
   }
 
@@ -103,18 +115,24 @@ export default function SettingsTab() {
     if (!newPromptLabel.trim() || !newPromptText.trim()) return
     try {
       await window.api?.scout9?.createPromptVersion?.({ version_label: newPromptLabel, prompt_text: newPromptText })
+      log.info('Scout-9 prompt version created', { versionLabel: newPromptLabel })
       setShowNewPrompt(false)
       setNewPromptLabel('')
       setNewPromptText('')
       loadData()
-    } catch {}
+    } catch (error) {
+      log.error('Scout-9 prompt version create failed', error)
+    }
   }
 
   async function handleActivatePrompt(id: string) {
     try {
       await window.api?.scout9?.activatePromptVersion?.({ id })
+      log.info('Scout-9 prompt version activated', { promptId: id })
       loadData()
-    } catch {}
+    } catch (error) {
+      log.error('Scout-9 prompt version activate failed', error)
+    }
   }
 
   function updateField<K extends keyof FormConfig>(key: K, value: FormConfig[K]) {

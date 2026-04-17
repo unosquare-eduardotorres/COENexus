@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { type RefinementMode } from '../types';
 import { getPrompts } from '../data/defaultPrompts';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
@@ -6,6 +7,9 @@ import { useAdminDashboard, type AdminTab } from '../hooks/useAdminDashboard';
 import PromptsTab from '../components/settings/PromptsTab';
 import AITab from '../components/settings/AITab';
 import ValidationRulesTab from '../components/settings/ValidationRulesTab';
+import { createRendererLogger } from '../../../shared/utils/rendererLogger';
+
+const log = createRendererLogger('AdminDashboard');
 
 interface AdminDashboardProps {
   onNavigateToResume: (resumeId: string) => void;
@@ -21,6 +25,10 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
     confirm: { confirmAction, setConfirmAction, handleConfirmAction },
     saveStatus,
   } = useAdminDashboard();
+
+  useEffect(() => {
+    log.info('Admin dashboard viewed');
+  }, []);
 
   const getModeIcon = (mode: RefinementMode) => {
     if (mode === 'professional-polish') {
@@ -181,7 +189,10 @@ export default function AdminDashboard({ onNavigateToResume: _onNavigateToResume
                       aria-selected={activeTab === tab.id}
                       aria-controls={`admin-tabpanel-${tab.id}`}
                       tabIndex={0}
-                      onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                      onClick={() => {
+                        log.info('Admin dashboard tab selected', { tabId: tab.id });
+                        setActiveTab(tab.id as typeof activeTab);
+                      }}
                       className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all text-sm ${
                         activeTab === tab.id
                           ? 'bg-accent-50/80 dark:bg-accent-500/20 text-accent-700 dark:text-accent-400 border-l-2 border-accent-500'

@@ -181,12 +181,14 @@ export function useTransformWizard(
   ]);
 
   const handleFilesSelected = useCallback((files: File[]) => {
+    log.info('Transform files selected', { count: files.length });
     search.selection.handleFilesSelected(files);
     pipeline.setError(null);
     pipeline.setTransformedResumes([]);
   }, [pipeline, search.selection]);
 
   const handleCandidateSelect = useCallback((candidate: ATSCandidate) => {
+    log.info('Transform candidate selected', { candidateId: candidate.id, upstreamId: candidate.upstreamId });
     search.selection.handleCandidateSelect(candidate);
     setSelectedPosition(null);
     pipeline.setError(null);
@@ -194,29 +196,47 @@ export function useTransformWizard(
   }, [pipeline, search.selection]);
 
   const handleEmployeeSelect = useCallback((employee: BenchEmployee) => {
+    log.info('Transform employee selected', { upstreamId: employee.upstreamId });
     search.selection.handleEmployeeSelect(employee);
     pipeline.setError(null);
     pipeline.setTransformedResumes([]);
   }, [pipeline, search.selection]);
 
   const handleNext = useCallback(() => {
+    log.info('Transform next step requested', { fromStep: session.currentStepKey });
     session.handleNext(refinementMode);
   }, [refinementMode, session]);
 
   const handleBack = useCallback(() => {
+    log.info('Transform previous step requested', { fromStep: session.currentStepKey });
     session.handleBack(refinementMode);
   }, [refinementMode, session]);
 
   const executeTransform = useCallback(async () => {
-    await pipeline.executeTransform();
-  }, [pipeline]);
+    log.info('Transform execution started', {
+      sourceType,
+      refinementMode,
+      selectedFileCount: search.selection.selectedFiles.length,
+      hasCandidate: Boolean(search.selection.selectedCandidate),
+      hasEmployee: Boolean(search.selection.selectedEmployee),
+    });
+    try {
+      await pipeline.executeTransform();
+      log.info('Transform execution completed');
+    } catch (err) {
+      log.error('Transform execution failed', err);
+      throw err;
+    }
+  }, [pipeline, refinementMode, search.selection.selectedCandidate, search.selection.selectedEmployee, search.selection.selectedFiles.length, sourceType]);
 
   const handleTransform = useCallback(() => {
+    log.info('Transform requested', { claudeConnected });
     if (claudeConnected === false) setShowFallbackWarning(true);
     else session.setShowSaveSessionModal(true);
   }, [claudeConnected, session]);
 
   const handleSaveAndEnhance = useCallback((sessionName: string) => {
+    log.info('Transform save-and-enhance confirmed', { sessionName });
     session.setPendingSessionName(sessionName);
     session.setSavedSessionName(sessionName);
     session.setShowSaveSessionModal(false);
@@ -229,6 +249,11 @@ export function useTransformWizard(
 
   const handleSaveSession = useCallback(async () => {
     try {
+      log.info('Transform session save requested', {
+        sourceType,
+        refinementMode,
+        transformedResumeCount: pipeline.transformedResumes.length,
+      });
       await session.saveSession({
         processingMode,
         sourceType,
@@ -242,6 +267,7 @@ export function useTransformWizard(
         transformedResumes: pipeline.transformedResumes,
         editedResumes: pipeline.editedResumes,
       });
+      log.info('Transform session save completed');
     } catch (err) {
       log.error('Failed to save session:', err);
       pipeline.setError('Failed to save session');
@@ -260,6 +286,7 @@ export function useTransformWizard(
   ]);
 
   const handleReset = useCallback(() => {
+    log.info('Transform flow reset');
     search.selection.setSelectedFiles([]);
     search.selection.setSelectedCandidate(null);
     search.selection.setSelectedEmployee(null);
@@ -304,7 +331,15 @@ export function useTransformWizard(
   }, [exportCtl, pipeline, search.selection, session, validation.suggestions]);
 
   useEffect(() => {
-    aiService.checkConnection().then(setClaudeConnected);
+    aiService.checkConnection()
+      .then((connected) => {
+        log.info('Transform AI connection checked', { connected });
+        setClaudeConnected(connected);
+      })
+      .catch((error) => {
+        log.error('Transform AI connection check failed', error);
+        setClaudeConnected(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -342,6 +377,7 @@ export function useTransformWizard(
           resumeContentJson: JSON.stringify(pipeline.transformedResumes),
           status: 'completed',
         });
+        log.info('Post-transform session persistence completed', { sessionName: session.pendingSessionName });
         session.setSessionSaved(true);
       } catch (err) {
         log.error('Session save failed:', err);
