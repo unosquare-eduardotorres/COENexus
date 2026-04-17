@@ -11,7 +11,7 @@ import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useAdminDashboard');
 
-export type AdminTab = 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template';
+export type AdminTab = 'validation' | 'guidelines' | 'prompts' | 'ai' | 'output-template' | 'data-maintenance';
 
 export function useAdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('validation');
