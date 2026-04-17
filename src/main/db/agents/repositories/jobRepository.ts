@@ -3,7 +3,7 @@ import { getAgentsDatabase } from '../agentsConnection'
 export type Scout9JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
 export type Scout9ScopeType = 'org' | 'project' | 'custom' | 'account' | 'stakeholder'
 
-export type AgentType = 'scout9' | 'vigil' | 'inference'
+export type AgentType = 'scout9' | 'vigil' | 'braniac'
 
 export interface AgentJobRow {
   id: string

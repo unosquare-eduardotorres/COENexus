@@ -136,6 +136,91 @@ export function createScout9Tools(tracker: ToolCallTracker, toolTimeoutMs: numbe
       },
     },
     {
+      name: 'get_candidate_salary_info',
+      description: 'Get normalized salary data for a candidate or employee by upstream ID and source type. Returns normalized_monthly_usd (USD/month), inferred_currency, currency_confidence, and raw salary fields.',
+      execute: async (args) => {
+        const { sourceType, upstreamId } = args as { sourceType: 'candidates' | 'employees'; upstreamId: number }
+        const check = tracker.check('get_candidate_salary_info', upstreamId)
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('get_candidate_salary_info', upstreamId)
+
+        return withTimeout(async () => {
+          const db = getDatabase()
+          if (sourceType === 'candidates') {
+            const row = db.prepare(`
+              SELECT upstream_id, full_name, country, seniority, main_skill,
+                salary_expectations, normalized_monthly_usd, inferred_currency, currency_confidence
+              FROM synced_candidates WHERE upstream_id = ?
+            `).get(upstreamId) as Record<string, unknown> | undefined
+            if (!row) return 'Candidate not found'
+            return JSON.stringify(row)
+          }
+          const row = db.prepare(`
+            SELECT upstream_id, full_name, country, seniority, main_skill,
+              salary_expectations, normalized_monthly_usd, inferred_currency, currency_confidence
+            FROM synced_employees WHERE upstream_id = ?
+          `).get(upstreamId) as Record<string, unknown> | undefined
+          if (!row) return 'Employee not found'
+          return JSON.stringify(row)
+        }, toolTimeoutMs, 'get_candidate_salary_info')
+      },
+    },
+    {
+      name: 'filter_candidates_by_salary_range',
+      description: 'Find candidates/employees whose normalized_monthly_usd falls within a given range. Provide minMonthlyUsd and/or maxMonthlyUsd. Optionally filter by country or seniority. Returns up to 50 results.',
+      execute: async (args) => {
+        const { minMonthlyUsd, maxMonthlyUsd, country, seniority, sourceType } = args as {
+          minMonthlyUsd?: number; maxMonthlyUsd?: number; country?: string; seniority?: string; sourceType?: 'candidates' | 'employees'
+        }
+        const check = tracker.check('filter_candidates_by_salary_range')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('filter_candidates_by_salary_range')
+
+        return withTimeout(async () => {
+          const db = getDatabase()
+          const results: Record<string, unknown>[] = []
+          const tables = sourceType ? [sourceType] : ['candidates', 'employees'] as const
+
+          for (const table of tables) {
+            const tableName = table === 'candidates' ? 'synced_candidates' : 'synced_employees'
+            const conditions: string[] = ['normalized_monthly_usd IS NOT NULL']
+            const params: unknown[] = []
+
+            if (minMonthlyUsd !== undefined) {
+              conditions.push('normalized_monthly_usd >= ?')
+              params.push(minMonthlyUsd)
+            }
+            if (maxMonthlyUsd !== undefined) {
+              conditions.push('normalized_monthly_usd <= ?')
+              params.push(maxMonthlyUsd)
+            }
+            if (country) {
+              conditions.push('country = ?')
+              params.push(country)
+            }
+            if (seniority) {
+              conditions.push('seniority = ?')
+              params.push(seniority)
+            }
+
+            const rows = db.prepare(`
+              SELECT upstream_id, full_name, country, seniority, main_skill,
+                normalized_monthly_usd, inferred_currency, currency_confidence
+              FROM ${tableName}
+              WHERE ${conditions.join(' AND ')}
+              ORDER BY normalized_monthly_usd ASC
+              LIMIT 50
+            `).all(...params) as Record<string, unknown>[]
+
+            results.push(...rows.map(r => ({ ...r, sourceType: table })))
+          }
+
+          if (results.length === 0) return 'No candidates found matching the salary range criteria'
+          return JSON.stringify(results.slice(0, 50))
+        }, toolTimeoutMs, 'filter_candidates_by_salary_range')
+      },
+    },
+    {
       name: 'get_knowledge_notes',
       description: 'Get context notes for a specific client or stakeholder',
       execute: async (args) => {

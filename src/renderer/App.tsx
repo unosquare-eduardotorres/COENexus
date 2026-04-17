@@ -9,6 +9,7 @@ import ResumeApp from './apps/resume/ResumeApp';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useErrorCapture } from './hooks/useErrorCapture';
 import { useErrorToastListener } from './hooks/useErrorToastListener';
+import { useAgentActivityListener } from './hooks/useAgentActivityListener';
 import NexusStatusBar from './components/NexusStatusBar';
 import ClaudeStatusModal from './components/modals/ClaudeStatusModal';
 import TokenUsageModal from './components/modals/TokenUsageModal';
@@ -38,6 +39,11 @@ function ErrorCaptureProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AgentActivityBridge() {
+  useAgentActivityListener();
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -47,6 +53,7 @@ function App() {
             <ErrorCaptureProvider>
               <HashRouter>
                 <NexusStatusProvider>
+                  <AgentActivityBridge />
                   <Routes>
                     <Route path="/" element={<NexusLanding />} />
                     <Route path="/resume/*" element={<ResumeApp />} />

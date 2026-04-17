@@ -8,6 +8,8 @@ import senseiAvatar from '../../assets/agents/sensei-avatar.png'
 import senseiBanner from '../../assets/agents/sensei-banner.png'
 import paydayAvatar from '../../assets/agents/payday-avatar.png'
 import paydayBanner from '../../assets/agents/payday-banner.png'
+import braniacAvatar from '../../assets/agents/braniac-avatar.png'
+import braniacBanner from '../../assets/agents/braniac-banner.png'
 
 export const AGENT_IMAGES: Record<string, { avatar: string; banner: string }> = {
   'scout-9': { avatar: scout9Avatar, banner: scout9Banner },
@@ -15,4 +17,5 @@ export const AGENT_IMAGES: Record<string, { avatar: string; banner: string }> = 
   'switchboard': { avatar: switchboardAvatar, banner: switchboardBanner },
   'sensei': { avatar: senseiAvatar, banner: senseiBanner },
   'payday': { avatar: paydayAvatar, banner: paydayBanner },
+  'braniac': { avatar: braniacAvatar, banner: braniacBanner },
 }

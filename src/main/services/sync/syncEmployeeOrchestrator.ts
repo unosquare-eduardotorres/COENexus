@@ -5,6 +5,7 @@ import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeD
 
 import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
+import { salaryNormalizationService } from '../salaryNormalizationService'
 import type { SyncRecordDto, SyncEvent, SyncOptions, EmployeeSyncRecord } from './syncTypes'
 
 const log = createLogger('SyncEmployeeOrchestrator')
@@ -60,6 +61,36 @@ function buildEmployeeEntity(
   const recordStatus = missingFields.length === 0 ? 'synced' : 'incomplete'
   const statusReason = missingFields.length > 0 ? `Missing: ${missingFields.join(', ')}` : null
 
+  const grossMonthlySalary = contract?.salary ?? null
+  const salaryCurrency = contract?.currencyCode ?? null
+  const rateValue = rate?.rate ?? null
+
+  let normalizedMonthlyUsd: number | null = null
+  let inferredCurrency: string | null = null
+  let currencyConfidence: string | null = null
+
+  if (grossMonthlySalary) {
+    const norm = salaryNormalizationService.normalizeSalary({
+      amount: grossMonthlySalary,
+      currency: salaryCurrency,
+      country: country || null,
+      seniority,
+    })
+    normalizedMonthlyUsd = norm.normalizedMonthlyUsd
+    inferredCurrency = norm.inferredCurrency
+    currencyConfidence = norm.currencyConfidence
+  } else if (rateValue) {
+    const norm = salaryNormalizationService.normalizeSalary({
+      amount: rateValue,
+      currency: 'USD',
+      country: country || null,
+      period: 'hourly',
+    })
+    normalizedMonthlyUsd = norm.normalizedMonthlyUsd
+    inferredCurrency = 'USD'
+    currencyConfidence = 'low'
+  }
+
   return {
     upstream_id: detail.userId,
     full_name: detail.fullName || '',
@@ -67,17 +98,20 @@ function buildEmployeeEntity(
     seniority,
     main_skill: mainSkill || '',
     country: country || '',
-    gross_monthly_salary: contract?.salary ?? null,
-    salary_currency: contract?.currencyCode ?? null,
+    gross_monthly_salary: grossMonthlySalary,
+    salary_currency: salaryCurrency,
     last_account: isBench ? null : (detail.accountName || null),
     last_account_start_date: rate?.startDate ?? null,
-    rate: rate?.rate ?? null,
+    rate: rateValue,
     has_resume: resumeNote ? 1 : 0,
     resume_note_id: resumeNote?.personaNoteId ?? null,
     resume_date_created: resumeNote?.dateCreated ?? null,
     resume_filename: resumeNote?.filename ?? null,
     is_bench: isBench ? 1 : 0,
     job_title: detail.jobTitle || basicEmployee.jobTitle || '',
+    normalized_monthly_usd: normalizedMonthlyUsd,
+    inferred_currency: inferredCurrency,
+    currency_confidence: currencyConfidence,
     status: recordStatus,
     status_reason: statusReason,
     synced_at: new Date().toISOString(),

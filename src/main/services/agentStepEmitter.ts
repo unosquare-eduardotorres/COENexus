@@ -29,7 +29,7 @@ function normalizeStatus(status: ExtendedStepStatus): AgentStepEvent['status'] {
 }
 
 function shouldNarrate(agentId: AgentId): boolean {
-  return agentId === 'switchboard' || agentId === 'sensei' || agentId === 'payday'
+  return agentId === 'switchboard' || agentId === 'sensei' || agentId === 'payday' || agentId === 'braniac'
 }
 
 function toNarrationDetail(runId: string, context: string, metadata?: Record<string, unknown>): string {

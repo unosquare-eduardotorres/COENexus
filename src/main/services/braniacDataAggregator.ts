@@ -2,7 +2,7 @@ import { getDatabase } from '../db/connection'
 import { getAgentsDatabase } from '../db/agents/agentsConnection'
 import { createLogger } from './logger'
 
-const log = createLogger('InferenceDataAggregator')
+const log = createLogger('BraniacDataAggregator')
 
 const CHARS_PER_TOKEN = 4
 const MAX_TOKEN_BUDGET = 80_000
@@ -30,6 +30,11 @@ export interface AggregatedCandidate {
   isEmployee: number
   candidateStatus: string
   rate: number
+  normalizedMonthlyUsd: number | null
+  inferredCurrency: string | null
+  currencyConfidence: string | null
+  country: string | null
+  seniority: string | null
   rejectionFeedback: string[]
   rejectionComments: string
   rejectionActionDate: string | null
@@ -55,7 +60,7 @@ export interface DataCompleteness {
   hasRejectionDetails: boolean
 }
 
-export interface InferenceDataBundle {
+export interface BraniacDataBundle {
   account: string
   stakeholder?: string
   positions: AggregatedPosition[]
@@ -157,20 +162,41 @@ function loadPositions(account: string, stakeholder?: string): AggregatedPositio
       ORDER BY candidate_id
     `).all(posId) as Record<string, unknown>[]
 
-    const candidates: AggregatedCandidate[] = candidateRows.map(c => ({
-      candidateId: c.candidate_id as number,
-      candidateName: c.candidate_name as string,
-      mainSkill: c.main_skill as string,
-      isEmployee: c.is_employee as number,
-      candidateStatus: c.candidate_status as string,
-      rate: c.rate as number,
-      rejectionFeedback: resolveRejectionFeedback(
-        (c.rejection_feedback as string) ?? '[]',
-        feedbackMap
-      ),
-      rejectionComments: (c.rejection_comments as string) ?? '',
-      rejectionActionDate: (c.rejection_action_date as string) ?? null,
-    }))
+    const candidates: AggregatedCandidate[] = candidateRows.map(c => {
+      const candidateId = c.candidate_id as number
+      const isEmployee = c.is_employee as number
+
+      let salaryData: { normalized_monthly_usd: number | null; inferred_currency: string | null; currency_confidence: string | null; country: string | null; seniority: string | null } | undefined
+      if (isEmployee) {
+        salaryData = nexusDb.prepare(
+          'SELECT normalized_monthly_usd, inferred_currency, currency_confidence, country, seniority FROM synced_employees WHERE upstream_id = ?'
+        ).get(candidateId) as typeof salaryData
+      } else {
+        salaryData = nexusDb.prepare(
+          'SELECT normalized_monthly_usd, inferred_currency, currency_confidence, country, seniority FROM synced_candidates WHERE upstream_id = ?'
+        ).get(candidateId) as typeof salaryData
+      }
+
+      return {
+        candidateId,
+        candidateName: c.candidate_name as string,
+        mainSkill: c.main_skill as string,
+        isEmployee,
+        candidateStatus: c.candidate_status as string,
+        rate: c.rate as number,
+        normalizedMonthlyUsd: salaryData?.normalized_monthly_usd ?? null,
+        inferredCurrency: salaryData?.inferred_currency ?? null,
+        currencyConfidence: salaryData?.currency_confidence ?? null,
+        country: salaryData?.country ?? null,
+        seniority: salaryData?.seniority ?? null,
+        rejectionFeedback: resolveRejectionFeedback(
+          (c.rejection_feedback as string) ?? '[]',
+          feedbackMap
+        ),
+        rejectionComments: (c.rejection_comments as string) ?? '',
+        rejectionActionDate: (c.rejection_action_date as string) ?? null,
+      }
+    })
 
     positions.push({
       upstreamId: pos.upstream_id as number,
@@ -222,9 +248,9 @@ function summarizePositions(positions: AggregatedPosition[], maxTokens: number):
   return result
 }
 
-export const inferenceDataAggregator = {
-  aggregateForAccount(account: string): InferenceDataBundle {
-    log.info('Aggregating inference data for account', { account })
+export const braniacDataAggregator = {
+  aggregateForAccount(account: string): BraniacDataBundle {
+    log.info('Aggregating data for account', { account })
 
     const positions = loadPositions(account)
     const salaryBands = loadSalaryBands()
@@ -267,8 +293,8 @@ export const inferenceDataAggregator = {
     }
   },
 
-  aggregateForStakeholder(account: string, stakeholder: string): InferenceDataBundle {
-    log.info('Aggregating inference data for stakeholder', { account, stakeholder })
+  aggregateForStakeholder(account: string, stakeholder: string): BraniacDataBundle {
+    log.info('Aggregating data for stakeholder', { account, stakeholder })
 
     const positions = loadPositions(account, stakeholder)
     const salaryBands = loadSalaryBands()

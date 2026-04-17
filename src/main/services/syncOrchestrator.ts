@@ -24,7 +24,7 @@ export const syncOrchestrator = {
   ): Promise<void> {
     activeController = new AbortController()
     const { signal } = activeController
-    log.info('Sync started', { source, limit: options.limit, skip: options.skip })
+    log.info('Sync started', { source, limit: options.limit, skip: options.skip, activeOnly: options.activeOnly })
     try {
       if (source === 'employees') {
         await syncEmployeeOrchestrator.sync(token, options, emitEvent, signal)

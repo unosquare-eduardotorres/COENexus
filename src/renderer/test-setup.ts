@@ -187,6 +187,23 @@ Object.defineProperty(window, 'api', {
       onActivityEvent: vi.fn().mockReturnValue(() => {}),
       onStatusEvent: vi.fn().mockReturnValue(() => {}),
     },
+    agents: {
+      runStub: vi.fn().mockResolvedValue({ success: true }),
+      onStepEvent: vi.fn().mockReturnValue(() => {}),
+    },
+    braniac: {
+      run: vi.fn().mockResolvedValue({ jobId: 'test' }),
+      cancel: vi.fn().mockResolvedValue({ success: true }),
+      getStatus: vi.fn().mockResolvedValue({ running: false }),
+      listJobs: vi.fn().mockResolvedValue([]),
+      getJob: vi.fn().mockResolvedValue(null),
+      listPatterns: vi.fn().mockResolvedValue([]),
+      listProfiles: vi.fn().mockResolvedValue([]),
+      getProfile: vi.fn().mockResolvedValue(null),
+      getAccounts: vi.fn().mockResolvedValue([]),
+      onStepEvent: vi.fn().mockReturnValue(() => {}),
+      onStatusEvent: vi.fn().mockReturnValue(() => {}),
+    },
     app: {
       getVersion: vi.fn().mockResolvedValue('1.0.0'),
       getPlatform: vi.fn().mockResolvedValue('darwin'),

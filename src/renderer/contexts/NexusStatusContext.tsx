@@ -49,6 +49,13 @@ interface ModalState {
 
 type ModalKey = 'claude' | 'tokens' | 'sharepoint';
 
+export interface AgentActivity {
+  id: string;
+  name: string;
+  status: 'running' | 'queued';
+  runId: string | null;
+}
+
 interface NexusStatusContextValue {
   claude: ClaudeStatus;
   checkClaude: () => Promise<void>;
@@ -63,6 +70,8 @@ interface NexusStatusContextValue {
   modals: ModalState;
   openModal: (modal: ModalKey) => void;
   closeModal: (modal: ModalKey) => void;
+  agentActivities: AgentActivity[];
+  setAgentActivities: (activities: AgentActivity[]) => void;
 }
 
 const NexusStatusContext = createContext<NexusStatusContextValue | null>(null);
@@ -100,6 +109,8 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
   const [spError, setSpError] = useState<string | undefined>();
   const [spRemainingMs, setSpRemainingMs] = useState(0);
   const [spShowWarning, setSpShowWarning] = useState(false);
+
+  const [agentActivities, setAgentActivities] = useState<AgentActivity[]>([]);
 
   const [modals, setModals] = useState<ModalState>({
     claude: false,
@@ -289,10 +300,13 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
     modals,
     openModal,
     closeModal,
+    agentActivities,
+    setAgentActivities,
   }), [
     claude, checkClaude, tokens, refreshTokenUsage, resetTokenUsage,
     sharepoint, setSharePointToken, validateSharePoint, disconnectSharePoint,
     requireSharePointToken, modals, openModal, closeModal,
+    agentActivities,
   ]);
 
   return (

@@ -54,4 +54,13 @@ export const AGENTS_DATA: Agent[] = [
     accentColor: '#ec4899',
     icon: 'Trophy',
   },
+  {
+    id: 'braniac',
+    name: 'Braniac',
+    description: 'Analyzes historical recruitment data to infer stakeholder preferences, rate patterns, and hiring behaviors. Produces pre-computed intelligence profiles for Scout.',
+    skills: ['pattern-inference', 'stakeholder-profiling', 'preference-mapping'],
+    status: 'active',
+    accentColor: '#8b5cf6',
+    icon: 'BrainCircuit',
+  },
 ]

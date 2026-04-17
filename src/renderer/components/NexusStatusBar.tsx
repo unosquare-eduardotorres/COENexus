@@ -16,7 +16,7 @@ function getCountdownColor(ms: number): string {
 }
 
 export default function NexusStatusBar() {
-  const { claude, tokens, sharepoint, openModal } = useNexusStatus();
+  const { claude, tokens, sharepoint, openModal, agentActivities } = useNexusStatus();
   const navigate = useNavigate();
 
   return (
@@ -40,6 +40,26 @@ export default function NexusStatusBar() {
             {claude.checking ? 'Checking...' : claude.connected ? 'Claude Connected' : 'Claude Offline'}
           </span>
         </button>
+
+        {agentActivities.length > 0 && (
+          <>
+            <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
+            {agentActivities.map((agent) => (
+              <button
+                key={agent.id}
+                type="button"
+                onClick={() => navigate(`/agents/${agent.id}`)}
+                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                title={`${agent.name} is ${agent.status}`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <span className="text-blue-400 dark:text-blue-300">
+                  {agent.name} syncing…
+                </span>
+              </button>
+            ))}
+          </>
+        )}
 
         <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
 

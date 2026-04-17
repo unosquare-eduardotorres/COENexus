@@ -10,7 +10,7 @@ import { registerBugHandlers } from './bug.ipc'
 import { registerAgentStubHandlers } from './agentStub.ipc'
 import { registerNomicoreHandlers } from './nomicore.ipc'
 import { registerMailHandlers } from './mail.ipc'
-import { registerInferenceHandlers } from './inference.ipc'
+import { registerBraniacHandlers } from './braniac.ipc'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -25,5 +25,5 @@ export function registerAllHandlers(): void {
   registerAgentStubHandlers()
   registerNomicoreHandlers()
   registerMailHandlers()
-  registerInferenceHandlers()
+  registerBraniacHandlers()
 }

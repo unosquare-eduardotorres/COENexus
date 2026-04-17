@@ -87,6 +87,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SYNC_GET_SKILLS),
     uploadNote: (params: SyncUploadNoteParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.SYNC_UPLOAD_NOTE, params),
+    backfillSalaryNormalization: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.SYNC_BACKFILL_SALARY_NORMALIZATION),
     onProgress: (callback: (data: SyncProgressEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: SyncProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.SYNC_PROGRESS_EVENT, handler)
@@ -497,6 +499,11 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
     },
+    onChatStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
+    },
   },
 
   bug: {
@@ -565,34 +572,34 @@ const api = {
     },
   },
 
-  inference: {
-    run: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_RUN]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_RUN]['response']>,
-    cancel: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_CANCEL]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_CANCEL, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_CANCEL]['response']>,
+  braniac: {
+    run: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_RUN]['response']>,
+    cancel: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CANCEL]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CANCEL, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CANCEL]['response']>,
     getStatus: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_STATUS) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_STATUS]['response']>,
-    listJobs: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_JOBS]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_JOBS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_JOBS]['response']>,
-    getJob: (jobId: IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_JOB]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_JOB, jobId) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_JOB]['response']>,
-    listPatterns: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PATTERNS]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_PATTERNS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PATTERNS]['response']>,
-    listProfiles: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PROFILES]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_PROFILES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PROFILES]['response']>,
-    getProfile: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_PROFILE]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_PROFILE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_PROFILE]['response']>,
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_STATUS) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_STATUS]['response']>,
+    listJobs: (params?: IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_JOBS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_LIST_JOBS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_JOBS]['response']>,
+    getJob: (jobId: IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_JOB]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_JOB, jobId) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_JOB]['response']>,
+    listPatterns: (params?: IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_PATTERNS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_LIST_PATTERNS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_PATTERNS]['response']>,
+    listProfiles: (params?: IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_PROFILES]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_LIST_PROFILES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_PROFILES]['response']>,
+    getProfile: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_PROFILE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_PROFILE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_PROFILE]['response']>,
     getAccounts: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_ACCOUNTS) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_ACCOUNTS]['response']>,
-    onStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STEP_EVENT]) => void) => {
-      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STEP_EVENT]) => callback(data)
-      ipcRenderer.on(IPC_CHANNELS.INFERENCE_STEP_EVENT, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.INFERENCE_STEP_EVENT, handler)
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_ACCOUNTS) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ACCOUNTS]['response']>,
+    onStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STEP_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STEP_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.BRANIAC_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BRANIAC_STEP_EVENT, handler)
     },
-    onStatusEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STATUS_EVENT]) => void) => {
-      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STATUS_EVENT]) => callback(data)
-      ipcRenderer.on(IPC_CHANNELS.INFERENCE_STATUS_EVENT, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.INFERENCE_STATUS_EVENT, handler)
+    onStatusEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STATUS_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STATUS_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.BRANIAC_STATUS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BRANIAC_STATUS_EVENT, handler)
     },
   },
   nomicore: {

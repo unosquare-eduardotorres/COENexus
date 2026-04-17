@@ -7,6 +7,7 @@ interface ChatPanelProps {
   onSend: (content: string) => Promise<void> | void
   onClear: () => Promise<void> | void
   isLoading: boolean
+  thinkingStep?: string | null
 }
 
 function parseMetadata(metadata: string | null): Record<string, unknown> | null {
@@ -30,7 +31,7 @@ function loadingDots() {
   )
 }
 
-export default function ChatPanel({ messages, onSend, onClear, isLoading }: ChatPanelProps) {
+export default function ChatPanel({ messages, onSend, onClear, isLoading, thinkingStep }: ChatPanelProps) {
   const [input, setInput] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -102,7 +103,12 @@ export default function ChatPanel({ messages, onSend, onClear, isLoading }: Chat
               className="h-6 w-6 rounded-full object-cover mt-1 flex-shrink-0"
             />
             <div className="glass-panel-subtle rounded-2xl px-3 py-2 text-xs text-secondary">
-              {loadingDots()}
+              {thinkingStep ? (
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent-500 animate-pulse" />
+                  <span className="italic">{thinkingStep}</span>
+                </div>
+              ) : loadingDots()}
             </div>
           </div>
         )}

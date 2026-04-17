@@ -94,6 +94,11 @@ export const claudeService = {
     cumulativeUsage = { inputTokens: 0, outputTokens: 0 }
   },
 
+  trackExternalUsage(inputTokens: number, outputTokens: number) {
+    cumulativeUsage.inputTokens += inputTokens
+    cumulativeUsage.outputTokens += outputTokens
+  },
+
   async checkAvailability(): Promise<boolean> {
     const { subscriptionService } = await import('./subscriptionService')
     const checkResult = await subscriptionService.checkClaudeAuth()

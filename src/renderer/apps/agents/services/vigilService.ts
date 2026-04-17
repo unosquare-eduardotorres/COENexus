@@ -10,6 +10,7 @@ import type {
   VigilSyncSourceParams,
   VigilActivityEvent,
   VigilStatusEvent,
+  VigilChatStepEvent,
 } from '../../../../shared/ipc-types'
 
 export const vigilService = {
@@ -31,4 +32,6 @@ export const vigilService = {
     window.api.vigil.onActivityEvent(callback),
   onStatusEvent: (callback: (event: VigilStatusEvent) => void) =>
     window.api.vigil.onStatusEvent(callback),
+  onChatStepEvent: (callback: (event: VigilChatStepEvent) => void) =>
+    window.api.vigil.onChatStepEvent(callback),
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Play, Square, Loader2, ChevronDown } from 'lucide-react'
 
-interface InferenceRunCardProps {
+interface BraniacRunCardProps {
   accounts: string[]
   isRunning: boolean
   currentJobId: string | null
@@ -9,13 +9,13 @@ interface InferenceRunCardProps {
   onCancel: (jobId: string) => void
 }
 
-export default function InferenceRunCard({
+export default function BraniacRunCard({
   accounts,
   isRunning,
   currentJobId,
   onRun,
   onCancel,
-}: InferenceRunCardProps) {
+}: BraniacRunCardProps) {
   const [selectedAccount, setSelectedAccount] = useState('')
 
   const handleRun = () => {
@@ -30,7 +30,7 @@ export default function InferenceRunCard({
   return (
     <div className="glass-panel p-5 rounded-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-primary">Run Inference</h2>
+        <h2 className="text-base font-semibold text-primary">Run Braniac</h2>
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${

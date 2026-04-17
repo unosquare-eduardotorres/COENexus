@@ -19,7 +19,7 @@ interface StubStep {
   delayMs: number
 }
 
-const STUB_AGENT_STEPS: Record<AgentId, StubStep[]> = {
+const STUB_AGENT_STEPS: Partial<Record<AgentId, StubStep[]>> = {
   switchboard: [
     {
       step: 'Ingesting request context',
@@ -91,6 +91,11 @@ export const agentStubExecutor = {
     const runId = randomUUID()
     const emitter = createStepEmitter({ agentId, runId, event })
     const steps = STUB_AGENT_STEPS[agentId]
+
+    if (!steps) {
+      log.warn('No stub steps defined for agent', { agentId })
+      return { success: false, runId }
+    }
 
     log.info('Starting stub agent run', { agentId, runId, hasPrompt: Boolean(prompt?.trim()) })
 

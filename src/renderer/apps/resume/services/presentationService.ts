@@ -1,4 +1,10 @@
 import type { PresentationSessionSummary, PresentationSessionDetail } from '../types'
+import { isIpcError } from '../../../shared/types'
+
+function unwrap<T>(result: unknown): T {
+  if (isIpcError(result)) throw new Error((result as { message: string }).message)
+  return result as T
+}
 
 export const presentationService = {
   async createSession(params: {
@@ -6,7 +12,8 @@ export const presentationService = {
     positionTitle?: string; accountName?: string;
     positionUpstreamId?: number; jobDescription?: string
   }): Promise<{ id: number }> {
-    return window.api.present.createSession(params) as Promise<{ id: number }>
+    const result = await window.api.present.createSession(params)
+    return unwrap<{ id: number }>(result)
   },
 
   async updateSession(id: number, data: {
@@ -14,19 +21,24 @@ export const presentationService = {
     openPositionId?: number; positionTitle?: string; accountName?: string;
     positionUpstreamId?: number; jobDescription?: string
   }): Promise<{ success: boolean }> {
-    return window.api.present.updateSession(id, data) as Promise<{ success: boolean }>
+    const result = await window.api.present.updateSession(id, data)
+    return unwrap<{ success: boolean }>(result)
   },
 
   async getSession(id: number): Promise<PresentationSessionDetail | null> {
-    return window.api.present.getSession(id) as Promise<PresentationSessionDetail | null>
+    const result = await window.api.present.getSession(id)
+    if (result === null) return null
+    return unwrap<PresentationSessionDetail>(result)
   },
 
   async listSessions(): Promise<PresentationSessionSummary[]> {
-    return window.api.present.listSessions() as Promise<PresentationSessionSummary[]>
+    const result = await window.api.present.listSessions()
+    return unwrap<PresentationSessionSummary[]>(result)
   },
 
   async deleteSession(id: number): Promise<{ deleted: boolean }> {
-    return window.api.present.deleteSession(id) as Promise<{ deleted: boolean }>
+    const result = await window.api.present.deleteSession(id)
+    return unwrap<{ deleted: boolean }>(result)
   },
 
   async addEntry(params: {
@@ -36,42 +48,50 @@ export const presentationService = {
     techStack?: string[]; professionalSummary?: string; domainExperience?: string;
     resumeFormatStatus?: string; sortOrder?: number
   }): Promise<{ id: number }> {
-    return window.api.present.addEntry(params) as Promise<{ id: number }>
+    const result = await window.api.present.addEntry(params)
+    return unwrap<{ id: number }>(result)
   },
 
   async updateEntry(id: number, data: Record<string, unknown>): Promise<{ success: boolean }> {
-    return window.api.present.updateEntry(id, data) as Promise<{ success: boolean }>
+    const result = await window.api.present.updateEntry(id, data)
+    return unwrap<{ success: boolean }>(result)
   },
 
   async deleteEntry(id: number): Promise<{ deleted: boolean }> {
-    return window.api.present.deleteEntry(id) as Promise<{ deleted: boolean }>
+    const result = await window.api.present.deleteEntry(id)
+    return unwrap<{ deleted: boolean }>(result)
   },
 
-  async checkResumeFormat(params: { resumeText: string }): Promise<{ isFormatted: boolean; details: string }> {
-    return window.api.present.checkResumeFormat(params) as Promise<{ isFormatted: boolean; details: string }>
+  async checkResumeFormat(params: { resumeText: string }): Promise<{ isFormatted: boolean; details: string[] }> {
+    const result = await window.api.present.checkResumeFormat(params)
+    return unwrap<{ isFormatted: boolean; details: string[] }>(result)
   },
 
-  async transformResume(params: { resumeText: string; fullName: string; jobDescription?: string }): Promise<{ transformedText: string }> {
-    return window.api.present.transformResume(params) as Promise<{ transformedText: string }>
+  async transformResume(params: { resumeText: string; fullName: string; jobDescription?: string }): Promise<{ transformedResumeText: string }> {
+    const result = await window.api.present.transformResume(params)
+    return unwrap<{ transformedResumeText: string }>(result)
   },
 
   async generateIntro(params: {
     candidateNames: string[]; positionTitle?: string;
     accountName?: string; jobDescription?: string; mainSkill?: string
   }): Promise<{ introText: string }> {
-    return window.api.present.generateIntro(params) as Promise<{ introText: string }>
+    const result = await window.api.present.generateIntro(params)
+    return unwrap<{ introText: string }>(result)
   },
 
   async generateCandidateProfile(params: {
     resumeText: string; fullName: string; mainSkill: string;
     jobDescription?: string; positionTitle?: string
   }): Promise<{ professionalSummary: string; techStack: string[]; domainExperience: string; yearsOfExperience: string }> {
-    return window.api.present.generateCandidateProfile(params) as Promise<{
+    const result = await window.api.present.generateCandidateProfile(params)
+    return unwrap<{
       professionalSummary: string; techStack: string[]; domainExperience: string; yearsOfExperience: string
-    }>
+    }>(result)
   },
 
   async generateHtml(params: { sessionId: number; mode: string }): Promise<{ html: string }> {
-    return window.api.present.generateHtml(params) as Promise<{ html: string }>
+    const result = await window.api.present.generateHtml(params)
+    return unwrap<{ html: string }>(result)
   },
 }

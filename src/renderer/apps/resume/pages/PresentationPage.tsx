@@ -7,6 +7,9 @@ import type {
 import { useStepWizard } from '../hooks/useStepWizard'
 import { presentationService } from '../services/presentationService'
 import { benchBurnService } from '../services/benchBurnService'
+import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+
+const log = createRendererLogger('PresentationPage')
 import PeopleSelector from '../components/presentation/PeopleSelector'
 import SelectedPeopleCart from '../components/presentation/SelectedPeopleCart'
 import PositionPicker from '../components/presentation/PositionPicker'
@@ -107,7 +110,8 @@ export default function PresentationPage() {
           const pos = positions.find(p => p.upstreamId === posId)
           if (pos) setSelectedPosition(pos)
         }
-      } catch {
+      } catch (err) {
+        log.error('Failed to load pre-selected people', err)
         setError('Failed to load pre-selected people')
       }
     }
@@ -191,6 +195,7 @@ export default function PresentationPage() {
         }
         setEntries(newEntries)
       } catch (err) {
+        log.error('Failed to create presentation session', err)
         setError('Failed to create presentation session')
         return
       }
@@ -240,7 +245,8 @@ export default function PresentationPage() {
           return
         }
         await doGenerateProfile(entry, text)
-      } catch {
+      } catch (err) {
+        log.error('Failed to get resume text', { fullName: entry.fullName, error: err })
         setError(`Failed to get resume text for ${entry.fullName}`)
       }
       return
@@ -274,7 +280,8 @@ export default function PresentationPage() {
         domainExperience: result.domainExperience,
         yearsOfExperience: result.yearsOfExperience,
       })
-    } catch {
+    } catch (err) {
+      log.error('Failed to generate profile', { fullName: entry.fullName, error: err })
       setError(`Failed to generate profile for ${entry.fullName}`)
     } finally {
       setGeneratingProfiles(prev => { const s = new Set(prev); s.delete(entry.id); return s })
@@ -295,7 +302,8 @@ export default function PresentationPage() {
       if (sessionId) {
         await presentationService.updateSession(sessionId, { introText: result.introText })
       }
-    } catch {
+    } catch (err) {
+      log.error('Failed to generate intro', err)
       setError('Failed to generate intro')
     } finally {
       setRegeneratingIntro(false)
@@ -307,7 +315,8 @@ export default function PresentationPage() {
     try {
       const result = await presentationService.generateHtml({ sessionId, mode })
       setHtmlContent(result.html)
-    } catch {
+    } catch (err) {
+      log.error('Failed to generate HTML', err)
       setError('Failed to generate HTML')
     }
   }, [sessionId, mode])
@@ -318,7 +327,8 @@ export default function PresentationPage() {
     try {
       await presentationService.updateSession(sessionId, { status: 'completed', introText })
       completeStep('finalize')
-    } catch {
+    } catch (err) {
+      log.error('Failed to save session', err)
       setError('Failed to save session')
     } finally {
       setSaving(false)
@@ -340,7 +350,8 @@ export default function PresentationPage() {
       setEntries(session.entries)
       setShowHistory(false)
       navigateStep('generate')
-    } catch {
+    } catch (err) {
+      log.error('Failed to load session', err)
       setError('Failed to load session')
     }
   }, [navigateStep])

@@ -163,8 +163,24 @@ For each position, evaluate available candidates based on:
 - Technical skill alignment with position requirements
 - Seniority level match
 - Geographic compatibility
-- Rate/salary fit within position budget
+- Rate/salary fit within position budget (see SALARY NORMALIZATION section below)
 - Prior presentation history (avoid re-presenting rejected candidates)
+
+[SALARY NORMALIZATION]
+All candidate and employee salary data has been normalized to a common unit: USD per month (normalized_monthly_usd).
+- Use normalized_monthly_usd for all salary comparisons across candidates and positions.
+- To compare against hourly position rates, convert: hourly_rate × 160 = approximate monthly USD.
+- To compare against annual rates, convert: annual_rate / 12 = monthly USD.
+- currency_confidence levels:
+  - "exact": salary was explicitly in USD or had a precise conversion.
+  - "high": country-based currency inference with reliable exchange rate.
+  - "medium": reasonable inference but some ambiguity in original data.
+  - "low": best-guess inference — treat as approximate, flag to the user.
+- When confidence is "low", note the uncertainty in your recommendation reasoning.
+- Use the get_candidate_salary_info tool to retrieve detailed salary data for a specific candidate.
+- Use the filter_candidates_by_salary_range tool to efficiently find candidates within a budget.
+- Consider both the candidate's normalized salary AND the position's rate range when evaluating fit.
+- For contractor-heavy countries (BOL, PRY), consider both FTE and contractor cost structures.
 
 Output a JSON report with this structure:
 {

@@ -227,6 +227,7 @@ export function registerVigilHandlers(): void {
       const assistantMessage = await vigilChatService.sendMessage({
         content: params.content,
         metadata_json: params.metadata_json,
+        _event: event,
       })
       return ok(mapChatRow(assistantMessage))
     } catch (error) {

@@ -1,9 +1,9 @@
+import { BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { IPC_CHANNELS } from '../../shared/ipc-channels'
 import { getConfig } from '../config'
-import { getDatabase } from '../db/connection'
-import { getAgentsDatabase } from '../db/agents/agentsConnection'
 import { vigilRepository, type VigilChatMessageRow } from '../db/agents/repositories/vigilRepository'
-import { claudeService } from './claudeService'
 import { createLogger } from './logger'
+import { oracleChatService } from './oracleChatService'
 
 const log = createLogger('VigilChatService')
 
@@ -22,92 +22,7 @@ interface SendVigilMessageParams {
   maxTokens?: number
   temperature?: number
   signal?: AbortSignal
-}
-
-function safeParseJson(value: string | null | undefined): Record<string, unknown> | null {
-  if (!value) return null
-  try {
-    return JSON.parse(value)
-  } catch {
-    return null
-  }
-}
-
-function buildContextualPrompt(): string {
-  try {
-    const agentsDb = getAgentsDatabase()
-    const nexusDb = getDatabase()
-
-    const recentRuns = agentsDb.prepare(
-      `SELECT id, trigger_type, status, sources_json, results_json, started_at, completed_at
-       FROM vigil_runs ORDER BY started_at DESC LIMIT 5`
-    ).all() as Array<Record<string, unknown>>
-
-    const recentActivity = agentsDb.prepare(
-      `SELECT event_type, source, severity, message, details_json, created_at
-       FROM vigil_activity_log ORDER BY created_at DESC LIMIT 15`
-    ).all() as Array<Record<string, unknown>>
-
-    const employees = (nexusDb.prepare('SELECT COUNT(*) AS c FROM synced_employees').get() as { c: number }).c
-    const candidates = (nexusDb.prepare('SELECT COUNT(*) AS c FROM synced_candidates').get() as { c: number }).c
-    const positions = (nexusDb.prepare('SELECT COUNT(*) AS c FROM synced_open_positions').get() as { c: number }).c
-    const prr = (nexusDb.prepare('SELECT COUNT(*) AS c FROM synced_project_reallocations').get() as { c: number }).c
-
-    const config = agentsDb.prepare('SELECT * FROM vigil_config WHERE id = 1').get() as Record<string, unknown> | undefined
-
-    const chatHistory = agentsDb.prepare(
-      `SELECT role, content, created_at FROM vigil_chat_messages ORDER BY created_at DESC LIMIT 8`
-    ).all() as Array<{ role: string; content: string; created_at: string }>
-
-    const runsBlock = recentRuns.map(r => {
-      const sources = safeParseJson(r.sources_json as string)
-      const results = safeParseJson(r.results_json as string)
-      const sourceResults = Array.isArray(results?.sources) ? results.sources : []
-
-      const sourceLines = (sourceResults as Array<Record<string, unknown>>).map((sr) => {
-        const prog = sr.progress as Record<string, unknown> | undefined
-        const statusLabel = sr.success ? 'Completed' : `Error: ${(sr.errors as string[])?.[0] ?? 'unknown'}`
-        const counts = prog
-          ? ` — new: ${prog.syncedCount}, updated: ${prog.updatedCount}, unchanged: ${prog.unchangedCount}, failed: ${prog.notProcessedCount}, skipped: ${prog.skippedCount}`
-          : ''
-        return `    ${sr.source}: ${statusLabel}${counts}`
-      })
-
-      return [
-        `  Run ${r.id} [${r.trigger_type}] ${r.status} | ${r.started_at} → ${r.completed_at ?? 'in progress'}`,
-        `  Sources: ${sources ? JSON.stringify(sources) : 'unknown'}`,
-        ...sourceLines,
-      ].join('\n')
-    })
-
-    const contextBlock = [
-      '--- CURRENT SYSTEM STATE (live data) ---',
-      '',
-      `Database Totals: ${employees} employees, ${candidates} candidates, ${positions} open positions, ${prr} project reallocations`,
-      '',
-      'Recent Vigil Runs (newest first):',
-      ...runsBlock,
-      '',
-      'Recent Activity Log:',
-      ...recentActivity.map(a => `  [${a.created_at}] ${a.severity} (${a.source}): ${a.message}`),
-      '',
-      config
-        ? `Schedule: ${config.schedule_enabled ? 'enabled' : 'disabled'}, runs at ${String(config.schedule_hour).padStart(2, '0')}:${String(config.schedule_minute).padStart(2, '0')}, year filter: ${config.candidate_year_filter}`
-        : '',
-      '',
-      'Recent Conversation:',
-      ...chatHistory.reverse().map(m => `  [${m.role}]: ${m.content.slice(0, 300)}`),
-      '',
-      '--- END SYSTEM STATE ---',
-    ].filter(Boolean).join('\n')
-
-    return `${VIGIL_SYSTEM_PROMPT}\n\n${contextBlock}`
-  } catch (err) {
-    log.warn('Failed to build contextual prompt, using base prompt', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-    return VIGIL_SYSTEM_PROMPT
-  }
+  _event?: IpcMainInvokeEvent
 }
 
 export const vigilChatService = {
@@ -136,14 +51,19 @@ export const vigilChatService = {
     })
 
     try {
-      const reply = await claudeService.chatAsync(
-        claudeModel,
-        content,
-        params.maxTokens ?? 1200,
-        params.temperature ?? 0.2,
-        buildContextualPrompt(),
-        params.signal
-      )
+      const emitStep = (step: string) => {
+        if (params._event) {
+          const win = BrowserWindow.fromWebContents(params._event.sender)
+          if (win && !win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, {
+              step,
+              timestamp: new Date().toISOString(),
+            })
+          }
+        }
+      }
+
+      const reply = await oracleChatService.chat(content, emitStep, params.signal)
 
       const assistantMessage = vigilRepository.createChatMessage({
         role: 'assistant',

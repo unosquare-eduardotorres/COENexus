@@ -45,7 +45,7 @@ interface PresentationEntryRow {
   years_of_experience: string | null
   availability: string | null
   recommended_rate: string | null
-  tech_stack: string | null
+  tech_stack_json: string | null
   professional_summary: string | null
   domain_experience: string | null
   individual_intro_text: string | null
@@ -108,29 +108,13 @@ function escapeHtml(value: string): string {
 }
 
 function getSessionFromRepository(sessionId: number): PresentationSessionRow | null {
-  const repo = presentationRepository as Record<string, unknown>
-  const getter = (repo.getSession ?? repo.getSessionById ?? repo.getById) as
-    | ((id: number) => PresentationSessionRow | null | undefined)
-    | undefined
-
-  if (!getter) {
-    throw new Error('Presentation repository session getter is not available')
-  }
-
-  return getter(sessionId) ?? null
+  const row = presentationRepository.getSession(sessionId)
+  return (row as unknown as PresentationSessionRow) ?? null
 }
 
 function getEntriesFromRepository(sessionId: number): PresentationEntryRow[] {
-  const repo = presentationRepository as Record<string, unknown>
-  const getter = (repo.listEntriesBySessionId ?? repo.listEntries ?? repo.getEntriesBySessionId) as
-    | ((id: number) => PresentationEntryRow[] | null | undefined)
-    | undefined
-
-  if (!getter) {
-    throw new Error('Presentation repository entry list getter is not available')
-  }
-
-  return getter(sessionId) ?? []
+  const rows = presentationRepository.listEntriesBySession(sessionId)
+  return (rows as unknown as PresentationEntryRow[]) ?? []
 }
 
 function renderTechStack(rawTechStack: string | null): string {
@@ -265,7 +249,7 @@ export const presentationService = {
         const professionalSummary = escapeHtml(normalizeText(entry.professional_summary))
         const domainExperience = escapeHtml(normalizeText(entry.domain_experience))
         const individualIntro = escapeHtml(normalizeText(entry.individual_intro_text))
-        const techStack = escapeHtml(renderTechStack(entry.tech_stack))
+        const techStack = escapeHtml(renderTechStack(entry.tech_stack_json))
 
         const details = [
           yearsOfExperience ? `<span style="margin-right: 12px;"><strong>Experience:</strong> ${yearsOfExperience}</span>` : '',

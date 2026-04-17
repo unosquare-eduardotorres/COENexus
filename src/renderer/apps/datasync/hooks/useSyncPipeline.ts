@@ -208,30 +208,37 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
 
     const yearParam = source === 'candidates' && selectedYear != null ? selectedYear : undefined;
 
-    const finalProgress = await dataSyncService.startSync(
-      source, token,
-      (p) => setProgress(p),
-      (record) => setRecords((prev) => {
-        const exists = prev.some((r) => r.upstreamId === record.upstreamId);
-        return exists
-          ? prev.map((r) => r.upstreamId === record.upstreamId ? record : r)
-          : [...prev, record];
-      }),
-      controller.signal, undefined,
-      isResume ? skipCount : undefined,
-      yearParam,
-      activeOnly,
-    );
+    try {
+      const finalProgress = await dataSyncService.startSync(
+        source, token,
+        (p) => setProgress(p),
+        (record) => setRecords((prev) => {
+          const exists = prev.some((r) => r.upstreamId === record.upstreamId);
+          return exists
+            ? prev.map((r) => r.upstreamId === record.upstreamId ? record : r)
+            : [...prev, record];
+        }),
+        controller.signal, undefined,
+        isResume ? skipCount : undefined,
+        yearParam,
+        activeOnly,
+      );
 
-    setProgress({ ...finalProgress, lastSyncedAt: new Date().toISOString() });
-    log.info('Sync completed', {
-      source,
-      fetchedRecords: finalProgress.fetchedRecords,
-      syncedCount: finalProgress.syncedCount,
-      incompleteCount: finalProgress.incompleteCount,
-      notProcessedCount: finalProgress.notProcessedCount,
-    });
-    await invalidateRecordQueries();
+      setProgress({ ...finalProgress, lastSyncedAt: new Date().toISOString() });
+      log.info('Sync completed', {
+        source,
+        activeOnly: activeOnly ?? null,
+        fetchedRecords: finalProgress.fetchedRecords,
+        syncedCount: finalProgress.syncedCount,
+        incompleteCount: finalProgress.incompleteCount,
+        notProcessedCount: finalProgress.notProcessedCount,
+      });
+      await invalidateRecordQueries();
+    } catch (err) {
+      log.error('Sync failed', err instanceof Error ? err : new Error(String(err)));
+      setProgress((prev) => ({ ...prev, status: SYNC_STATUS.ERROR }));
+      throw err;
+    }
   }, [source, token, invalidateRecordQueries, selectedYear]);
 
   const handlePauseSync = useCallback(() => {

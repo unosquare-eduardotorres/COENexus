@@ -132,6 +132,7 @@ export default function VigilPage() {
   const [messages, setMessages] = useState<VigilChatMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [chatLoading, setChatLoading] = useState(false)
+  const [thinkingStep, setThinkingStep] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [timelineLoading, setTimelineLoading] = useState(false)
   const [timelineHasMore, setTimelineHasMore] = useState(true)
@@ -216,6 +217,13 @@ export default function VigilPage() {
       unsubscribeActivity()
       unsubscribeStatus()
     }
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = vigilService.onChatStepEvent(event => {
+      setThinkingStep(event.step === 'Done' ? null : event.step)
+    })
+    return unsubscribe
   }, [])
 
   const handleWakeNow = useCallback(async (token: string) => {
@@ -414,6 +422,7 @@ export default function VigilPage() {
           onSend={handleSendMessage}
           onClear={handleClearChat}
           isLoading={chatLoading}
+          thinkingStep={thinkingStep}
         />
       </div>
       </div>

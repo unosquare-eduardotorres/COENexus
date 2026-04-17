@@ -30,6 +30,9 @@ interface CandidatePoolEntry {
   seniority: string
   country: string
   hasResumeText: boolean
+  normalizedMonthlyUsd: number | null
+  inferredCurrency: string | null
+  currencyConfidence: string | null
 }
 
 export async function fetchPositions(
@@ -88,21 +91,23 @@ export async function gatherCandidates(
   emit({ type: 'log', message: '2.1 Querying candidate pool from resume_embeddings JOIN synced_candidates...' })
   const candidateRows = db.prepare(`
     SELECT re.upstream_id, sc.full_name, sc.main_skill, sc.seniority, sc.country,
+      sc.normalized_monthly_usd, sc.inferred_currency, sc.currency_confidence,
       CASE WHEN re.resume_text IS NOT NULL AND re.resume_text != '' THEN 1 ELSE 0 END as has_text
     FROM resume_embeddings re
     JOIN synced_candidates sc ON sc.upstream_id = re.upstream_id
     WHERE re.source_type = 'candidates'
-  `).all() as { upstream_id: number; full_name: string; main_skill: string | null; seniority: string | null; country: string | null; has_text: number }[]
+  `).all() as { upstream_id: number; full_name: string; main_skill: string | null; seniority: string | null; country: string | null; normalized_monthly_usd: number | null; inferred_currency: string | null; currency_confidence: string | null; has_text: number }[]
   emit({ type: 'log', message: `2.1 Found ${candidateRows.length} candidates with embeddings` })
 
   emit({ type: 'log', message: '2.2 Querying employee pool from resume_embeddings JOIN synced_employees...' })
   const employeeRows = db.prepare(`
     SELECT re.upstream_id, se.full_name, se.main_skill, se.seniority, se.country,
+      se.normalized_monthly_usd, se.inferred_currency, se.currency_confidence,
       CASE WHEN re.resume_text IS NOT NULL AND re.resume_text != '' THEN 1 ELSE 0 END as has_text
     FROM resume_embeddings re
     JOIN synced_employees se ON se.upstream_id = re.upstream_id
     WHERE re.source_type = 'employees'
-  `).all() as { upstream_id: number; full_name: string; main_skill: string; seniority: string; country: string; has_text: number }[]
+  `).all() as { upstream_id: number; full_name: string; main_skill: string; seniority: string; country: string; normalized_monthly_usd: number | null; inferred_currency: string | null; currency_confidence: string | null; has_text: number }[]
   emit({ type: 'log', message: `2.2 Found ${employeeRows.length} employees with embeddings` })
 
   emit({ type: 'log', message: '2.3 Building unified candidate pool...' })
@@ -115,6 +120,9 @@ export async function gatherCandidates(
       seniority: row.seniority ?? '',
       country: row.country ?? '',
       hasResumeText: row.has_text === 1,
+      normalizedMonthlyUsd: row.normalized_monthly_usd,
+      inferredCurrency: row.inferred_currency,
+      currencyConfidence: row.currency_confidence,
     })),
     ...employeeRows.map(row => ({
       upstreamId: row.upstream_id,
@@ -124,6 +132,9 @@ export async function gatherCandidates(
       seniority: row.seniority,
       country: row.country,
       hasResumeText: row.has_text === 1,
+      normalizedMonthlyUsd: row.normalized_monthly_usd,
+      inferredCurrency: row.inferred_currency,
+      currencyConfidence: row.currency_confidence,
     })),
   ]
   emit({ type: 'log', message: `2.3 Unified pool: ${fullPool.length} total (${candidateRows.length} candidates + ${employeeRows.length} employees)` })
@@ -209,6 +220,9 @@ export async function runAgenticPhase(
         seniority: c.seniority,
         country: c.country,
         hasResume: c.hasResumeText,
+        normalizedMonthlyUsd: c.normalizedMonthlyUsd,
+        inferredCurrency: c.inferredCurrency,
+        currencyConfidence: c.currencyConfidence,
       })),
     }
   })

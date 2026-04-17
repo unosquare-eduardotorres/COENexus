@@ -187,6 +187,9 @@ export interface SyncedEmployeeRow {
   resume_filename: string | null
   is_bench: number
   job_title: string
+  normalized_monthly_usd: number | null
+  inferred_currency: string | null
+  currency_confidence: string | null
   status: string
   status_reason: string | null
   failed?: number
@@ -212,6 +215,9 @@ export interface SyncedCandidateRow {
   resume_note_id: number | null
   resume_date_created: string | null
   resume_filename: string | null
+  normalized_monthly_usd: number | null
+  inferred_currency: string | null
+  currency_confidence: string | null
   status: string
   status_reason: string | null
   failed?: number
@@ -1241,6 +1247,11 @@ export interface VigilChatMessage {
   created_at: string
 }
 
+export interface VigilChatStepEvent {
+  step: string
+  timestamp: string
+}
+
 export interface VigilConfig {
   id: 1
   schedule_enabled: 0 | 1
@@ -1324,7 +1335,7 @@ export interface VigilStatusEvent {
   timestamp: string
 }
 
-export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'inference'
+export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'braniac'
 
 export interface AgentStepEvent {
   agentId: AgentId
@@ -1450,44 +1461,44 @@ export interface MailTestResult {
   message: string
 }
 
-// --- Inference Agent Types ---
+// --- Braniac Agent Types ---
 
-export type InferenceScopeType = 'account' | 'stakeholder'
-export type InferenceApprovalStatus = 'auto_applied' | 'pending_review'
+export type BraniacScopeType = 'account' | 'stakeholder'
+export type BraniacApprovalStatus = 'auto_applied' | 'pending_review'
 
-export interface InferenceRunParams {
-  scope: InferenceScopeType
+export interface BraniacRunParams {
+  scope: BraniacScopeType
   account: string
   stakeholder?: string
 }
 
-export interface InferenceCancelParams {
+export interface BraniacCancelParams {
   job_id: string
 }
 
-export interface InferenceListJobsParams {
+export interface BraniacListJobsParams {
   limit?: number
   offset?: number
 }
 
-export interface InferenceListPatternsParams {
+export interface BraniacListPatternsParams {
   account?: string
-  approval_status?: InferenceApprovalStatus
+  approval_status?: BraniacApprovalStatus
 }
 
-export interface InferenceListProfilesParams {
+export interface BraniacListProfilesParams {
   account?: string
 }
 
-export interface InferenceGetProfileParams {
+export interface BraniacGetProfileParams {
   stakeholder: string
   account: string
 }
 
-export interface InferenceJob {
+export interface BraniacJob {
   id: string
   status: Scout9JobStatus
-  scope_type: InferenceScopeType
+  scope_type: BraniacScopeType
   scope_value: string | null
   initiated_by: string
   run_reason: string
@@ -1499,14 +1510,14 @@ export interface InferenceJob {
   created_at: string
 }
 
-export interface InferencePattern {
+export interface BraniacPattern {
   id: string
   pattern_name: string
   pattern_text: string
   confidence_score: number
   usage_count: number
   is_active: number
-  approval_status: InferenceApprovalStatus
+  approval_status: BraniacApprovalStatus
   account: string | null
   stakeholder: string | null
   source_agent: string
@@ -1515,7 +1526,7 @@ export interface InferencePattern {
   updated_at: string
 }
 
-export interface InferenceStakeholderProfile {
+export interface BraniacStakeholderProfile {
   id: string
   stakeholder_name: string
   account: string
@@ -1539,13 +1550,13 @@ export interface InferenceStakeholderProfile {
   updated_at: string
 }
 
-export interface InferenceStatusEvent {
+export interface BraniacStatusEvent {
   status: 'idle' | 'running' | 'completed' | 'failed'
   job_id: string | null
   timestamp: string
 }
 
-export interface InferenceResponse<T = unknown> {
+export interface BraniacResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
@@ -1564,6 +1575,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.SYNC_CLEAR]: { request: SyncClearDataSource; response: { cleared: boolean; dataSource: SyncClearDataSource } }
   [IPC_CHANNELS.SYNC_GET_SKILLS]: { request: void; response: string[] }
   [IPC_CHANNELS.SYNC_UPLOAD_NOTE]: { request: SyncUploadNoteParams; response: { success: boolean; noteId: number } }
+  [IPC_CHANNELS.SYNC_BACKFILL_SALARY_NORMALIZATION]: { request: void; response: { candidatesUpdated: number; employeesUpdated: number; errors: number } }
 
   [IPC_CHANNELS.PROCESSING_VOYAGE_KEY_STATUS]: { request: void; response: VoyageKeyStatus }
   [IPC_CHANNELS.PROCESSING_GET_STATUS]: { request: void; response: ProcessingStatusBySource }
@@ -1739,15 +1751,15 @@ export interface IpcContracts {
   [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
   [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
 
-  [IPC_CHANNELS.INFERENCE_RUN]: { request: InferenceRunParams; response: InferenceResponse<InferenceJob> }
-  [IPC_CHANNELS.INFERENCE_CANCEL]: { request: InferenceCancelParams; response: InferenceResponse<{ canceled: boolean }> }
-  [IPC_CHANNELS.INFERENCE_GET_STATUS]: { request: void; response: InferenceResponse<{ running: boolean; job_id: string | null }> }
-  [IPC_CHANNELS.INFERENCE_LIST_JOBS]: { request: InferenceListJobsParams | void; response: InferenceResponse<InferenceJob[]> }
-  [IPC_CHANNELS.INFERENCE_GET_JOB]: { request: string; response: InferenceResponse<InferenceJob | null> }
-  [IPC_CHANNELS.INFERENCE_LIST_PATTERNS]: { request: InferenceListPatternsParams | void; response: InferenceResponse<InferencePattern[]> }
-  [IPC_CHANNELS.INFERENCE_LIST_PROFILES]: { request: InferenceListProfilesParams | void; response: InferenceResponse<InferenceStakeholderProfile[]> }
-  [IPC_CHANNELS.INFERENCE_GET_PROFILE]: { request: InferenceGetProfileParams; response: InferenceResponse<InferenceStakeholderProfile | null> }
-  [IPC_CHANNELS.INFERENCE_GET_ACCOUNTS]: { request: void; response: InferenceResponse<string[]> }
+  [IPC_CHANNELS.BRANIAC_RUN]: { request: BraniacRunParams; response: BraniacResponse<BraniacJob> }
+  [IPC_CHANNELS.BRANIAC_CANCEL]: { request: BraniacCancelParams; response: BraniacResponse<{ canceled: boolean }> }
+  [IPC_CHANNELS.BRANIAC_GET_STATUS]: { request: void; response: BraniacResponse<{ running: boolean; job_id: string | null }> }
+  [IPC_CHANNELS.BRANIAC_LIST_JOBS]: { request: BraniacListJobsParams | void; response: BraniacResponse<BraniacJob[]> }
+  [IPC_CHANNELS.BRANIAC_GET_JOB]: { request: string; response: BraniacResponse<BraniacJob | null> }
+  [IPC_CHANNELS.BRANIAC_LIST_PATTERNS]: { request: BraniacListPatternsParams | void; response: BraniacResponse<BraniacPattern[]> }
+  [IPC_CHANNELS.BRANIAC_LIST_PROFILES]: { request: BraniacListProfilesParams | void; response: BraniacResponse<BraniacStakeholderProfile[]> }
+  [IPC_CHANNELS.BRANIAC_GET_PROFILE]: { request: BraniacGetProfileParams; response: BraniacResponse<BraniacStakeholderProfile | null> }
+  [IPC_CHANNELS.BRANIAC_GET_ACCOUNTS]: { request: void; response: BraniacResponse<string[]> }
 
   [IPC_CHANNELS.AGENT_STUB_RUN]: { request: { agentId: AgentId; prompt?: string }; response: { success: boolean; runId: string } }
 
@@ -1787,9 +1799,10 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
   [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
+  [IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]: VigilChatStepEvent
   [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
-  [IPC_CHANNELS.INFERENCE_STEP_EVENT]: AgentStepEvent
-  [IPC_CHANNELS.INFERENCE_STATUS_EVENT]: InferenceStatusEvent
+  [IPC_CHANNELS.BRANIAC_STEP_EVENT]: AgentStepEvent
+  [IPC_CHANNELS.BRANIAC_STATUS_EVENT]: BraniacStatusEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
   [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent

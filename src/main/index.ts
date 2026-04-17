@@ -274,6 +274,20 @@ app.whenReady().then(async () => {
           timestamp: new Date().toISOString(),
         }
         emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, completedStatus)
+
+        if (Notification.isSupported()) {
+          const notification = new Notification({
+            title: 'Vigil Sync Complete',
+            body: 'All sources synced successfully',
+            silent: false,
+          })
+          notification.on('click', () => {
+            const win = getMainWindow()
+            if (win) { win.show(); win.focus() }
+          })
+          notification.show()
+        }
+
         return run
       } catch (error) {
         const failedStatus: VigilStatusEvent = {
@@ -282,6 +296,20 @@ app.whenReady().then(async () => {
           timestamp: new Date().toISOString(),
         }
         emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, failedStatus)
+
+        if (Notification.isSupported()) {
+          const notification = new Notification({
+            title: 'Vigil Sync Failed',
+            body: error instanceof Error ? error.message : 'Unknown error',
+            silent: false,
+          })
+          notification.on('click', () => {
+            const win = getMainWindow()
+            if (win) { win.show(); win.focus() }
+          })
+          notification.show()
+        }
+
         throw error
       }
     },

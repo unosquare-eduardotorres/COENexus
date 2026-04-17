@@ -26,7 +26,7 @@ export default function ResumeTransformModal({
     }).then(result => {
       if (!cancelled) {
         setStatus('done')
-        onComplete(result.transformedText)
+        onComplete(result.transformedResumeText)
       }
     }).catch(err => {
       if (!cancelled) {

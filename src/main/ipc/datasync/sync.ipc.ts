@@ -12,6 +12,7 @@ import { upstreamApiService } from '../../services/upstreamApiService'
 import { validatePayload, syncStartSchema, syncSingleSchema, syncRetrySchema, syncUploadNoteSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { createLogger } from '../../services/logger'
+import { salaryNormalizationService } from '../../services/salaryNormalizationService'
 
 const log = createLogger('SyncIPC')
 
@@ -259,5 +260,12 @@ export function registerSyncHandlers(): void {
       log.info('Note upload requested', { personId: p.personId, noteType: p.noteType, fileName: p.fileName })
       const noteId = await upstreamApiService.savePersonaNote(p.token, p.personId, p.noteType, p.fileName, p.fileContent)
       return { success: true, noteId }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.SYNC_BACKFILL_SALARY_NORMALIZATION,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      log.info('Salary normalization backfill requested')
+      return salaryNormalizationService.backfillAll()
     })
 }

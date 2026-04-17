@@ -2,26 +2,26 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { jobRepository, type AgentJobRow } from '../db/agents/repositories/jobRepository'
 import { patternRepository, type PatternApprovalStatus } from '../db/agents/repositories/patternRepository'
 import { stakeholderProfileRepository } from '../db/agents/repositories/stakeholderProfileRepository'
-import { inferenceDataAggregator, type InferenceDataBundle } from './inferenceDataAggregator'
+import { braniacDataAggregator, type BraniacDataBundle } from './braniacDataAggregator'
 import { claudeService } from './claudeService'
 import { createStepEmitter } from './agentStepEmitter'
 import { createLogger } from './logger'
 
-const log = createLogger('InferenceExecutor')
+const log = createLogger('BraniacExecutor')
 
-const INFERENCE_MODEL = 'claude-sonnet-4-20250514'
+const BRANIAC_MODEL = 'claude-sonnet-4-20250514'
 const MAX_OUTPUT_TOKENS = 8192
 const AUTO_APPLY_CONFIDENCE_THRESHOLD = 0.9
 const AUTO_APPLY_DATA_POINTS_THRESHOLD = 15
 
-export interface InferenceExecutorRunParams {
+export interface BraniacExecutorRunParams {
   scope: 'account' | 'stakeholder'
   account: string
   stakeholder?: string
   event?: IpcMainInvokeEvent
 }
 
-export interface InferenceExecutorStatus {
+export interface BraniacExecutorStatus {
   running: boolean
   job_id: string | null
 }
@@ -49,7 +49,7 @@ interface InferredStakeholderProfile {
   preference_summary: string
 }
 
-interface InferenceResult {
+interface BraniacResult {
   patterns: InferredPattern[]
   stakeholder_profiles: InferredStakeholderProfile[]
 }
@@ -67,10 +67,17 @@ IMPORTANT:
   - 15+ data points: 0.8-1.0 (high confidence)
 - If data is insufficient for a particular insight, omit it rather than guess
 - For rate analysis, use actual candidate rates and position rate ranges
+- When normalized_monthly_usd is available for candidates, use it alongside the billing rate for more accurate cost analysis:
+  - "rate" = billing rate charged to the client (from open_position_candidates)
+  - "normalizedMonthlyUsd" = the candidate's actual salary expectation/cost in USD/month
+  - Distinguish between these two metrics in your analysis — the spread between them is the margin
+  - For observed_rate_floor/ceiling/avg_accepted_rate, continue using billing rates as these reflect client-facing pricing
+  - Note when normalized salary data reveals candidates whose cost structure wouldn't support a given billing rate
+- currency_confidence indicates reliability: "exact" > "high" > "medium" > "low". Weight analysis accordingly.
 - For rejection patterns, identify recurring feedback themes`
 }
 
-function buildAnalysisPrompt(data: InferenceDataBundle): string {
+function buildAnalysisPrompt(data: BraniacDataBundle): string {
   const parts: string[] = []
 
   parts.push(`Analyze the following recruitment data for account "${data.account}"${data.stakeholder ? ` (stakeholder: ${data.stakeholder})` : ''}.`)
@@ -128,18 +135,20 @@ Respond with ONLY a JSON object (no markdown fences) matching this structure:
 }
 
 Analyze:
-1. Rate patterns (min/max rates, what rates get accepted/rejected)
-2. Country/geography preferences (which countries appear accepted vs rejected)
-3. Seniority patterns (posted vs actually hired seniorities)
-4. Rejection themes (common rejection reasons from feedback)
-5. Decision speed (time from candidate presentation to decision)
-6. Skill preferences (what skills are repeatedly requested)
-7. Any other recurring behavioral patterns`)
+1. Rate patterns (min/max billing rates, what rates get accepted/rejected)
+2. Salary vs rate analysis (compare normalizedMonthlyUsd against billing rates to understand margin patterns)
+3. Country/geography preferences (which countries appear accepted vs rejected)
+4. Seniority patterns (posted vs actually hired seniorities)
+5. Rejection themes (common rejection reasons from feedback)
+6. Decision speed (time from candidate presentation to decision)
+7. Skill preferences (what skills are repeatedly requested)
+8. Cost feasibility patterns (which country+seniority combinations are feasible at observed rate ranges)
+9. Any other recurring behavioral patterns`)
 
   return parts.join('\n')
 }
 
-function parseInferenceResponse(response: string): InferenceResult {
+function parseBraniacResponse(response: string): BraniacResult {
   const cleaned = response
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```\s*$/i, '')
@@ -152,8 +161,7 @@ function parseInferenceResponse(response: string): InferenceResult {
       stakeholder_profiles: Array.isArray(parsed.stakeholder_profiles) ? parsed.stakeholder_profiles : [],
     }
   } catch (error) {
-    log.error('Failed to parse inference response', {
-      error: error instanceof Error ? error.message : String(error),
+    log.error('Failed to parse Braniac response', error instanceof Error ? error : new Error(String(error)), {
       responsePreview: cleaned.slice(0, 200),
     })
     return { patterns: [], stakeholder_profiles: [] }
@@ -172,7 +180,7 @@ function determineApprovalStatus(
 
 function adjustConfidenceForCompleteness(
   confidence: number,
-  completeness: InferenceDataBundle['dataCompleteness']
+  completeness: BraniacDataBundle['dataCompleteness']
 ): number {
   let adjustment = 0
   if (!completeness.hasSalaryBands) adjustment -= 0.05
@@ -181,15 +189,16 @@ function adjustConfidenceForCompleteness(
   return Math.max(0, Math.min(1, confidence + adjustment))
 }
 
-class InferenceExecutor {
+class BraniacExecutor {
   private activeRunId: string | null = null
   private abortController: AbortController | null = null
 
-  async run(params: InferenceExecutorRunParams): Promise<AgentJobRow> {
+  async run(params: BraniacExecutorRunParams): Promise<AgentJobRow> {
     if (this.activeRunId) {
-      throw new Error('Inference run already in progress')
+      throw new Error('Braniac run already in progress')
     }
 
+    const startTime = Date.now()
     const { scope, account, stakeholder, event } = params
 
     if (scope === 'stakeholder' && !stakeholder) {
@@ -201,17 +210,19 @@ class InferenceExecutor {
       scope_type: scope,
       scope_value: stakeholder ?? account,
       initiated_by: 'user',
-      run_reason: `Pattern inference for ${scope}: ${stakeholder ?? account}`,
+      run_reason: `Braniac analysis for ${scope}: ${stakeholder ?? account}`,
       pipeline_phase: 'aggregating',
-      agent_type: 'inference',
+      agent_type: 'braniac',
       metadata_json: JSON.stringify({ account, stakeholder: stakeholder ?? null }),
     })
 
     this.activeRunId = job.id
     this.abortController = new AbortController()
 
+    log.info('Braniac run started', { jobId: job.id, scope, account, stakeholder })
+
     const emitter = event
-      ? createStepEmitter({ agentId: 'inference' as never, runId: job.id, event })
+      ? createStepEmitter({ agentId: 'braniac', runId: job.id, event })
       : null
 
     try {
@@ -224,8 +235,16 @@ class InferenceExecutor {
       jobRepository.update(job.id, { pipeline_phase: 'aggregating' })
 
       const dataBundle = scope === 'stakeholder'
-        ? inferenceDataAggregator.aggregateForStakeholder(account, stakeholder!)
-        : inferenceDataAggregator.aggregateForAccount(account)
+        ? braniacDataAggregator.aggregateForStakeholder(account, stakeholder!)
+        : braniacDataAggregator.aggregateForAccount(account)
+
+      log.info('Data aggregation complete', {
+        jobId: job.id,
+        positions: dataBundle.positions.length,
+        dataPoints: dataBundle.dataPointsCount,
+        estimatedTokens: dataBundle.estimatedTokens,
+        completeness: dataBundle.dataCompleteness,
+      })
 
       if (dataBundle.positions.length === 0) {
         jobRepository.update(job.id, {
@@ -237,6 +256,7 @@ class InferenceExecutor {
             stakeholder: stakeholder ?? null,
             result: 'no_data',
             dataPointsCount: 0,
+            durationMs: Date.now() - startTime,
           }),
         })
 
@@ -262,13 +282,21 @@ class InferenceExecutor {
       const analysisPrompt = buildAnalysisPrompt(dataBundle)
 
       const response = await claudeService.chatAsync(
-        INFERENCE_MODEL,
+        BRANIAC_MODEL,
         analysisPrompt,
         MAX_OUTPUT_TOKENS,
         0.1,
         systemPrompt,
         this.abortController.signal
       )
+
+      const tokenUsage = claudeService.getTokenUsage?.() ?? null
+
+      log.info('Claude analysis received', {
+        jobId: job.id,
+        responseLength: response.length,
+        tokenUsage,
+      })
 
       await emitter?.narrate(
         'Processing results',
@@ -278,7 +306,14 @@ class InferenceExecutor {
 
       jobRepository.update(job.id, { pipeline_phase: 'persisting' })
 
-      const result = parseInferenceResponse(response)
+      const result = parseBraniacResponse(response)
+
+      log.info('Claude analysis received', {
+        jobId: job.id,
+        responseLength: response.length,
+        patternsFound: result.patterns.length,
+        profilesFound: result.stakeholder_profiles.length,
+      })
 
       let patternsCreated = 0
       let autoApplied = 0
@@ -300,7 +335,7 @@ class InferenceExecutor {
             approval_status: approvalStatus,
             account,
             stakeholder: stakeholder ?? null,
-            source_agent: 'inference',
+            source_agent: 'braniac',
             data_points_count: pattern.data_points_count,
           })
           patternsCreated++
@@ -341,13 +376,13 @@ class InferenceExecutor {
           })
           profilesUpserted++
         } catch (error) {
-          log.error('Failed to upsert stakeholder profile', {
+          log.error('Failed to upsert stakeholder profile', error instanceof Error ? error : new Error(String(error)), {
             stakeholder: profile.stakeholder_name,
-            error: error instanceof Error ? error.message : String(error),
           })
         }
       }
 
+      const durationMs = Date.now() - startTime
       const completedAt = new Date().toISOString()
       jobRepository.update(job.id, {
         status: 'completed',
@@ -363,11 +398,25 @@ class InferenceExecutor {
           autoApplied,
           pendingReview,
           profilesUpserted,
+          durationMs,
+          tokenUsage: tokenUsage ? {
+            inputTokens: tokenUsage.inputTokens,
+            outputTokens: tokenUsage.outputTokens,
+          } : null,
         }),
       })
 
+      log.info('Braniac run completed', {
+        jobId: job.id,
+        patternsCreated,
+        autoApplied,
+        pendingReview,
+        profilesUpserted,
+        durationMs,
+      })
+
       await emitter?.narrate(
-        'Inference complete',
+        'Analysis complete',
         `Analysis complete: ${patternsCreated} patterns (${autoApplied} auto-applied, ${pendingReview} pending review), ${profilesUpserted} stakeholder profiles updated.`,
         'done',
         { patternsCreated, autoApplied, pendingReview, profilesUpserted }
@@ -385,8 +434,10 @@ class InferenceExecutor {
         error_message: message,
       })
 
+      log.error('Braniac run failed', error instanceof Error ? error : new Error(message), { jobId: job.id })
+
       await emitter?.narrate(
-        'Inference failed',
+        'Analysis failed',
         `Analysis failed: ${message}`,
         'error',
         { error: message }
@@ -407,6 +458,8 @@ class InferenceExecutor {
       this.abortController.abort()
     }
 
+    log.info('Braniac run canceled', { jobId: targetId })
+
     const now = new Date().toISOString()
     jobRepository.update(targetId, {
       status: 'canceled',
@@ -420,7 +473,7 @@ class InferenceExecutor {
     return true
   }
 
-  getStatus(): InferenceExecutorStatus {
+  getStatus(): BraniacExecutorStatus {
     return {
       running: this.activeRunId !== null,
       job_id: this.activeRunId,
@@ -428,4 +481,4 @@ class InferenceExecutor {
   }
 }
 
-export const inferenceExecutor = new InferenceExecutor()
+export const braniacExecutor = new BraniacExecutor()

@@ -25,6 +25,9 @@ export interface SyncedEmployeeRow {
   resume_filename: string | null
   is_bench: number
   job_title: string
+  normalized_monthly_usd: number | null
+  inferred_currency: string | null
+  currency_confidence: string | null
   status: string
   status_reason: string | null
   failed?: number
@@ -50,6 +53,9 @@ export interface SyncedCandidateRow {
   resume_note_id: number | null
   resume_date_created: string | null
   resume_filename: string | null
+  normalized_monthly_usd: number | null
+  inferred_currency: string | null
+  currency_confidence: string | null
   status: string
   status_reason: string | null
   failed?: number
@@ -146,6 +152,7 @@ const EMPLOYEE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'gross_monthly_salary', 'salary_currency', 'last_account', 'last_account_start_date', 'rate',
   'has_resume', 'resume_note_id', 'resume_date_created', 'resume_filename', 'is_bench', 'job_title',
+  'normalized_monthly_usd', 'inferred_currency', 'currency_confidence',
   'status', 'status_reason', 'synced_at',
 ]
 
@@ -153,7 +160,9 @@ const CANDIDATE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'current_salary', 'salary_currency', 'coe_certified', 'candidate_status', 'last_status_update',
   'salary_expectations', 'salary_expectations_currency', 'has_resume', 'resume_note_id',
-  'resume_date_created', 'resume_filename', 'status', 'status_reason', 'synced_at',
+  'resume_date_created', 'resume_filename',
+  'normalized_monthly_usd', 'inferred_currency', 'currency_confidence',
+  'status', 'status_reason', 'synced_at',
 ]
 
 const POSITION_COLUMNS = [

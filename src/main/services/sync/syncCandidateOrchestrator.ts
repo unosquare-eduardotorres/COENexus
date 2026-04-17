@@ -7,6 +7,7 @@ import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeD
 
 import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
+import { salaryNormalizationService } from '../salaryNormalizationService'
 import type { SyncRecordDto, SyncEvent, SyncOptions, CandidateSyncRecord } from './syncTypes'
 
 const log = createLogger('SyncCandidateOrchestrator')
@@ -47,6 +48,23 @@ function buildCandidateEntity(
   const recordStatus = missingFields.length === 0 ? 'synced' : 'incomplete'
   const statusReason = missingFields.length > 0 ? `Missing: ${missingFields.join(', ')}` : null
 
+  const salaryCurrency = detail.currentSalaryCurrency ?? detail.salaryCurrency ?? null
+  const salaryExpectationsCurrency = detail.desiredSalaryCurrency ?? null
+
+  const expectNorm = salaryNormalizationService.normalizeSalary({
+    amount: detail.offer ?? null,
+    currency: salaryExpectationsCurrency ?? salaryCurrency,
+    country: country ?? null,
+    seniority: seniority || null,
+  })
+  const currentNorm = salaryNormalizationService.normalizeSalary({
+    amount: detail.currentSalary ?? null,
+    currency: salaryCurrency,
+    country: country ?? null,
+    seniority: seniority || null,
+  })
+  const primaryNorm = expectNorm.normalizedMonthlyUsd ? expectNorm : currentNorm
+
   return {
     upstream_id: detail.candidateId,
     full_name: fullName || '',
@@ -55,16 +73,19 @@ function buildCandidateEntity(
     main_skill: mainSkill ?? null,
     country: country ?? null,
     current_salary: detail.currentSalary ?? null,
-    salary_currency: detail.currentSalaryCurrency ?? detail.salaryCurrency ?? null,
+    salary_currency: salaryCurrency,
     coe_certified: (detail.coeCertifiedStatusId && detail.coeCertifiedStatusId > 0) ? 1 : 0,
     candidate_status: detail.candidateStatusName ?? pagedFallback.candidateStatusName ?? null,
     last_status_update: detail.statusUpdate ?? null,
     salary_expectations: detail.offer ?? null,
-    salary_expectations_currency: detail.desiredSalaryCurrency ?? null,
+    salary_expectations_currency: salaryExpectationsCurrency,
     has_resume: resumeNote ? 1 : 0,
     resume_note_id: resumeNote?.personaNoteId ?? null,
     resume_date_created: resumeNote?.dateCreated ?? null,
     resume_filename: resumeNote?.filename ?? null,
+    normalized_monthly_usd: primaryNorm.normalizedMonthlyUsd,
+    inferred_currency: primaryNorm.inferredCurrency,
+    currency_confidence: primaryNorm.currencyConfidence,
     status: recordStatus,
     status_reason: statusReason,
     synced_at: new Date().toISOString(),
