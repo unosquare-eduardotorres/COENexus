@@ -1,4 +1,4 @@
-import { chromium, type BrowserContext } from 'playwright'
+import { chromium, type BrowserContext, type Page } from 'playwright'
 import { app } from 'electron'
 import { join } from 'path'
 import { createLogger } from './logger'
@@ -105,22 +105,57 @@ class NomicoreService {
       log.info('Landed on URL', { currentUrl })
 
       if (currentUrl.includes('login') || currentUrl.includes('.auth') || currentUrl.includes('microsoftonline')) {
-        const buffer = await page.screenshot({ fullPage: true })
         await ctx.close()
         throw new Error('Session expired — please login to Nomicore first. The page redirected to: ' + currentUrl)
       }
 
+      // Phase 1: Wait for Blazor WASM to bootstrap and render the page
+      try {
+        await this.waitForBlazorReady(page)
+        log.info('Blazor WASM bootstrapped')
+      } catch {
+        log.warn('Blazor bootstrap timed out — attempting to continue')
+      }
+
+      // Phase 2: Wait for exchange rate API call to complete
+      // The Blazor component fetches from internal-api.unosquare.com/exchangerate/
+      // Give it time to complete + re-render
+      await page.waitForTimeout(3000)
+
+      // Phase 3: Check if Finder auto-populated, if not fill manually
+      const finderPopulated = await page.evaluate(() => {
+        const inputs = document.querySelectorAll('input[type="number"], input[type="text"]')
+        for (const input of inputs) {
+          const val = (input as HTMLInputElement).value
+          if (val && parseFloat(val) > 0) return true
+        }
+        return false
+      })
+
+      if (!finderPopulated) {
+        log.info('Finder did not auto-populate — filling fields manually', {
+          grossMonthly: params.grossMonthly,
+        })
+        await this.fillCalculatorManually(page, params)
+      }
+
+      // Phase 4: Wait for tables with actual data
       try {
         await page.waitForFunction(() => {
           const tables = document.querySelectorAll('table')
-          return tables.length >= 1
+          if (tables.length === 0) return false
+          for (const table of tables) {
+            const dataCells = table.querySelectorAll('td')
+            if (dataCells.length >= 2) return true
+          }
+          return false
         }, { timeout: WASM_LOAD_TIMEOUT })
         await page.waitForTimeout(2000)
       } catch {
         const buffer = await page.screenshot({ fullPage: true })
         const screenshotBase64 = buffer.toString('base64')
         const html = await page.content()
-        log.error('Timed out waiting for tables', {
+        log.error('Timed out waiting for tables with data', {
           currentUrl: page.url(),
           htmlLength: html.length,
           htmlSnippet: html.substring(0, 2000),
@@ -204,6 +239,63 @@ class NomicoreService {
     } finally {
       await ctx.close()
     }
+  }
+
+  private async waitForBlazorReady(page: Page, timeout = 30_000): Promise<void> {
+    await page.waitForFunction(() => {
+      const loader = document.getElementById('apploader')
+      return !loader || loader.children.length === 0 || loader.style.display === 'none'
+    }, { timeout })
+
+    await page.waitForFunction(() => {
+      const appEl = document.getElementById('app')
+      if (!appEl) return false
+      const hasContent = appEl.querySelectorAll('.card, .container, form, table, input').length > 0
+      return hasContent
+    }, { timeout: 15_000 })
+  }
+
+  private async fillCalculatorManually(page: Page, params: NomicoreCalculateParams): Promise<void> {
+    const filled = await page.evaluate((amount) => {
+      const allInputs = document.querySelectorAll('input')
+      for (const input of allInputs) {
+        const inp = input as HTMLInputElement
+        const container = inp.closest('.candyform-formgroup, .form-group, .input-group, div')
+        const containerText = container?.textContent?.toLowerCase() || ''
+
+        if (containerText.includes('finder') || containerText.includes('amount') ||
+            containerText.includes('gross') || containerText.includes('bruto') ||
+            containerText.includes('salary') || containerText.includes('sueldo')) {
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLInputElement.prototype, 'value'
+          )?.set
+          nativeInputValueSetter?.call(inp, String(amount))
+          inp.dispatchEvent(new Event('input', { bubbles: true }))
+          inp.dispatchEvent(new Event('change', { bubbles: true }))
+          return true
+        }
+      }
+      return false
+    }, params.grossMonthly)
+
+    if (!filled) {
+      log.warn('Could not find salary input field to fill manually')
+      const numberInput = page.locator('input[type="number"]').first()
+      if (await numberInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await numberInput.fill(String(params.grossMonthly))
+        log.info('Filled first visible number input as fallback')
+      }
+    }
+
+    const calcButton = page.locator('button, input[type="submit"]').filter({
+      hasText: /calculate|calcular|find|buscar|search/i,
+    }).first()
+    if (await calcButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await calcButton.click()
+      log.info('Clicked calculate/find button')
+    }
+
+    await page.waitForTimeout(3000)
   }
 
   private buildUrl(params: NomicoreCalculateParams): string {

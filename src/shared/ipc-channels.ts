@@ -184,6 +184,11 @@ export const IPC_CHANNELS = {
   SCOUT9_SETTINGS_CREATE_PROMPT: 'scout9:settings-create-prompt',
   SCOUT9_SETTINGS_ACTIVATE_PROMPT: 'scout9:settings-activate-prompt',
   SCOUT9_GET_BRAIN_SNAPSHOT: 'scout9:get-brain-snapshot',
+  SCOUT9_SALARY_BANDS_LIST: 'scout9:salary-bands:list',
+  SCOUT9_SALARY_BANDS_BY_COUNTRY: 'scout9:salary-bands:by-country',
+  SCOUT9_SALARY_BANDS_UPSERT: 'scout9:salary-bands:upsert',
+  SCOUT9_SALARY_BANDS_DELETE: 'scout9:salary-bands:delete',
+  SCOUT9_JOB_FAMILIES_LIST: 'scout9:job-families:list',
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
 

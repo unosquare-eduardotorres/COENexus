@@ -18,12 +18,14 @@ import type {
   Scout9UpdateGlossaryTermParams,
   Scout9UpdateNoteParams,
   Scout9UpdateRuleParams,
+  Scout9UpsertSalaryBandParams,
 } from '../../shared/ipc-types'
 import { knowledgeRepository } from '../db/agents/repositories/knowledgeRepository'
 import { reportRepository } from '../db/agents/repositories/reportRepository'
 import { patternRepository } from '../db/agents/repositories/patternRepository'
 import { brainRepository } from '../db/agents/repositories/brainRepository'
 import * as configRepository from '../db/agents/repositories/configRepository'
+import * as salaryBandRepository from '../db/agents/repositories/salaryBandRepository'
 import { scout9JobManager } from '../services/scout9JobManager'
 import { getScopeOptions } from '../services/scout9ScopeService'
 import { getTokenBudgetBreakdown } from '../services/scout9BrainService'
@@ -39,6 +41,27 @@ function ok<T>(data: T): Scout9Response<T> {
 
 function fail<T>(message: string): Scout9Response<T> {
   return { success: false, error: message }
+}
+
+import type { SalaryBandRow } from '../db/agents/repositories/salaryBandRepository'
+import type { SalaryBand } from '../../shared/ipc-types'
+
+function mapSalaryBandRow(row: SalaryBandRow): SalaryBand {
+  return {
+    id: row.id,
+    countryCode: row.country_code,
+    countryName: row.country_name,
+    currency: row.currency,
+    payPeriod: row.pay_period as SalaryBand['payPeriod'],
+    jobFamilyGroup: row.job_family_group,
+    band: row.band,
+    level: row.level,
+    minSalary: row.min_salary,
+    maxSalary: row.max_salary,
+    grossMarginUsd: row.gross_margin_usd,
+    source: row.source,
+    isActive: row.is_active === 1,
+  }
 }
 
 function emitPipelineEvent(event: IpcMainInvokeEvent, payload: unknown): void {
@@ -458,6 +481,61 @@ export function registerScout9Handlers(): void {
       return ok(brainRepository.getLatest() ?? null)
     } catch (error) {
       return fail(error instanceof Error ? error.message : 'Failed to get brain snapshot')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_SALARY_BANDS_LIST, async (event: IpcMainInvokeEvent) => {
+    validateSender(event)
+    try {
+      const rows = salaryBandRepository.getAllSalaryBands()
+      return ok(rows.map(mapSalaryBandRow))
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to list salary bands')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_SALARY_BANDS_BY_COUNTRY, async (event: IpcMainInvokeEvent, countryCode: string) => {
+    validateSender(event)
+    try {
+      const rows = salaryBandRepository.getSalaryBandsByCountry(countryCode)
+      return ok(rows.map(mapSalaryBandRow))
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to get salary bands by country')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_SALARY_BANDS_UPSERT, async (event: IpcMainInvokeEvent, params: Scout9UpsertSalaryBandParams) => {
+    validateSender(event)
+    try {
+      salaryBandRepository.upsertSalaryBand(params)
+      return ok({ upserted: true })
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to upsert salary band')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_SALARY_BANDS_DELETE, async (event: IpcMainInvokeEvent, id: string) => {
+    validateSender(event)
+    try {
+      salaryBandRepository.deleteSalaryBand(id)
+      return ok({ deleted: true })
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to delete salary band')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST, async (event: IpcMainInvokeEvent) => {
+    validateSender(event)
+    try {
+      const rows = salaryBandRepository.getAllJobFamilies()
+      return ok(rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        jobFamilyGroup: r.job_family_group,
+        isActive: r.is_active === 1,
+      })))
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to list job families')
     }
   })
 

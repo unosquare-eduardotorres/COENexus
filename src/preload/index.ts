@@ -53,6 +53,7 @@ import type {
   Scout9ActivatePromptVersionParams,
   Scout9PipelineEvent,
   Scout9StatusEvent,
+  Scout9UpsertSalaryBandParams,
   AgentStepEvent,
   IpcContracts,
   IpcEventContracts,
@@ -425,6 +426,20 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SETTINGS_ACTIVATE_PROMPT, params),
     getBrainSnapshot: () =>
       ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_GET_BRAIN_SNAPSHOT),
+    salaryBands: {
+      list: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SALARY_BANDS_LIST),
+      byCountry: (code: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SALARY_BANDS_BY_COUNTRY, code),
+      upsert: (data: Scout9UpsertSalaryBandParams) =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SALARY_BANDS_UPSERT, data),
+      delete: (id: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_SALARY_BANDS_DELETE, id),
+    },
+    jobFamilies: {
+      list: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST),
+    },
     onPipelineEvent: (callback: (data: Scout9PipelineEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: Scout9PipelineEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)

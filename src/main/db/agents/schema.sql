@@ -168,6 +168,33 @@ CREATE TABLE IF NOT EXISTS client_rule_overrides (
   FOREIGN KEY (rule_id) REFERENCES knowledge_rules(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS salary_bands (
+  id TEXT PRIMARY KEY NOT NULL DEFAULT (lower(hex(randomblob(16)))),
+  country_code TEXT NOT NULL,
+  country_name TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  pay_period TEXT NOT NULL CHECK (pay_period IN ('monthly', 'yearly', 'hourly')),
+  job_family_group TEXT NOT NULL DEFAULT 'engineering',
+  band TEXT NOT NULL,
+  level INTEGER NOT NULL,
+  min_salary REAL NOT NULL,
+  max_salary REAL NOT NULL,
+  gross_margin_usd REAL,
+  source TEXT NOT NULL DEFAULT 'manual',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (country_code, job_family_group, band, level)
+);
+
+CREATE TABLE IF NOT EXISTS job_families (
+  id TEXT PRIMARY KEY NOT NULL DEFAULT (lower(hex(randomblob(16)))),
+  name TEXT NOT NULL UNIQUE,
+  job_family_group TEXT NOT NULL DEFAULT 'engineering',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 INSERT OR IGNORE INTO agent_config (id) VALUES (1);
 
 CREATE INDEX IF NOT EXISTS idx_agent_jobs_status_created
@@ -206,3 +233,7 @@ CREATE INDEX IF NOT EXISTS idx_client_rule_overrides_client_active
   ON client_rule_overrides(client_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_client_rule_overrides_rule
   ON client_rule_overrides(rule_id);
+CREATE INDEX IF NOT EXISTS idx_salary_bands_country_group_active
+  ON salary_bands(country_code, job_family_group, is_active);
+CREATE INDEX IF NOT EXISTS idx_salary_bands_band_level
+  ON salary_bands(band, level);

@@ -1155,6 +1155,43 @@ export interface Scout9StatusEvent {
   timestamp: string
 }
 
+export interface SalaryBand {
+  id: string
+  countryCode: string
+  countryName: string
+  currency: string
+  payPeriod: 'monthly' | 'yearly' | 'hourly'
+  jobFamilyGroup: string
+  band: string
+  level: number
+  minSalary: number
+  maxSalary: number
+  grossMarginUsd: number | null
+  source: string
+  isActive: boolean
+}
+
+export interface JobFamily {
+  id: string
+  name: string
+  jobFamilyGroup: string
+  isActive: boolean
+}
+
+export interface Scout9UpsertSalaryBandParams {
+  country_code: string
+  country_name: string
+  currency: string
+  pay_period: string
+  job_family_group: string
+  band: string
+  level: number
+  min_salary: number
+  max_salary: number
+  gross_margin_usd?: number | null
+  source?: string
+}
+
 export interface Scout9Response<T> {
   success: boolean
   data?: T
@@ -1562,6 +1599,11 @@ export interface IpcContracts {
   [IPC_CHANNELS.SCOUT9_SETTINGS_CREATE_PROMPT]: { request: Scout9CreatePromptVersionParams; response: Scout9Response<Scout9PromptVersion> }
   [IPC_CHANNELS.SCOUT9_SETTINGS_ACTIVATE_PROMPT]: { request: Scout9ActivatePromptVersionParams; response: Scout9Response<Scout9PromptVersion> }
   [IPC_CHANNELS.SCOUT9_GET_BRAIN_SNAPSHOT]: { request: void; response: Scout9Response<Scout9BrainSnapshot | null> }
+  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_LIST]: { request: void; response: Scout9Response<SalaryBand[]> }
+  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_BY_COUNTRY]: { request: string; response: Scout9Response<SalaryBand[]> }
+  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_UPSERT]: { request: Scout9UpsertSalaryBandParams; response: Scout9Response<{ upserted: boolean }> }
+  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_DELETE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
+  [IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST]: { request: void; response: Scout9Response<JobFamily[]> }
 
   [IPC_CHANNELS.VIGIL_RUN]: { request: VigilRunParams; response: VigilResponse<VigilRun> }
   [IPC_CHANNELS.VIGIL_CANCEL_RUN]: { request: VigilCancelRunParams; response: VigilResponse<{ canceled: boolean }> }

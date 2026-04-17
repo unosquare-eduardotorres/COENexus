@@ -330,7 +330,7 @@ const SyncDashboard = memo(function SyncDashboard({
               bgClass="bg-emerald-500"
               hoverBgClass="hover:bg-emerald-600"
               gradientClass="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
-              label="Process All"
+              label={source === 'open-positions' ? 'Extract & Vectorize' : 'Process All'}
               icon={
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
