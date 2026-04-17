@@ -50,11 +50,21 @@ export default function PositionDetailDrawer({ upstreamId, onClose }: PositionDe
   useEffect(() => {
     if (!detail) return
     const hasRejected = detail.candidates.some(c => c.candidateStatus === 'RejectedByClient')
-    if (!hasRejected || !sharepoint.token) return
+    if (!hasRejected) return
 
-    reportService.getFeedbackCatalog(sharepoint.token)
-      .then(setFeedbackCatalog)
-      .catch(() => setFeedbackCatalog({}))
+    if (sharepoint.token) {
+      reportService.getFeedbackCatalog(sharepoint.token)
+        .then(setFeedbackCatalog)
+        .catch(() => {
+          reportService.getFeedbackCatalogLocal()
+            .then(setFeedbackCatalog)
+            .catch(() => setFeedbackCatalog({}))
+        })
+    } else {
+      reportService.getFeedbackCatalogLocal()
+        .then(setFeedbackCatalog)
+        .catch(() => setFeedbackCatalog({}))
+    }
   }, [detail, sharepoint.token])
 
   const additionalSkills = detail?.position.additional_skills

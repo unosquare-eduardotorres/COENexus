@@ -192,4 +192,35 @@ export const matchRepository = {
     const oldest = db.prepare('SELECT MIN(created_at) as oldest FROM candidate_analysis_cache').get() as { oldest: string | null }
     return { totalEntries: count.c, oldestEntry: oldest.oldest }
   },
+
+  getFeedbackCatalog(): Record<number, string> {
+    const db = getDatabase()
+    const rows = db.prepare('SELECT id, label FROM feedback_catalog').all() as { id: number; label: string }[]
+    const result: Record<number, string> = {}
+    for (const row of rows) result[row.id] = row.label
+    return result
+  },
+
+  upsertFeedbackCatalog(entries: Map<number, string>): void {
+    const db = getDatabase()
+    const upsert = db.prepare(`
+      INSERT INTO feedback_catalog (id, label, synced_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT (id) DO UPDATE SET
+        label = excluded.label,
+        synced_at = excluded.synced_at
+    `)
+    const tx = db.transaction(() => {
+      for (const [id, label] of entries) {
+        upsert.run(id, label)
+      }
+    })
+    tx()
+  },
+
+  getFeedbackCatalogSyncedAt(): string | null {
+    const db = getDatabase()
+    const row = db.prepare('SELECT MAX(synced_at) as last_sync FROM feedback_catalog').get() as { last_sync: string | null } | undefined
+    return row?.last_sync ?? null
+  },
 }

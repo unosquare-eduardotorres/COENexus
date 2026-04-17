@@ -165,7 +165,8 @@ export const dataSyncService = {
     signal: AbortSignal,
     limit?: number,
     skip?: number,
-    year?: number
+    year?: number,
+    activeOnly?: boolean
   ): Promise<SyncProgress> {
     return new Promise((resolve, reject) => {
       let lastProgress: SyncProgress = {
@@ -208,8 +209,8 @@ export const dataSyncService = {
         resolve({ ...lastProgress, status: 'paused' });
       });
 
-      log.info('Sync stream start requested', { source, limit: limit ?? null, skip: skip ?? null, year: year ?? null });
-      window.api.sync.start({ source, token, limit, skip, year });
+      log.info('Sync stream start requested', { source, limit: limit ?? null, skip: skip ?? null, year: year ?? null, activeOnly: activeOnly ?? null });
+      window.api.sync.start({ source, token, limit, skip, year, activeOnly });
     });
   },
 };

@@ -1,7 +1,9 @@
 import { getAgentsDatabase } from '../agentsConnection'
 
 export type Scout9JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
-export type Scout9ScopeType = 'org' | 'project' | 'custom'
+export type Scout9ScopeType = 'org' | 'project' | 'custom' | 'account' | 'stakeholder'
+
+export type AgentType = 'scout9' | 'vigil' | 'inference'
 
 export interface AgentJobRow {
   id: string
@@ -16,6 +18,7 @@ export interface AgentJobRow {
   canceled_at: string | null
   error_message: string | null
   metadata_json: string
+  agent_type: AgentType
   created_at: string
   updated_at: string
 }
@@ -28,6 +31,7 @@ export interface CreateAgentJobInput {
   run_reason?: string
   pipeline_phase?: string
   metadata_json?: string
+  agent_type?: AgentType
 }
 
 export interface UpdateAgentJobInput {
@@ -42,6 +46,7 @@ export interface UpdateAgentJobInput {
   canceled_at?: string | null
   error_message?: string | null
   metadata_json?: string
+  agent_type?: AgentType
 }
 
 export const jobRepository = {
@@ -63,9 +68,9 @@ export const jobRepository = {
     const db = getAgentsDatabase()
     const row = db.prepare(`
       INSERT INTO agent_jobs (
-        status, scope_type, scope_value, initiated_by, run_reason, pipeline_phase, metadata_json, updated_at
+        status, scope_type, scope_value, initiated_by, run_reason, pipeline_phase, metadata_json, agent_type, updated_at
       ) VALUES (
-        @status, @scope_type, @scope_value, @initiated_by, @run_reason, @pipeline_phase, @metadata_json, datetime('now')
+        @status, @scope_type, @scope_value, @initiated_by, @run_reason, @pipeline_phase, @metadata_json, @agent_type, datetime('now')
       )
       RETURNING *
     `).get({
@@ -76,6 +81,7 @@ export const jobRepository = {
       run_reason: input.run_reason ?? '',
       pipeline_phase: input.pipeline_phase ?? 'idle',
       metadata_json: input.metadata_json ?? '{}',
+      agent_type: input.agent_type ?? 'scout9',
     }) as AgentJobRow | undefined
     if (!row) throw new Error('Failed to create agent job')
     return row
@@ -99,6 +105,16 @@ export const jobRepository = {
     `).run(...values)
 
     return result.changes > 0
+  },
+
+  listByAgentType(agentType: AgentType, limit = 100, offset = 0): AgentJobRow[] {
+    const db = getAgentsDatabase()
+    return db.prepare(`
+      SELECT * FROM agent_jobs
+      WHERE agent_type = ?
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `).all(agentType, limit, offset) as AgentJobRow[]
   },
 
   delete(id: string): boolean {

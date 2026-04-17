@@ -70,6 +70,7 @@ export function useDataSync(activePanel: DataSyncPanel) {
     sync: {
       isSyncing,
       handleStartSync: activePipeline.handleStartSync,
+      handleStartSyncAll: activePipeline.handleStartSyncAll,
       handlePauseSync: activePipeline.handlePauseSync,
       handleResumeSync: activePipeline.handleResumeSync,
     },

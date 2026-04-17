@@ -281,6 +281,8 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_SYNC_STATUS),
     getFeedbackCatalog: (token: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG, token),
+    getFeedbackCatalogLocal: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG_LOCAL),
     deletePosition: (upstreamId: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_DELETE_POSITION, upstreamId),
     exportPdf: () =>
@@ -560,6 +562,37 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: AgentStepEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.AGENT_STEP_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.AGENT_STEP_EVENT, handler)
+    },
+  },
+
+  inference: {
+    run: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_RUN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_RUN]['response']>,
+    cancel: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_CANCEL]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_CANCEL, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_CANCEL]['response']>,
+    getStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_STATUS) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_STATUS]['response']>,
+    listJobs: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_JOBS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_JOBS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_JOBS]['response']>,
+    getJob: (jobId: IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_JOB]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_JOB, jobId) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_JOB]['response']>,
+    listPatterns: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PATTERNS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_PATTERNS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PATTERNS]['response']>,
+    listProfiles: (params?: IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PROFILES]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_LIST_PROFILES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_LIST_PROFILES]['response']>,
+    getProfile: (params: IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_PROFILE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_PROFILE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_PROFILE]['response']>,
+    getAccounts: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.INFERENCE_GET_ACCOUNTS) as Promise<IpcContracts[typeof IPC_CHANNELS.INFERENCE_GET_ACCOUNTS]['response']>,
+    onStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STEP_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STEP_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.INFERENCE_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.INFERENCE_STEP_EVENT, handler)
+    },
+    onStatusEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STATUS_EVENT]) => void) => {
+      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.INFERENCE_STATUS_EVENT]) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.INFERENCE_STATUS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.INFERENCE_STATUS_EVENT, handler)
     },
   },
   nomicore: {

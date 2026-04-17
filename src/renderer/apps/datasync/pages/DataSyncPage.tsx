@@ -70,7 +70,7 @@ export default function DataSyncPage() {
   const isTokenValid = sharepoint.isValid;
 
   const {
-    sync: { isSyncing, handleStartSync, handlePauseSync, handleResumeSync },
+    sync: { isSyncing, handleStartSync, handleStartSyncAll, handlePauseSync, handleResumeSync },
     records: { activeRecords, activeProgress, isLoadingRecords },
     processing: { activeExtractionProgress, activeVectorizationProgress },
     extraction: { handleStartExtraction, handlePauseExtraction, extractingUpstreamId },
@@ -165,6 +165,7 @@ export default function DataSyncPage() {
           progress={activeProgress}
           records={activeRecords}
           onStartSync={handleStartSync}
+          onStartSyncAll={handleStartSyncAll}
           onPauseSync={handlePauseSync}
           onResumeSync={handleResumeSync}
           onStartExtraction={handleStartExtraction}

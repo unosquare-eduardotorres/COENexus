@@ -96,4 +96,5 @@ export interface SyncOptions {
   limit?: number
   skip?: number
   year?: number
+  activeOnly?: boolean
 }

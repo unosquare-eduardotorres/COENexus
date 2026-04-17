@@ -214,6 +214,12 @@ CREATE TABLE IF NOT EXISTS open_position_candidates (
   UNIQUE(open_position_id, candidate_requisition_id)
 );
 
+CREATE TABLE IF NOT EXISTS feedback_catalog (
+  id INTEGER PRIMARY KEY NOT NULL,
+  label TEXT NOT NULL,
+  synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS candidate_analysis_cache (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   candidate_upstream_id INTEGER NOT NULL,

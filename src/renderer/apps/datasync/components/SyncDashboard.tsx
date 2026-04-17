@@ -13,6 +13,7 @@ interface SyncDashboardProps {
   progress: SyncProgress;
   records: SyncRecord[];
   onStartSync?: () => void;
+  onStartSyncAll?: () => void;
   onPauseSync?: () => void;
   onResumeSync?: () => void;
   onStartExtraction?: () => void;
@@ -56,6 +57,7 @@ const SyncDashboard = memo(function SyncDashboard({
   progress,
   records,
   onStartSync,
+  onStartSyncAll,
   onPauseSync,
   onResumeSync,
   onStartExtraction,
@@ -302,17 +304,32 @@ const SyncDashboard = memo(function SyncDashboard({
                 </button>
               )}
               {(progress.status === 'idle' || progress.status === 'completed') && onStartSync && (
-                <button
-                  onClick={isSyncDisabled ? undefined : onStartSync}
-                  disabled={isSyncDisabled || candidateNeedsYear}
-                  title={isSyncDisabled ? 'SharePoint connection required — connect via the status bar' : undefined}
-                  className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${(isSyncDisabled || candidateNeedsYear) ? 'opacity-60 cursor-not-allowed' : ''}`}
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Sync
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={isSyncDisabled ? undefined : onStartSync}
+                    disabled={isSyncDisabled || candidateNeedsYear}
+                    title={isSyncDisabled ? 'SharePoint connection required — connect via the status bar' : 'Sync active positions only'}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors duration-200 font-semibold text-sm ${(isSyncDisabled || candidateNeedsYear) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                    {source === 'open-positions' ? 'Sync Active' : 'Sync'}
+                  </button>
+                  {source === 'open-positions' && onStartSyncAll && (
+                    <button
+                      onClick={isSyncDisabled ? undefined : onStartSyncAll}
+                      disabled={isSyncDisabled}
+                      title={isSyncDisabled ? 'SharePoint connection required — connect via the status bar' : 'Sync all positions including historical (~7000+)'}
+                      className={`inline-flex items-center gap-2 px-5 py-2.5 bg-violet-500 text-white rounded-xl hover:bg-violet-600 transition-colors duration-200 font-semibold text-sm ${isSyncDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Sync All Positions
+                    </button>
+                  )}
+                </div>
               )}
             </>
           )}

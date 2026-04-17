@@ -174,9 +174,9 @@ export function registerSyncHandlers(): void {
     async (event: IpcMainInvokeEvent, params: SyncStartParams) => {
       validateSender(event)
       const p = validatePayload(syncStartSchema, params, IPC_CHANNELS.SYNC_START)
-      log.info('Sync start requested', { source: p.source, limit: p.limit, skip: p.skip, year: p.year })
+      log.info('Sync start requested', { source: p.source, limit: p.limit, skip: p.skip, year: p.year, activeOnly: p.activeOnly })
       const win = getMainWindow()
-      syncOrchestrator.syncAsync(p.source, p.token, { limit: p.limit, skip: p.skip, year: p.year }, (evt) => {
+      syncOrchestrator.syncAsync(p.source, p.token, { limit: p.limit, skip: p.skip, year: p.year, activeOnly: p.activeOnly }, (evt) => {
         win?.webContents.send(IPC_CHANNELS.SYNC_PROGRESS_EVENT, evt)
       })
       return { started: true }

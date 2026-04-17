@@ -1,4 +1,5 @@
 import { getConfig } from '../config'
+import { matchRepository } from '../db/repositories/matchRepository'
 import { createLogger } from './logger'
 import { mapKeysToCamelCase } from './upstream/caseMapper'
 
@@ -78,12 +79,29 @@ export const catalogService = {
       log.debug('Feedback cache hit')
       return feedbackCache
     }
-    const { catalog } = getConfig()
-    log.info('Loading candidate position feedbacks catalog from API')
-    const raw = await fetchAuthorized<Record<string, unknown>[]>(`${catalog.apiUrl}candidate-position-feedbacks`, token)
-    const items = raw.map(item => mapKeysToCamelCase<ValueLabelItem>(item))
-    feedbackCache = new Map(items.map(i => [i.value, i.label]))
-    log.info('Feedback catalog loaded', { count: feedbackCache.size })
+
+    try {
+      const { catalog } = getConfig()
+      log.info('Loading candidate position feedbacks catalog from API')
+      const raw = await fetchAuthorized<Record<string, unknown>[]>(`${catalog.apiUrl}candidate-position-feedbacks`, token)
+      const items = raw.map(item => mapKeysToCamelCase<ValueLabelItem>(item))
+      feedbackCache = new Map(items.map(i => [i.value, i.label]))
+      log.info('Feedback catalog loaded from API', { count: feedbackCache.size })
+
+      matchRepository.upsertFeedbackCatalog(feedbackCache)
+      log.info('Feedback catalog persisted to DB')
+    } catch (error) {
+      log.warn('Failed to fetch feedback catalog from API, falling back to DB', { error: error instanceof Error ? error.message : String(error) })
+      const dbCatalog = matchRepository.getFeedbackCatalog()
+      const entries = Object.entries(dbCatalog)
+      if (entries.length > 0) {
+        feedbackCache = new Map(entries.map(([k, v]) => [Number(k), v]))
+        log.info('Feedback catalog loaded from DB fallback', { count: feedbackCache.size })
+      } else {
+        throw error
+      }
+    }
+
     return feedbackCache
   },
 

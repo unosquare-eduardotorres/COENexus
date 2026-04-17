@@ -6,6 +6,7 @@ export const syncStartSchema = z.object({
   limit: z.number().int().positive().optional(),
   skip: z.number().int().nonnegative().optional(),
   year: z.number().int().min(2000).max(2100).optional(),
+  activeOnly: z.boolean().optional(),
 })
 
 export const syncSingleSchema = z.object({

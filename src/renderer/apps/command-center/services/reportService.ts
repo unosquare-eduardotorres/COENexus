@@ -25,6 +25,10 @@ export const reportService = {
     return window.api.report.getFeedbackCatalog(token)
   },
 
+  getFeedbackCatalogLocal(): Promise<Record<number, string>> {
+    return window.api.report.getFeedbackCatalogLocal()
+  },
+
   deletePosition(upstreamId: number): Promise<{ deleted: boolean }> {
     return window.api.report.deletePosition(upstreamId)
   },

@@ -9,7 +9,8 @@ const log = createLogger('SyncOpenPositionOrchestrator')
 
 export const syncOpenPositionOrchestrator = {
   async sync(token: string, options: SyncOptions, emitEvent: (event: SyncEvent) => void, signal: AbortSignal): Promise<void> {
-    log.info('Open positions sync started', { limit: options.limit, skip: options.skip })
+    const activeOnly = options.activeOnly !== false
+    log.info('Open positions sync started', { limit: options.limit, skip: options.skip, activeOnly })
 
     let pageOffset = 0
     let totalRecords = 0
@@ -24,7 +25,9 @@ export const syncOpenPositionOrchestrator = {
     while (processedInRun < maxToProcess) {
       if (signal.aborted) break
 
-      const { items, totalRecords: total } = await upstreamApiService.getOpenPositionsPaged(token, pageOffset, pageSize)
+      const { items, totalRecords: total } = activeOnly
+        ? await upstreamApiService.getOpenPositionsPaged(token, pageOffset, pageSize)
+        : await upstreamApiService.getAllOpenPositionsPaged(token, pageOffset, pageSize)
       totalRecords = total
       if (items.length === 0) break
 
@@ -175,7 +178,7 @@ export const syncOpenPositionOrchestrator = {
       if (pageOffset >= totalRecords) break
     }
 
-    if (!signal.aborted) {
+    if (!signal.aborted && activeOnly) {
       const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
       const closedDate = new Date().toISOString()
       let closedCount = 0

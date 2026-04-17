@@ -1,5 +1,7 @@
 import { getAgentsDatabase } from '../agentsConnection'
 
+export type PatternApprovalStatus = 'auto_applied' | 'pending_review'
+
 export interface LearnedPatternRow {
   id: string
   pattern_name: string
@@ -7,6 +9,11 @@ export interface LearnedPatternRow {
   confidence_score: number
   usage_count: number
   is_active: number
+  approval_status: PatternApprovalStatus
+  account: string | null
+  stakeholder: string | null
+  source_agent: string
+  data_points_count: number
   created_at: string
   updated_at: string
 }
@@ -37,6 +44,11 @@ export interface CreatePatternInput {
   confidence_score?: number
   usage_count?: number
   is_active?: number
+  approval_status?: PatternApprovalStatus
+  account?: string | null
+  stakeholder?: string | null
+  source_agent?: string
+  data_points_count?: number
 }
 
 export interface UpdatePatternInput {
@@ -45,6 +57,11 @@ export interface UpdatePatternInput {
   confidence_score?: number
   usage_count?: number
   is_active?: number
+  approval_status?: PatternApprovalStatus
+  account?: string | null
+  stakeholder?: string | null
+  source_agent?: string
+  data_points_count?: number
 }
 
 export interface CreatePatternApplicationInput {
@@ -80,9 +97,11 @@ export const patternRepository = {
     const db = getAgentsDatabase()
     return db.prepare(`
       INSERT INTO learned_patterns (
-        pattern_name, pattern_text, confidence_score, usage_count, is_active, updated_at
+        pattern_name, pattern_text, confidence_score, usage_count, is_active,
+        approval_status, account, stakeholder, source_agent, data_points_count, updated_at
       ) VALUES (
-        @pattern_name, @pattern_text, @confidence_score, @usage_count, @is_active, datetime('now')
+        @pattern_name, @pattern_text, @confidence_score, @usage_count, @is_active,
+        @approval_status, @account, @stakeholder, @source_agent, @data_points_count, datetime('now')
       )
       RETURNING *
     `).get({
@@ -91,6 +110,11 @@ export const patternRepository = {
       confidence_score: input.confidence_score ?? 0,
       usage_count: input.usage_count ?? 0,
       is_active: input.is_active ?? 1,
+      approval_status: input.approval_status ?? 'pending_review',
+      account: input.account ?? null,
+      stakeholder: input.stakeholder ?? null,
+      source_agent: input.source_agent ?? 'scout9',
+      data_points_count: input.data_points_count ?? 0,
     }) as LearnedPatternRow
   },
 
@@ -182,5 +206,32 @@ export const patternRepository = {
       WHERE candidate_id = ?
       ORDER BY created_at DESC
     `).all(candidateId) as SkipFeedbackRow[]
+  },
+
+  listPatternsByAccount(account: string): LearnedPatternRow[] {
+    const db = getAgentsDatabase()
+    return db.prepare(`
+      SELECT * FROM learned_patterns
+      WHERE account = ?
+      ORDER BY confidence_score DESC, updated_at DESC
+    `).all(account) as LearnedPatternRow[]
+  },
+
+  listPatternsByApprovalStatus(status: PatternApprovalStatus): LearnedPatternRow[] {
+    const db = getAgentsDatabase()
+    return db.prepare(`
+      SELECT * FROM learned_patterns
+      WHERE approval_status = ?
+      ORDER BY confidence_score DESC, updated_at DESC
+    `).all(status) as LearnedPatternRow[]
+  },
+
+  listPatternsBySourceAgent(sourceAgent: string): LearnedPatternRow[] {
+    const db = getAgentsDatabase()
+    return db.prepare(`
+      SELECT * FROM learned_patterns
+      WHERE source_agent = ?
+      ORDER BY confidence_score DESC, updated_at DESC
+    `).all(sourceAgent) as LearnedPatternRow[]
   },
 }

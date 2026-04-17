@@ -76,6 +76,7 @@ export interface SyncStartParams {
   limit?: number
   skip?: number
   year?: number
+  activeOnly?: boolean
 }
 
 export interface SyncSingleParams {
@@ -1323,7 +1324,7 @@ export interface VigilStatusEvent {
   timestamp: string
 }
 
-export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday'
+export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'inference'
 
 export interface AgentStepEvent {
   agentId: AgentId
@@ -1449,6 +1450,107 @@ export interface MailTestResult {
   message: string
 }
 
+// --- Inference Agent Types ---
+
+export type InferenceScopeType = 'account' | 'stakeholder'
+export type InferenceApprovalStatus = 'auto_applied' | 'pending_review'
+
+export interface InferenceRunParams {
+  scope: InferenceScopeType
+  account: string
+  stakeholder?: string
+}
+
+export interface InferenceCancelParams {
+  job_id: string
+}
+
+export interface InferenceListJobsParams {
+  limit?: number
+  offset?: number
+}
+
+export interface InferenceListPatternsParams {
+  account?: string
+  approval_status?: InferenceApprovalStatus
+}
+
+export interface InferenceListProfilesParams {
+  account?: string
+}
+
+export interface InferenceGetProfileParams {
+  stakeholder: string
+  account: string
+}
+
+export interface InferenceJob {
+  id: string
+  status: Scout9JobStatus
+  scope_type: InferenceScopeType
+  scope_value: string | null
+  initiated_by: string
+  run_reason: string
+  pipeline_phase: string
+  started_at: string | null
+  completed_at: string | null
+  error_message: string | null
+  metadata_json: string
+  created_at: string
+}
+
+export interface InferencePattern {
+  id: string
+  pattern_name: string
+  pattern_text: string
+  confidence_score: number
+  usage_count: number
+  is_active: number
+  approval_status: InferenceApprovalStatus
+  account: string | null
+  stakeholder: string | null
+  source_agent: string
+  data_points_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface InferenceStakeholderProfile {
+  id: string
+  stakeholder_name: string
+  account: string
+  observed_rate_floor: number | null
+  observed_rate_ceiling: number | null
+  avg_accepted_rate: number | null
+  accepted_countries: string
+  rejected_countries: string
+  untested_countries: string
+  seniority_flexibility: number
+  posted_seniorities: string
+  accepted_seniorities: string
+  avg_time_to_decision_days: number | null
+  top_rejection_reasons: string
+  top_acceptance_signals: string
+  preference_summary: string
+  data_points_count: number
+  confidence_score: number
+  last_inference_job_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InferenceStatusEvent {
+  status: 'idle' | 'running' | 'completed' | 'failed'
+  job_id: string | null
+  timestamp: string
+}
+
+export interface InferenceResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
 export interface IpcContracts {
   [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: string; response: { valid: boolean; message: string } }
   [IPC_CHANNELS.SYNC_GET_STATUS]: { request: SyncDataSource; response: SyncCountByStatus }
@@ -1543,6 +1645,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_EXPORT_CSV]: { request: readonly [ReportStalledPositionResult[]]; response: ReportExportCsvResult }
   [IPC_CHANNELS.REPORT_GET_SYNC_STATUS]: { request: void; response: ReportSyncStatus }
   [IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG]: { request: string; response: Record<number, string> }
+  [IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG_LOCAL]: { request: void; response: Record<number, string> }
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
   [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
   [IPC_CHANNELS.REPORT_EXPORT_XLSX]: { request: readonly [ReportStalledPositionResult[]]; response: ExcelExportResult }
@@ -1636,6 +1739,16 @@ export interface IpcContracts {
   [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
   [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
 
+  [IPC_CHANNELS.INFERENCE_RUN]: { request: InferenceRunParams; response: InferenceResponse<InferenceJob> }
+  [IPC_CHANNELS.INFERENCE_CANCEL]: { request: InferenceCancelParams; response: InferenceResponse<{ canceled: boolean }> }
+  [IPC_CHANNELS.INFERENCE_GET_STATUS]: { request: void; response: InferenceResponse<{ running: boolean; job_id: string | null }> }
+  [IPC_CHANNELS.INFERENCE_LIST_JOBS]: { request: InferenceListJobsParams | void; response: InferenceResponse<InferenceJob[]> }
+  [IPC_CHANNELS.INFERENCE_GET_JOB]: { request: string; response: InferenceResponse<InferenceJob | null> }
+  [IPC_CHANNELS.INFERENCE_LIST_PATTERNS]: { request: InferenceListPatternsParams | void; response: InferenceResponse<InferencePattern[]> }
+  [IPC_CHANNELS.INFERENCE_LIST_PROFILES]: { request: InferenceListProfilesParams | void; response: InferenceResponse<InferenceStakeholderProfile[]> }
+  [IPC_CHANNELS.INFERENCE_GET_PROFILE]: { request: InferenceGetProfileParams; response: InferenceResponse<InferenceStakeholderProfile | null> }
+  [IPC_CHANNELS.INFERENCE_GET_ACCOUNTS]: { request: void; response: InferenceResponse<string[]> }
+
   [IPC_CHANNELS.AGENT_STUB_RUN]: { request: { agentId: AgentId; prompt?: string }; response: { success: boolean; runId: string } }
 
   [IPC_CHANNELS.APP_GET_VERSION]: { request: void; response: string }
@@ -1675,6 +1788,8 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
   [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
+  [IPC_CHANNELS.INFERENCE_STEP_EVENT]: AgentStepEvent
+  [IPC_CHANNELS.INFERENCE_STATUS_EVENT]: InferenceStatusEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
   [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent

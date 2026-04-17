@@ -7,6 +7,7 @@ import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { matchEngineService } from '../../services/matchEngineService'
+import { matchRepository } from '../../db/repositories/matchRepository'
 import { catalogService } from '../../services/catalogService'
 import { createLogger } from '../../services/logger'
 
@@ -59,6 +60,14 @@ export function registerReportHandlers(): void {
       validateSender(event)
       const feedbacks = await catalogService.getCandidatePositionFeedbacks(token)
       return Object.fromEntries(feedbacks)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_GET_FEEDBACK_CATALOG_LOCAL,
+    async (event): Promise<Record<number, string>> => {
+      validateSender(event)
+      return matchRepository.getFeedbackCatalog()
     }
   )
 

@@ -350,6 +350,37 @@ export const upstreamApiService = {
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
+  async getAllOpenPositionsPaged(token: string, skip: number, take: number): Promise<{ items: OpenPositionListItem[]; totalRecords: number }> {
+    const { upstream } = getConfig()
+    const paged = await fetchPaged(`${upstream.apiUrl}op/paged/false//`, token, {
+      skip, take, columns: buildOpenPositionColumns(),
+    })
+    const items = paged.payload.map(row => ({
+      id: getInt(row, 1),
+      account: getString(row, 2),
+      verticalIndustry: getString(row, 3),
+      coe: getString(row, 4),
+      practice: getString(row, 5),
+      stakeholder: getString(row, 6),
+      mainSkill: getString(row, 7),
+      status: getString(row, 8),
+      countries: getString(row, 9),
+      aging: row.length > 13 ? getInt(row, 13) : 0,
+      seniorities: row.length > 14 ? getString(row, 14) : '',
+      availableRange: row.length > 15 ? getString(row, 15) : '',
+      created: row.length > 16 ? getString(row, 16) : '',
+      readyDate: row.length > 17 ? getString(row, 17) : '',
+      lastModification: row.length > 18 ? getString(row, 18) : '',
+      sourcing: row.length > 19 ? getString(row, 19) : '',
+      replacement: row.length > 20 && getBool(row, 20),
+      candidatesPresented: row.length > 21 ? getInt(row, 21) : 0,
+      lastDiscussionDate: row.length > 22 ? getString(row, 22) : '',
+      closedReason: row.length > 23 ? getString(row, 23) : '',
+    }))
+    log.debug('getAllOpenPositionsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
+    return { items, totalRecords: paged.filteredRecordCount }
+  },
+
   async getOpenPositionDetail(token: string, id: number): Promise<OpenPositionDetail | null> {
     const { upstream } = getConfig()
     try {

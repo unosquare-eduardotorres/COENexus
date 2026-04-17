@@ -189,8 +189,8 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     }
   }, []);
 
-  const doStartSync = useCallback(async (isResume = false, skipCount?: number) => {
-    log.info('Sync started', { source, isResume, skipCount: skipCount ?? 0, selectedYear: selectedYear ?? null });
+  const doStartSync = useCallback(async (isResume = false, skipCount?: number, activeOnly?: boolean) => {
+    log.info('Sync started', { source, isResume, skipCount: skipCount ?? 0, selectedYear: selectedYear ?? null, activeOnly: activeOnly ?? null });
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -220,6 +220,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
       controller.signal, undefined,
       isResume ? skipCount : undefined,
       yearParam,
+      activeOnly,
     );
 
     setProgress({ ...finalProgress, lastSyncedAt: new Date().toISOString() });
@@ -397,6 +398,9 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
   const startSyncMutation = useIpcMutation<void, { isResume?: boolean; skipCount?: number }>(
     async ({ isResume = false, skipCount } = {}) => { await doStartSync(isResume, skipCount); }
   );
+  const startSyncAllMutation = useIpcMutation<void, { isResume?: boolean; skipCount?: number }>(
+    async ({ isResume = false, skipCount } = {}) => { await doStartSync(isResume, skipCount, false); }
+  );
   const clearDataMutation = useIpcMutation<void>(async () => { await doClearData(); });
   const refreshRecordMutation = useIpcMutation<void, number>(async (upstreamId) => { await doRefreshRecord(upstreamId); });
   const vectorizeRecordMutation = useIpcMutation<void, number>(async (upstreamId) => { await doVectorizeRecord(upstreamId); });
@@ -413,6 +417,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     isClearing,
     isLoadingRecords: recordsQuery.isLoading || recordsQuery.isFetching,
     handleStartSync: useCallback(() => { startSyncMutation.mutate({}); }, [startSyncMutation]),
+    handleStartSyncAll: useCallback(() => { startSyncAllMutation.mutate({}); }, [startSyncAllMutation]),
     handlePauseSync,
     handleResumeSync: useCallback(() => {
       startSyncMutation.mutate({ isResume: true, skipCount: progress.fetchedRecords });
