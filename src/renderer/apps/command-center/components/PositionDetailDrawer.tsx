@@ -58,7 +58,14 @@ export default function PositionDetailDrawer({ upstreamId, onClose }: PositionDe
   }, [detail, sharepoint.token])
 
   const additionalSkills = detail?.position.additional_skills
-    ? (() => { try { return JSON.parse(detail.position.additional_skills) as Array<{ tagName: string }> } catch { return [] } })()
+    ? (() => {
+        try {
+          const parsed = JSON.parse(detail.position.additional_skills) as Array<Record<string, unknown>>
+          return parsed.map(s => ({
+            name: ((s.label ?? s.tagName ?? s.name ?? '') as string),
+          }))
+        } catch { return [] }
+      })()
     : []
 
   const rateRange = detail
@@ -227,8 +234,8 @@ export default function PositionDetailDrawer({ upstreamId, onClose }: PositionDe
               <div>
                 <p className="text-xs text-muted uppercase tracking-wide mb-2">Additional Skills</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {additionalSkills.map((s: { tagName: string }, i: number) => (
-                    <span key={i} className="px-2 py-1 rounded-md bg-white/5 text-xs text-secondary border border-white/5">{s.tagName}</span>
+                  {additionalSkills.map((s, i) => (
+                    <span key={i} className="px-2 py-1 rounded-md bg-white/5 text-xs text-secondary border border-white/5">{s.name}</span>
                   ))}
                 </div>
               </div>

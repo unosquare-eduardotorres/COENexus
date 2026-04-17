@@ -136,6 +136,83 @@ export default function NomicorePage() {
           />
         </details>
       )}
+
+      {result?.diagnostics && (
+        <details className="glass-card p-4">
+          <summary className="text-sm font-medium text-secondary cursor-pointer">
+            Diagnostics ({result.diagnostics.phases?.length || 0} phases, {result.diagnostics.pageStructure?.tableCount || 0} tables found)
+          </summary>
+          <div className="mt-3 space-y-4 text-xs font-mono">
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">Phases</h4>
+              <div className="space-y-1">
+                {result.diagnostics.phases?.map((p: any, i: number) => (
+                  <div key={i} className="flex gap-2">
+                    <span className={p.status === 'ok' || p.status === 'populated' ? 'text-green-400' : p.status === 'timeout' || p.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}>
+                      {p.status === 'ok' || p.status === 'populated' ? '✓' : p.status === 'timeout' || p.status === 'failed' ? '✗' : '⚠'}
+                    </span>
+                    <span className="text-secondary">{p.phase}</span>
+                    <span className="text-muted">{p.status}</span>
+                    {p.detail && <span className="text-muted truncate max-w-md">{p.detail}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">Page Headings ({result.diagnostics.pageStructure?.headings?.length || 0})</h4>
+              <div className="text-muted whitespace-pre-wrap">
+                {result.diagnostics.pageStructure?.headings?.join('\n') || 'None found'}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">Tables ({result.diagnostics.pageStructure?.tableCount || 0})</h4>
+              {result.diagnostics.pageStructure?.tables?.map((t: any) => (
+                <div key={t.index} className="glass-panel-subtle p-2 mb-2">
+                  <div className="text-secondary">Table #{t.index}: {t.headerText}</div>
+                  <div className="text-muted">rows={t.rows} td-cells={t.cells} th-cells={t.thCount} classes="{t.tableClasses}"</div>
+                  {t.sampleHeaders?.length > 0 && <div className="text-muted">Headers: {t.sampleHeaders.join(' | ')}</div>}
+                  {t.sampleCells?.length > 0 && <div className="text-muted">Sample row: {t.sampleCells.join(' | ')}</div>}
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">Inputs ({result.diagnostics.pageStructure?.inputCount || 0})</h4>
+              <div className="text-muted whitespace-pre-wrap">
+                {result.diagnostics.pageStructure?.inputs?.map((inp: any, i: number) =>
+                  `[${i}] type=${inp.type} name="${inp.name}" id="${inp.id}" value="${inp.value}"`
+                ).join('\n') || 'None found'}
+              </div>
+            </div>
+
+            {result.diagnostics.allTablesData && Object.keys(result.diagnostics.allTablesData).length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-primary mb-2">All Extracted Table Data</h4>
+                {Object.entries(result.diagnostics.allTablesData).map(([name, data]: [string, any]) => (
+                  <details key={name} className="glass-panel-subtle p-2 mb-2">
+                    <summary className="text-secondary cursor-pointer">{name} ({Object.keys(data).length} rows)</summary>
+                    <div className="mt-1 space-y-0.5">
+                      {Object.entries(data).map(([k, v]: [string, any]) => (
+                        <div key={k} className="flex justify-between gap-2">
+                          <span className="text-muted truncate">{k}</span>
+                          <span className="text-primary whitespace-nowrap">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-2">Body Text (first 500 chars)</h4>
+              <div className="text-muted whitespace-pre-wrap break-all">{result.diagnostics.pageStructure?.bodyTextSnippet || 'Empty'}</div>
+            </div>
+          </div>
+        </details>
+      )}
     </div>
   )
 }

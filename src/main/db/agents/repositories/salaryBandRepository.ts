@@ -3,19 +3,25 @@ import { getAgentsDatabase } from '../agentsConnection'
 export interface SalaryBandRow {
   id: string
   country_code: string
-  country_name: string
-  currency: string
-  pay_period: string
   job_family_group: string
   band: string
   level: number
-  min_salary: number
-  max_salary: number
-  gross_margin_usd: number | null
+  min_monthly: number
+  max_monthly: number
   source: string
   is_active: number
   created_at: string
   updated_at: string
+}
+
+export interface CountryRow {
+  code: string
+  name: string
+  default_currency: string
+  upstream_catalog_name: string | null
+  aliases_json: string
+  is_active: number
+  created_at: string
 }
 
 export interface JobFamilyRow {
@@ -28,15 +34,11 @@ export interface JobFamilyRow {
 
 export interface UpsertSalaryBandData {
   country_code: string
-  country_name: string
-  currency: string
-  pay_period: string
   job_family_group: string
   band: string
   level: number
-  min_salary: number
-  max_salary: number
-  gross_margin_usd?: number | null
+  min_monthly: number
+  max_monthly: number
   source?: string
 }
 
@@ -76,29 +78,21 @@ export function getSalaryBand(
 export function upsertSalaryBand(data: UpsertSalaryBandData): void {
   const db = getAgentsDatabase()
   db.prepare(`
-    INSERT INTO salary_bands (country_code, country_name, currency, pay_period, job_family_group, band, level, min_salary, max_salary, gross_margin_usd, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO salary_bands (country_code, job_family_group, band, level, min_monthly, max_monthly, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (country_code, job_family_group, band, level)
     DO UPDATE SET
-      country_name = excluded.country_name,
-      currency = excluded.currency,
-      pay_period = excluded.pay_period,
-      min_salary = excluded.min_salary,
-      max_salary = excluded.max_salary,
-      gross_margin_usd = excluded.gross_margin_usd,
+      min_monthly = excluded.min_monthly,
+      max_monthly = excluded.max_monthly,
       source = excluded.source,
       updated_at = datetime('now')
   `).run(
     data.country_code,
-    data.country_name,
-    data.currency,
-    data.pay_period,
     data.job_family_group,
     data.band,
     data.level,
-    data.min_salary,
-    data.max_salary,
-    data.gross_margin_usd ?? null,
+    data.min_monthly,
+    data.max_monthly,
     data.source ?? 'manual'
   )
 }
@@ -131,4 +125,62 @@ export function upsertJobFamily(name: string, group: string): void {
     ON CONFLICT (name)
     DO UPDATE SET job_family_group = excluded.job_family_group
   `).run(name, group)
+}
+
+export function getAllCountries(): CountryRow[] {
+  const db = getAgentsDatabase()
+  return db.prepare(
+    'SELECT * FROM countries WHERE is_active = 1 ORDER BY name'
+  ).all() as CountryRow[]
+}
+
+export function getCountryByCode(code: string): CountryRow | undefined {
+  const db = getAgentsDatabase()
+  return db.prepare(
+    'SELECT * FROM countries WHERE code = ?'
+  ).get(code) as CountryRow | undefined
+}
+
+export function getCountryByUpstreamName(name: string): CountryRow | undefined {
+  const db = getAgentsDatabase()
+  const byExact = db.prepare(
+    'SELECT * FROM countries WHERE upstream_catalog_name = ?'
+  ).get(name) as CountryRow | undefined
+  if (byExact) return byExact
+
+  const all = db.prepare('SELECT * FROM countries WHERE is_active = 1').all() as CountryRow[]
+  return all.find(c => {
+    try {
+      const aliases = JSON.parse(c.aliases_json) as string[]
+      return aliases.some(a => a.toLowerCase() === name.toLowerCase())
+    } catch {
+      return false
+    }
+  })
+}
+
+export function upsertCountry(data: {
+  code: string
+  name: string
+  default_currency: string
+  upstream_catalog_name?: string
+  aliases_json?: string
+}): void {
+  const db = getAgentsDatabase()
+  db.prepare(`
+    INSERT INTO countries (code, name, default_currency, upstream_catalog_name, aliases_json)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (code)
+    DO UPDATE SET
+      name = excluded.name,
+      default_currency = excluded.default_currency,
+      upstream_catalog_name = excluded.upstream_catalog_name,
+      aliases_json = excluded.aliases_json
+  `).run(
+    data.code,
+    data.name,
+    data.default_currency,
+    data.upstream_catalog_name ?? null,
+    data.aliases_json ?? '[]'
+  )
 }

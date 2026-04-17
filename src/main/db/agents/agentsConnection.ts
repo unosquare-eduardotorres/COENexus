@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import { existsSync, readFileSync, readdirSync, renameSync } from 'fs'
+import { existsSync, readFileSync, renameSync } from 'fs'
 import { createLogger } from '../../services/logger'
+import { runFileBasedMigrations, seedMigrationsFromSchema } from '../migrationRunner'
 
 const log = createLogger('AgentsDatabase')
 
@@ -85,54 +86,16 @@ function runInitialSchema(database: Database.Database): void {
     database.prepare(
       "INSERT OR IGNORE INTO scout9_schema_migrations (version, name) VALUES (1, 'initial_schema')"
     ).run()
+
+    seedMigrationsFromSchema(database, 'scout9_schema_migrations', join(__dirname, 'migrations'))
   }
 }
 
 function runMigrations(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS scout9_schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `)
-
-  const current = database.prepare(
-    'SELECT MAX(version) as v FROM scout9_schema_migrations'
-  ).get() as { v: number } | undefined
-  const currentVersion = current?.v ?? 0
-
-  const migrationsCandidates = [
-    join(__dirname, 'migrations'),
-    join(__dirname, 'db', 'agents', 'migrations'),
-  ]
-  const migrationsDir = migrationsCandidates.find(existsSync) ?? migrationsCandidates[0]
-  if (!existsSync(migrationsDir)) return
-
-  const files = readdirSync(migrationsDir)
-    .map((fileName) => {
-      const match = /^(\d+)_([a-zA-Z0-9_-]+)\.sql$/.exec(fileName)
-      if (!match) return null
-      return {
-        version: Number(match[1]),
-        name: match[2],
-        fileName,
-      }
-    })
-    .filter((item): item is { version: number; name: string; fileName: string } => item !== null)
-    .sort((a, b) => a.version - b.version)
-
-  for (const migration of files) {
-    if (migration.version <= currentVersion) continue
-
-    const migrationPath = join(migrationsDir, migration.fileName)
-    const source = readFileSync(migrationPath, 'utf-8')
-    const tx = database.transaction(() => {
-      database.exec(source)
-      database.prepare(
-        'INSERT INTO scout9_schema_migrations (version, name) VALUES (?, ?)'
-      ).run(migration.version, migration.name)
-    })
-    tx()
-  }
+  runFileBasedMigrations({
+    database,
+    migrationsTable: 'scout9_schema_migrations',
+    migrationsDir: join(__dirname, 'migrations'),
+    dbLabel: 'agents',
+  })
 }

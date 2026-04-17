@@ -44,21 +44,17 @@ function fail<T>(message: string): Scout9Response<T> {
 }
 
 import type { SalaryBandRow } from '../db/agents/repositories/salaryBandRepository'
-import type { SalaryBand } from '../../shared/ipc-types'
+import type { SalaryBand, Country } from '../../shared/ipc-types'
 
 function mapSalaryBandRow(row: SalaryBandRow): SalaryBand {
   return {
     id: row.id,
     countryCode: row.country_code,
-    countryName: row.country_name,
-    currency: row.currency,
-    payPeriod: row.pay_period as SalaryBand['payPeriod'],
     jobFamilyGroup: row.job_family_group,
     band: row.band,
     level: row.level,
-    minSalary: row.min_salary,
-    maxSalary: row.max_salary,
-    grossMarginUsd: row.gross_margin_usd,
+    minMonthly: row.min_monthly,
+    maxMonthly: row.max_monthly,
     source: row.source,
     isActive: row.is_active === 1,
   }
@@ -536,6 +532,22 @@ export function registerScout9Handlers(): void {
       })))
     } catch (error) {
       return fail(error instanceof Error ? error.message : 'Failed to list job families')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_COUNTRIES_LIST, async (event: IpcMainInvokeEvent) => {
+    validateSender(event)
+    try {
+      const rows = salaryBandRepository.getAllCountries()
+      return ok(rows.map((r): Country => ({
+        code: r.code,
+        name: r.name,
+        defaultCurrency: r.default_currency,
+        upstreamCatalogName: r.upstream_catalog_name,
+        isActive: r.is_active === 1,
+      })))
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Failed to list countries')
     }
   })
 

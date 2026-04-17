@@ -12,6 +12,22 @@ import {
 const THRESHOLDS_STORAGE_KEY = 'core-stalled-thresholds'
 const FILTER_STORAGE_KEY = 'core-op-report-filters'
 
+export const COLUMN_VALUE_EXTRACTORS: Record<string, (r: StalledPositionResult) => string> = {
+  account: r => r.position.account || '',
+  status: r => r.position.position_status || '',
+  stakeholder: r => r.position.stakeholder || '',
+  coe: r => r.position.coe || '',
+  practice: r => r.position.practice || '',
+  main_skill: r => r.position.main_skill || '',
+  vertical: r => r.position.vertical_industry || '',
+  action_needed: r => r.actors.sort().join(', ') || '—',
+  criteria: r => r.matchingCriteria.length === 0 ? 'Healthy' : r.matchingCriteria.sort().join(', '),
+  job_title: r => r.position.job_title || '',
+  countries: r => r.position.countries || '',
+  seniorities: r => r.position.seniorities || '',
+  sourcing: r => r.position.sourcing || '',
+}
+
 function loadThresholds(): StalledThresholds {
   try {
     const stored = localStorage.getItem(THRESHOLDS_STORAGE_KEY)
@@ -26,13 +42,10 @@ function saveThresholds(t: StalledThresholds): void {
 
 interface FilterState {
   searchText: string
-  filterCoes: string[]
-  filterPractices: string[]
-  filterSkills: string[]
+  columnFilters: Record<string, string[]>
   criteriaFilter: StalledCriterionKey[]
   filterActors: CriterionActor[]
   filterHealthStatus: 'all' | 'flagged' | 'healthy'
-  filterPositionStatuses: string[]
   sortOrder: 'aging-desc' | 'aging-asc'
 }
 
@@ -56,20 +69,17 @@ export function useOpenPositionReport() {
 
   const persisted = useRef(loadFilters())
   const [searchText, setSearchText] = useState(persisted.current.searchText ?? '')
-  const [filterCoes, setFilterCoes] = useState<string[]>(persisted.current.filterCoes ?? [])
-  const [filterPractices, setFilterPractices] = useState<string[]>(persisted.current.filterPractices ?? [])
-  const [filterSkills, setFilterSkills] = useState<string[]>(persisted.current.filterSkills ?? [])
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>(persisted.current.columnFilters ?? {})
   const [criteriaFilter, setCriteriaFilter] = useState<StalledCriterionKey[]>(persisted.current.criteriaFilter ?? [])
   const [filterActors, setFilterActors] = useState<CriterionActor[]>(persisted.current.filterActors ?? [])
   const [filterHealthStatus, setFilterHealthStatus] = useState<'all' | 'flagged' | 'healthy'>(persisted.current.filterHealthStatus ?? 'all')
-  const [filterPositionStatuses, setFilterPositionStatuses] = useState<string[]>(persisted.current.filterPositionStatuses ?? [])
   const [sortOrder, setSortOrder] = useState<'aging-desc' | 'aging-asc'>(persisted.current.sortOrder ?? 'aging-desc')
 
   useEffect(() => {
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
-      searchText, filterCoes, filterPractices, filterSkills, criteriaFilter, filterActors, filterHealthStatus, filterPositionStatuses, sortOrder,
+      searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder,
     }))
-  }, [searchText, filterCoes, filterPractices, filterSkills, criteriaFilter, filterActors, filterHealthStatus, filterPositionStatuses, sortOrder])
+  }, [searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder])
 
   const checkSyncStatus = useCallback(async () => {
     try {
@@ -130,70 +140,51 @@ export function useOpenPositionReport() {
     flagged: results.filter(r => r.matchingCriteria.length > 0).length,
   }), [results])
 
-  const availableCoes = useMemo(() => {
-    let base = results
-    if (criteriaFilter.length > 0) {
-      base = base.filter(r => r.matchingCriteria.some(c => criteriaFilter.includes(c)))
+  const availableColumnValues = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const [key, extractor] of Object.entries(COLUMN_VALUE_EXTRACTORS)) {
+      const values = [...new Set(results.map(extractor).filter(Boolean))].sort()
+      map[key] = values
     }
-    return [...new Set(base.map(r => r.position.coe).filter(Boolean))].sort()
-  }, [results, criteriaFilter])
-
-  const availablePractices = useMemo(() => {
-    let base = results
-    if (criteriaFilter.length > 0) {
-      base = base.filter(r => r.matchingCriteria.some(c => criteriaFilter.includes(c)))
-    }
-    const withCoe = filterCoes.length > 0 ? base.filter(r => filterCoes.includes(r.position.coe)) : base
-    return [...new Set(withCoe.map(r => r.position.practice).filter(Boolean))].sort()
-  }, [results, criteriaFilter, filterCoes])
-
-  const availableSkills = useMemo(() => {
-    let base = results
-    if (criteriaFilter.length > 0) {
-      base = base.filter(r => r.matchingCriteria.some(c => criteriaFilter.includes(c)))
-    }
-    const withCoe = filterCoes.length > 0 ? base.filter(r => filterCoes.includes(r.position.coe)) : base
-    const withPractice = filterPractices.length > 0 ? withCoe.filter(r => filterPractices.includes(r.position.practice)) : withCoe
-    return [...new Set(withPractice.map(r => r.position.main_skill).filter(Boolean))].sort()
-  }, [results, criteriaFilter, filterCoes, filterPractices])
-
-  const availablePositionStatuses = useMemo(() => {
-    return [...new Set(results.map(r => r.position.position_status).filter(Boolean))].sort()
+    return map
   }, [results])
+
+  const setColumnFilter = useCallback((colKey: string, values: string[]) => {
+    setColumnFilters(prev => ({ ...prev, [colKey]: values }))
+  }, [])
+
+  const clearColumnFilter = useCallback((colKey: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev }
+      delete next[colKey]
+      return next
+    })
+  }, [])
 
   const hasActiveFilters = useMemo(() => {
     return searchText.trim() !== '' ||
       criteriaFilter.length > 0 ||
       filterActors.length > 0 ||
       filterHealthStatus !== 'all' ||
-      filterPositionStatuses.length > 0 ||
-      filterCoes.length > 0 ||
-      filterPractices.length > 0 ||
-      filterSkills.length > 0
-  }, [searchText, criteriaFilter, filterActors, filterHealthStatus, filterPositionStatuses, filterCoes, filterPractices, filterSkills])
+      Object.keys(columnFilters).length > 0
+  }, [searchText, criteriaFilter, filterActors, filterHealthStatus, columnFilters])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (criteriaFilter.length > 0) count++
     if (filterActors.length > 0) count++
-    if (filterPositionStatuses.length > 0) count++
-    if (filterCoes.length > 0) count++
-    if (filterPractices.length > 0) count++
-    if (filterSkills.length > 0) count++
     if (filterHealthStatus !== 'all') count++
     if (searchText.trim()) count++
+    count += Object.keys(columnFilters).length
     return count
-  }, [criteriaFilter, filterActors, filterPositionStatuses, filterCoes, filterPractices, filterSkills, filterHealthStatus, searchText])
+  }, [criteriaFilter, filterActors, filterHealthStatus, searchText, columnFilters])
 
   const clearAllFilters = useCallback(() => {
     setSearchText('')
     setCriteriaFilter([])
     setFilterActors([])
     setFilterHealthStatus('all')
-    setFilterPositionStatuses([])
-    setFilterCoes([])
-    setFilterPractices([])
-    setFilterSkills([])
+    setColumnFilters({})
   }, [])
 
   const filteredResults = useMemo(() => {
@@ -230,17 +221,13 @@ export function useOpenPositionReport() {
         r.actors.some(a => filterActors.includes(a))
       )
     }
-    if (filterCoes.length > 0) {
-      filtered = filtered.filter(r => filterCoes.includes(r.position.coe))
-    }
-    if (filterPractices.length > 0) {
-      filtered = filtered.filter(r => filterPractices.includes(r.position.practice))
-    }
-    if (filterSkills.length > 0) {
-      filtered = filtered.filter(r => filterSkills.includes(r.position.main_skill))
-    }
-    if (filterPositionStatuses.length > 0) {
-      filtered = filtered.filter(r => filterPositionStatuses.includes(r.position.position_status))
+
+    for (const [colKey, selectedValues] of Object.entries(columnFilters)) {
+      const extractor = COLUMN_VALUE_EXTRACTORS[colKey]
+      if (!extractor) continue
+      const available = availableColumnValues[colKey] ?? []
+      if (selectedValues.length === available.length) continue
+      filtered = filtered.filter(r => selectedValues.includes(extractor(r)))
     }
 
     return [...filtered].sort((a, b) =>
@@ -248,7 +235,7 @@ export function useOpenPositionReport() {
         ? b.position.aging - a.position.aging
         : a.position.aging - b.position.aging
     )
-  }, [results, searchText, criteriaFilter, filterActors, filterHealthStatus, filterCoes, filterPractices, filterSkills, filterPositionStatuses, sortOrder])
+  }, [results, searchText, criteriaFilter, filterActors, filterHealthStatus, columnFilters, availableColumnValues, sortOrder])
 
   const exportCsv = useCallback(async () => {
     return reportService.exportXlsx(filteredResults)
@@ -271,12 +258,10 @@ export function useOpenPositionReport() {
     healthCounts,
     searchText,
     setSearchText,
-    filterCoes,
-    setFilterCoes,
-    filterPractices,
-    setFilterPractices,
-    filterSkills,
-    setFilterSkills,
+    columnFilters,
+    setColumnFilter,
+    clearColumnFilter,
+    availableColumnValues,
     criteriaFilter,
     setCriteriaFilter,
     filterActors,
@@ -285,12 +270,6 @@ export function useOpenPositionReport() {
     setFilterHealthStatus,
     sortOrder,
     setSortOrder,
-    availableCoes,
-    availablePractices,
-    availableSkills,
-    availablePositionStatuses,
-    filterPositionStatuses,
-    setFilterPositionStatuses,
     hasActiveFilters,
     activeFilterCount,
     clearAllFilters,

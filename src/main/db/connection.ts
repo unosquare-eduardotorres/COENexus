@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, existsSync } from 'fs'
 import { createLogger } from '../services/logger'
+import { runFileBasedMigrations, seedMigrationsFromSchema } from './migrationRunner'
 
 const log = createLogger('Database')
 
@@ -94,211 +95,18 @@ function runInitialSchema(database: Database.Database): void {
     database.prepare(
       "INSERT OR IGNORE INTO schema_migrations (version, name) VALUES (1, 'initial_schema')"
     ).run()
+
+    seedMigrationsFromSchema(database, 'schema_migrations', join(__dirname, 'migrations'))
   }
 }
 
 function runMigrations(database: Database.Database): void {
-  const current = database.prepare(
-    'SELECT MAX(version) as v FROM schema_migrations'
-  ).get() as { v: number } | undefined
-
-  const currentVersion = current?.v ?? 0
-
-  if (currentVersion < 2) {
-    log.info('Running migration 002: convert legacy failed status to pipeline error states')
-    database.exec(`
-      UPDATE synced_employees SET status = 'extract_failed' WHERE status = 'failed';
-      UPDATE synced_candidates SET status = 'extract_failed' WHERE status = 'failed';
-      UPDATE synced_open_positions SET status = 'extract_failed' WHERE status = 'failed';
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (2, 'convert_failed_to_status')"
-    ).run()
-  }
-
-  if (currentVersion < 3) {
-    log.info('Running migration 003: add open position report fields + discussions table')
-    const existingCols = new Set(
-      (database.prepare("PRAGMA table_info(synced_open_positions)").all() as { name: string }[]).map(c => c.name)
-    )
-    const columnsToAdd: [string, string][] = [
-      ['vertical_industry', "TEXT NOT NULL DEFAULT ''"],
-      ['in_office', 'INTEGER NOT NULL DEFAULT 0'],
-      ['csu', "TEXT NOT NULL DEFAULT ''"],
-      ['cs', "TEXT NOT NULL DEFAULT ''"],
-      ['closed_date', 'TEXT'],
-      ['closed_reason', 'TEXT'],
-      ['is_ready', 'INTEGER NOT NULL DEFAULT 0'],
-      ['is_promotion', 'INTEGER NOT NULL DEFAULT 0'],
-      ['maximum_rate', 'REAL'],
-      ['minimum_rate', 'REAL'],
-      ['additional_skills', "TEXT NOT NULL DEFAULT '[]'"],
-      ['created_with_assignments_tool', 'INTEGER'],
-      ['candidates_presented', 'INTEGER NOT NULL DEFAULT 0'],
-      ['last_discussion_date', 'TEXT'],
-    ]
-    for (const [col, def] of columnsToAdd) {
-      if (!existingCols.has(col)) {
-        database.exec(`ALTER TABLE synced_open_positions ADD COLUMN ${col} ${def}`)
-      }
-    }
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS open_position_discussions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        open_position_id INTEGER NOT NULL,
-        comment_id INTEGER NOT NULL,
-        author TEXT NOT NULL DEFAULT '',
-        date TEXT NOT NULL DEFAULT '',
-        message TEXT NOT NULL DEFAULT '',
-        parent_comment_id INTEGER,
-        synced_at TEXT NOT NULL,
-        UNIQUE(open_position_id, comment_id)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_op_discussions_position
-        ON open_position_discussions(open_position_id);
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (3, 'open_position_report_fields')"
-    ).run()
-  }
-
-  if (currentVersion < 4) {
-    log.info('Running migration 004: candidate analysis cache')
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS candidate_analysis_cache (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        candidate_upstream_id INTEGER NOT NULL,
-        candidate_source_type TEXT NOT NULL,
-        jd_hash TEXT NOT NULL,
-        analysis_json TEXT NOT NULL,
-        model_used TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        UNIQUE(candidate_upstream_id, candidate_source_type, jd_hash)
-      );
-      CREATE INDEX IF NOT EXISTS idx_analysis_cache_lookup
-        ON candidate_analysis_cache(candidate_upstream_id, candidate_source_type, jd_hash);
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (4, 'candidate_analysis_cache')"
-    ).run()
-  }
-
-  if (currentVersion < 5) {
-    log.info('Running migration 005: project reallocations tables')
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS synced_project_reallocations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        upstream_id INTEGER NOT NULL UNIQUE,
-        employee TEXT NOT NULL DEFAULT '',
-        account TEXT NOT NULL DEFAULT '',
-        team TEXT NOT NULL DEFAULT '',
-        main_skill TEXT NOT NULL DEFAULT '',
-        seniority TEXT NOT NULL DEFAULT '',
-        transition_status TEXT NOT NULL DEFAULT '',
-        transition_sub_type TEXT NOT NULL DEFAULT '',
-        location TEXT NOT NULL DEFAULT '',
-        request_date TEXT,
-        days_since_last_interview TEXT NOT NULL DEFAULT '',
-        impact TEXT NOT NULL DEFAULT '',
-        attrition_risk TEXT NOT NULL DEFAULT '',
-        comments TEXT NOT NULL DEFAULT '',
-        presentations_count INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'synced',
-        status_reason TEXT,
-        synced_at TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS prr_presentations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        prr_id INTEGER NOT NULL,
-        open_position_id INTEGER NOT NULL,
-        account TEXT NOT NULL DEFAULT '',
-        open_position_status TEXT NOT NULL DEFAULT '',
-        location TEXT NOT NULL DEFAULT '',
-        presented_on TEXT,
-        candidate_status TEXT NOT NULL DEFAULT '',
-        synced_at TEXT NOT NULL,
-        UNIQUE(prr_id, open_position_id, presented_on)
-      );
-      CREATE INDEX IF NOT EXISTS idx_prr_presentations_prr_id ON prr_presentations(prr_id);
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (5, 'project_reallocations')"
-    ).run()
-  }
-
-  if (currentVersion < 6) {
-    log.info('Running migration 006: PRR COE status and comments fields')
-    const prrCols = new Set(
-      (database.prepare("PRAGMA table_info(synced_project_reallocations)").all() as { name: string }[]).map(c => c.name)
-    )
-    if (!prrCols.has('coe_status')) {
-      database.exec("ALTER TABLE synced_project_reallocations ADD COLUMN coe_status TEXT NOT NULL DEFAULT 'Not Set'")
-    }
-    if (!prrCols.has('coe_comments')) {
-      database.exec("ALTER TABLE synced_project_reallocations ADD COLUMN coe_comments TEXT NOT NULL DEFAULT '[]'")
-    }
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (6, 'prr_coe_fields')"
-    ).run()
-  }
-
-  if (currentVersion < 7) {
-    log.info('Running migration 007: rename COE statuses')
-    database.exec(`
-      UPDATE synced_project_reallocations SET coe_status = 'Not Set' WHERE coe_status = 'Undefined';
-      UPDATE synced_project_reallocations SET coe_status = 'Pending Evaluation' WHERE coe_status = 'Active';
-      UPDATE synced_project_reallocations SET coe_status = 'Ready to Present' WHERE coe_status = 'Idle';
-      UPDATE synced_project_reallocations SET coe_status = 'Not Applies' WHERE coe_status = 'Not Apply';
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (7, 'rename_coe_statuses')"
-    ).run()
-  }
-
-  if (currentVersion < 8) {
-    log.info('Running migration 008: reconcile pipeline status with embedding reality')
-    database.exec(`
-      UPDATE synced_employees SET status = 'vectorized', status_reason = NULL
-      WHERE id IN (
-        SELECT e.id FROM synced_employees e
-        JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
-        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NOT NULL
-          AND e.status NOT IN ('vectorized', 'vectorize_failed')
-      );
-
-      UPDATE synced_candidates SET status = 'vectorized', status_reason = NULL
-      WHERE id IN (
-        SELECT c.id FROM synced_candidates c
-        JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
-        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NOT NULL
-          AND c.status NOT IN ('vectorized', 'vectorize_failed')
-      );
-
-      UPDATE synced_employees SET status = 'extracted', status_reason = NULL
-      WHERE id IN (
-        SELECT e.id FROM synced_employees e
-        JOIN resume_embeddings re ON re.source_type = 'employees' AND re.source_id = e.id
-        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NULL
-          AND e.status NOT IN ('extracted', 'extract_failed', 'vectorize_failed')
-      );
-
-      UPDATE synced_candidates SET status = 'extracted', status_reason = NULL
-      WHERE id IN (
-        SELECT c.id FROM synced_candidates c
-        JOIN resume_embeddings re ON re.source_type = 'candidates' AND re.source_id = c.id
-        WHERE re.resume_text IS NOT NULL AND re.resume_text != '' AND re.embedding IS NULL
-          AND c.status NOT IN ('extracted', 'extract_failed', 'vectorize_failed')
-      );
-
-      UPDATE synced_employees SET status = 'synced' WHERE status = 'processing';
-      UPDATE synced_candidates SET status = 'synced' WHERE status = 'processing';
-    `)
-    database.prepare(
-      "INSERT INTO schema_migrations (version, name) VALUES (8, 'reconcile_pipeline_status')"
-    ).run()
-  }
+  runFileBasedMigrations({
+    database,
+    migrationsTable: 'schema_migrations',
+    migrationsDir: join(__dirname, 'migrations'),
+    dbLabel: 'nexus',
+  })
 }
 
 function getInlineSchema(): string {
@@ -494,6 +302,54 @@ function getInlineSchema(): string {
     );
     CREATE INDEX IF NOT EXISTS idx_transform_sessions_created ON transform_sessions(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_transform_sessions_context ON transform_sessions(context_type, context_id);
+
+    CREATE TABLE IF NOT EXISTS presentation_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL DEFAULT '',
+      mode TEXT NOT NULL DEFAULT 'manual',
+      intro_text TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      open_position_id INTEGER,
+      position_title TEXT,
+      account_name TEXT,
+      position_upstream_id INTEGER,
+      job_description TEXT,
+      generated_html TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_presentation_sessions_created
+      ON presentation_sessions(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_presentation_sessions_open_position
+      ON presentation_sessions(open_position_id);
+
+    CREATE TABLE IF NOT EXISTS presentation_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES presentation_sessions(id) ON DELETE CASCADE,
+      source_type TEXT NOT NULL DEFAULT '',
+      upstream_id INTEGER NOT NULL,
+      full_name TEXT NOT NULL DEFAULT '',
+      main_skill TEXT NOT NULL DEFAULT '',
+      seniority TEXT NOT NULL DEFAULT '',
+      country TEXT NOT NULL DEFAULT '',
+      years_of_experience TEXT,
+      availability TEXT,
+      recommended_rate TEXT,
+      tech_stack_json TEXT,
+      professional_summary TEXT,
+      domain_experience TEXT,
+      resume_format_status TEXT,
+      transform_session_id INTEGER,
+      individual_intro_text TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(session_id, source_type, upstream_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_presentation_entries_session
+      ON presentation_entries(session_id, sort_order, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_presentation_entries_transform_session
+      ON presentation_entries(transform_session_id);
 
     CREATE TABLE IF NOT EXISTS open_position_candidates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

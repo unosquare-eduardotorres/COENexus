@@ -54,7 +54,7 @@
   }
 
   .glass-button {
-    @apply bg-white/70 dark:bg-dark-card/70 backdrop-blur-lg border border-white/40 dark:border-white/10 rounded-xl transition-all duration-200 hover:bg-white/95 dark:hover:bg-dark-card/90 shadow-sm focus-visible:ring-2 focus-visible:ring-accent-500/70 focus-visible:ring-offset-1;
+    @apply bg-white/70 dark:bg-dark-card/70 backdrop-blur-lg border border-white/40 dark:border-white/10 rounded-xl transition-all duration-200 hover:bg-white/95 dark:hover:bg-dark-card/90 shadow-sm focus-visible:ring-2 focus-visible:ring-accent-500/70 focus-visible:ring-offset-1 text-gray-700 dark:text-gray-200;
   }
 
   .glass-input {

@@ -1158,16 +1158,20 @@ export interface Scout9StatusEvent {
 export interface SalaryBand {
   id: string
   countryCode: string
-  countryName: string
-  currency: string
-  payPeriod: 'monthly' | 'yearly' | 'hourly'
   jobFamilyGroup: string
   band: string
   level: number
-  minSalary: number
-  maxSalary: number
-  grossMarginUsd: number | null
+  minMonthly: number
+  maxMonthly: number
   source: string
+  isActive: boolean
+}
+
+export interface Country {
+  code: string
+  name: string
+  defaultCurrency: string
+  upstreamCatalogName: string | null
   isActive: boolean
 }
 
@@ -1180,15 +1184,11 @@ export interface JobFamily {
 
 export interface Scout9UpsertSalaryBandParams {
   country_code: string
-  country_name: string
-  currency: string
-  pay_period: string
   job_family_group: string
   band: string
   level: number
-  min_salary: number
-  max_salary: number
-  gross_margin_usd?: number | null
+  min_monthly: number
+  max_monthly: number
   source?: string
 }
 
@@ -1409,6 +1409,21 @@ export interface NomicoreCalculationResult {
   rawHtml?: string
   screenshotBase64?: string
   calculatedAt: string
+  diagnostics?: NomicoreDiagnostics
+}
+
+export interface NomicoreDiagnostics {
+  phases: { phase: string; status: string; detail?: string }[]
+  pageStructure: {
+    tableCount: number
+    tables: { index: number; rows: number; cells: number; headerText: string; sampleCells: string[] }[]
+    headings: string[]
+    inputCount: number
+    inputs: { type: string; value: string; name: string; id: string }[]
+    cardCount: number
+    bodyTextSnippet: string
+  }
+  allTablesData: Record<string, Record<string, string>>
 }
 
 export interface MailSmtpConfig {
@@ -1604,6 +1619,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.SCOUT9_SALARY_BANDS_UPSERT]: { request: Scout9UpsertSalaryBandParams; response: Scout9Response<{ upserted: boolean }> }
   [IPC_CHANNELS.SCOUT9_SALARY_BANDS_DELETE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
   [IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST]: { request: void; response: Scout9Response<JobFamily[]> }
+  [IPC_CHANNELS.SCOUT9_COUNTRIES_LIST]: { request: void; response: Scout9Response<Country[]> }
 
   [IPC_CHANNELS.VIGIL_RUN]: { request: VigilRunParams; response: VigilResponse<VigilRun> }
   [IPC_CHANNELS.VIGIL_CANCEL_RUN]: { request: VigilCancelRunParams; response: VigilResponse<{ canceled: boolean }> }

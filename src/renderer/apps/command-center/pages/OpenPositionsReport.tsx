@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useOpenPositionReport } from '../hooks/useOpenPositionReport'
+import { useOpenPositionReport, COLUMN_VALUE_EXTRACTORS } from '../hooks/useOpenPositionReport'
 import { reportService } from '../services/reportService'
 import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
 import PositionDetailDrawer from '../components/PositionDetailDrawer'
@@ -105,6 +105,22 @@ function TrashIcon() {
   )
 }
 
+function SmallFilterIcon({ active }: { active?: boolean }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
 interface ColumnDef {
   key: string
   label: string
@@ -112,21 +128,24 @@ interface ColumnDef {
   render: (r: StalledPositionResult) => ReactNode
 }
 
-interface MultiSelectProps {
-  label: string
-  options: string[]
-  selected: string[]
-  onChange: (values: string[]) => void
+interface ExcelFilterDropdownProps {
+  columnKey: string
+  allValues: string[]
+  selectedValues: string[]
+  isFiltered: boolean
+  onChangeFilter: (colKey: string, values: string[]) => void
+  onClearFilter: (colKey: string) => void
 }
 
-function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
+function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered, onChangeFilter, onClearFilter }: ExcelFilterDropdownProps) {
   const [open, setOpen] = useState(false)
-  const [filterText, setFilterText] = useState('')
+  const [searchText, setSearchText] = useState('')
   const ref = useRef<HTMLDivElement>(null)
 
-  const toggle = useCallback((value: string) => {
-    onChange(selected.includes(value) ? selected.filter(v => v !== value) : [...selected, value])
-  }, [selected, onChange])
+  const effectiveSelected = !isFiltered ? allValues : selectedValues
+  const isAllSelected = effectiveSelected.length === allValues.length
+  const isActive = isFiltered && !isAllSelected
+  const filtered = allValues.filter(v => v.toLowerCase().includes(searchText.toLowerCase()))
 
   useEffect(() => {
     if (!open) return
@@ -138,49 +157,108 @@ function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {
   }, [open])
 
   useEffect(() => {
-    if (!open) setFilterText('')
+    if (!open) setSearchText('')
   }, [open])
 
-  const filtered = options.filter(o => o.toLowerCase().includes(filterText.toLowerCase()))
+  const toggleAll = () => {
+    if (isAllSelected) {
+      onChangeFilter(columnKey, [])
+    } else {
+      onClearFilter(columnKey)
+    }
+  }
+
+  const toggleValue = (value: string) => {
+    const current = new Set(effectiveSelected)
+    if (current.has(value)) {
+      current.delete(value)
+    } else {
+      current.add(value)
+    }
+    const arr = [...current]
+    if (arr.length === allValues.length) {
+      onClearFilter(columnKey)
+    } else {
+      onChangeFilter(columnKey, arr)
+    }
+  }
+
+  if (allValues.length === 0) return null
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative inline-flex" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium uppercase tracking-wider transition-all border ${
-          selected.length > 0
-            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-            : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
+        onClick={e => { e.stopPropagation(); setOpen(!open) }}
+        className={`p-0.5 rounded transition-colors ${
+          isActive
+            ? 'text-emerald-400 hover:text-emerald-300'
+            : 'text-muted/50 hover:text-muted'
         }`}
+        title={`Filter ${columnKey}`}
       >
-        {label}{selected.length > 0 && ` (${selected.length})`}
+        <SmallFilterIcon active={isActive} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-40 w-56 glass-panel border border-white/10 rounded-lg shadow-xl overflow-hidden">
+        <div
+          className="absolute top-full left-0 mt-1 z-50 w-60 glass-panel border border-white/10 rounded-lg shadow-xl overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
           <div className="p-1.5 border-b border-white/5">
             <input
               type="text"
-              value={filterText}
-              onChange={e => setFilterText(e.target.value)}
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
               placeholder="Search..."
               className="glass-input w-full text-xs py-1.5 px-2"
               autoFocus
             />
           </div>
-          <div className="max-h-48 overflow-y-auto p-1">
+          <div className="max-h-56 overflow-y-auto p-1">
+            <button
+              onClick={toggleAll}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/5"
+            >
+              <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
+                isAllSelected
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                  : 'border-white/15 text-transparent'
+              }`}>
+                {isAllSelected && <CheckIcon />}
+              </span>
+              <span className="text-primary font-medium">Select All ({allValues.length})</span>
+            </button>
+            <div className="my-0.5 border-b border-white/5" />
             {filtered.length === 0 && <p className="text-xs text-muted px-2 py-1">No matches</p>}
-            {filtered.map(opt => (
-              <button
-                key={opt}
-                onClick={() => toggle(opt)}
-                className={`w-full text-left px-2 py-1 rounded text-sm transition-colors ${
-                  selected.includes(opt) ? 'bg-emerald-500/15 text-emerald-400' : 'text-secondary hover:bg-white/5'
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
+            {filtered.map(value => {
+              const checked = effectiveSelected.includes(value)
+              return (
+                <button
+                  key={value}
+                  onClick={() => toggleValue(value)}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors hover:bg-white/5"
+                >
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
+                    checked
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                      : 'border-white/15 text-transparent'
+                  }`}>
+                    {checked && <CheckIcon />}
+                  </span>
+                  <span className={`truncate ${checked ? 'text-secondary' : 'text-muted'}`}>{value}</span>
+                </button>
+              )
+            })}
           </div>
+          {isActive && (
+            <div className="border-t border-white/5 p-1.5">
+              <button
+                onClick={() => { onClearFilter(columnKey); setOpen(false) }}
+                className="w-full text-center text-[10px] text-red-400 hover:text-red-300 py-1 transition-colors"
+              >
+                Clear Filter
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -379,6 +457,22 @@ const COLUMN_DEFINITIONS: ColumnDef[] = [
     },
   },
 ]
+
+const COLUMN_FILTER_LABELS: Record<string, string> = {
+  account: 'Account',
+  status: 'Status',
+  stakeholder: 'Stakeholder',
+  coe: 'COE',
+  practice: 'Practice',
+  main_skill: 'Main Skill',
+  vertical: 'Vertical',
+  action_needed: 'Action Needed',
+  criteria: 'Criteria',
+  job_title: 'Job Title',
+  countries: 'Countries',
+  seniorities: 'Seniorities',
+  sourcing: 'Sourcing',
+}
 
 const COLUMNS_STORAGE_KEY = 'core-op-list-columns'
 
@@ -657,11 +751,7 @@ export default function OpenPositionsReport() {
                                 : 'border-white/10 text-transparent hover:border-white/20'
                             }`}
                           >
-                            {isVisible && (
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
+                            {isVisible && <CheckIcon />}
                           </button>
                           <span className={`flex-1 text-xs ${isVisible ? 'text-primary' : 'text-muted'}`}>
                             {def.label}
@@ -808,19 +898,22 @@ export default function OpenPositionsReport() {
                   )
                 })}
               </div>
-
-              <div className="w-px h-5 bg-white/10" />
-
-              <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Status</p>
-              <MultiSelect label="Position Status" options={report.availablePositionStatuses} selected={report.filterPositionStatuses} onChange={report.setFilterPositionStatuses} />
-
-              <div className="w-px h-5 bg-white/10" />
-
-              <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Dimensions</p>
-              <MultiSelect label="COEs" options={report.availableCoes} selected={report.filterCoes} onChange={v => { report.setFilterCoes(v); report.setFilterPractices([]); report.setFilterSkills([]) }} />
-              <MultiSelect label="Practices" options={report.availablePractices} selected={report.filterPractices} onChange={v => { report.setFilterPractices(v); report.setFilterSkills([]) }} />
-              <MultiSelect label="Skills" options={report.availableSkills} selected={report.filterSkills} onChange={report.setFilterSkills} />
             </div>
+
+            {Object.keys(report.columnFilters).length > 0 && (
+              <>
+                <div className="minimal-divider" />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Active Column Filters</p>
+                  {Object.entries(report.columnFilters).map(([key, values]) => (
+                    <span key={key} className="px-2 py-1 rounded-lg text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
+                      {COLUMN_FILTER_LABELS[key] ?? key}: {values.length} selected
+                      <button onClick={() => report.clearColumnFilter(key)} className="hover:text-emerald-200 transition-colors">×</button>
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -850,6 +943,28 @@ export default function OpenPositionsReport() {
 
       {!report.isLoading && !report.error && report.filteredResults.length > 0 && viewMode === 'grid' && (
         <div className="space-y-4">
+          {Object.keys(report.columnFilters).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <span className="text-[11px] text-muted uppercase tracking-wider font-medium">Column Filters:</span>
+              {Object.entries(report.columnFilters).map(([key, values]) => (
+                <span key={key} className="px-2 py-1 rounded-lg text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
+                  {COLUMN_FILTER_LABELS[key] ?? key}: {values.length} selected
+                  <button onClick={() => report.clearColumnFilter(key)} className="hover:text-emerald-200 transition-colors ml-0.5">×</button>
+                </span>
+              ))}
+              <button
+                onClick={() => {
+                  for (const key of Object.keys(report.columnFilters)) {
+                    report.clearColumnFilter(key)
+                  }
+                }}
+                className="text-[10px] text-red-400 hover:text-red-300 ml-1 transition-colors"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+
           {flaggedResults.length > 0 && (
             <>
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -981,7 +1096,19 @@ export default function OpenPositionsReport() {
               <tr className="border-b border-white/10">
                 {visibleColumns.map(col => (
                   <th key={col.key} className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted px-3 py-3 first:pl-4 last:pr-4">
-                    {col.label}
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      {COLUMN_VALUE_EXTRACTORS[col.key] && (
+                        <ExcelFilterDropdown
+                          columnKey={col.key}
+                          allValues={report.availableColumnValues[col.key] ?? []}
+                          selectedValues={report.columnFilters[col.key] ?? []}
+                          isFiltered={report.columnFilters[col.key] !== undefined}
+                          onChangeFilter={report.setColumnFilter}
+                          onClearFilter={report.clearColumnFilter}
+                        />
+                      )}
+                    </div>
                   </th>
                 ))}
                 <th className="w-10" />

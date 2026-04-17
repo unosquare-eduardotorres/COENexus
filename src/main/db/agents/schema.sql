@@ -168,18 +168,24 @@ CREATE TABLE IF NOT EXISTS client_rule_overrides (
   FOREIGN KEY (rule_id) REFERENCES knowledge_rules(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS countries (
+  code TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  default_currency TEXT NOT NULL,
+  upstream_catalog_name TEXT,
+  aliases_json TEXT NOT NULL DEFAULT '[]',
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS salary_bands (
   id TEXT PRIMARY KEY NOT NULL DEFAULT (lower(hex(randomblob(16)))),
-  country_code TEXT NOT NULL,
-  country_name TEXT NOT NULL,
-  currency TEXT NOT NULL,
-  pay_period TEXT NOT NULL CHECK (pay_period IN ('monthly', 'yearly', 'hourly')),
+  country_code TEXT NOT NULL REFERENCES countries(code),
   job_family_group TEXT NOT NULL DEFAULT 'engineering',
   band TEXT NOT NULL,
   level INTEGER NOT NULL,
-  min_salary REAL NOT NULL,
-  max_salary REAL NOT NULL,
-  gross_margin_usd REAL,
+  min_monthly REAL NOT NULL,
+  max_monthly REAL NOT NULL,
   source TEXT NOT NULL DEFAULT 'manual',
   is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),

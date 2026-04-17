@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useRef, useEffect } from 'react'
 import GlobalTitleBar from '../../../components/GlobalTitleBar'
 
 function DatabaseIcon() {
@@ -44,6 +45,11 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
 export default function SettingsLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0)
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen pb-8 gradient-subtle transition-colors duration-300">
@@ -72,7 +78,9 @@ export default function SettingsLayout() {
         <nav className="flex-1 py-2 overflow-hidden">
           <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Configuration</p>
           {SIDEBAR_ITEMS.map(item => {
-            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+            const isActive = item.path === '/settings'
+              ? location.pathname === '/settings'
+              : location.pathname === item.path || location.pathname.startsWith(item.path + '/')
             return (
               <button
                 key={item.id}
@@ -100,7 +108,7 @@ export default function SettingsLayout() {
       </aside>
 
       <div className="flex flex-col min-h-screen md:ml-[220px]">
-        <main className="flex-1 pt-10 p-4 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 pt-10 p-4 overflow-y-auto">
           <Outlet />
         </main>
       </div>

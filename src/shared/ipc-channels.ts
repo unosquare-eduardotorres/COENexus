@@ -189,6 +189,7 @@ export const IPC_CHANNELS = {
   SCOUT9_SALARY_BANDS_UPSERT: 'scout9:salary-bands:upsert',
   SCOUT9_SALARY_BANDS_DELETE: 'scout9:salary-bands:delete',
   SCOUT9_JOB_FAMILIES_LIST: 'scout9:job-families:list',
+  SCOUT9_COUNTRIES_LIST: 'scout9:countries:list',
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
 

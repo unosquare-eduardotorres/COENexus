@@ -440,6 +440,10 @@ const api = {
       list: () =>
         ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST),
     },
+    countries: {
+      list: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_COUNTRIES_LIST),
+    },
     onPipelineEvent: (callback: (data: Scout9PipelineEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: Scout9PipelineEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)

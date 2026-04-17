@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, existsSync } from 'fs'
 import { createLogger } from '../../services/logger'
+import { runFileBasedMigrations, seedMigrationsFromSchema } from '../migrationRunner'
 
 const log = createLogger('PathDatabase')
 
@@ -64,27 +65,16 @@ function runInitialSchema(database: Database.Database): void {
     database.prepare(
       "INSERT OR IGNORE INTO path_schema_migrations (version, name) VALUES (1, 'initial_schema')"
     ).run()
+
+    seedMigrationsFromSchema(database, 'path_schema_migrations', join(__dirname, 'migrations'))
   }
 }
 
 function runMigrations(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS path_schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `)
-
-  const current = database.prepare(
-    'SELECT MAX(version) as v FROM path_schema_migrations'
-  ).get() as { v: number } | undefined
-
-  const currentVersion = current?.v ?? 0
-
-  if (currentVersion < 1) {
-    database.prepare(
-      "INSERT OR IGNORE INTO path_schema_migrations (version, name) VALUES (1, 'initial_schema')"
-    ).run()
-  }
+  runFileBasedMigrations({
+    database,
+    migrationsTable: 'path_schema_migrations',
+    migrationsDir: join(__dirname, 'migrations'),
+    dbLabel: 'path',
+  })
 }

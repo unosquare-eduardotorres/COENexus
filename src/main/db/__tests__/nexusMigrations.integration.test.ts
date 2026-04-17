@@ -32,9 +32,9 @@ describe('nexus database migrations', () => {
     const files = readdirSync(migrationsDir)
       .filter(f => f.endsWith('.sql'))
       .sort()
-    expect(files.length).toBeGreaterThanOrEqual(8)
-    expect(files[0]).toMatch(/^001/)
-    expect(files[files.length - 1]).toMatch(/^008/)
+    expect(files.length).toBeGreaterThanOrEqual(9)
+    expect(files[0]).toMatch(/^002/)
+    expect(files[files.length - 1]).toMatch(/^010/)
   })
 
   it('should have valid SQL in each migration file', () => {
@@ -59,13 +59,25 @@ describe('nexus database migrations', () => {
     expect(schema).toMatch(/foreign_keys\s*=\s*ON/i)
   })
 
-  it('migration 001 should handle status conversion', () => {
-    const sql = readFileSync(join(migrationsDir, '001_convert_failed_to_status.sql'), 'utf-8')
+  it('migration 002 should handle status conversion', () => {
+    const sql = readFileSync(join(migrationsDir, '002_convert_failed_to_status.sql'), 'utf-8')
     expect(sql.length).toBeGreaterThan(0)
   })
 
   it('migration 008 should handle pipeline reconciliation', () => {
     const sql = readFileSync(join(migrationsDir, '008_reconcile_pipeline_status.sql'), 'utf-8')
     expect(sql.length).toBeGreaterThan(0)
+  })
+
+  it('migration 010 should create presentation tables', () => {
+    const sql = readFileSync(join(migrationsDir, '010_presentation_sessions.sql'), 'utf-8')
+    expect(sql).toContain('presentation_sessions')
+    expect(sql).toContain('presentation_entries')
+  })
+
+  it('should have schema with presentation tables', () => {
+    const schema = readFileSync(schemaPath, 'utf-8')
+    expect(schema).toContain('presentation_sessions')
+    expect(schema).toContain('presentation_entries')
   })
 })
