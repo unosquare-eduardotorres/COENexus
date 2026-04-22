@@ -68,4 +68,17 @@ export function registerPositionPipelineHandlers(): void {
       validateSender(event)
       return syncRepository.getFailedRecords('synced_open_positions')
     })
+
+  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return positionPipelineOrchestrator.getSavedSyncAllOffset()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      positionPipelineOrchestrator.clearSavedSyncAllOffset()
+      return { cleared: true }
+    })
 }

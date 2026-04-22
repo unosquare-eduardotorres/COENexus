@@ -1,5 +1,5 @@
-import React, { lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NexusStatusProvider } from './contexts/NexusStatusContext';
@@ -44,6 +44,17 @@ function AgentActivityBridge() {
   return null;
 }
 
+function AppNavigationBridge() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const unsub = window.api?.app?.onNavigate?.((data: { path: string }) => {
+      navigate(data.path);
+    });
+    return () => unsub?.();
+  }, [navigate]);
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -54,6 +65,7 @@ function App() {
               <HashRouter>
                 <NexusStatusProvider>
                   <AgentActivityBridge />
+                  <AppNavigationBridge />
                   <Routes>
                     <Route path="/" element={<NexusLanding />} />
                     <Route path="/resume/*" element={<ResumeApp />} />

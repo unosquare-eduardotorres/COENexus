@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { VigilConfig, VigilRunStatus } from '../../../../../shared/ipc-types'
 
 interface StatusBannerProps {
   status: VigilRunStatus | 'idle'
   config: VigilConfig | null
-  onScheduleUpdate: (hour: number, minute: number) => Promise<void> | void
   error: string | null
 }
 
@@ -71,43 +70,55 @@ function nextWakeCountdown(config: VigilConfig | null): string {
   if (!config || !config.schedule_enabled) return 'Schedule disabled'
 
   const now = new Date()
-  const next = new Date()
-  next.setHours(config.schedule_hour, config.schedule_minute, 0, 0)
-  if (next.getTime() <= now.getTime()) {
-    next.setDate(next.getDate() + 1)
+  const scheduledDays: number[] = (() => {
+    try {
+      const parsed = JSON.parse(config.schedule_days_json || '[1,2,3,4,5]')
+      return Array.isArray(parsed) ? parsed : [1, 2, 3, 4, 5]
+    } catch {
+      return [1, 2, 3, 4, 5]
+    }
+  })()
+
+  for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
+    const candidate = new Date(now)
+    candidate.setDate(now.getDate() + dayOffset)
+    candidate.setHours(config.schedule_hour, config.schedule_minute, 0, 0)
+
+    if (candidate.getTime() <= now.getTime()) continue
+    if (!scheduledDays.includes(candidate.getDay())) continue
+
+    const diffMs = candidate.getTime() - now.getTime()
+    const totalMins = Math.floor(diffMs / 60000)
+    const hrs = Math.floor(totalMins / 60)
+    const mins = totalMins % 60
+    return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`
   }
 
-  const diffMs = next.getTime() - now.getTime()
-  const totalMins = Math.floor(diffMs / 60000)
-  const hrs = Math.floor(totalMins / 60)
-  const mins = totalMins % 60
-  return `${hrs}h ${mins}m`
+  return 'No upcoming run'
 }
 
-export default function StatusBanner({ status, config, onScheduleUpdate, error }: StatusBannerProps) {
-  const [timeValue, setTimeValue] = useState('09:00')
-  const [saving, setSaving] = useState(false)
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  useEffect(() => {
-    if (!config) return
-    const hour = String(config.schedule_hour).padStart(2, '0')
-    const minute = String(config.schedule_minute).padStart(2, '0')
-    setTimeValue(`${hour}:${minute}`)
-  }, [config])
+function scheduleSummary(config: VigilConfig | null): string {
+  if (!config || !config.schedule_enabled) return 'Schedule disabled'
+  const hour = String(config.schedule_hour).padStart(2, '0')
+  const minute = String(config.schedule_minute).padStart(2, '0')
+  const days: number[] = (() => {
+    try {
+      const parsed = JSON.parse(config.schedule_days_json || '[1,2,3,4,5]')
+      return Array.isArray(parsed) ? parsed : [1, 2, 3, 4, 5]
+    } catch {
+      return [1, 2, 3, 4, 5]
+    }
+  })()
+  const dayLabels = days.sort().map(d => DAY_SHORT[d]).join(', ')
+  return `Daily at ${hour}:${minute} on ${dayLabels}`
+}
 
+export default function StatusBanner({ status, config, error }: StatusBannerProps) {
   const meta = useMemo(() => statusMeta(status), [status])
   const countdown = useMemo(() => nextWakeCountdown(config), [config])
-
-  async function handleTimeCommit() {
-    const [hourText, minuteText] = timeValue.split(':')
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    if (Number.isNaN(hour) || Number.isNaN(minute)) return
-
-    setSaving(true)
-    await onScheduleUpdate(hour, minute)
-    setSaving(false)
-  }
+  const schedule = useMemo(() => scheduleSummary(config), [config])
 
   return (
     <section className="glass-card p-4">
@@ -125,24 +136,7 @@ export default function StatusBanner({ status, config, onScheduleUpdate, error }
 
         <div className="glass-panel-subtle rounded-xl p-3 min-w-[220px]">
           <p className="text-xs text-muted">Schedule</p>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="time"
-              value={timeValue}
-              onChange={(event) => setTimeValue(event.target.value)}
-              className="glass-input h-9 px-2 text-sm flex-1"
-            />
-            <button
-              onClick={handleTimeCommit}
-              disabled={saving}
-              className="glass-button h-9 px-3 text-xs font-semibold text-primary"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-          <p className="text-[10px] text-secondary mt-1">
-            Daily at {timeValue}
-          </p>
+          <p className="text-xs text-secondary mt-1">{schedule}</p>
         </div>
       </div>
     </section>

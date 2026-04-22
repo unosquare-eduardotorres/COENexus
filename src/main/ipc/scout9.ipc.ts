@@ -563,9 +563,20 @@ export function registerScout9Handlers(): void {
         }
       }
 
+      const emitChunk = (text: string) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.SCOUT9_CHAT_CHUNK_EVENT, {
+            text,
+            timestamp: new Date().toISOString(),
+          })
+        }
+      }
+
       const result = await scout9ChatService.chat(
         params.message,
         emitStep,
+        emitChunk,
         params.scopeClient,
         params.scopeStakeholder
       )

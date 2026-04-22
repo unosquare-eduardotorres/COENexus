@@ -50,6 +50,14 @@ export const positionPipelineService = {
     return window.api.positionPipeline.getFailed()
   },
 
+  async getSavedOffset(): Promise<number | null> {
+    return window.api.positionPipeline.getSavedOffset()
+  },
+
+  async clearSavedOffset(): Promise<void> {
+    await window.api.positionPipeline.clearSavedOffset()
+  },
+
   onProgress(callback: (event: PipelineProgressEvent) => void): () => void {
     return window.api.positionPipeline.onProgress(callback)
   },

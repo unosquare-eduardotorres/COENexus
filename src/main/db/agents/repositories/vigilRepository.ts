@@ -44,6 +44,8 @@ export interface VigilConfigRow {
   schedule_minute: number
   sync_sources_json: string
   candidate_year_filter: number
+  schedule_days_json: string
+  active_positions_only: 0 | 1
 }
 
 export interface CreateVigilRunInput {
@@ -97,6 +99,8 @@ export interface UpdateVigilConfigInput {
   schedule_minute?: number
   sync_sources_json?: string
   candidate_year_filter?: number
+  schedule_days_json?: string
+  active_positions_only?: 0 | 1
 }
 
 export interface ListVigilRunsInput {

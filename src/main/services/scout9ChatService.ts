@@ -28,10 +28,13 @@ function describeToolCall(name: string, input: unknown): string {
   return `Running ${name} with ${truncated}`
 }
 
+const SENTENCE_DELIMITERS = /(?<=[.!?])\s+|\n/
+
 export const scout9ChatService = {
   async chat(
     content: string,
     emitStep?: (step: string) => void,
+    emitChunk?: (text: string) => void,
     scopeClient?: string,
     scopeStakeholder?: string
   ): Promise<{ content: string; toolCalls: number; inputTokens: number; outputTokens: number }> {
@@ -61,6 +64,7 @@ export const scout9ChatService = {
     let inputTokens = 0
     let outputTokens = 0
     let toolCallCount = 0
+    let sentenceBuffer = ''
 
     const q = query({
       prompt: content,
@@ -70,6 +74,7 @@ export const scout9ChatService = {
         maxTurns: 5,
         permissionMode: 'auto',
         abortController,
+        includePartialMessages: true,
         env: {
           ...process.env,
           CLAUDE_AGENT_SDK_CLIENT_APP: `operation-nexus/${app.getVersion()}`,
@@ -87,6 +92,20 @@ export const scout9ChatService = {
     try {
       for await (const message of q) {
         const msg = message as Record<string, unknown>
+
+        if (msg.type === 'stream_event') {
+          const event = (msg as { event: { type: string; delta?: { type: string; text?: string } } }).event
+          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+            sentenceBuffer += event.delta.text
+            const sentences = sentenceBuffer.split(SENTENCE_DELIMITERS)
+            if (sentences.length > 1) {
+              for (let i = 0; i < sentences.length - 1; i++) {
+                emitChunk?.(sentences[i] + (i < sentences.length - 2 ? ' ' : ''))
+              }
+              sentenceBuffer = sentences[sentences.length - 1]
+            }
+          }
+        }
 
         if (msg.type === 'assistant' && typeof msg.message === 'object' && msg.message) {
           const assistantMessage = msg.message as Record<string, unknown>
@@ -127,6 +146,10 @@ export const scout9ChatService = {
         resultLength: result.length,
         toolCallCount,
       })
+    }
+
+    if (sentenceBuffer.trim()) {
+      emitChunk?.(sentenceBuffer)
     }
 
     emitStep?.('Done')

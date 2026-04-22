@@ -1289,7 +1289,7 @@ export type VigilRunTriggerType = 'manual' | 'scheduled'
 export type VigilRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
 export type VigilActivityEventType = 'run_started' | 'run_progress' | 'run_completed' | 'run_failed' | 'chat' | 'system'
 export type VigilActivitySeverity = 'info' | 'warning' | 'error'
-export type VigilChatRole = 'system' | 'user' | 'assistant' | 'tool'
+
 
 export interface VigilRun {
   id: string
@@ -1313,18 +1313,7 @@ export interface VigilActivityLog {
   created_at: string
 }
 
-export interface VigilChatMessage {
-  id: string
-  role: VigilChatRole
-  content: string
-  metadata_json: string | null
-  created_at: string
-}
 
-export interface VigilChatStepEvent {
-  step: string
-  timestamp: string
-}
 
 export interface VigilConfig {
   id: 1
@@ -1333,6 +1322,8 @@ export interface VigilConfig {
   schedule_minute: number
   sync_sources_json: string
   candidate_year_filter: number
+  schedule_days_json: string
+  active_positions_only: 0 | 1
 }
 
 export interface VigilRunParams {
@@ -1371,17 +1362,11 @@ export interface VigilUpdateConfigParams {
   schedule_minute?: number
   sync_sources_json?: string
   candidate_year_filter?: number
+  schedule_days_json?: string
+  active_positions_only?: 0 | 1
 }
 
-export interface VigilSendChatMessageParams {
-  content: string
-  metadata_json?: string
-}
 
-export interface VigilListChatMessagesParams {
-  limit?: number
-  offset?: number
-}
 
 export interface VigilToolsDryRunParams {
   input: string
@@ -1428,6 +1413,12 @@ export interface OracleChatMessage {
   content: string
   metadata_json: string | null
   created_at: string
+  toolCalls?: number
+}
+
+export interface ChatChunkEvent {
+  text: string
+  timestamp: string
 }
 
 export interface OracleChatStepEvent {
@@ -1722,6 +1713,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.POSITION_PIPELINE_RETRY_ALL_FAILED]: { request: PipelineRetryParams; response: { started: boolean } }
   [IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE]: { request: PipelineRetrySingleParams; response: PipelineRecordEvent }
   [IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED]: { request: void; response: PipelineFailedRecord[] }
+  [IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET]: { request: void; response: number | null }
+  [IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET]: { request: void; response: { cleared: boolean } }
 
   [IPC_CHANNELS.PROCESSING_VOYAGE_KEY_STATUS]: { request: void; response: VoyageKeyStatus }
   [IPC_CHANNELS.PROCESSING_GET_STATUS]: { request: void; response: ProcessingStatusBySource }
@@ -1891,9 +1884,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.VIGIL_CLEAR_ACTIVITY_LOG]: { request: void; response: VigilResponse<{ cleared: boolean }> }
   [IPC_CHANNELS.VIGIL_GET_CONFIG]: { request: void; response: VigilResponse<VigilConfig> }
   [IPC_CHANNELS.VIGIL_UPDATE_CONFIG]: { request: VigilUpdateConfigParams; response: VigilResponse<VigilConfig> }
-  [IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]: { request: VigilSendChatMessageParams; response: VigilResponse<VigilChatMessage> }
-  [IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]: { request: VigilListChatMessagesParams | void; response: VigilResponse<VigilChatMessage[]> }
-  [IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES]: { request: void; response: VigilResponse<{ cleared: boolean }> }
+
   [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
   [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
 
@@ -1955,14 +1946,17 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.SCOUT9_PIPELINE_EVENT]: Scout9PipelineEvent
   [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
   [IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT]: string
+  [IPC_CHANNELS.SCOUT9_CHAT_CHUNK_EVENT]: ChatChunkEvent
   [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
-  [IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]: VigilChatStepEvent
+
   [IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT]: OracleChatStepEvent
+  [IPC_CHANNELS.ORACLE_CHAT_CHUNK_EVENT]: ChatChunkEvent
   [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STATUS_EVENT]: BraniacStatusEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
+  [IPC_CHANNELS.APP_NAVIGATE]: { path: string }
   [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent
 }

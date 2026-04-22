@@ -74,6 +74,17 @@ export const positionPipelineOrchestrator = {
     }
   },
 
+  getSavedSyncAllOffset(): number | null {
+    const raw = syncRepository.getSyncMetadata('position_sync_all_offset')
+    if (!raw) return null
+    const parsed = parseInt(raw, 10)
+    return isNaN(parsed) ? null : parsed
+  },
+
+  clearSavedSyncAllOffset(): void {
+    syncRepository.clearSyncMetadata('position_sync_all_offset')
+  },
+
   async run(
     params: PositionPipelineStartParams,
     emitEvent: (event: PipelineEvent) => void,
@@ -97,6 +108,19 @@ export const positionPipelineOrchestrator = {
     let processedInRun = 0
     const syncedUpstreamIds = new Set<number>()
 
+    if (!skip && pageOffset === 0) {
+      const savedOffset = syncRepository.getSyncMetadata('position_sync_all_offset')
+      if (savedOffset) {
+        const parsed = parseInt(savedOffset, 10)
+        if (!isNaN(parsed) && parsed > 0) {
+          pageOffset = parsed
+          processedRecords = parsed
+          processedInRun = parsed
+          log.info('Resuming position sync from saved offset', { pageOffset })
+        }
+      }
+    }
+
     try {
       while (processedInRun < maxToProcess) {
         if (signal.aborted) break
@@ -107,6 +131,36 @@ export const positionPipelineOrchestrator = {
 
         totalRecords = total
         if (items.length === 0) break
+
+        const pageUpstreamIds = items.map(p => p.id)
+        const existingMap = syncRepository.findPositionsByUpstreamIds(pageUpstreamIds)
+
+        const allUnchanged = items.every(pos => {
+          const existing = existingMap.get(pos.id)
+          if (!existing) return false
+          return existing.last_modification === (pos.lastModification || null)
+            && existing.candidates_presented === (pos.candidatesPresented ?? 0)
+            && existing.last_discussion_date === (pos.lastDiscussionDate || null)
+            && (activeOnly ? existing.status === 'vectorized' : true)
+        })
+
+        if (allUnchanged) {
+          const pageSkipped = items.length
+          processedRecords += pageSkipped
+          processedInRun += pageSkipped
+          skippedCount += pageSkipped
+          for (const pos of items) syncedUpstreamIds.add(pos.id)
+
+          emitEvent({ type: 'progress', progress: makeProgress(
+            totalRecords, processedRecords, succeededCount, failedCount, skippedCount,
+            'processing', `Skipped page (${items.length} unchanged)`
+          )})
+
+          pageOffset += items.length
+          syncRepository.saveSyncMetadata('position_sync_all_offset', String(pageOffset))
+          if (pageOffset >= totalRecords) break
+          continue
+        }
 
         for (const pos of items) {
           if (signal.aborted) break
@@ -119,7 +173,7 @@ export const positionPipelineOrchestrator = {
           emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
 
           try {
-            const existing = syncRepository.findPositionByUpstreamId(pos.id)
+            const existing = existingMap.get(pos.id)
 
             const lastModUnchanged = existing && existing.last_modification === (pos.lastModification || null)
             const candidatesUnchanged = existing && existing.candidates_presented === (pos.candidatesPresented ?? 0)
@@ -207,6 +261,9 @@ export const positionPipelineOrchestrator = {
                 candidate_status: cand.candidateStatusName || '',
                 rate: cand.rate ?? 0,
                 start_date: cand.startDate || null,
+                rejection_feedback: '',
+                rejection_comments: '',
+                rejection_action_date: null,
                 synced_at: new Date().toISOString(),
               })
             }
@@ -287,7 +344,12 @@ export const positionPipelineOrchestrator = {
         }
 
         pageOffset += items.length
+        syncRepository.saveSyncMetadata('position_sync_all_offset', String(pageOffset))
         if (pageOffset >= totalRecords) break
+      }
+
+      if (!signal.aborted) {
+        syncRepository.clearSyncMetadata('position_sync_all_offset')
       }
 
       if (!signal.aborted && activeOnly) {
@@ -319,6 +381,7 @@ export const positionPipelineOrchestrator = {
         return
       }
       log.error('Position pipeline failed', err instanceof Error ? err : new Error(String(err)))
+      syncRepository.clearSyncMetadata('position_sync_all_offset')
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Pipeline failed' })
     } finally {
       activeController = null
@@ -558,6 +621,9 @@ async function retrySinglePosition(
           candidate_status: cand.candidateStatusName || '',
           rate: cand.rate ?? 0,
           start_date: cand.startDate || null,
+          rejection_feedback: '',
+          rejection_comments: '',
+          rejection_action_date: null,
           synced_at: new Date().toISOString(),
         })
       }

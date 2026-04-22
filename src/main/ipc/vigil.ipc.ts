@@ -5,23 +5,19 @@ import type {
   VigilActivityEvent,
   VigilActivityLog,
   VigilCancelRunParams,
-  VigilChatMessage,
   VigilGetActivityLogParams,
-  VigilListChatMessagesParams,
   VigilListRunsParams,
   VigilResponse,
   VigilRun,
   VigilRunParams,
-  VigilSendChatMessageParams,
   VigilStatusEvent,
   VigilSyncSourceParams,
   VigilToolsDryRunParams,
   VigilUpdateConfigParams,
 } from '../../shared/ipc-types'
 import { vigilRepository } from '../db/agents/repositories/vigilRepository'
-import type { VigilRunRow, VigilActivityLogRow, VigilChatMessageRow } from '../db/agents/repositories/vigilRepository'
+import type { VigilRunRow, VigilActivityLogRow } from '../db/agents/repositories/vigilRepository'
 import { vigilExecutor } from '../services/vigilExecutor'
-import { vigilChatService } from '../services/vigilChatService'
 import { toVigilActivityEvent } from '../services/vigilEventMapper'
 import { createLogger } from '../services/logger'
 import { setVigilToken } from '../services/vigilTokenStore'
@@ -78,16 +74,6 @@ function mapActivityRow(row: VigilActivityLogRow): VigilActivityLog {
   }
 }
 
-function mapChatRow(row: VigilChatMessageRow): VigilChatMessage {
-  return {
-    id: row.id,
-    role: row.role,
-    content: row.content,
-    metadata_json: row.metadata_json,
-    created_at: row.created_at,
-  }
-}
-
 function nowIso(): string {
   return new Date().toISOString()
 }
@@ -98,12 +84,17 @@ export function registerVigilHandlers(): void {
     try {
       setVigilToken(params.token)
       const sources = params.sources ?? ['employees', 'candidates', 'open-positions', 'project-reallocations']
+      const config = vigilRepository.getConfig()
+      const mergedOptions = {
+        ...(params.options ?? {}),
+        activeOnly: config.active_positions_only === 1,
+      }
 
       const runPromise = vigilExecutor.run({
         token: params.token,
         triggerType: 'manual',
         sources,
-        options: params.options ?? {},
+        options: mergedOptions,
         emitEvent: (syncEvent) => {
           emitActivityEvent(event, toVigilActivityEvent(syncEvent))
         },
@@ -218,40 +209,6 @@ export function registerVigilHandlers(): void {
       return ok(vigilRepository.updateConfig(params))
     } catch (error) {
       return fail(error instanceof Error ? error.message : 'Failed to update Vigil config')
-    }
-  })
-
-  registerIpcHandler(IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE, async (event: IpcMainInvokeEvent, params: VigilSendChatMessageParams) => {
-    validateSender(event)
-    try {
-      const assistantMessage = await vigilChatService.sendMessage({
-        content: params.content,
-        metadata_json: params.metadata_json,
-        _event: event,
-      })
-      return ok(mapChatRow(assistantMessage))
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : 'Failed to send Vigil chat message')
-    }
-  })
-
-  registerIpcHandler(IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES, async (event: IpcMainInvokeEvent, params: VigilListChatMessagesParams | void) => {
-    validateSender(event)
-    try {
-      const rows = vigilChatService.listMessages(params?.limit, params?.offset)
-      return ok(rows.map(mapChatRow))
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : 'Failed to list Vigil chat messages')
-    }
-  })
-
-  registerIpcHandler(IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES, async (event: IpcMainInvokeEvent) => {
-    validateSender(event)
-    try {
-      vigilChatService.clearMessages()
-      return ok({ cleared: true })
-    } catch (error) {
-      return fail(error instanceof Error ? error.message : 'Failed to clear Vigil chat messages')
     }
   })
 

@@ -9,6 +9,15 @@ import type { VigilSource, VigilRunStatus, VigilRunTriggerType } from '../../sha
 const log = createLogger('VigilExecutor')
 
 const DEFAULT_SOURCES: VigilSource[] = ['employees', 'candidates', 'open-positions', 'project-reallocations']
+const MAX_FAILED_RECORDS = 500
+
+interface FailedRecord {
+  source: string
+  name: string
+  upstreamId: number
+  reason: string
+  timestamp: string
+}
 
 interface SourceRunResult {
   source: VigilSource
@@ -87,6 +96,26 @@ class VigilExecutor {
     })
 
     const results: SourceRunResult[] = []
+    const failedRecords: FailedRecord[] = []
+
+    const wrappedEmitEvent = params.emitEvent
+      ? (event: SyncEvent) => {
+          if (
+            event.type === 'record' &&
+            event.record.status === 'sync_failed' &&
+            failedRecords.length < MAX_FAILED_RECORDS
+          ) {
+            failedRecords.push({
+              source: event.record.source,
+              name: event.record.name,
+              upstreamId: event.record.upstreamId,
+              reason: event.record.reason ?? 'Unknown error',
+              timestamp: event.record.syncedAt,
+            })
+          }
+          params.emitEvent!(event)
+        }
+      : undefined
 
     try {
       await emitter?.narrate(
@@ -104,7 +133,7 @@ class VigilExecutor {
           { source, index: index + 1, total: sources.length }
         )
 
-        const sourceResult = await this.runSourceWithRetry(run.id, source, token, options, params.emitEvent)
+        const sourceResult = await this.runSourceWithRetry(run.id, source, token, options, wrappedEmitEvent)
         results.push(sourceResult)
 
         await emitter?.narrate(
@@ -126,6 +155,7 @@ class VigilExecutor {
         completed_at: completedAt,
         results_json: JSON.stringify({
           sources: results,
+          failedRecords,
           options,
           trigger_type: triggerType,
         }),
@@ -158,6 +188,7 @@ class VigilExecutor {
         completed_at: completedAt,
         results_json: JSON.stringify({
           sources: results,
+          failedRecords,
           error: message,
           options,
           trigger_type: triggerType,

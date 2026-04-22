@@ -25,12 +25,20 @@ function fail(error: string): OracleResponse<never> {
 }
 
 function mapChatRow(row: OracleChatMessageRow): OracleChatMessage {
+  let toolCalls: number | undefined
+  if (row.metadata_json) {
+    try {
+      const meta = JSON.parse(row.metadata_json)
+      toolCalls = meta.toolCalls
+    } catch { /* ignore */ }
+  }
   return {
     id: row.id,
     role: row.role,
     content: row.content,
     metadata_json: row.metadata_json,
     created_at: row.created_at,
+    toolCalls,
   }
 }
 
@@ -60,12 +68,22 @@ export function registerOracleHandlers(): void {
         }
       }
 
-      const reply = await oracleChatService.chat(content, emitStep)
+      const emitChunk = (text: string) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.ORACLE_CHAT_CHUNK_EVENT, {
+            text,
+            timestamp: new Date().toISOString(),
+          })
+        }
+      }
+
+      const reply = await oracleChatService.chat(content, emitStep, emitChunk)
 
       const assistantMessage = oracleRepository.createChatMessage({
         role: 'assistant',
-        content: reply,
-        metadata_json: JSON.stringify({ in_reply_to: userMessage.id }),
+        content: reply.content,
+        metadata_json: JSON.stringify({ in_reply_to: userMessage.id, toolCalls: reply.toolCalls }),
         created_at: new Date().toISOString(),
       })
 

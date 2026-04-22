@@ -62,6 +62,7 @@ import type {
   Scout9UpsertSalaryBandParams,
   AgentStepEvent,
   OracleChatStepEvent,
+  ChatChunkEvent,
   IpcContracts,
   IpcEventContracts,
 } from '../shared/ipc-types'
@@ -168,6 +169,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE, params),
     getFailed: () =>
       ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED),
+    getSavedOffset: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET) as Promise<number | null>,
+    clearSavedOffset: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET),
     onProgress: (callback: (data: PipelineProgressEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: PipelineProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT, handler)
@@ -500,6 +505,11 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT, handler)
     },
+    onChatChunkEvent: (callback: (data: ChatChunkEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: ChatChunkEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.SCOUT9_CHAT_CHUNK_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT9_CHAT_CHUNK_EVENT, handler)
+    },
     onPipelineEvent: (callback: (data: Scout9PipelineEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: Scout9PipelineEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)
@@ -531,12 +541,7 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.VIGIL_GET_CONFIG) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_GET_CONFIG]['response']>,
     updateConfig: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_UPDATE_CONFIG]['request']) =>
       ipcRenderer.invoke(IPC_CHANNELS.VIGIL_UPDATE_CONFIG, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_UPDATE_CONFIG]['response']>,
-    sendMessage: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_SEND_MESSAGE]['response']>,
-    listMessages: (params?: IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]['request']) =>
-      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_LIST_MESSAGES]['response']>,
-    clearMessages: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_CHAT_CLEAR_MESSAGES]['response']>,
+
     toolsDryRun: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]['request']) =>
       ipcRenderer.invoke(IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]['response']>,
     syncSource: (params: IpcContracts[typeof IPC_CHANNELS.VIGIL_SYNC_SOURCE]['request']) =>
@@ -551,11 +556,7 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_STATUS_EVENT, handler)
     },
-    onChatStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]) => void) => {
-      const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]) => callback(data)
-      ipcRenderer.on(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
-      return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
-    },
+
   },
 
   oracle: {
@@ -569,6 +570,11 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: OracleChatStepEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT, handler)
+    },
+    onChunkEvent: (callback: (data: ChatChunkEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: ChatChunkEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.ORACLE_CHAT_CHUNK_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.ORACLE_CHAT_CHUNK_EVENT, handler)
     },
   },
 
@@ -615,6 +621,11 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.APP_SHOW_ITEM_IN_FOLDER, filePath),
     openPath: (filePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.APP_OPEN_PATH, filePath),
+    onNavigate: (callback: (data: { path: string }) => void) => {
+      const handler = (_e: IpcRendererEvent, data: { path: string }) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.APP_NAVIGATE, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.APP_NAVIGATE, handler)
+    },
   },
 
   mail: {

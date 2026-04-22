@@ -4,13 +4,10 @@ import type {
   VigilListRunsParams,
   VigilGetActivityLogParams,
   VigilUpdateConfigParams,
-  VigilSendChatMessageParams,
-  VigilListChatMessagesParams,
   VigilToolsDryRunParams,
   VigilSyncSourceParams,
   VigilActivityEvent,
   VigilStatusEvent,
-  VigilChatStepEvent,
 } from '../../../../shared/ipc-types'
 
 export const vigilService = {
@@ -23,15 +20,10 @@ export const vigilService = {
   clearActivityLog: () => window.api.vigil.clearActivityLog(),
   getConfig: () => window.api.vigil.getConfig(),
   updateConfig: (params: VigilUpdateConfigParams) => window.api.vigil.updateConfig(params),
-  sendMessage: (params: VigilSendChatMessageParams) => window.api.vigil.sendMessage(params),
-  listMessages: (params?: VigilListChatMessagesParams) => window.api.vigil.listMessages(params),
-  clearMessages: () => window.api.vigil.clearMessages(),
   toolsDryRun: (params: VigilToolsDryRunParams) => window.api.vigil.toolsDryRun(params),
   syncSource: (params: VigilSyncSourceParams) => window.api.vigil.syncSource(params),
   onActivityEvent: (callback: (event: VigilActivityEvent) => void) =>
     window.api.vigil.onActivityEvent(callback),
   onStatusEvent: (callback: (event: VigilStatusEvent) => void) =>
     window.api.vigil.onStatusEvent(callback),
-  onChatStepEvent: (callback: (event: VigilChatStepEvent) => void) =>
-    window.api.vigil.onChatStepEvent(callback),
 }

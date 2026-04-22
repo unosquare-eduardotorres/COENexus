@@ -89,6 +89,7 @@ function buildSystemPrompt(schemaSnapshot: string): string {
     '- If data is insufficient, say what is missing and suggest the next query.',
     '- Keep responses concise and business-oriented.',
     '- Include key metrics, patterns, and risks when relevant.',
+    '- When querying or reporting on open positions, focus on Active positions by default (position_status = "Active") unless the user explicitly asks for other statuses (Draft, Closed, Filled, etc.). Active positions are the ones that need operational focus and attention.',
     'Key relationships:',
     '- synced_open_positions links to open_position_candidates via upstream_id/open_position_id.',
     '- match_sessions captures matching pipeline execution history.',
@@ -97,8 +98,15 @@ function buildSystemPrompt(schemaSnapshot: string): string {
   ].join('\n\n')
 }
 
+const SENTENCE_DELIMITERS = /(?<=[.!?])\s+|\n/
+
 export const oracleChatService = {
-  async chat(content: string, emitStep?: (step: string) => void, signal?: AbortSignal): Promise<string> {
+  async chat(
+    content: string,
+    emitStep?: (step: string) => void,
+    emitChunk?: (text: string) => void,
+    signal?: AbortSignal
+  ): Promise<{ content: string; toolCalls: number; inputTokens: number; outputTokens: number }> {
     const chatStart = performance.now()
     const mcpServer = createOracleMcpServer()
     const model = getConfig().claude.sonnetModel
@@ -120,6 +128,8 @@ export const oracleChatService = {
     let result = ''
     let inputTokens = 0
     let outputTokens = 0
+    let toolCallCount = 0
+    let sentenceBuffer = ''
 
     const q = query({
       prompt: content,
@@ -129,6 +139,7 @@ export const oracleChatService = {
         maxTurns: 3,
         permissionMode: 'auto',
         abortController,
+        includePartialMessages: true,
         env: {
           ...process.env,
           CLAUDE_AGENT_SDK_CLIENT_APP: `operation-nexus/${app.getVersion()}`,
@@ -147,12 +158,27 @@ export const oracleChatService = {
       for await (const message of q) {
         const msg = message as Record<string, unknown>
 
+        if (msg.type === 'stream_event') {
+          const event = (msg as { event: { type: string; delta?: { type: string; text?: string } } }).event
+          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+            sentenceBuffer += event.delta.text
+            const sentences = sentenceBuffer.split(SENTENCE_DELIMITERS)
+            if (sentences.length > 1) {
+              for (let i = 0; i < sentences.length - 1; i++) {
+                emitChunk?.(sentences[i] + (i < sentences.length - 2 ? ' ' : ''))
+              }
+              sentenceBuffer = sentences[sentences.length - 1]
+            }
+          }
+        }
+
         if (msg.type === 'assistant' && typeof msg.message === 'object' && msg.message) {
           const assistantMessage = msg.message as Record<string, unknown>
           const blocks = assistantMessage.content as Array<Record<string, unknown>> | undefined
 
           blocks?.forEach(block => {
             if (block.type === 'tool_use' && typeof block.name === 'string') {
+              toolCallCount++
               emitStep?.(describeToolCall(block.name, block.input))
             }
 
@@ -183,7 +209,12 @@ export const oracleChatService = {
       log.warn('SDK max turns reached in Oracle chat — using accumulated response', {
         model,
         resultLength: result.length,
+        toolCallCount,
       })
+    }
+
+    if (sentenceBuffer.trim()) {
+      emitChunk?.(sentenceBuffer)
     }
 
     emitStep?.('Done')
@@ -196,6 +227,7 @@ export const oracleChatService = {
       inputTokens,
       outputTokens,
       resultLength: result.length,
+      toolCallCount,
       durationMs: chatMs,
       schemaIntrospectionMs: schemaMs,
     })
@@ -204,6 +236,6 @@ export const oracleChatService = {
       throw new Error('Empty response from Oracle chat service')
     }
 
-    return result
+    return { content: result, toolCalls: toolCallCount, inputTokens, outputTokens }
   },
 }

@@ -98,6 +98,7 @@ export const IPC_CHANNELS = {
   APP_READ_BUNDLED_FILE: 'app:read-bundled-file',
   APP_SHOW_ITEM_IN_FOLDER: 'app:show-item-in-folder',
   APP_OPEN_PATH: 'app:open-path',
+  APP_NAVIGATE: 'app:navigate',
 
   REPORT_EVALUATE_POSITIONS: 'report:evaluate-positions',
   REPORT_POSITION_DETAIL: 'report:position-detail',
@@ -152,14 +153,12 @@ export const IPC_CHANNELS = {
   VIGIL_CLEAR_ACTIVITY_LOG: 'vigil:clear-activity-log',
   VIGIL_GET_CONFIG: 'vigil:get-config',
   VIGIL_UPDATE_CONFIG: 'vigil:update-config',
-  VIGIL_CHAT_SEND_MESSAGE: 'vigil:chat-send-message',
-  VIGIL_CHAT_LIST_MESSAGES: 'vigil:chat-list-messages',
-  VIGIL_CHAT_CLEAR_MESSAGES: 'vigil:chat-clear-messages',
+
   VIGIL_TOOLS_DRY_RUN: 'vigil:tools-dry-run',
   VIGIL_SYNC_SOURCE: 'vigil:sync-source',
   VIGIL_ACTIVITY_EVENT: 'vigil:activity-event',
   VIGIL_STATUS_EVENT: 'vigil:status-event',
-  VIGIL_CHAT_STEP_EVENT: 'vigil:chat-step-event',
+
 
   SCOUT9_RUN: 'scout9:run',
   SCOUT9_CANCEL: 'scout9:cancel',
@@ -202,6 +201,7 @@ export const IPC_CHANNELS = {
   SCOUT9_COUNTRIES_LIST: 'scout9:countries:list',
   SCOUT9_CHAT: 'scout9:chat',
   SCOUT9_CHAT_STEP_EVENT: 'scout9:chat-step-event',
+  SCOUT9_CHAT_CHUNK_EVENT: 'scout9:chat-chunk-event',
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
 
@@ -224,6 +224,7 @@ export const IPC_CHANNELS = {
   ORACLE_CHAT_LIST_MESSAGES: 'oracle:chat-list-messages',
   ORACLE_CHAT_CLEAR_MESSAGES: 'oracle:chat-clear-messages',
   ORACLE_CHAT_STEP_EVENT: 'oracle:chat-step-event',
+  ORACLE_CHAT_CHUNK_EVENT: 'oracle:chat-chunk-event',
 
   AGENT_STEP_EVENT: 'agent:step-event',
   AGENT_STUB_RUN: 'agent:stub-run',
@@ -260,6 +261,8 @@ export const IPC_CHANNELS = {
   POSITION_PIPELINE_RETRY_ALL_FAILED: 'position-pipeline:retry-all-failed',
   POSITION_PIPELINE_RETRY_SINGLE: 'position-pipeline:retry-single',
   POSITION_PIPELINE_GET_FAILED: 'position-pipeline:get-failed',
+  POSITION_PIPELINE_GET_SAVED_OFFSET: 'position-pipeline:get-saved-offset',
+  POSITION_PIPELINE_CLEAR_SAVED_OFFSET: 'position-pipeline:clear-saved-offset',
   POSITION_PIPELINE_PROGRESS_EVENT: 'position-pipeline:progress-event',
 
   MAIL_GET_CONFIG: 'mail:get-config',

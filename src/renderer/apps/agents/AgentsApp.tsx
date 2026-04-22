@@ -6,6 +6,10 @@ import AgentDetailPage from './pages/AgentDetailPage'
 
 const Scout9Page = lazy(() => import('./pages/Scout9Page'))
 const VigilPage = lazy(() => import('./pages/VigilPage'))
+const MissionControlTab = lazy(() => import('./components/vigil/MissionControlTab'))
+const ScheduleTab = lazy(() => import('./components/vigil/ScheduleTab'))
+const RunsTab = lazy(() => import('./components/vigil/RunsTab'))
+const VigilRunReportPage = lazy(() => import('./pages/VigilRunReportPage'))
 const PipelineTab = lazy(() => import('./pages/scout9/PipelineTab'))
 const ReportsTab = lazy(() => import('./pages/scout9/ReportsTab'))
 const KnowledgeBaseTab = lazy(() => import('./pages/scout9/KnowledgeBaseTab'))
@@ -13,6 +17,16 @@ const SettingsTab = lazy(() => import('./pages/scout9/SettingsTab'))
 const Scout9ChatTab = lazy(() => import('./pages/scout9/Scout9ChatTab'))
 const StubAgentPage = lazy(() => import('./pages/StubAgentPage'))
 const BraniacPage = lazy(() => import('./pages/BraniacPage'))
+const BraniacHomeTab = lazy(() => import('./pages/braniac/HomeTab'))
+const BraniacPipelineTab = lazy(() => import('./pages/braniac/PipelineTab'))
+const BraniacJobHistoryTab = lazy(() => import('./pages/braniac/JobHistoryTab'))
+const BraniacPatternsTab = lazy(() => import('./pages/braniac/PatternsTab'))
+const OraclePage = lazy(() => import('./pages/OraclePage'))
+const OracleHomeTab = lazy(() => import('./pages/oracle/OracleHomeTab'))
+const OracleChatTab = lazy(() => import('./pages/oracle/OracleChatTab'))
+const OraclePage = lazy(() => import('./pages/OraclePage'))
+const OracleHomeTab = lazy(() => import('./pages/oracle/OracleHomeTab'))
+const OracleChatTab = lazy(() => import('./pages/oracle/OracleChatTab'))
 
 function RouteFallback() {
   return (
@@ -38,8 +52,26 @@ export default function AgentsApp() {
             <Route path="chat" element={<Scout9ChatTab />} />
             <Route path="settings" element={<SettingsTab />} />
           </Route>
-          <Route path="vigil" element={<VigilPage />} />
-          <Route path="braniac" element={<BraniacPage />} />
+          <Route path="vigil" element={<VigilPage />}>
+            <Route index element={<MissionControlTab />} />
+            <Route path="schedule" element={<ScheduleTab />} />
+            <Route path="runs" element={<RunsTab />} />
+            <Route path="runs/:runId" element={<VigilRunReportPage />} />
+          </Route>
+          <Route path="braniac" element={<BraniacPage />}>
+            <Route index element={<BraniacHomeTab />} />
+            <Route path="pipeline" element={<BraniacPipelineTab />} />
+            <Route path="history" element={<BraniacJobHistoryTab />} />
+            <Route path="patterns" element={<BraniacPatternsTab />} />
+          </Route>
+          <Route path="oracle" element={<OraclePage />}>
+            <Route index element={<OracleHomeTab />} />
+            <Route path="chat" element={<OracleChatTab />} />
+          </Route>
+          <Route path="oracle" element={<OraclePage />}>
+            <Route index element={<OracleHomeTab />} />
+            <Route path="chat" element={<OracleChatTab />} />
+          </Route>
           <Route path="switchboard" element={<StubAgentPage />} />
           <Route path="sensei" element={<StubAgentPage />} />
           <Route path="payday" element={<StubAgentPage />} />

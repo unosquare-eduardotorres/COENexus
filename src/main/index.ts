@@ -16,6 +16,7 @@ import { initAutoUpdater, stopAutoUpdater } from './updater'
 import { initErrorTransport } from './services/errorTransport'
 import { syncWatcherService } from './services/syncWatcherService'
 import { databaseSharingService } from './services/databaseSharingService'
+import { trayService } from './services/trayService'
 import { createLogger } from './services/logger'
 
 function validateNativeModules(): void {
@@ -42,14 +43,32 @@ validateNativeModules()
 const log = createLogger('Main')
 
 let mainWindow: BrowserWindow | null = null
+let isQuitting = false
+
+const activeAgents = new Set<string>()
+
+function updateTrayActivity(agentId: string, running: boolean): void {
+  if (running) activeAgents.add(agentId)
+  else activeAgents.delete(agentId)
+  trayService.setActive(activeAgents.size > 0)
+
+  const statuses: Record<string, string> = {}
+  for (const id of activeAgents) {
+    statuses[id] = 'Running'
+  }
+  trayService.rebuildMenu(activeAgents.size > 0 ? statuses : undefined)
+}
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow?.isMinimized()) mainWindow.restore()
-    mainWindow?.focus()
+    if (mainWindow) {
+      mainWindow.show()
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
   })
 }
 
@@ -88,6 +107,22 @@ function createWindow(): void {
   mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     if (level >= 2) {
       console.log(`[Renderer:${level}] ${message} (${sourceId}:${line})`)
+    }
+  })
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+      if (process.platform === 'darwin') {
+        app.dock?.hide()
+      }
+    }
+  })
+
+  mainWindow.on('show', () => {
+    if (process.platform === 'darwin') {
+      app.dock?.show()
     }
   })
 
@@ -247,6 +282,9 @@ app.whenReady().then(async () => {
 
   createWindow()
   createMenu()
+  if (mainWindow) {
+    trayService.init(mainWindow)
+  }
   vigilScheduler.start({
     getToken: () => getVigilToken(),
     run: async ({ token, sources, options }) => {
@@ -256,6 +294,7 @@ app.whenReady().then(async () => {
         timestamp: new Date().toISOString(),
       }
       emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, runningStatus)
+      updateTrayActivity('Vigil', true)
 
       try {
         const run = await vigilExecutor.run({
@@ -274,8 +313,10 @@ app.whenReady().then(async () => {
           timestamp: new Date().toISOString(),
         }
         emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, completedStatus)
+        updateTrayActivity('Vigil', false)
 
         if (Notification.isSupported()) {
+          const completedRunId = run.id
           const notification = new Notification({
             title: 'Vigil Sync Complete',
             body: 'All sources synced successfully',
@@ -283,7 +324,11 @@ app.whenReady().then(async () => {
           })
           notification.on('click', () => {
             const win = getMainWindow()
-            if (win) { win.show(); win.focus() }
+            if (win) {
+              win.show()
+              win.focus()
+              win.webContents.send(IPC_CHANNELS.APP_NAVIGATE, { path: `/agents/vigil/runs/${completedRunId}` })
+            }
           })
           notification.show()
         }
@@ -296,6 +341,7 @@ app.whenReady().then(async () => {
           timestamp: new Date().toISOString(),
         }
         emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, failedStatus)
+        updateTrayActivity('Vigil', false)
 
         if (Notification.isSupported()) {
           const notification = new Notification({
@@ -305,7 +351,11 @@ app.whenReady().then(async () => {
           })
           notification.on('click', () => {
             const win = getMainWindow()
-            if (win) { win.show(); win.focus() }
+            if (win) {
+              win.show()
+              win.focus()
+              win.webContents.send(IPC_CHANNELS.APP_NAVIGATE, { path: '/agents/vigil/runs' })
+            }
           })
           notification.show()
         }
@@ -321,10 +371,12 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // Don't quit — tray keeps the app alive
 })
 
 app.on('before-quit', () => {
+  isQuitting = true
+  trayService.destroy()
   embeddingWorker.stop()
   vigilScheduler.stop()
   syncWatcherService.stop()

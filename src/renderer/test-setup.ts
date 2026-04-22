@@ -221,6 +221,7 @@ Object.defineProperty(window, 'api', {
       onUpdateDownloaded: vi.fn().mockReturnValue(() => {}),
       readBundledFile: vi.fn().mockResolvedValue(''),
       showItemInFolder: vi.fn().mockResolvedValue(undefined),
+      onNavigate: vi.fn().mockReturnValue(() => {}),
       openPath: vi.fn().mockResolvedValue(undefined),
     },
   },

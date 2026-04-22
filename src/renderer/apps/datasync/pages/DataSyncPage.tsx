@@ -4,8 +4,10 @@ import DataSyncLayout from '../components/DataSyncLayout';
 import DataSyncOverview from '../components/DataSyncOverview';
 import SyncDashboard from '../components/SyncDashboard';
 import PipelineDashboard from '../components/PipelineDashboard';
+import PositionPipelineDashboard from '../components/PositionPipelineDashboard';
 import { useDataSync } from '../hooks/useDataSync';
 import { useUnifiedPipeline } from '../hooks/useUnifiedPipeline';
+import { usePositionPipeline } from '../hooks/usePositionPipeline';
 import { useDataSyncSettings } from '../hooks/useDataSyncSettings';
 import { useNexusStatus } from '../../../contexts/NexusStatusContext';
 import { databaseSharingService } from '../services/databaseSharingService';
@@ -86,6 +88,7 @@ export default function DataSyncPage() {
 
   const employeePipeline = useUnifiedPipeline({ source: 'employees' });
   const candidatePipeline = useUnifiedPipeline({ source: 'candidates', selectedYear });
+  const positionPipeline = usePositionPipeline();
 
   const renderDatabaseEmptyBanner = () => {
     if (!isDatabaseEmpty || dismissedBanner || importSuccess) return null;
@@ -181,11 +184,43 @@ export default function DataSyncPage() {
       );
     }
 
+    if (activePanel === 'open-positions') {
+      return (
+        <>
+          {renderDatabaseEmptyBanner()}
+          <PositionPipelineDashboard
+            progress={positionPipeline.progress}
+            succeededRecords={positionPipeline.succeededRecords}
+            failedRecords={positionPipeline.failedRecords}
+            skippedRecords={positionPipeline.skippedRecords}
+            retryingId={positionPipeline.retryingId}
+            activeTab={positionPipeline.activeTab}
+            onTabChange={positionPipeline.setActiveTab}
+            isRunning={positionPipeline.isRunning}
+            isPaused={positionPipeline.isPaused}
+            progressPercent={positionPipeline.progressPercent}
+            isVectorizingSynced={positionPipeline.isVectorizingSynced}
+            onSyncActive={positionPipeline.handleSyncActive}
+            onSyncAll={positionPipeline.handleSyncAll}
+            onVectorizeSynced={positionPipeline.handleVectorizeSynced}
+            onPause={positionPipeline.handlePause}
+            onResume={positionPipeline.handleResume}
+            onRetryAllFailed={positionPipeline.handleRetryAllFailed}
+            onRetrySingle={positionPipeline.handleRetrySingle}
+            onResumeSyncAll={positionPipeline.handleResumeSyncAll}
+            savedOffset={positionPipeline.savedOffset}
+            isSyncDisabled={!isTokenValid}
+            isVoyageKeyConfigured={settings.voyageKeyConfigured}
+          />
+        </>
+      );
+    }
+
     return (
       <>
         {renderDatabaseEmptyBanner()}
         <SyncDashboard
-          source={activePanel as 'open-positions' | 'project-reallocations'}
+          source={activePanel as 'project-reallocations'}
           progress={activeProgress}
           records={activeRecords}
           onStartSync={handleStartSync}

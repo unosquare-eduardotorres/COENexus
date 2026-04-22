@@ -69,6 +69,18 @@ async function tick(): Promise<void> {
     return
   }
 
+  const scheduledDays: number[] = (() => {
+    try {
+      const parsed = JSON.parse(config.schedule_days_json || '[1,2,3,4,5]')
+      return Array.isArray(parsed) ? parsed : [1, 2, 3, 4, 5]
+    } catch {
+      return [1, 2, 3, 4, 5]
+    }
+  })()
+  if (!scheduledDays.includes(now.getDay())) {
+    return
+  }
+
   const currentMinuteKey = minuteKey(now)
   if (currentMinuteKey === lastTriggeredMinuteKey) {
     return
@@ -92,6 +104,7 @@ async function tick(): Promise<void> {
     const sources = parseSources(config.sync_sources_json)
     const options: SyncOptions = {
       year: config.candidate_year_filter,
+      activeOnly: config.active_positions_only === 1,
     }
 
     await runFn({

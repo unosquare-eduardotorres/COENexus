@@ -532,4 +532,38 @@ export const syncRepository = {
       fields.resume_filename, fields.status, fields.status_reason, fields.synced_at, id
     )
   },
+
+  findPositionsByUpstreamIds(upstreamIds: number[]): Map<number, SyncedOpenPositionRow> {
+    if (upstreamIds.length === 0) return new Map()
+    const db = getDatabase()
+    const placeholders = upstreamIds.map(() => '?').join(',')
+    const rows = db.prepare(
+      `SELECT * FROM synced_open_positions WHERE upstream_id IN (${placeholders})`
+    ).all(...upstreamIds) as SyncedOpenPositionRow[]
+    const map = new Map<number, SyncedOpenPositionRow>()
+    for (const row of rows) {
+      map.set(row.upstream_id, row)
+    }
+    return map
+  },
+
+  saveSyncMetadata(key: string, value: string): void {
+    const db = getDatabase()
+    const now = new Date().toISOString()
+    db.prepare(
+      `INSERT INTO sync_metadata (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = ?`
+    ).run(key, value, now, value, now)
+  },
+
+  getSyncMetadata(key: string): string | null {
+    const db = getDatabase()
+    const row = db.prepare('SELECT value FROM sync_metadata WHERE key = ?').get(key) as { value: string } | undefined
+    return row ? row.value : null
+  },
+
+  clearSyncMetadata(key: string): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM sync_metadata WHERE key = ?').run(key)
+  },
 }

@@ -56,6 +56,8 @@ export const scout9Service = {
   chat: (params: Scout9ChatParams) => window.api.scout9.chat(params),
   onChatStepEvent: (callback: (step: string) => void) =>
     window.api.scout9.onChatStepEvent(callback),
+  onChatChunkEvent: (callback: (text: string) => void) =>
+    window.api.scout9.onChatChunkEvent((data) => callback(data.text)),
   onPipelineEvent: (callback: (event: Scout9PipelineEvent) => void) =>
     window.api.scout9.onPipelineEvent(callback),
   onStatusEvent: (callback: (event: Scout9StatusEvent) => void) =>
