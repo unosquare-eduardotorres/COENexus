@@ -1,6 +1,8 @@
 import { getDatabase } from '../db/connection'
 import { reportRepository } from '../db/agents/repositories/reportRepository'
 import { assembleBrain } from './scout9BrainService'
+import { evaluateSalaryFeasibility } from './salaryFeasibilityService'
+import { runScout9Agent } from './scout9AgentService'
 import { createLogger } from './logger'
 import type { PipelineContext, Scout9PipelineEvent } from './scout9PipelineService'
 
@@ -20,6 +22,8 @@ interface PositionRow {
   vertical_industry: string
   aging: number
   candidates_presented: number
+  minimum_rate: number | null
+  maximum_rate: number | null
 }
 
 interface CandidatePoolEntry {
@@ -73,7 +77,7 @@ export async function fetchPositions(
   }
 
   emit({ type: 'log', message: '1.4 Executing position query...' })
-  const query = `SELECT id, upstream_id, account, coe, stakeholder, main_skill, job_title, job_description, seniorities, countries, vertical_industry, aging, candidates_presented FROM synced_open_positions WHERE ${conditions.join(' AND ')} ORDER BY aging DESC`
+  const query = `SELECT id, upstream_id, account, coe, stakeholder, main_skill, job_title, job_description, seniorities, countries, vertical_industry, aging, candidates_presented, minimum_rate, maximum_rate FROM synced_open_positions WHERE ${conditions.join(' AND ')} ORDER BY aging DESC`
   const positions = db.prepare(query).all(...params) as PositionRow[]
 
   emit({ type: 'log', message: `1.5 Found ${positions.length} positions matching filters` })
@@ -212,18 +216,33 @@ export async function runAgenticPhase(
       countries: pos.countries,
       aging: pos.aging,
       candidatesPresented: pos.candidates_presented,
-      availableCandidates: newCandidates.map(c => ({
-        upstreamId: c.upstreamId,
-        sourceType: c.sourceType,
-        name: c.fullName,
-        skill: c.mainSkill,
-        seniority: c.seniority,
-        country: c.country,
-        hasResume: c.hasResumeText,
-        normalizedMonthlyUsd: c.normalizedMonthlyUsd,
-        inferredCurrency: c.inferredCurrency,
-        currencyConfidence: c.currencyConfidence,
-      })),
+      minimumRate: pos.minimum_rate,
+      maximumRate: pos.maximum_rate,
+      availableCandidates: newCandidates.map(c => {
+        const feasibility = evaluateSalaryFeasibility(
+          c.normalizedMonthlyUsd,
+          c.currencyConfidence,
+          { minimum_rate: pos.minimum_rate, maximum_rate: pos.maximum_rate },
+          c.seniority,
+          pos.seniorities,
+          c.country,
+          pos.account
+        )
+        return {
+          upstreamId: c.upstreamId,
+          sourceType: c.sourceType,
+          name: c.fullName,
+          skill: c.mainSkill,
+          seniority: c.seniority,
+          country: c.country,
+          hasResume: c.hasResumeText,
+          normalizedMonthlyUsd: c.normalizedMonthlyUsd,
+          currencyConfidence: c.currencyConfidence,
+          salaryFeasibility: feasibility.verdict,
+          salaryNote: feasibility.reason,
+          employmentTypeNote: feasibility.employmentTypeNote,
+        }
+      }),
     }
   })
 
@@ -241,11 +260,15 @@ Use the available tools to get additional details when needed (resume text, disc
 
 Respond with a valid JSON report following the structure defined in your system instructions.`
 
-  emit({ type: 'log', message: '4.5 Running AI analysis (stub — returns fitScore: 50, pending Agent SDK wiring)...' })
+  emit({ type: 'log', message: '4.5 Running AI analysis via Claude Agent SDK...' })
   let reportContent: Record<string, unknown>
   try {
+    reportContent = await runScout9Agent(systemPrompt, analysisPrompt, emit, ctx.signal)
+  } catch (err) {
+    log.error('Scout9 agent failed', err instanceof Error ? err : new Error(String(err)))
+    emit({ type: 'log', message: `4.5 AI analysis failed: ${err instanceof Error ? err.message : String(err)} — using fallback stub` })
     reportContent = {
-      summary: `Scout-9 analysis of ${positions.length} positions with ${positionSummaries.reduce((s, p) => s + p.availableCandidates.length, 0)} available candidates`,
+      summary: `Scout-9 analysis of ${positions.length} positions (fallback — AI unavailable)`,
       positions: positionSummaries.map(pos => ({
         upstreamId: pos.upstreamId,
         account: pos.account,
@@ -255,15 +278,12 @@ Respond with a valid JSON report following the structure defined in your system 
           candidateSourceType: c.sourceType,
           candidateName: c.name,
           fitScore: 50,
-          reasoning: 'Pending AI analysis',
+          reasoning: 'AI analysis unavailable — fallback scoring',
           strengths: [c.skill],
           concerns: [],
         })),
       })),
     }
-  } catch (err) {
-    log.error('Failed to build report content', err instanceof Error ? err : new Error(String(err)))
-    reportContent = { summary: 'Analysis failed', positions: [] }
   }
 
   const allRecommendations = (reportContent.positions as Array<{ recommendations: unknown[] }>)

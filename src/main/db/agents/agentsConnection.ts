@@ -65,8 +65,8 @@ function runInitialSchema(database: Database.Database): void {
 
   if (!hasJobsTable) {
     const schemaCandidates = [
-      join(__dirname, 'schema.sql'),
       join(__dirname, 'db', 'agents', 'schema.sql'),
+      join(__dirname, 'schema.sql'),
     ]
     const schemaPath = schemaCandidates.find(existsSync) ?? schemaCandidates[0]
     if (!existsSync(schemaPath)) {
@@ -87,7 +87,7 @@ function runInitialSchema(database: Database.Database): void {
       "INSERT OR IGNORE INTO scout9_schema_migrations (version, name) VALUES (1, 'initial_schema')"
     ).run()
 
-    seedMigrationsFromSchema(database, 'scout9_schema_migrations', join(__dirname, 'migrations'))
+    seedMigrationsFromSchema(database, 'scout9_schema_migrations', join(__dirname, 'db', 'agents', 'migrations'))
   }
 }
 
@@ -95,7 +95,7 @@ function runMigrations(database: Database.Database): void {
   runFileBasedMigrations({
     database,
     migrationsTable: 'scout9_schema_migrations',
-    migrationsDir: join(__dirname, 'migrations'),
+    migrationsDir: join(__dirname, 'db', 'agents', 'migrations'),
     dbLabel: 'agents',
   })
 }

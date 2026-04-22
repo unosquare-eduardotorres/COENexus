@@ -69,8 +69,15 @@ export const IPC_CHANNELS = {
   DATABASE_IMPORT_LATEST: 'database:import-latest',
   DATABASE_SYNC_UPDATE: 'database:sync-update',
 
+  PIPELINE_START: 'pipeline:start',
+  PIPELINE_PAUSE: 'pipeline:pause',
+  PIPELINE_RETRY_ALL_FAILED: 'pipeline:retry-all-failed',
+  PIPELINE_RETRY_SINGLE: 'pipeline:retry-single',
+  PIPELINE_GET_FAILED: 'pipeline:get-failed',
+
   SYNC_PROGRESS_EVENT: 'sync:progress-event',
   PROCESSING_PROGRESS_EVENT: 'processing:progress-event',
+  PIPELINE_PROGRESS_EVENT: 'pipeline:progress-event',
   MATCH_SEARCH_EVENT: 'match:search-event',
   MATCH_BENCH_BURN_EVENT: 'match:bench-burn-event',
 
@@ -193,6 +200,8 @@ export const IPC_CHANNELS = {
   SCOUT9_SALARY_BANDS_DELETE: 'scout9:salary-bands:delete',
   SCOUT9_JOB_FAMILIES_LIST: 'scout9:job-families:list',
   SCOUT9_COUNTRIES_LIST: 'scout9:countries:list',
+  SCOUT9_CHAT: 'scout9:chat',
+  SCOUT9_CHAT_STEP_EVENT: 'scout9:chat-step-event',
   SCOUT9_PIPELINE_EVENT: 'scout9:pipeline-event',
   SCOUT9_STATUS_EVENT: 'scout9:status-event',
 
@@ -205,8 +214,16 @@ export const IPC_CHANNELS = {
   BRANIAC_LIST_PROFILES: 'braniac:list-profiles',
   BRANIAC_GET_PROFILE: 'braniac:get-profile',
   BRANIAC_GET_ACCOUNTS: 'braniac:get-accounts',
+  BRANIAC_APPROVE_PATTERN: 'braniac:approve-pattern',
+  BRANIAC_REJECT_PATTERN: 'braniac:reject-pattern',
+  BRANIAC_UPDATE_PATTERN: 'braniac:update-pattern',
   BRANIAC_STEP_EVENT: 'braniac:step-event',
   BRANIAC_STATUS_EVENT: 'braniac:status-event',
+
+  ORACLE_CHAT_SEND_MESSAGE: 'oracle:chat-send-message',
+  ORACLE_CHAT_LIST_MESSAGES: 'oracle:chat-list-messages',
+  ORACLE_CHAT_CLEAR_MESSAGES: 'oracle:chat-clear-messages',
+  ORACLE_CHAT_STEP_EVENT: 'oracle:chat-step-event',
 
   AGENT_STEP_EVENT: 'agent:step-event',
   AGENT_STUB_RUN: 'agent:stub-run',
@@ -236,6 +253,14 @@ export const IPC_CHANNELS = {
   PRESENT_GENERATE_INTRO: 'present:generate-intro',
   PRESENT_GENERATE_CANDIDATE_PROFILE: 'present:generate-candidate-profile',
   PRESENT_GENERATE_HTML: 'present:generate-html',
+
+  POSITION_PIPELINE_START: 'position-pipeline:start',
+  POSITION_PIPELINE_PAUSE: 'position-pipeline:pause',
+  POSITION_PIPELINE_VECTORIZE_SYNCED: 'position-pipeline:vectorize-synced',
+  POSITION_PIPELINE_RETRY_ALL_FAILED: 'position-pipeline:retry-all-failed',
+  POSITION_PIPELINE_RETRY_SINGLE: 'position-pipeline:retry-single',
+  POSITION_PIPELINE_GET_FAILED: 'position-pipeline:get-failed',
+  POSITION_PIPELINE_PROGRESS_EVENT: 'position-pipeline:progress-event',
 
   MAIL_GET_CONFIG: 'mail:get-config',
   MAIL_SAVE_CONFIG: 'mail:save-config',

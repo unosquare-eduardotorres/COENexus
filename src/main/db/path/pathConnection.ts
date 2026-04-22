@@ -44,8 +44,8 @@ function runInitialSchema(database: Database.Database): void {
 
   if (!hasSeniorityLevels) {
     const schemaCandidates = [
-      join(__dirname, 'schema.sql'),
       join(__dirname, 'db', 'path', 'schema.sql'),
+      join(__dirname, 'schema.sql'),
     ]
     const schemaPath = schemaCandidates.find(existsSync) ?? schemaCandidates[0]
     if (!existsSync(schemaPath)) {
@@ -66,7 +66,7 @@ function runInitialSchema(database: Database.Database): void {
       "INSERT OR IGNORE INTO path_schema_migrations (version, name) VALUES (1, 'initial_schema')"
     ).run()
 
-    seedMigrationsFromSchema(database, 'path_schema_migrations', join(__dirname, 'migrations'))
+    seedMigrationsFromSchema(database, 'path_schema_migrations', join(__dirname, 'db', 'path', 'migrations'))
   }
 }
 
@@ -74,7 +74,7 @@ function runMigrations(database: Database.Database): void {
   runFileBasedMigrations({
     database,
     migrationsTable: 'path_schema_migrations',
-    migrationsDir: join(__dirname, 'migrations'),
+    migrationsDir: join(__dirname, 'db', 'path', 'migrations'),
     dbLabel: 'path',
   })
 }

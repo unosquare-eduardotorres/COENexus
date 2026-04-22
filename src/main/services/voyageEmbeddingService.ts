@@ -42,40 +42,56 @@ export const voyageEmbeddingService = {
   ): Promise<Float32Array> {
     const { voyage } = getConfig()
     const apiUrl = voyage.apiUrl.replace(/\/+$/, '')
-    const apiKey = keyRotator.getNextApiKey()
     const embeddingModel = model ?? voyage.defaultModel
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const response = await fetch(`${apiUrl}/embeddings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ input: [text], model: embeddingModel }),
-        signal,
-      })
+    const keychainKeys = keychainService.getVoyageKeys()
+    const allKeys = keychainKeys.length > 0 ? keychainKeys : voyage.apiKeys
+    if (allKeys.length === 0) throw new Error('Voyage API key not configured — add one in Settings → Vectorization')
 
-      if (response.status === 429 && attempt < MAX_RETRIES) {
-        const retryAfter = parseInt(response.headers.get('retry-after') ?? '', 10)
-        const delay = isNaN(retryAfter) ? BACKOFF_SECONDS[Math.min(attempt, BACKOFF_SECONDS.length - 1)] : retryAfter
-        const keySuffix = apiKey.length > 4 ? apiKey.slice(-4) : '****'
-        log.warn(`429 rate-limited on key ...${keySuffix}, waiting ${delay}s (retry ${attempt + 1}/${MAX_RETRIES})`)
-        await new Promise(resolve => setTimeout(resolve, delay * 1000))
-        continue
+    let lastError: Error | null = null
+
+    for (let keyAttempt = 0; keyAttempt < allKeys.length; keyAttempt++) {
+      const apiKey = keyRotator.getNextApiKey()
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const response = await fetch(`${apiUrl}/embeddings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ input: [text], model: embeddingModel }),
+          signal,
+        })
+
+        if (response.status === 429 && attempt < MAX_RETRIES) {
+          const retryAfter = parseInt(response.headers.get('retry-after') ?? '', 10)
+          const delay = isNaN(retryAfter) ? BACKOFF_SECONDS[Math.min(attempt, BACKOFF_SECONDS.length - 1)] : retryAfter
+          const keySuffix = apiKey.length > 4 ? apiKey.slice(-4) : '****'
+          log.warn(`429 rate-limited on key ...${keySuffix}, waiting ${delay}s (retry ${attempt + 1}/${MAX_RETRIES})`)
+          await new Promise(resolve => setTimeout(resolve, delay * 1000))
+          continue
+        }
+
+        if (response.status === 401) {
+          const keySuffix = apiKey.length > 4 ? apiKey.slice(-4) : '****'
+          log.warn(`401 Unauthorized on key ...${keySuffix}, trying next key`)
+          lastError = new Error(`Voyage API key ...${keySuffix} is unauthorized — replace this key in Settings → Vectorization`)
+          break
+        }
+
+        if (!response.ok) {
+          throw new Error(`Voyage API error ${response.status}: ${response.statusText}`)
+        }
+
+        const result = (await response.json()) as VoyageResponse
+        const embedding = result.data?.[0]?.embedding
+        if (!embedding) throw new Error('Empty embedding response')
+        return new Float32Array(embedding)
       }
-
-      if (!response.ok) {
-        throw new Error(`Voyage API error ${response.status}: ${response.statusText}`)
-      }
-
-      const result = (await response.json()) as VoyageResponse
-      const embedding = result.data?.[0]?.embedding
-      if (!embedding) throw new Error('Empty embedding response')
-      return new Float32Array(embedding)
     }
 
-    throw new Error('Voyage API rate limit exceeded after all retries')
+    throw lastError ?? new Error('All Voyage API keys failed authentication (401) — update keys in Settings → Vectorization')
   },
 
 }

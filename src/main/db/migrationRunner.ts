@@ -36,6 +36,7 @@ export function runFileBasedMigrations(options: MigrationRunnerOptions): void {
 
   const dirCandidates = [
     migrationsDir,
+    join(migrationsDir, '..', 'db', 'migrations'),
     join(migrationsDir, '..', 'db', dbLabel, 'migrations'),
   ]
   const resolvedDir = dirCandidates.find(existsSync)

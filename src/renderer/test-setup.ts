@@ -187,6 +187,12 @@ Object.defineProperty(window, 'api', {
       onActivityEvent: vi.fn().mockReturnValue(() => {}),
       onStatusEvent: vi.fn().mockReturnValue(() => {}),
     },
+    oracle: {
+      sendMessage: vi.fn().mockResolvedValue({ success: true, data: { id: '1', role: 'assistant', content: '', metadata_json: null, created_at: '' } }),
+      listMessages: vi.fn().mockResolvedValue({ success: true, data: [] }),
+      clearMessages: vi.fn().mockResolvedValue({ success: true, data: { cleared: true } }),
+      onStepEvent: vi.fn().mockReturnValue(() => {}),
+    },
     agents: {
       runStub: vi.fn().mockResolvedValue({ success: true }),
       onStepEvent: vi.fn().mockReturnValue(() => {}),

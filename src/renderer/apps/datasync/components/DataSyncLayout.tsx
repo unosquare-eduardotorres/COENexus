@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import GlobalTitleBar from '../../../components/GlobalTitleBar';
 
-export type DataSyncPanel = 'overview' | 'employees' | 'candidates' | 'open-positions' | 'project-reallocations' | 'vectorization';
+export type DataSyncPanel = 'overview' | 'employees' | 'candidates' | 'open-positions' | 'project-reallocations';
 
 interface DataSyncLayoutProps {
   children: ReactNode;
@@ -63,15 +63,6 @@ const sourceItems: Array<{ id: DataSyncPanel; label: string; icon: JSX.Element }
 ];
 
 const configItems: Array<{ id: DataSyncPanel; label: string; icon: JSX.Element }> = [
-  {
-    id: 'vectorization',
-    label: 'Vectorization',
-    icon: (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-      </svg>
-    ),
-  },
 
 ];
 
@@ -141,28 +132,31 @@ export default function DataSyncLayout({
             );
           })}
 
-          <div className="minimal-divider mx-3 my-2" />
-
-          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Configuration</p>
-          {configItems.map(item => {
-            const isActive = activePanel === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onPanelChange(item.id)}
-                className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
-                }`}
-                style={{ maxWidth: 'calc(100% - 16px)' }}
-              >
-                <span className="flex-shrink-0">{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-              </button>
-            );
-          })}
+          {configItems.length > 0 && (
+            <>
+              <div className="minimal-divider mx-3 my-2" />
+              <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Configuration</p>
+              {configItems.map(item => {
+                const isActive = activePanel === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onPanelChange(item.id)}
+                    className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
+                    }`}
+                    style={{ maxWidth: 'calc(100% - 16px)' }}
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </nav>
 
       </aside>

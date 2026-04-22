@@ -97,6 +97,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
   const [refreshingId, setRefreshingId] = useState<number | undefined>();
   const [vectorizingId, setVectorizingId] = useState<number | undefined>();
   const [isClearing, setIsClearing] = useState(false);
+  const [isProcessingAll, setIsProcessingAll] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const extractionAbortRef = useRef<AbortController | null>(null);
@@ -256,23 +257,37 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
       source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
       processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
     });
-
-    const finalProgress = await resumeProcessingService.startExtraction(
-      source, token, (p) => setExtractionProgress(p),
-      handleRecordExtracted, controller.signal,
+    setVectorizationProgress(initialProcessingProgress(source));
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.pipelineStatus === 'extract_failed'
+          ? { ...r, pipelineStatus: 'synced' as const, reason: undefined }
+          : r
+      )
     );
 
-    setExtractionProgress(finalProgress);
-    setExtractingUpstreamId(undefined);
-    log.info('Extraction completed', {
-      source,
-      successCount: finalProgress.successCount,
-      failedCount: finalProgress.failedCount,
-      skippedCount: finalProgress.skippedCount,
-    });
+    try {
+      const finalProgress = await resumeProcessingService.startExtraction(
+        source, token, (p) => setExtractionProgress(p),
+        handleRecordExtracted, controller.signal,
+      );
 
-    if (finalProgress.successCount > 0) {
-      await invalidateRecordQueries();
+      setExtractionProgress(finalProgress);
+      setExtractingUpstreamId(undefined);
+      log.info('Extraction completed', {
+        source,
+        successCount: finalProgress.successCount,
+        failedCount: finalProgress.failedCount,
+        skippedCount: finalProgress.skippedCount,
+      });
+
+      if (finalProgress.successCount > 0) {
+        await invalidateRecordQueries();
+      }
+    } catch (err) {
+      log.error('Extraction failed', err instanceof Error ? err : new Error(String(err)));
+      setExtractionProgress((prev) => ({ ...prev, status: 'error' }));
+      setExtractingUpstreamId(undefined);
     }
   }, [source, token, handleRecordExtracted, invalidateRecordQueries]);
 
@@ -291,23 +306,37 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
       source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
       processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
     });
-
-    const finalProgress = await resumeProcessingService.startVectorization(
-      source, (p) => setVectorizationProgress(p),
-      handleRecordVectorized, controller.signal,
+    setExtractionProgress(initialProcessingProgress(source));
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.pipelineStatus === 'vectorize_failed'
+          ? { ...r, pipelineStatus: 'extracted' as const, reason: undefined }
+          : r
+      )
     );
 
-    setVectorizationProgress(finalProgress);
-    setVectorizingUpstreamId(undefined);
-    log.info('Vectorization completed', {
-      source,
-      successCount: finalProgress.successCount,
-      failedCount: finalProgress.failedCount,
-      skippedCount: finalProgress.skippedCount,
-    });
+    try {
+      const finalProgress = await resumeProcessingService.startVectorization(
+        source, (p) => setVectorizationProgress(p),
+        handleRecordVectorized, controller.signal,
+      );
 
-    if (finalProgress.successCount > 0) {
-      await invalidateRecordQueries();
+      setVectorizationProgress(finalProgress);
+      setVectorizingUpstreamId(undefined);
+      log.info('Vectorization completed', {
+        source,
+        successCount: finalProgress.successCount,
+        failedCount: finalProgress.failedCount,
+        skippedCount: finalProgress.skippedCount,
+      });
+
+      if (finalProgress.successCount > 0) {
+        await invalidateRecordQueries();
+      }
+    } catch (err) {
+      log.error('Vectorization failed', err instanceof Error ? err : new Error(String(err)));
+      setVectorizationProgress((prev) => ({ ...prev, status: 'error' }));
+      setVectorizingUpstreamId(undefined);
     }
   }, [source, handleRecordVectorized, invalidateRecordQueries]);
 
@@ -323,10 +352,19 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     const controller = new AbortController();
     extractionAbortRef.current = controller;
 
+    setIsProcessingAll(true);
     setExtractionProgress({
       source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
       processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
     });
+    setVectorizationProgress(initialProcessingProgress(source));
+    setRecords((prev) =>
+      prev.map((r) => {
+        if (r.pipelineStatus === 'extract_failed') return { ...r, pipelineStatus: 'synced' as const, reason: undefined };
+        if (r.pipelineStatus === 'vectorize_failed') return { ...r, pipelineStatus: 'extracted' as const, reason: undefined };
+        return r;
+      })
+    );
 
     const handleRecord = (processed: ProcessingRecord) => {
       if (processed.status === 'extracted') {
@@ -338,23 +376,32 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
       }
     };
 
-    const finalProgress = await resumeProcessingService.processAll(
-      source, token, (p) => setExtractionProgress(p),
-      handleRecord, controller.signal,
-    );
+    try {
+      const finalProgress = await resumeProcessingService.processAll(
+        source, token, (p) => setExtractionProgress(p),
+        handleRecord, controller.signal,
+      );
 
-    setExtractionProgress(finalProgress);
-    setExtractingUpstreamId(undefined);
-    setVectorizingUpstreamId(undefined);
-    log.info('Process-all completed', {
-      source,
-      successCount: finalProgress.successCount,
-      failedCount: finalProgress.failedCount,
-      skippedCount: finalProgress.skippedCount,
-    });
+      setExtractionProgress(finalProgress);
+      setExtractingUpstreamId(undefined);
+      setVectorizingUpstreamId(undefined);
+      setIsProcessingAll(false);
+      log.info('Process-all completed', {
+        source,
+        successCount: finalProgress.successCount,
+        failedCount: finalProgress.failedCount,
+        skippedCount: finalProgress.skippedCount,
+      });
 
-    if (finalProgress.successCount > 0) {
-      await invalidateRecordQueries();
+      if (finalProgress.successCount > 0) {
+        await invalidateRecordQueries();
+      }
+    } catch (err) {
+      log.error('Process-all failed', err instanceof Error ? err : new Error(String(err)));
+      setExtractionProgress((prev) => ({ ...prev, status: 'error' }));
+      setExtractingUpstreamId(undefined);
+      setVectorizingUpstreamId(undefined);
+      setIsProcessingAll(false);
     }
   }, [source, token, handleRecordExtracted, handleRecordVectorized, invalidateRecordQueries]);
 
@@ -422,6 +469,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     refreshingId,
     vectorizingId,
     isClearing,
+    isProcessingAll,
     isLoadingRecords: recordsQuery.isLoading || recordsQuery.isFetching,
     handleStartSync: useCallback(() => { startSyncMutation.mutate({}); }, [startSyncMutation]),
     handleStartSyncAll: useCallback(() => { startSyncAllMutation.mutate({}); }, [startSyncAllMutation]),

@@ -444,6 +444,71 @@ export const syncRepository = {
     db.prepare('DELETE FROM synced_open_positions WHERE upstream_id = ?').run(upstreamId)
   },
 
+  upsertSyncFailed(table: 'synced_employees' | 'synced_candidates' | 'synced_open_positions', data: {
+    upstream_id: number
+    full_name: string
+    status: string
+    status_reason: string
+  }): void {
+    const db = getDatabase()
+    const existing = db.prepare(`SELECT id FROM ${table} WHERE upstream_id = ?`).get(data.upstream_id) as { id: number } | undefined
+    if (existing) {
+      db.prepare(`UPDATE ${table} SET status = ?, status_reason = ? WHERE id = ?`).run(data.status, data.status_reason, existing.id)
+    } else {
+      const now = new Date().toISOString()
+      if (table === 'synced_employees') {
+        db.prepare(`INSERT INTO synced_employees (upstream_id, full_name, email, seniority, main_skill, country, has_resume, is_bench, job_title, status, status_reason, synced_at) VALUES (?, ?, '', '', '', '', 0, 0, '', ?, ?, ?)`).run(data.upstream_id, data.full_name, data.status, data.status_reason, now)
+      } else if (table === 'synced_candidates') {
+        db.prepare(`INSERT INTO synced_candidates (upstream_id, full_name, email, has_resume, coe_certified, status, status_reason, synced_at) VALUES (?, ?, '', 0, 0, ?, ?, ?)`).run(data.upstream_id, data.full_name, data.status, data.status_reason, now)
+      } else {
+        db.prepare(`INSERT INTO synced_open_positions (upstream_id, account, coe, practice, stakeholder, main_skill, countries, seniorities, available_range, account_overview, job_description, job_title, position_status, aging, status, status_reason, synced_at) VALUES (?, ?, '', '', '', '', '', '', '', '', '', '', 'Active', 0, ?, ?, ?)`).run(data.upstream_id, data.full_name, data.status, data.status_reason, now)
+      }
+    }
+  },
+
+  getFailedRecords(table: 'synced_employees' | 'synced_candidates' | 'synced_open_positions'): Array<{
+    id: number
+    upstream_id: number
+    full_name: string
+    status: string
+    status_reason: string | null
+    has_resume: number
+    resume_note_id: number | null
+    resume_filename: string | null
+  }> {
+    const db = getDatabase()
+    if (table === 'synced_open_positions') {
+      return db.prepare(
+        `SELECT id, upstream_id, account AS full_name, status, status_reason, 0 AS has_resume, NULL AS resume_note_id, NULL AS resume_filename
+         FROM synced_open_positions
+         WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed', 'incomplete')`
+      ).all() as Array<{
+        id: number
+        upstream_id: number
+        full_name: string
+        status: string
+        status_reason: string | null
+        has_resume: number
+        resume_note_id: number | null
+        resume_filename: string | null
+      }>
+    }
+    return db.prepare(
+      `SELECT id, upstream_id, full_name, status, status_reason, has_resume, resume_note_id, resume_filename
+       FROM ${table}
+       WHERE status IN ('sync_failed', 'extract_failed', 'vectorize_failed', 'incomplete')`
+    ).all() as Array<{
+      id: number
+      upstream_id: number
+      full_name: string
+      status: string
+      status_reason: string | null
+      has_resume: number
+      resume_note_id: number | null
+      resume_filename: string | null
+    }>
+  },
+
   updateResumeFields(
     id: number,
     fields: {

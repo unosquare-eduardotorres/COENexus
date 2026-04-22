@@ -5,6 +5,9 @@ import type {
   BraniacListPatternsParams,
   BraniacListProfilesParams,
   BraniacGetProfileParams,
+  BraniacApprovePatternParams,
+  BraniacRejectPatternParams,
+  BraniacUpdatePatternParams,
   AgentStepEvent,
   BraniacStatusEvent,
 } from '../../../../shared/ipc-types'
@@ -19,6 +22,9 @@ export const braniacService = {
   listProfiles: (params?: BraniacListProfilesParams) => window.api.braniac.listProfiles(params),
   getProfile: (params: BraniacGetProfileParams) => window.api.braniac.getProfile(params),
   getAccounts: () => window.api.braniac.getAccounts(),
+  approvePattern: (params: BraniacApprovePatternParams) => window.api.braniac.approvePattern(params),
+  rejectPattern: (params: BraniacRejectPatternParams) => window.api.braniac.rejectPattern(params),
+  updatePattern: (params: BraniacUpdatePatternParams) => window.api.braniac.updatePattern(params),
   onStepEvent: (cb: (data: AgentStepEvent) => void) => window.api.braniac.onStepEvent(cb),
   onStatusEvent: (cb: (data: BraniacStatusEvent) => void) => window.api.braniac.onStatusEvent(cb),
 }

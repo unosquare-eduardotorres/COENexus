@@ -165,7 +165,7 @@ function rebuildVecIndex(): number {
 
   for (const row of embeddings) {
     if (!existingIds.has(row.id) && row.embedding.length > 0) {
-      insertStmt.run(row.id, row.embedding)
+      insertStmt.run(BigInt(row.id), row.embedding)
       rebuilt++
     }
   }

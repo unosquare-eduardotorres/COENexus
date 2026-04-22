@@ -202,12 +202,21 @@ export const syncCandidateOrchestrator = {
 
         const db = getDatabase()
         const processChunk = db.transaction(() => {
-          for (const result of fetchResults) {
+          for (let i = 0; i < fetchResults.length; i++) {
+            const result = fetchResults[i]
+            const basicCandRef = chunk[i]
             fetchedRecords++
             processedInRun++
 
             if (result.status === 'rejected') {
-              log.error('Candidate fetch failed', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Fetch failed'), { pageOffset })
+              const reason = result.reason?.message ?? 'Fetch failed'
+              log.error('Candidate fetch failed', result.reason instanceof Error ? result.reason : new Error(reason), { pageOffset, upstreamId: basicCandRef.candidateId })
+              syncRepository.upsertSyncFailed('synced_candidates', {
+                upstream_id: basicCandRef.candidateId,
+                full_name: basicCandRef.fullName || 'Unknown',
+                status: 'sync_failed',
+                status_reason: reason,
+              })
               notProcessedCount++
               emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, status: 'syncing' } })
               continue

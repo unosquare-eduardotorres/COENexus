@@ -20,6 +20,12 @@ import type {
   DatabaseImportParams,
   SyncProgressEvent,
   ProcessingProgressEvent,
+  PipelineProgressEvent,
+  PipelineStartParams,
+  PipelineRetryParams,
+  PipelineRetrySingleParams,
+  PositionPipelineStartParams,
+  PositionPipelineVectorizeSyncedParams,
   MatchSearchEvent,
   BenchBurnEvent,
   ReportStalledThresholds,
@@ -55,6 +61,7 @@ import type {
   Scout9StatusEvent,
   Scout9UpsertSalaryBandParams,
   AgentStepEvent,
+  OracleChatStepEvent,
   IpcContracts,
   IpcEventContracts,
 } from '../shared/ipc-types'
@@ -127,6 +134,44 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: ProcessingProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.PROCESSING_PROGRESS_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.PROCESSING_PROGRESS_EVENT, handler)
+    },
+  },
+
+  pipeline: {
+    start: (params: PipelineStartParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_START, params),
+    pause: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_PAUSE),
+    retryAllFailed: (params: PipelineRetryParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_RETRY_ALL_FAILED, params),
+    retrySingle: (params: PipelineRetrySingleParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_RETRY_SINGLE, params),
+    getFailed: (source: 'employees' | 'candidates') =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_GET_FAILED, source),
+    onProgress: (callback: (data: PipelineProgressEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: PipelineProgressEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.PIPELINE_PROGRESS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.PIPELINE_PROGRESS_EVENT, handler)
+    },
+  },
+
+  positionPipeline: {
+    start: (params: PositionPipelineStartParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_START, params),
+    pause: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_PAUSE),
+    vectorizeSynced: (params: PositionPipelineVectorizeSyncedParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_VECTORIZE_SYNCED, params),
+    retryAllFailed: (params: PipelineRetryParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_RETRY_ALL_FAILED, params),
+    retrySingle: (params: PipelineRetrySingleParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE, params),
+    getFailed: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED),
+    onProgress: (callback: (data: PipelineProgressEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: PipelineProgressEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT, handler)
     },
   },
 
@@ -448,6 +493,13 @@ const api = {
       list: () =>
         ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_COUNTRIES_LIST),
     },
+    chat: (params: IpcContracts[typeof IPC_CHANNELS.SCOUT9_CHAT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SCOUT9_CHAT, params) as Promise<IpcContracts[typeof IPC_CHANNELS.SCOUT9_CHAT]['response']>,
+    onChatStepEvent: (callback: (data: string) => void) => {
+      const handler = (_e: IpcRendererEvent, data: string) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT, handler)
+    },
     onPipelineEvent: (callback: (data: Scout9PipelineEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: Scout9PipelineEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.SCOUT9_PIPELINE_EVENT, handler)
@@ -503,6 +555,20 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT, handler)
+    },
+  },
+
+  oracle: {
+    sendMessage: (params: IpcContracts[typeof IPC_CHANNELS.ORACLE_CHAT_SEND_MESSAGE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ORACLE_CHAT_SEND_MESSAGE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.ORACLE_CHAT_SEND_MESSAGE]['response']>,
+    listMessages: (params?: IpcContracts[typeof IPC_CHANNELS.ORACLE_CHAT_LIST_MESSAGES]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.ORACLE_CHAT_LIST_MESSAGES, params) as Promise<IpcContracts[typeof IPC_CHANNELS.ORACLE_CHAT_LIST_MESSAGES]['response']>,
+    clearMessages: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.ORACLE_CHAT_CLEAR_MESSAGES) as Promise<IpcContracts[typeof IPC_CHANNELS.ORACLE_CHAT_CLEAR_MESSAGES]['response']>,
+    onStepEvent: (callback: (data: OracleChatStepEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: OracleChatStepEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT, handler)
     },
   },
 
@@ -591,6 +657,12 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_PROFILE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_PROFILE]['response']>,
     getAccounts: () =>
       ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_ACCOUNTS) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ACCOUNTS]['response']>,
+    approvePattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_APPROVE_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_APPROVE_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_APPROVE_PATTERN]['response']>,
+    rejectPattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_REJECT_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_REJECT_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_REJECT_PATTERN]['response']>,
+    updatePattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_UPDATE_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_UPDATE_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_UPDATE_PATTERN]['response']>,
     onStepEvent: (callback: (data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STEP_EVENT]) => void) => {
       const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STEP_EVENT]) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.BRANIAC_STEP_EVENT, handler)

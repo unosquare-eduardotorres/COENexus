@@ -71,6 +71,24 @@ const secondaryActions = [
     hoverText: 'group-hover:text-amber-600 dark:group-hover:text-amber-400',
   },
   {
+    title: 'Presentations',
+    description: 'Build polished candidate presentations for client-ready position proposals',
+    href: '/resume/present',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+        />
+      </svg>
+    ),
+    iconBg: 'bg-rose-500/10 dark:bg-rose-500/15',
+    iconText: 'text-rose-600 dark:text-rose-400',
+    hoverText: 'group-hover:text-rose-600 dark:group-hover:text-rose-400',
+  },
+  {
     title: 'Data Sync',
     description: 'Import and sync employee & candidate records from external sources',
     href: '/datasync',
@@ -284,7 +302,7 @@ export default function HomePage() {
         </section>
 
         <section className="mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {secondaryActions.map((action) => (
               <Link
                 key={action.title}

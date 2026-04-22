@@ -1,5 +1,6 @@
 import { getDatabase } from '../db/connection'
 import { getAgentsDatabase } from '../db/agents/agentsConnection'
+import { batchEvaluateFeasibility, buildCountrySalaryMatrix, compareEmploymentCosts } from './salaryFeasibilityService'
 import { createLogger } from './logger'
 
 const log = createLogger('Scout9Tools')
@@ -218,6 +219,116 @@ export function createScout9Tools(tracker: ToolCallTracker, toolTimeoutMs: numbe
           if (results.length === 0) return 'No candidates found matching the salary range criteria'
           return JSON.stringify(results.slice(0, 50))
         }, toolTimeoutMs, 'filter_candidates_by_salary_range')
+      },
+    },
+    {
+      name: 'compare_employment_costs',
+      description: 'Compare FTE vs contractor cost for a candidate in a specific country. Especially useful for contractor-heavy countries (BOL, PRY). Returns estimated FTE cost (with overhead), contractor cost, and recommendation.',
+      execute: async (args) => {
+        const { normalizedMonthlyUsd, country, candidateName } = args as {
+          normalizedMonthlyUsd: number; country: string; candidateName: string
+        }
+        const check = tracker.check('compare_employment_costs')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('compare_employment_costs')
+
+        return withTimeout(async () => {
+          const result = compareEmploymentCosts(normalizedMonthlyUsd, country, candidateName)
+          return JSON.stringify(result)
+        }, toolTimeoutMs, 'compare_employment_costs')
+      },
+    },
+    {
+      name: 'get_country_salary_matrix',
+      description: 'Get a country-by-seniority feasibility matrix for a position. Shows which country+seniority combinations are feasible, marginal, or not-feasible based on salary bands vs position budget. Includes contractor-heavy country notes.',
+      execute: async (args) => {
+        const { positionUpstreamId } = args as { positionUpstreamId: number }
+        const check = tracker.check('get_country_salary_matrix')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('get_country_salary_matrix')
+
+        return withTimeout(async () => {
+          const matrix = buildCountrySalaryMatrix(positionUpstreamId)
+          if (matrix.length === 0) return 'No feasibility data available (position not found or no salary bands)'
+          return JSON.stringify(matrix)
+        }, toolTimeoutMs, 'get_country_salary_matrix')
+      },
+    },
+    {
+      name: 'evaluate_salary_feasibility',
+      description: 'Evaluate salary feasibility for candidates against a position budget. Provide positionUpstreamId and an array of candidate objects. Returns verdict (feasible/marginal/not-feasible/unknown), reasoning, seniority flexibility info, and employment type notes for contractor-heavy countries.',
+      execute: async (args) => {
+        const { positionUpstreamId, candidates } = args as {
+          positionUpstreamId: number
+          candidates: Array<{
+            upstreamId: number; fullName: string; sourceType: 'candidates' | 'employees'
+            country: string; seniority: string; normalizedMonthlyUsd: number | null; currencyConfidence: string | null
+          }>
+        }
+        const check = tracker.check('evaluate_salary_feasibility')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('evaluate_salary_feasibility')
+
+        return withTimeout(async () => {
+          const results = batchEvaluateFeasibility(positionUpstreamId, candidates)
+          return JSON.stringify(results)
+        }, toolTimeoutMs, 'evaluate_salary_feasibility')
+      },
+    },
+    {
+      name: 'get_stakeholder_profile',
+      description: 'Get the inferred stakeholder profile for a client/stakeholder. Returns observed rate ranges, accepted/rejected countries, seniority preferences, rejection reasons, and preference summary. Use this to understand what a specific hiring manager likes/dislikes before recommending candidates.',
+      execute: async (args) => {
+        const { account, stakeholder } = args as { account: string; stakeholder?: string }
+        const check = tracker.check('get_stakeholder_profile')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('get_stakeholder_profile')
+
+        return withTimeout(async () => {
+          const db = getAgentsDatabase()
+          const hasTable = db.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='stakeholder_profiles'"
+          ).get()
+          if (!hasTable) return 'Stakeholder profiles table not available'
+
+          if (stakeholder) {
+            const row = db.prepare(
+              'SELECT * FROM stakeholder_profiles WHERE account = ? AND stakeholder_name = ?'
+            ).get(account, stakeholder)
+            if (!row) return `No profile found for stakeholder "${stakeholder}" at account "${account}"`
+            return JSON.stringify(row)
+          }
+
+          const rows = db.prepare(
+            'SELECT * FROM stakeholder_profiles WHERE account = ? ORDER BY data_points_count DESC'
+          ).all(account)
+          if ((rows as unknown[]).length === 0) return `No profiles found for account "${account}"`
+          return JSON.stringify(rows)
+        }, toolTimeoutMs, 'get_stakeholder_profile')
+      },
+    },
+    {
+      name: 'get_client_rule_overrides',
+      description: 'Get client-specific rule overrides (e.g., "Axos: allow seniority -1", "Axos: max $36/hr"). These override default business rules for specific accounts.',
+      execute: async (args) => {
+        const { clientId } = args as { clientId: string }
+        const check = tracker.check('get_client_rule_overrides')
+        if (!check.allowed) return check.reason ?? 'Budget exhausted'
+        tracker.record('get_client_rule_overrides')
+
+        return withTimeout(async () => {
+          const db = getAgentsDatabase()
+          const hasTable = db.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='client_rule_overrides'"
+          ).get()
+          if (!hasTable) return 'Client rule overrides table not available'
+
+          const rows = db.prepare(
+            'SELECT * FROM client_rule_overrides WHERE client_id = ? AND is_active = 1 ORDER BY updated_at DESC'
+          ).all(clientId)
+          if ((rows as unknown[]).length === 0) return `No active rule overrides found for client "${clientId}"`
+          return JSON.stringify(rows)
+        }, toolTimeoutMs, 'get_client_rule_overrides')
       },
     },
     {

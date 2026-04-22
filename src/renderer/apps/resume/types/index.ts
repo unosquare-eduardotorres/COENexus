@@ -565,6 +565,7 @@ export interface ProcessingProgress {
   skippedCount: number;
   currentRecord?: string;
   errorMessage?: string;
+  currentPhase?: 'extracting' | 'vectorizing';
 }
 
 export type VoyageModel = 'voyage-4-large' | 'voyage-4' | 'voyage-4-lite';

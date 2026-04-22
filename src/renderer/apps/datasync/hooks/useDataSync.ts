@@ -90,6 +90,7 @@ export function useDataSync(activePanel: DataSyncPanel) {
     },
     processAll: {
       handleProcessAll: activePipeline.handleProcessAll,
+      isProcessingAll: activePipeline.isProcessingAll,
     },
     vectorization: {
       handleStartVectorization: activePipeline.handleStartVectorization,

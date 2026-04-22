@@ -105,6 +105,80 @@ export interface SyncUploadNoteParams {
 export type SyncDataSource = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations'
 export type SyncClearDataSource = 'employees' | 'candidates' | 'positions' | 'project-reallocations'
 
+export interface PipelineStartParams {
+  source: 'employees' | 'candidates'
+  token: string
+  model?: string
+  limit?: number
+  skip?: number
+  year?: number
+  activeOnly?: boolean
+}
+
+export interface PipelineRetryParams {
+  source: 'employees' | 'candidates'
+  token: string
+  model?: string
+}
+
+export interface PipelineRetrySingleParams {
+  source: 'employees' | 'candidates'
+  token: string
+  model?: string
+  upstreamId: number
+}
+
+export interface PipelineRecordEvent {
+  upstreamId: number
+  name: string
+  outcome: 'vectorized' | 'skipped' | 'failed'
+  failedStep?: 'sync' | 'extract' | 'vectorize' | 'no_resume'
+  error?: string
+  seniority?: string
+  mainSkill?: string
+}
+
+export interface PipelineProgressDto {
+  source: string
+  status: 'processing' | 'paused' | 'completed'
+  totalRecords: number
+  processedRecords: number
+  succeededCount: number
+  failedCount: number
+  skippedCount: number
+  currentRecord?: string
+}
+
+export type PipelineProgressEvent =
+  | { type: 'record'; record: PipelineRecordEvent }
+  | { type: 'progress'; progress: PipelineProgressDto }
+  | { type: 'complete'; progress: PipelineProgressDto }
+  | { type: 'error'; message: string }
+
+export interface PositionPipelineStartParams {
+  token: string
+  model?: string
+  activeOnly: boolean
+  limit?: number
+  skip?: number
+}
+
+export interface PositionPipelineVectorizeSyncedParams {
+  token: string
+  model?: string
+}
+
+export interface PipelineFailedRecord {
+  id: number
+  upstream_id: number
+  full_name: string
+  status: string
+  status_reason: string | null
+  has_resume: number
+  resume_note_id: number | null
+  resume_filename: string | null
+}
+
 export interface SyncRecordDto {
   id: string
   source: string
@@ -1335,7 +1409,7 @@ export interface VigilStatusEvent {
   timestamp: string
 }
 
-export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'braniac'
+export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'braniac' | 'oracle'
 
 export interface AgentStepEvent {
   agentId: AgentId
@@ -1344,6 +1418,37 @@ export interface AgentStepEvent {
   message: string
   narration?: string
   timestamp: string
+}
+
+export type OracleChatRole = 'user' | 'assistant'
+
+export interface OracleChatMessage {
+  id: string
+  role: OracleChatRole
+  content: string
+  metadata_json: string | null
+  created_at: string
+}
+
+export interface OracleChatStepEvent {
+  step: string
+  timestamp: string
+}
+
+export interface OracleSendChatMessageParams {
+  content: string
+  metadata_json?: string
+}
+
+export interface OracleListChatMessagesParams {
+  limit?: number
+  offset?: number
+}
+
+export interface OracleResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
 }
 
 export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
@@ -1464,7 +1569,7 @@ export interface MailTestResult {
 // --- Braniac Agent Types ---
 
 export type BraniacScopeType = 'account' | 'stakeholder'
-export type BraniacApprovalStatus = 'auto_applied' | 'pending_review'
+export type BraniacApprovalStatus = 'auto_applied' | 'pending_review' | 'approved' | 'rejected'
 
 export interface BraniacRunParams {
   scope: BraniacScopeType
@@ -1493,6 +1598,34 @@ export interface BraniacListProfilesParams {
 export interface BraniacGetProfileParams {
   stakeholder: string
   account: string
+}
+
+export interface BraniacApprovePatternParams {
+  id: string
+}
+
+export interface BraniacRejectPatternParams {
+  id: string
+  reason?: string
+}
+
+export interface BraniacUpdatePatternParams {
+  id: string
+  pattern_text?: string
+  confidence_score?: number
+}
+
+export interface Scout9ChatParams {
+  message: string
+  scopeClient?: string
+  scopeStakeholder?: string
+}
+
+export interface Scout9ChatResponse {
+  content: string
+  toolCalls: number
+  inputTokens: number
+  outputTokens: number
 }
 
 export interface BraniacJob {
@@ -1576,6 +1709,19 @@ export interface IpcContracts {
   [IPC_CHANNELS.SYNC_GET_SKILLS]: { request: void; response: string[] }
   [IPC_CHANNELS.SYNC_UPLOAD_NOTE]: { request: SyncUploadNoteParams; response: { success: boolean; noteId: number } }
   [IPC_CHANNELS.SYNC_BACKFILL_SALARY_NORMALIZATION]: { request: void; response: { candidatesUpdated: number; employeesUpdated: number; errors: number } }
+
+  [IPC_CHANNELS.PIPELINE_START]: { request: PipelineStartParams; response: { started: boolean } }
+  [IPC_CHANNELS.PIPELINE_PAUSE]: { request: void; response: { paused: boolean } }
+  [IPC_CHANNELS.PIPELINE_RETRY_ALL_FAILED]: { request: PipelineRetryParams; response: { started: boolean } }
+  [IPC_CHANNELS.PIPELINE_RETRY_SINGLE]: { request: PipelineRetrySingleParams; response: PipelineRecordEvent }
+  [IPC_CHANNELS.PIPELINE_GET_FAILED]: { request: 'employees' | 'candidates'; response: PipelineFailedRecord[] }
+
+  [IPC_CHANNELS.POSITION_PIPELINE_START]: { request: PositionPipelineStartParams; response: { started: boolean } }
+  [IPC_CHANNELS.POSITION_PIPELINE_PAUSE]: { request: void; response: { paused: boolean } }
+  [IPC_CHANNELS.POSITION_PIPELINE_VECTORIZE_SYNCED]: { request: PositionPipelineVectorizeSyncedParams; response: { started: boolean } }
+  [IPC_CHANNELS.POSITION_PIPELINE_RETRY_ALL_FAILED]: { request: PipelineRetryParams; response: { started: boolean } }
+  [IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE]: { request: PipelineRetrySingleParams; response: PipelineRecordEvent }
+  [IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED]: { request: void; response: PipelineFailedRecord[] }
 
   [IPC_CHANNELS.PROCESSING_VOYAGE_KEY_STATUS]: { request: void; response: VoyageKeyStatus }
   [IPC_CHANNELS.PROCESSING_GET_STATUS]: { request: void; response: ProcessingStatusBySource }
@@ -1751,6 +1897,10 @@ export interface IpcContracts {
   [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
   [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
 
+  [IPC_CHANNELS.ORACLE_CHAT_SEND_MESSAGE]: { request: OracleSendChatMessageParams; response: OracleResponse<OracleChatMessage> }
+  [IPC_CHANNELS.ORACLE_CHAT_LIST_MESSAGES]: { request: OracleListChatMessagesParams | void; response: OracleResponse<OracleChatMessage[]> }
+  [IPC_CHANNELS.ORACLE_CHAT_CLEAR_MESSAGES]: { request: void; response: OracleResponse<{ cleared: boolean }> }
+
   [IPC_CHANNELS.BRANIAC_RUN]: { request: BraniacRunParams; response: BraniacResponse<BraniacJob> }
   [IPC_CHANNELS.BRANIAC_CANCEL]: { request: BraniacCancelParams; response: BraniacResponse<{ canceled: boolean }> }
   [IPC_CHANNELS.BRANIAC_GET_STATUS]: { request: void; response: BraniacResponse<{ running: boolean; job_id: string | null }> }
@@ -1760,6 +1910,11 @@ export interface IpcContracts {
   [IPC_CHANNELS.BRANIAC_LIST_PROFILES]: { request: BraniacListProfilesParams | void; response: BraniacResponse<BraniacStakeholderProfile[]> }
   [IPC_CHANNELS.BRANIAC_GET_PROFILE]: { request: BraniacGetProfileParams; response: BraniacResponse<BraniacStakeholderProfile | null> }
   [IPC_CHANNELS.BRANIAC_GET_ACCOUNTS]: { request: void; response: BraniacResponse<string[]> }
+  [IPC_CHANNELS.BRANIAC_APPROVE_PATTERN]: { request: BraniacApprovePatternParams; response: BraniacResponse<{ updated: boolean }> }
+  [IPC_CHANNELS.BRANIAC_REJECT_PATTERN]: { request: BraniacRejectPatternParams; response: BraniacResponse<{ updated: boolean }> }
+  [IPC_CHANNELS.BRANIAC_UPDATE_PATTERN]: { request: BraniacUpdatePatternParams; response: BraniacResponse<{ updated: boolean }> }
+
+  [IPC_CHANNELS.SCOUT9_CHAT]: { request: Scout9ChatParams; response: BraniacResponse<Scout9ChatResponse> }
 
   [IPC_CHANNELS.AGENT_STUB_RUN]: { request: { agentId: AgentId; prompt?: string }; response: { success: boolean; runId: string } }
 
@@ -1793,13 +1948,17 @@ export interface IpcContracts {
 export interface IpcEventContracts {
   [IPC_CHANNELS.SYNC_PROGRESS_EVENT]: SyncProgressEvent
   [IPC_CHANNELS.PROCESSING_PROGRESS_EVENT]: ProcessingProgressEvent
+  [IPC_CHANNELS.PIPELINE_PROGRESS_EVENT]: PipelineProgressEvent
+  [IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT]: PipelineProgressEvent
   [IPC_CHANNELS.MATCH_SEARCH_EVENT]: MatchSearchEvent
   [IPC_CHANNELS.MATCH_BENCH_BURN_EVENT]: BenchBurnEvent
   [IPC_CHANNELS.SCOUT9_PIPELINE_EVENT]: Scout9PipelineEvent
   [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
+  [IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT]: string
   [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
   [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
   [IPC_CHANNELS.VIGIL_CHAT_STEP_EVENT]: VigilChatStepEvent
+  [IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT]: OracleChatStepEvent
   [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STATUS_EVENT]: BraniacStatusEvent

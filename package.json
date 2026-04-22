@@ -34,13 +34,13 @@
     "lucide-react": "^1.0.0",
     "mammoth": "^1.8.0",
     "motion": "^12.0.0",
+    "nodemailer": "^6.10.0",
     "pdfjs-dist": "^5.0.0",
     "playwright": "^1.52.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.6.2",
     "tailwind-merge": "^2.6.0",
-    "nodemailer": "^6.10.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -62,7 +62,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "autoprefixer": "^10.4.20",
-    "electron": "^41.0.0",
+    "electron": "^41.2.1",
     "electron-vite": "^5.0.0",
     "jsdom": "^29.0.0",
     "postcss": "^8.4.49",

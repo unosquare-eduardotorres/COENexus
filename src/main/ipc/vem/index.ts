@@ -4,6 +4,8 @@ import { registerSessionsHandlers } from './sessions.ipc'
 import { registerDatabaseHandlers } from './database.ipc'
 import { registerAiHandlers } from './ai.ipc'
 import { registerPresentationHandlers } from './presentation.ipc'
+import { registerPipelineHandlers } from './pipeline.ipc'
+import { registerPositionPipelineHandlers } from './positionPipeline.ipc'
 
 export function registerVemHandlers(): void {
   registerProcessingHandlers()
@@ -12,4 +14,6 @@ export function registerVemHandlers(): void {
   registerDatabaseHandlers()
   registerAiHandlers()
   registerPresentationHandlers()
+  registerPipelineHandlers()
+  registerPositionPipelineHandlers()
 }

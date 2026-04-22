@@ -99,9 +99,51 @@ export default function BraniacPage() {
     }
   }, [])
 
+  const handleApprovePattern = useCallback(async (id: string) => {
+    try {
+      await braniacService.approvePattern({ id })
+      void loadData()
+    } catch (err) {
+      const errorMsg = reportError(err)
+      log.error('Failed to approve pattern', { error: errorMsg })
+      setError(errorMsg)
+    }
+  }, [loadData])
+
+  const handleRejectPattern = useCallback(async (id: string, reason?: string) => {
+    try {
+      await braniacService.rejectPattern({ id, reason })
+      void loadData()
+    } catch (err) {
+      const errorMsg = reportError(err)
+      log.error('Failed to reject pattern', { error: errorMsg })
+      setError(errorMsg)
+    }
+  }, [loadData])
+
+  const handleUpdatePattern = useCallback(async (id: string, updates: { pattern_text?: string; confidence_score?: number }) => {
+    try {
+      await braniacService.updatePattern({ id, ...updates })
+      void loadData()
+    } catch (err) {
+      const errorMsg = reportError(err)
+      log.error('Failed to update pattern', { error: errorMsg })
+      setError(errorMsg)
+    }
+  }, [loadData])
+
+  const pendingPatternCount = patterns.filter(p => p.approval_status === 'pending_review').length
+
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      <AgentBanner agentId="braniac" agentName="Braniac" compact />
+      <div className="flex items-center justify-between">
+        <AgentBanner agentId="braniac" agentName="Braniac" compact />
+        {pendingPatternCount > 0 && (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+            {pendingPatternCount} pattern{pendingPatternCount !== 1 ? 's' : ''} pending review
+          </span>
+        )}
+      </div>
 
       {error && (
         <div className="glass-panel p-3 rounded-xl bg-red-50/50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20">
@@ -128,7 +170,12 @@ export default function BraniacPage() {
 
         <div className="space-y-4">
           <BraniacJobHistory jobs={jobs} />
-          <BraniacPatternList patterns={patterns} />
+          <BraniacPatternList
+            patterns={patterns}
+            onApprove={handleApprovePattern}
+            onReject={handleRejectPattern}
+            onUpdate={handleUpdatePattern}
+          />
         </div>
       </div>
     </div>

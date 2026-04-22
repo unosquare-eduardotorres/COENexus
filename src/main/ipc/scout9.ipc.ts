@@ -19,6 +19,7 @@ import type {
   Scout9UpdateNoteParams,
   Scout9UpdateRuleParams,
   Scout9UpsertSalaryBandParams,
+  Scout9ChatParams,
 } from '../../shared/ipc-types'
 import { knowledgeRepository } from '../db/agents/repositories/knowledgeRepository'
 import { reportRepository } from '../db/agents/repositories/reportRepository'
@@ -548,6 +549,29 @@ export function registerScout9Handlers(): void {
       })))
     } catch (error) {
       return fail(error instanceof Error ? error.message : 'Failed to list countries')
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.SCOUT9_CHAT, async (event: IpcMainInvokeEvent, params: Scout9ChatParams) => {
+    validateSender(event)
+    try {
+      const { scout9ChatService } = await import('../services/scout9ChatService')
+      const emitStep = (step: string) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
+        if (win && !win.isDestroyed()) {
+          win.webContents.send(IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT, step)
+        }
+      }
+
+      const result = await scout9ChatService.chat(
+        params.message,
+        emitStep,
+        params.scopeClient,
+        params.scopeStakeholder
+      )
+      return ok(result)
+    } catch (error) {
+      return fail(error instanceof Error ? error.message : 'Scout9 chat failed')
     }
   })
 

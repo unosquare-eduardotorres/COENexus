@@ -2,15 +2,18 @@ import { BrowserWindow } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../shared/ipc-channels'
 import type {
+  BraniacApprovePatternParams,
   BraniacCancelParams,
   BraniacJob,
   BraniacListJobsParams,
   BraniacListPatternsParams,
   BraniacListProfilesParams,
   BraniacGetProfileParams,
+  BraniacRejectPatternParams,
   BraniacResponse,
   BraniacRunParams,
   BraniacStatusEvent,
+  BraniacUpdatePatternParams,
 } from '../../shared/ipc-types'
 import { jobRepository, type AgentJobRow } from '../db/agents/repositories/jobRepository'
 import { patternRepository } from '../db/agents/repositories/patternRepository'
@@ -198,6 +201,49 @@ export function registerBraniacHandlers(): void {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to get accounts'
       log.error('braniac:get-accounts failed', error instanceof Error ? error : new Error(message))
+      return fail(message)
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.BRANIAC_APPROVE_PATTERN, async (event: IpcMainInvokeEvent, params: BraniacApprovePatternParams) => {
+    validateSender(event)
+    try {
+      const updated = patternRepository.updatePattern(params.id, { approval_status: 'approved' })
+      return ok({ updated })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to approve pattern'
+      log.error('braniac:approve-pattern failed', error instanceof Error ? error : new Error(message))
+      return fail(message)
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.BRANIAC_REJECT_PATTERN, async (event: IpcMainInvokeEvent, params: BraniacRejectPatternParams) => {
+    validateSender(event)
+    try {
+      const updates: Record<string, unknown> = { approval_status: 'rejected', is_active: 0 }
+      if (params.reason) {
+        updates.rejection_reason = params.reason
+      }
+      const updated = patternRepository.updatePattern(params.id, updates)
+      return ok({ updated })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reject pattern'
+      log.error('braniac:reject-pattern failed', error instanceof Error ? error : new Error(message))
+      return fail(message)
+    }
+  })
+
+  registerIpcHandler(IPC_CHANNELS.BRANIAC_UPDATE_PATTERN, async (event: IpcMainInvokeEvent, params: BraniacUpdatePatternParams) => {
+    validateSender(event)
+    try {
+      const updates: Record<string, unknown> = {}
+      if (params.pattern_text !== undefined) updates.pattern_text = params.pattern_text
+      if (params.confidence_score !== undefined) updates.confidence_score = params.confidence_score
+      const updated = patternRepository.updatePattern(params.id, updates)
+      return ok({ updated })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update pattern'
+      log.error('braniac:update-pattern failed', error instanceof Error ? error : new Error(message))
       return fail(message)
     }
   })

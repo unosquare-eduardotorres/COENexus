@@ -10,6 +10,7 @@ const PipelineTab = lazy(() => import('./pages/scout9/PipelineTab'))
 const ReportsTab = lazy(() => import('./pages/scout9/ReportsTab'))
 const KnowledgeBaseTab = lazy(() => import('./pages/scout9/KnowledgeBaseTab'))
 const SettingsTab = lazy(() => import('./pages/scout9/SettingsTab'))
+const Scout9ChatTab = lazy(() => import('./pages/scout9/Scout9ChatTab'))
 const StubAgentPage = lazy(() => import('./pages/StubAgentPage'))
 const BraniacPage = lazy(() => import('./pages/BraniacPage'))
 
@@ -34,6 +35,7 @@ export default function AgentsApp() {
             <Route index element={<PipelineTab />} />
             <Route path="reports" element={<ReportsTab />} />
             <Route path="brain" element={<KnowledgeBaseTab />} />
+            <Route path="chat" element={<Scout9ChatTab />} />
             <Route path="settings" element={<SettingsTab />} />
           </Route>
           <Route path="vigil" element={<VigilPage />} />

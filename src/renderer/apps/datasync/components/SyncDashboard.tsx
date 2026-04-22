@@ -27,6 +27,7 @@ interface SyncDashboardProps {
   vectorizationProgress?: ProcessingProgress;
   vectorizingUpstreamId?: number;
   onProcessAll?: () => void;
+  isProcessingAll?: boolean;
   onRefreshRecord?: (upstreamId: number) => void;
   onVectorizeRecord?: (upstreamId: number) => void;
   refreshingId?: number;
@@ -71,6 +72,7 @@ const SyncDashboard = memo(function SyncDashboard({
   vectorizationProgress,
   vectorizingUpstreamId,
   onProcessAll,
+  isProcessingAll,
   onRefreshRecord,
   onVectorizeRecord,
   refreshingId,
@@ -358,7 +360,8 @@ const SyncDashboard = memo(function SyncDashboard({
             />
           )}
 
-          {source !== 'project-reallocations' && (statusFilter === 'synced' || statusFilter === 'extracted' || statusFilter === 'extract_failed') && (
+          {source !== 'project-reallocations' && !isProcessingAll
+            && (statusFilter === 'synced' || statusFilter === 'extracted' || statusFilter === 'extract_failed') && (
             <ProcessActionButtons
               progress={extractionProgress}
               hasEligible={source === 'open-positions'
@@ -376,7 +379,8 @@ const SyncDashboard = memo(function SyncDashboard({
             />
           )}
 
-          {source !== 'project-reallocations' && (statusFilter === 'vectorized' || statusFilter === 'extracted' || statusFilter === 'vectorize_failed') && (
+          {source !== 'project-reallocations' && !isProcessingAll
+            && (statusFilter === 'vectorized' || statusFilter === 'extracted' || statusFilter === 'vectorize_failed') && (
             <ProcessActionButtons
               progress={vectorizationProgress}
               hasEligible={records.some((r) => r.pipelineStatus === 'extracted' || r.pipelineStatus === 'vectorize_failed')}
@@ -413,19 +417,23 @@ const SyncDashboard = memo(function SyncDashboard({
           </div>
         ) : (
           <ProgressBar
-            label={source === 'open-positions' ? 'Extracting JDs' : 'Extracting resumes'}
+            label={
+              isProcessingAll && extractionProgress.currentPhase === 'vectorizing'
+                ? (source === 'open-positions' ? 'Vectorizing JDs' : 'Vectorizing resumes')
+                : (source === 'open-positions' ? 'Extracting JDs' : 'Extracting resumes')
+            }
             progress={extractionProgress}
             percent={extractionPercent}
-            dotColor="bg-blue-500"
-            barGradient="bg-gradient-to-r from-blue-500 to-cyan-500"
-            textColor="text-blue-500"
+            dotColor={isProcessingAll && extractionProgress.currentPhase === 'vectorizing' ? 'bg-violet-500' : 'bg-blue-500'}
+            barGradient={isProcessingAll && extractionProgress.currentPhase === 'vectorizing' ? 'bg-gradient-to-r from-violet-500 to-violet-500' : 'bg-gradient-to-r from-blue-500 to-cyan-500'}
+            textColor={isProcessingAll && extractionProgress.currentPhase === 'vectorizing' ? 'text-violet-500' : 'text-blue-500'}
             onPause={onPauseExtraction}
             onResume={onResumeExtraction}
           />
         )
       )}
 
-      {(isVectorizing || showVectorizationResult) && vectorizationProgress && (
+      {!isProcessingAll && (isVectorizing || showVectorizationResult) && vectorizationProgress && (
         vectorizationProgress.status === 'completed' ? (
           <div className="glass-panel-subtle rounded-xl p-4">
             <div className="flex items-center gap-2">

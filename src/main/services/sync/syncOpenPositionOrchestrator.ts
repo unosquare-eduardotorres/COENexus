@@ -17,6 +17,8 @@ export const syncOpenPositionOrchestrator = {
     const pageSize = options.limit ? Math.min(100, options.limit) : 100
 
     let syncedCount = 0
+    let updatedCount = 0
+    let unchangedCount = 0
     let fetchedRecords = 0
     let processedInRun = 0
     const maxToProcess = options.limit ?? Infinity
@@ -44,6 +46,42 @@ export const syncOpenPositionOrchestrator = {
         processedInRun++
 
         try {
+          const existing = syncRepository.findPositionByUpstreamId(pos.id)
+
+          const lastModUnchanged = existing
+            && existing.last_modification === (pos.lastModification || null)
+          const candidatesUnchanged = existing
+            && existing.candidates_presented === (pos.candidatesPresented ?? 0)
+          const discussionUnchanged = existing
+            && existing.last_discussion_date === (pos.lastDiscussionDate || null)
+
+          if (lastModUnchanged && candidatesUnchanged && discussionUnchanged) {
+            syncedUpstreamIds.add(pos.id)
+            unchangedCount++
+
+            const record: PositionSyncRecord = {
+              id: `pos-${pos.id}`, source: 'open-positions', status: existing.status,
+              name: `${pos.account} - ${existing.job_title || pos.mainSkill}`,
+              email: '', hasResume: false, isBench: false, resumeChanged: false,
+              upstreamId: pos.id, syncDetail: 'unchanged',
+              syncedAt: existing.synced_at,
+              account: pos.account, coe: pos.coe, practice: pos.practice,
+              stakeholder: pos.stakeholder, mainSkill: pos.mainSkill,
+              countries: pos.countries, seniorities: pos.seniorities,
+              availableRange: pos.availableRange, positionStatus: pos.status,
+              aging: pos.aging, hasJobDescription: !!existing.job_description?.trim(),
+              candidatesCount: existing.candidates_presented,
+            }
+            emitEvent({ type: 'record', record })
+
+            emitEvent({ type: 'progress', progress: {
+              source: 'open-positions', totalRecords, fetchedRecords, syncedCount,
+              incompleteCount: 0, notProcessedCount: 0, updatedCount, unchangedCount,
+              skippedCount: 0, currentRecord: pos.account, status: 'syncing',
+            }})
+            continue
+          }
+
           const [detail, candidates, discussions] = await Promise.all([
             upstreamApiService.getOpenPositionDetail(token, pos.id),
             upstreamApiService.getPresentedCandidates(token, pos.id),
@@ -96,6 +134,9 @@ export const syncOpenPositionOrchestrator = {
           syncRepository.upsertOpenPosition(entity)
           syncedUpstreamIds.add(pos.id)
           syncedCount++
+          if (existing) {
+            updatedCount++
+          }
 
           for (const cand of candidates) {
             matchRepository.upsertOpenPositionCandidate({
@@ -155,7 +196,7 @@ export const syncOpenPositionOrchestrator = {
             id: `pos-${pos.id}`, source: 'open-positions', status: 'synced',
             name: `${pos.account} - ${detail?.jobTitle ?? pos.mainSkill}`,
             email: '', hasResume: false, isBench: false, resumeChanged: false,
-            upstreamId: pos.id, syncDetail: 'new',
+            upstreamId: pos.id, syncDetail: existing ? 'updated' : 'new',
             syncedAt: new Date().toISOString(),
             account: pos.account, coe: pos.coe, practice: pos.practice,
             stakeholder: pos.stakeholder, mainSkill: pos.mainSkill,
@@ -169,7 +210,7 @@ export const syncOpenPositionOrchestrator = {
           emitEvent({ type: 'record', record: { id: `pos-${pos.id}`, source: 'open-positions', status: 'sync_failed', name: pos.account || 'Unknown', email: '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: pos.id, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
         }
 
-        emitEvent({ type: 'progress', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, currentRecord: pos.account, status: 'syncing' } })
+        emitEvent({ type: 'progress', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount, unchangedCount, skippedCount: 0, currentRecord: pos.account, status: 'syncing' } })
 
         if (processedInRun >= maxToProcess) break
       }
@@ -195,6 +236,6 @@ export const syncOpenPositionOrchestrator = {
 
     matchEngineService.invalidateFilterCache()
     log.info('Open positions sync finished', { totalRecords, fetchedRecords, syncedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount: 0, unchangedCount: 0, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
+    emitEvent({ type: 'complete', progress: { source: 'open-positions', totalRecords, fetchedRecords, syncedCount, incompleteCount: 0, notProcessedCount: 0, updatedCount, unchangedCount, skippedCount: 0, status: signal.aborted ? 'paused' : 'completed' } })
   },
 }

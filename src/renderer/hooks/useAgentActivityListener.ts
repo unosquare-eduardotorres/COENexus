@@ -9,6 +9,7 @@ const AGENT_LABELS: Record<string, string> = {
   'switchboard': 'Switchboard',
   'sensei': 'Sensei',
   'payday': 'Payday',
+  'oracle': 'Nexus Oracle',
 }
 
 type NormalizedStatus = 'running' | 'completed' | 'failed' | 'canceled' | 'idle'
@@ -71,6 +72,14 @@ export function useAgentActivityListener() {
       }
     }).catch(() => {})
 
+    const unsubOracle = window.api?.oracle?.onStepEvent((e) => {
+      if (e.step === 'Done') {
+        handleAgentStatus('oracle', 'completed', null)
+      } else {
+        handleAgentStatus('oracle', 'running', null)
+      }
+    })
+
     const unsubSteps = window.api?.agents?.onStepEvent((e) => {
       const status = e.status === 'started' ? 'running' : e.status as NormalizedStatus
       handleAgentStatus(e.agentId, status, null)
@@ -98,6 +107,7 @@ export function useAgentActivityListener() {
       unsubVigil?.()
       unsubScout9?.()
       unsubBraniac?.()
+      unsubOracle?.()
       unsubSteps?.()
     }
   }, [handleAgentStatus])

@@ -166,6 +166,128 @@ describe('BraniacDataAggregator', () => {
     })
   })
 
+  describe('salary data in aggregated candidates', () => {
+    it('should include normalizedMonthlyUsd in AggregatedCandidate when available', () => {
+      nexusDb.exec(`
+        CREATE TABLE synced_candidates (
+          upstream_id INTEGER PRIMARY KEY,
+          full_name TEXT NOT NULL DEFAULT '',
+          country TEXT,
+          seniority TEXT,
+          main_skill TEXT,
+          normalized_monthly_usd REAL,
+          inferred_currency TEXT,
+          currency_confidence TEXT
+        );
+      `)
+
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'MX', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate, is_employee)
+        VALUES (1, 100, 200, 'Alice', 'React', 'Presented', 85, 0)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO synced_candidates (upstream_id, full_name, country, seniority, normalized_monthly_usd, inferred_currency, currency_confidence)
+        VALUES (200, 'Alice', 'MX', 'Senior', 4500.0, 'MXN', 'high')
+      `).run()
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      expect(result.positions[0].candidates[0].normalizedMonthlyUsd).toBe(4500.0)
+      expect(result.positions[0].candidates[0].inferredCurrency).toBe('MXN')
+      expect(result.positions[0].candidates[0].currencyConfidence).toBe('high')
+    })
+
+    it('should return null salary fields when synced record not found', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate, is_employee)
+        VALUES (1, 100, 999, 'Ghost', 'React', 'Presented', 80, 0)
+      `).run()
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      expect(result.positions[0].candidates[0].normalizedMonthlyUsd).toBeNull()
+      expect(result.positions[0].candidates[0].inferredCurrency).toBeNull()
+      expect(result.positions[0].candidates[0].currencyConfidence).toBeNull()
+    })
+
+    it('should query synced_employees for employee candidates (is_employee=1)', () => {
+      nexusDb.exec(`
+        CREATE TABLE synced_employees (
+          upstream_id INTEGER PRIMARY KEY,
+          full_name TEXT NOT NULL DEFAULT '',
+          country TEXT,
+          seniority TEXT,
+          main_skill TEXT,
+          normalized_monthly_usd REAL,
+          inferred_currency TEXT,
+          currency_confidence TEXT
+        );
+      `)
+
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'CO', 'Mid', 'Dev', 3)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate, is_employee)
+        VALUES (1, 100, 300, 'Bob Employee', 'React', 'Presented', 90, 1)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO synced_employees (upstream_id, full_name, country, seniority, normalized_monthly_usd, inferred_currency, currency_confidence)
+        VALUES (300, 'Bob Employee', 'CO', 'Mid', 3200.0, 'COP', 'medium')
+      `).run()
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      expect(result.positions[0].candidates[0].normalizedMonthlyUsd).toBe(3200.0)
+      expect(result.positions[0].candidates[0].country).toBe('CO')
+    })
+
+    it('should query synced_candidates for non-employee candidates (is_employee=0)', () => {
+      nexusDb.exec(`
+        CREATE TABLE synced_candidates (
+          upstream_id INTEGER PRIMARY KEY,
+          full_name TEXT NOT NULL DEFAULT '',
+          country TEXT,
+          seniority TEXT,
+          main_skill TEXT,
+          normalized_monthly_usd REAL,
+          inferred_currency TEXT,
+          currency_confidence TEXT
+        );
+      `)
+
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'Node', 'MX', 'Junior', 'Dev', 2)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate, is_employee)
+        VALUES (1, 101, 400, 'Carol Candidate', 'Node', 'Presented', 60, 0)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO synced_candidates (upstream_id, full_name, country, seniority, normalized_monthly_usd, inferred_currency, currency_confidence)
+        VALUES (400, 'Carol Candidate', 'MX', 'Junior', 2500.0, 'MXN', 'exact')
+      `).run()
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      expect(result.positions[0].candidates[0].normalizedMonthlyUsd).toBe(2500.0)
+      expect(result.positions[0].candidates[0].seniority).toBe('Junior')
+    })
+  })
+
   describe('aggregateForStakeholder', () => {
     it('should filter by stakeholder', () => {
       nexusDb.prepare(`

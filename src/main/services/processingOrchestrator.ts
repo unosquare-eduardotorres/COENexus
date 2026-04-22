@@ -28,6 +28,7 @@ export interface ProcessingProgressDto {
   successCount: number
   failedCount: number
   skippedCount: number
+  currentPhase?: 'extracting' | 'vectorizing'
 }
 
 export type ProcessingEvent =
@@ -48,8 +49,8 @@ interface EligibleRecord {
 let extractionController: AbortController | null = null
 let vectorizationController: AbortController | null = null
 
-function makeProgress(source: string, total: number, processed: number, success: number, failed: number, skipped: number, status = 'processing'): ProcessingEvent {
-  return { type: 'progress', progress: { source, status, totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped } }
+function makeProgress(source: string, total: number, processed: number, success: number, failed: number, skipped: number, status = 'processing', currentPhase?: 'extracting' | 'vectorizing'): ProcessingEvent {
+  return { type: 'progress', progress: { source, status, totalRecords: total, processedRecords: processed, successCount: success, failedCount: failed, skippedCount: skipped, currentPhase } }
 }
 
 function getEligibleEmployeesForExtraction(): EligibleRecord[] {
@@ -84,6 +85,11 @@ function getEligibleCandidatesForExtraction(): EligibleRecord[] {
 
 function getEligibleForVectorization(source: string): { dbId: number; upstreamId: number; name: string; resumeText: string; isBench: boolean }[] {
   const db = getDatabase()
+
+  const syncTable = source === 'employees' ? 'synced_employees'
+    : source === 'candidates' ? 'synced_candidates'
+    : 'synced_open_positions'
+
   const rows = db.prepare(`
     SELECT re.source_id, re.upstream_id, re.resume_text, re.is_bench,
       CASE
@@ -92,12 +98,50 @@ function getEligibleForVectorization(source: string): { dbId: number; upstreamId
         ELSE 'Unknown'
       END as name
     FROM resume_embeddings re
+    JOIN ${syncTable} s ON s.id = re.source_id
     WHERE re.source_type = ? AND re.resume_text IS NOT NULL AND re.resume_text != ''
-      AND (re.embedding IS NULL)
+      AND (re.embedding IS NULL OR s.status = 'vectorize_failed')
     ORDER BY re.source_id
   `).all(source) as { source_id: number; upstream_id: number; resume_text: string; is_bench: number; name: string }[]
 
   return rows.map(r => ({ dbId: r.source_id, upstreamId: r.upstream_id, name: r.name, resumeText: r.resume_text, isBench: r.is_bench === 1 }))
+}
+
+function reconcileStatuses(source: string): number {
+  const db = getDatabase()
+  const syncTable = source === 'employees' ? 'synced_employees'
+    : source === 'candidates' ? 'synced_candidates'
+    : 'synced_open_positions'
+
+  const vectorizedFix = db.prepare(`
+    UPDATE ${syncTable} SET status = 'vectorized'
+    WHERE status = 'synced' AND has_resume = 1
+      AND id IN (
+        SELECT re.source_id FROM resume_embeddings re
+        WHERE re.source_type = ? AND re.embedding IS NOT NULL
+          AND re.resume_text IS NOT NULL AND re.resume_text != ''
+      )
+  `).run(source)
+
+  const extractedFix = db.prepare(`
+    UPDATE ${syncTable} SET status = 'extracted'
+    WHERE status = 'synced' AND has_resume = 1
+      AND id IN (
+        SELECT re.source_id FROM resume_embeddings re
+        WHERE re.source_type = ? AND re.resume_text IS NOT NULL AND re.resume_text != ''
+          AND re.embedding IS NULL
+      )
+  `).run(source)
+
+  const totalFixed = vectorizedFix.changes + extractedFix.changes
+  if (totalFixed > 0) {
+    log.warn('Reconciled mismatched statuses', {
+      source,
+      vectorizedFix: vectorizedFix.changes,
+      extractedFix: extractedFix.changes,
+    })
+  }
+  return totalFixed
 }
 
 function sanitizeUnicode(text: string): string {
@@ -136,7 +180,7 @@ async function runExtraction(source: string, token: string, eligible: EligibleRe
   const total = eligible.length
   let processed = 0, success = 0, failed = 0, skipped = 0
 
-  emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+  emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'processing', 'extracting'))
 
   const batchSize = 5
 
@@ -163,7 +207,7 @@ async function runExtraction(source: string, token: string, eligible: EligibleRe
         failed++
         log.error('Extraction failed for record', result.reason instanceof Error ? result.reason : new Error(result.reason?.message ?? 'Extraction failed'), { source })
         emitEvent({ type: 'record', record: { id: `${source}-0`, upstreamId: 0, name: 'Unknown', status: 'failed', error: result.reason?.message ?? 'Extraction failed' } })
-        emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+        emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'processing', 'extracting'))
         continue
       }
 
@@ -192,7 +236,7 @@ async function runExtraction(source: string, token: string, eligible: EligibleRe
         emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'extracted', resumeSizeKb: Math.round(fileSize / 1024), extractedChunks: text.length } })
       }
 
-      emitEvent(makeProgress(source, total, processed, success, failed, skipped))
+      emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'processing', 'extracting'))
     }
   }
 
@@ -204,7 +248,19 @@ async function runVectorization(source: string, model: string, eligible: { dbId:
   const total = eligible.length
   let processed = 0, success = 0, failed = 0, skipped = 0
 
-  emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
+  const table = source === 'employees' ? 'synced_employees' as const
+    : source === 'candidates' ? 'synced_candidates' as const
+    : 'synced_open_positions' as const
+  const failedIds = eligible.map(e => e.dbId)
+  if (failedIds.length > 0) {
+    const db = getDatabase()
+    db.prepare(
+      `UPDATE ${table} SET status = 'extracted', status_reason = NULL WHERE id IN (${failedIds.map(() => '?').join(',')}) AND status = 'vectorize_failed'`
+    ).run(...failedIds)
+    log.info('Reset vectorize_failed records to extracted', { source, count: failedIds.length })
+  }
+
+  emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'processing', 'vectorizing'))
 
   for (const item of eligible) {
     if (signal.aborted) break
@@ -239,7 +295,7 @@ async function runVectorization(source: string, model: string, eligible: { dbId:
       emitEvent({ type: 'record', record: { id: `${source}-${item.upstreamId}`, upstreamId: item.upstreamId, name: item.name, status: 'failed', error: err instanceof Error ? err.message : 'Vectorization failed' } })
     }
 
-    emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'vectorizing'))
+    emitEvent(makeProgress(source, total, processed, success, failed, skipped, 'processing', 'vectorizing'))
   }
 
   log.info('Vectorization complete', { source, total, success, failed, paused: signal.aborted })
@@ -284,6 +340,7 @@ export const processingOrchestrator = {
     extractionController = new AbortController()
     const { signal } = extractionController
     log.info('Text extraction started', { source })
+    reconcileStatuses(source)
 
     try {
       if (source === 'open-positions') {
@@ -310,6 +367,7 @@ export const processingOrchestrator = {
     vectorizationController = new AbortController()
     const { signal } = vectorizationController
     log.info('Vectorization started', { source, model })
+    reconcileStatuses(source)
 
     try {
       const eligible = getEligibleForVectorization(source)
@@ -330,6 +388,7 @@ export const processingOrchestrator = {
     extractionController = new AbortController()
     const extractSignal = extractionController.signal
     log.info('Process All started', { source })
+    reconcileStatuses(source)
 
     try {
       if (source === 'open-positions') {
@@ -412,7 +471,7 @@ async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void,
   let processed = 0, success = 0, failed = 0
   log.info('Open position text extraction started', { eligible: positions.length })
 
-  emitEvent(makeProgress('open-positions', total, processed, success, failed, 0))
+  emitEvent(makeProgress('open-positions', total, processed, success, failed, 0, 'processing', 'extracting'))
 
   for (const pos of positions) {
     if (signal?.aborted) break
@@ -438,7 +497,7 @@ async function extractOpenPositions(emitEvent: (event: ProcessingEvent) => void,
     success++
 
     emitEvent({ type: 'record', record: { id: `pos-${pos.upstream_id}`, upstreamId: pos.upstream_id, name: `${pos.account} - ${pos.job_title}`, status: 'extracted' } })
-    emitEvent(makeProgress('open-positions', total, processed, success, failed, 0))
+    emitEvent(makeProgress('open-positions', total, processed, success, failed, 0, 'processing', 'extracting'))
   }
 
   log.info('Open position text extraction complete', { total, success, failed })

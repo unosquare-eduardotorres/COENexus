@@ -11,6 +11,7 @@ import { registerAgentStubHandlers } from './agentStub.ipc'
 import { registerNomicoreHandlers } from './nomicore.ipc'
 import { registerMailHandlers } from './mail.ipc'
 import { registerBraniacHandlers } from './braniac.ipc'
+import { registerOracleHandlers } from './oracle.ipc'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -26,4 +27,5 @@ export function registerAllHandlers(): void {
   registerNomicoreHandlers()
   registerMailHandlers()
   registerBraniacHandlers()
+  registerOracleHandlers()
 }

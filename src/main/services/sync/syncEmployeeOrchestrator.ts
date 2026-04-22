@@ -243,6 +243,12 @@ export const syncEmployeeOrchestrator = {
           if (result.status === 'rejected') {
             const reason = result.reason?.message ?? 'Fetch failed'
             log.error(`Employee detail fetch failed: ${basicEmp.fullName} (${basicEmp.userId})`, result.reason instanceof Error ? result.reason : new Error(reason), { upstreamId: basicEmp.userId })
+            syncRepository.upsertSyncFailed('synced_employees', {
+              upstream_id: basicEmp.userId,
+              full_name: basicEmp.fullName || 'Unknown',
+              status: 'sync_failed',
+              status_reason: reason,
+            })
             notProcessedCount++
             emitEvent({ type: 'record', record: { id: `emp-${basicEmp.userId}`, source: 'employees', status: 'sync_failed', name: basicEmp.fullName || 'Unknown', email: basicEmp.email || '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicEmp.userId, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason, seniority: '', mainSkill: '', country: '' } })
             continue

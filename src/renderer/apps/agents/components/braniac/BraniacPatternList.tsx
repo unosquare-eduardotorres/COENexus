@@ -1,46 +1,37 @@
-import { Lightbulb, CheckCircle2, Clock } from 'lucide-react'
-import type { BraniacPattern } from '../../../../../shared/ipc-types'
+import { useState, useMemo } from 'react'
+import type { BraniacPattern, BraniacApprovalStatus } from '../../../../../shared/ipc-types'
+import BraniacPatternReviewCard from './BraniacPatternReviewCard'
+
+type FilterTab = 'all' | 'pending_review' | 'approved' | 'auto_applied' | 'rejected'
 
 interface BraniacPatternListProps {
   patterns: BraniacPattern[]
+  onApprove: (id: string) => Promise<void>
+  onReject: (id: string, reason?: string) => Promise<void>
+  onUpdate: (id: string, updates: { pattern_text?: string; confidence_score?: number }) => Promise<void>
 }
 
-function approvalBadge(status: string) {
-  if (status === 'auto_applied') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300">
-        <CheckCircle2 className="h-3 w-3" />
-        Auto-applied
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-      <Clock className="h-3 w-3" />
-      Pending review
-    </span>
+const TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending_review', label: 'Pending Review' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'auto_applied', label: 'Auto-applied' },
+  { key: 'rejected', label: 'Rejected' },
+]
+
+export default function BraniacPatternList({ patterns, onApprove, onReject, onUpdate }: BraniacPatternListProps) {
+  const [activeTab, setActiveTab] = useState<FilterTab>('all')
+
+  const pendingCount = useMemo(
+    () => patterns.filter(p => p.approval_status === 'pending_review').length,
+    [patterns]
   )
-}
 
-function confidenceBar(score: number) {
-  const pct = Math.round(score * 100)
-  const color = score >= 0.9
-    ? 'bg-green-500'
-    : score >= 0.6
-      ? 'bg-amber-500'
-      : 'bg-red-400'
+  const filteredPatterns = useMemo(() => {
+    if (activeTab === 'all') return patterns
+    return patterns.filter(p => p.approval_status === (activeTab as BraniacApprovalStatus))
+  }, [patterns, activeTab])
 
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full bg-gray-200 dark:bg-dark-muted/30 overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-muted tabular-nums">{pct}%</span>
-    </div>
-  )
-}
-
-export default function BraniacPatternList({ patterns }: BraniacPatternListProps) {
   if (patterns.length === 0) {
     return (
       <div className="glass-panel p-5 rounded-2xl">
@@ -53,38 +44,59 @@ export default function BraniacPatternList({ patterns }: BraniacPatternListProps
   return (
     <div className="glass-panel p-5 rounded-2xl space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-primary">Learned Patterns</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-primary">Learned Patterns</h2>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+              {pendingCount}
+            </span>
+          )}
+        </div>
         <span className="text-xs text-muted">{patterns.length} patterns</span>
       </div>
 
-      <div className="space-y-2">
-        {patterns.map((pattern) => (
-          <div
-            key={pattern.id}
-            className="p-3 rounded-xl bg-gray-50/50 dark:bg-dark-surface/50 border border-gray-100 dark:border-dark-border/30 space-y-2"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <Lightbulb className="h-4 w-4 text-violet-500 mt-0.5 shrink-0" />
-                <div>
-                  <h3 className="text-sm font-medium text-primary">{pattern.pattern_name}</h3>
-                  <p className="text-xs text-secondary mt-0.5 line-clamp-2">{pattern.pattern_text}</p>
-                </div>
-              </div>
-              {approvalBadge(pattern.approval_status)}
-            </div>
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.key
+          const tabCount = tab.key === 'all'
+            ? patterns.length
+            : patterns.filter(p => p.approval_status === tab.key).length
 
-            <div className="flex items-center gap-4 text-xs">
-              <div className="flex-1 max-w-[160px]">
-                {confidenceBar(pattern.confidence_score)}
-              </div>
-              <span className="text-muted">{pattern.data_points_count} data points</span>
-              {pattern.account && (
-                <span className="text-muted">{pattern.account}</span>
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+                isActive
+                  ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-300 dark:border-violet-500/30'
+                  : 'text-muted hover:bg-gray-100 dark:hover:bg-dark-hover/50'
+              }`}
+            >
+              {tab.label}
+              {tabCount > 0 && (
+                <span className={`ml-1 ${isActive ? 'text-violet-500 dark:text-violet-400' : 'text-muted'}`}>
+                  ({tabCount})
+                </span>
               )}
-            </div>
-          </div>
-        ))}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="space-y-2">
+        {filteredPatterns.length === 0 ? (
+          <p className="text-sm text-muted py-3 text-center">No patterns in this category.</p>
+        ) : (
+          filteredPatterns.map(pattern => (
+            <BraniacPatternReviewCard
+              key={pattern.id}
+              pattern={pattern}
+              onApprove={onApprove}
+              onReject={onReject}
+              onUpdate={onUpdate}
+            />
+          ))
+        )}
       </div>
     </div>
   )

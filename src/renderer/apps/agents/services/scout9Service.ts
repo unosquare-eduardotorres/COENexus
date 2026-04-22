@@ -14,6 +14,7 @@ import type {
   Scout9UpdateConfigParams,
   Scout9CreatePromptVersionParams,
   Scout9ActivatePromptVersionParams,
+  Scout9ChatParams,
   Scout9PipelineEvent,
   Scout9StatusEvent,
 } from '../../../../shared/ipc-types'
@@ -52,6 +53,9 @@ export const scout9Service = {
   createPromptVersion: (params: Scout9CreatePromptVersionParams) => window.api.scout9.createPromptVersion(params),
   activatePromptVersion: (params: Scout9ActivatePromptVersionParams) => window.api.scout9.activatePromptVersion(params),
   getBrainSnapshot: () => window.api.scout9.getBrainSnapshot(),
+  chat: (params: Scout9ChatParams) => window.api.scout9.chat(params),
+  onChatStepEvent: (callback: (step: string) => void) =>
+    window.api.scout9.onChatStepEvent(callback),
   onPipelineEvent: (callback: (event: Scout9PipelineEvent) => void) =>
     window.api.scout9.onPipelineEvent(callback),
   onStatusEvent: (callback: (event: Scout9StatusEvent) => void) =>

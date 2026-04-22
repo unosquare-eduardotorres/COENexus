@@ -291,6 +291,42 @@ export const removeVoyageKeySchema = z.object({
   index: z.number().int().min(0),
 })
 
+export const pipelineStartSchema = z.object({
+  source: z.enum(['employees', 'candidates']),
+  token: z.string().min(1),
+  model: z.string().optional(),
+  limit: z.number().int().positive().optional(),
+  skip: z.number().int().nonnegative().optional(),
+  year: z.number().int().min(2000).max(2100).optional(),
+  activeOnly: z.boolean().optional(),
+})
+
+export const pipelineRetrySchema = z.object({
+  source: z.enum(['employees', 'candidates']),
+  token: z.string().min(1),
+  model: z.string().optional(),
+})
+
+export const pipelineRetrySingleSchema = z.object({
+  source: z.enum(['employees', 'candidates']),
+  token: z.string().min(1),
+  model: z.string().optional(),
+  upstreamId: z.number().int().positive(),
+})
+
+export const positionPipelineStartSchema = z.object({
+  token: z.string().min(1),
+  model: z.string().optional(),
+  activeOnly: z.boolean(),
+  limit: z.number().int().positive().optional(),
+  skip: z.number().int().nonnegative().optional(),
+})
+
+export const positionPipelineVectorizeSyncedSchema = z.object({
+  token: z.string().min(1),
+  model: z.string().optional(),
+})
+
 export function validatePayload<T>(schema: z.ZodType<T>, data: unknown, channel: string): T {
   const result = schema.safeParse(data)
   if (!result.success) {

@@ -62,3 +62,8 @@ resources/sqlite-vec/*.dll
 
 # Agent Studio worktrees
 .agent-studio/
+
+# Obsidian - track shared config, ignore personal workspace state
+docs/.obsidian/workspace.json
+docs/.obsidian/workspace-mobile.json
+docs/.obsidian/graph.json

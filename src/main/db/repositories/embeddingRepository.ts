@@ -50,7 +50,7 @@ export const embeddingRepository = {
   }): number {
     const db = getDatabase()
     const now = new Date().toISOString()
-    const embeddingBuffer = Buffer.from(row.embedding.buffer)
+    const embeddingBuffer = Buffer.from(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength)
 
     const resultRow = db.prepare(`
       INSERT INTO resume_embeddings (source_type, source_id, upstream_id, embedding, resume_text, is_bench, created_at, updated_at)
@@ -65,15 +65,30 @@ export const embeddingRepository = {
       row.sourceType, row.sourceId, row.upstreamId,
       embeddingBuffer,
       row.resumeText, row.isBench ? 1 : 0, now, now
-    ) as { id: number }
+    ) as { id: number | bigint } | undefined
 
-    if (row.embedding.length > 0) {
-      db.prepare(
-        'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
-      ).run(resultRow.id, embeddingBuffer)
+    if (!resultRow) {
+      throw new Error(`Failed to upsert embedding for ${row.sourceType}/${row.sourceId}: no row returned`)
     }
 
-    return resultRow.id
+    const embeddingId = Number(resultRow.id)
+
+    if (!Number.isInteger(embeddingId) || embeddingId <= 0) {
+      throw new Error(`Invalid embedding id ${resultRow.id} for ${row.sourceType}/${row.sourceId}`)
+    }
+
+    if (row.embedding.length > 0) {
+      try {
+        db.prepare(
+          'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
+        ).run(BigInt(embeddingId), embeddingBuffer)
+      } catch (vecErr) {
+        db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
+        throw vecErr
+      }
+    }
+
+    return embeddingId
   },
 
   upsertTextOnly(row: {
@@ -106,7 +121,7 @@ export const embeddingRepository = {
     const db = getDatabase()
     const existing = this.findBySource(sourceType, sourceId)
     if (existing) {
-      db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(existing.id)
+      db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(BigInt(existing.id))
       db.prepare('DELETE FROM resume_embeddings WHERE id = ?').run(existing.id)
     }
   },
@@ -117,7 +132,7 @@ export const embeddingRepository = {
     sourceType?: string
   ): VectorSearchResult[] {
     const db = getDatabase()
-    const queryBuffer = Buffer.from(queryEmbedding.buffer)
+    const queryBuffer = Buffer.from(queryEmbedding.buffer, queryEmbedding.byteOffset, queryEmbedding.byteLength)
 
     if (sourceType) {
       return db.prepare(`
