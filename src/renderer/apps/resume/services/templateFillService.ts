@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { StructuredResume } from '../types';
 import { escapeXml } from '../utils/escapeHtml';
 
-const BUNDLED_TEMPLATE_PATH = '/templates/USQ Resume Template.docx';
+const BUNDLED_TEMPLATE_PATH = './templates/USQ Resume Template.docx';
 
 function mergeFragmentedTokens(xml: string): string {
   const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
@@ -441,24 +441,30 @@ export const templateFillService = {
   async getTemplateBuffer(): Promise<ArrayBuffer> {
     const stored = localStorage.getItem('output_template_docx');
     if (stored) {
-      const binary = atob(stored);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const buffer = bytes.buffer;
+      try {
+        const binary = atob(stored);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const buffer = bytes.buffer;
 
-      const zip = await JSZip.loadAsync(buffer);
-      const docFile = zip.file('word/document.xml');
-      if (docFile) {
-        const xml = await docFile.async('string');
-        if (xml.includes('{{PROFILE_SUMMARY}}')) {
-          return buffer;
+        const zip = await JSZip.loadAsync(buffer);
+        const docFile = zip.file('word/document.xml');
+        if (docFile) {
+          const xml = await docFile.async('string');
+          if (xml.includes('{{PROFILE_SUMMARY}}')) {
+            return buffer;
+          }
         }
+      } catch {
+        // Stored template is corrupt — fall through to bundled default
       }
-
       localStorage.removeItem('output_template_docx');
     }
-    const buffer = await window.api.app.readBundledFile('templates/USQ Resume Template.docx') as ArrayBuffer;
-    return buffer;
+    const response = await fetch(BUNDLED_TEMPLATE_PATH);
+    if (!response.ok) {
+      throw new Error(`Failed to load resume template: ${response.status}`);
+    }
+    return response.arrayBuffer();
   },
 
   async fillTemplate(resume: StructuredResume): Promise<Blob> {

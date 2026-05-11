@@ -47,7 +47,7 @@ export default function HaikuConfirmModal({ haikuConfirm, onDecision }: HaikuCon
 
         <div className="glass-panel-subtle rounded-lg p-3">
           <p className="text-xs text-amber-500 font-medium">
-            Including low-scoring candidates may result in less relevant matches. They will still receive full Sonnet analysis.
+            Including low-scoring candidates may result in less relevant matches. They will still receive full Opus analysis.
           </p>
         </div>
 

@@ -30,12 +30,8 @@ export function usePositionPipeline() {
   const [activeTab, setActiveTab] = useState<'succeeded' | 'failed' | 'skipped'>('succeeded')
   const [isVectorizingSynced, setIsVectorizingSynced] = useState(false)
 
-  const [savedOffset, setSavedOffset] = useState<number | null>(null)
   const pausedOffsetRef = useRef(0)
-
-  useEffect(() => {
-    positionPipelineService.getSavedOffset().then(offset => setSavedOffset(offset))
-  }, [])
+  const prevTokenRef = useRef(token)
 
   useEffect(() => {
     const unsub = positionPipelineService.onProgress((event: PipelineProgressEvent) => {
@@ -70,20 +66,57 @@ export function usePositionPipeline() {
           setIsVectorizingSynced(false)
           if (event.progress.status === 'paused') {
             pausedOffsetRef.current = event.progress.processedRecords
-            positionPipelineService.getSavedOffset().then(offset => setSavedOffset(offset))
-          } else {
-            setSavedOffset(null)
           }
         }
       }
       if (event.type === 'error') {
         log.error('Position pipeline error', new Error(event.message))
         setIsVectorizingSynced(false)
+        setProgress(prev => prev.status === 'processing' ? { ...prev, status: 'paused' } : prev)
       }
     })
 
     return unsub
   }, [])
+
+  useEffect(() => {
+    positionPipelineService.getState().then(saved => {
+      if (saved && saved.status === 'paused') {
+        log.info('Restoring persisted position pipeline state', { offset: saved.offset })
+        setProgress({
+          source: 'open-positions',
+          status: 'paused',
+          totalRecords: saved.totalRecords,
+          processedRecords: saved.processedRecords,
+          succeededCount: saved.succeededCount,
+          failedCount: saved.failedCount,
+          skippedCount: saved.skippedCount,
+          pauseReason: saved.pauseReason as PipelineProgressDto['pauseReason'],
+          errorMessage: saved.errorMessage,
+        })
+        setSucceededRecords(saved.succeededRecords ?? [])
+        setFailedRecords(saved.failedRecords ?? [])
+        setSkippedRecords(saved.skippedRecords ?? [])
+        pausedOffsetRef.current = saved.offset
+      }
+    }).catch(err => log.error('Failed to load persisted state', err))
+  }, [])
+
+  useEffect(() => {
+    if (prevTokenRef.current !== token) {
+      prevTokenRef.current = token
+      if (
+        progress.status === 'paused'
+        && (progress.pauseReason === 'token-expiring' || progress.pauseReason === 'error')
+        && pausedOffsetRef.current > 0
+        && sharepoint.isValid
+      ) {
+        log.info('Token refreshed — auto-resuming position pipeline', { skip: pausedOffsetRef.current })
+        setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
+        positionPipelineService.startPipeline(true, token, { skip: pausedOffsetRef.current })
+      }
+    }
+  }, [token, progress.status, progress.pauseReason, sharepoint.isValid])
 
   const resetState = useCallback(() => {
     setSucceededRecords([])
@@ -94,25 +127,19 @@ export function usePositionPipeline() {
 
   const handleSyncActive = useCallback(async () => {
     log.info('Position pipeline sync active')
+    await positionPipelineService.clearState()
     resetState()
     setProgress({ ...initialProgress(), status: 'processing' })
-    await positionPipelineService.startPipeline(true, token)
+    await positionPipelineService.startPipeline(true, token, { skip: 0 })
   }, [token, resetState])
 
   const handleSyncAll = useCallback(async () => {
     log.info('Position pipeline sync all')
+    await positionPipelineService.clearState()
     resetState()
-    setSavedOffset(null)
-    await positionPipelineService.clearSavedOffset()
     setProgress({ ...initialProgress(), status: 'processing' })
-    await positionPipelineService.startPipeline(false, token)
+    await positionPipelineService.startPipeline(false, token, { skip: 0 })
   }, [token, resetState])
-
-  const handleResumeSyncAll = useCallback(async () => {
-    log.info('Position pipeline resume sync all from saved offset', { savedOffset })
-    setProgress(prev => ({ ...prev, status: 'processing' }))
-    await positionPipelineService.startPipeline(false, token, { skip: savedOffset ?? 0 })
-  }, [token, savedOffset])
 
   const handleVectorizeSynced = useCallback(async () => {
     log.info('Position pipeline vectorize synced')
@@ -131,7 +158,7 @@ export function usePositionPipeline() {
 
   const handleResume = useCallback(async () => {
     log.info('Position pipeline resume', { skip: pausedOffsetRef.current })
-    setProgress(prev => ({ ...prev, status: 'processing' }))
+    setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
     await positionPipelineService.startPipeline(true, token, { skip: pausedOffsetRef.current })
   }, [token])
 
@@ -162,11 +189,18 @@ export function usePositionPipeline() {
     }
   }, [token])
 
+  const handleStartOver = useCallback(async () => {
+    log.info('Position pipeline start over')
+    await positionPipelineService.clearState()
+    resetState()
+    setProgress(initialProgress())
+  }, [resetState])
+
   const isRunning = progress.status === 'processing'
   const isPaused = progress.status === 'paused'
   const isCompleted = progress.status === 'completed'
   const progressPercent = progress.totalRecords > 0
-    ? Math.round((progress.processedRecords / progress.totalRecords) * 100)
+    ? Math.min(100, Math.round((progress.processedRecords / progress.totalRecords) * 100))
     : 0
 
   return {
@@ -182,13 +216,12 @@ export function usePositionPipeline() {
     isCompleted,
     progressPercent,
     isVectorizingSynced,
-    savedOffset,
     handleSyncActive,
     handleSyncAll,
-    handleResumeSyncAll,
     handleVectorizeSynced,
     handlePause,
     handleResume,
+    handleStartOver,
     handleRetryAllFailed,
     handleRetrySingle,
   }

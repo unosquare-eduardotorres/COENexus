@@ -158,7 +158,9 @@ export function useAdminDashboard() {
             for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
             arrayBuffer = bytes.buffer;
           } else {
-            arrayBuffer = await window.api.app.readBundledFile('templates/USQ Resume Template.docx') as ArrayBuffer;
+            const response = await fetch('./templates/USQ Resume Template.docx');
+            if (!response.ok) throw new Error(`Template load failed: ${response.status}`);
+            arrayBuffer = await response.arrayBuffer();
           }
           setOutputTemplateBuffer(arrayBuffer);
         } catch (err) {

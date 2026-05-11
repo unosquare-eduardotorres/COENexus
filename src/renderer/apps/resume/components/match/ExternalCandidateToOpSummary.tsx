@@ -88,7 +88,7 @@ export default function ExternalCandidateToOpSummary({ resumes, position, onNext
                 <svg className="w-3 h-3 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium">2. Sonnet Deep Analysis</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium">2. Opus Deep Analysis</span>
               </div>
             </div>
           </div>

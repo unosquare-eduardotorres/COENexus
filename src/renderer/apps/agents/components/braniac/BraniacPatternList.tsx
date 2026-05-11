@@ -9,6 +9,7 @@ interface BraniacPatternListProps {
   onApprove: (id: string) => Promise<void>
   onReject: (id: string, reason?: string) => Promise<void>
   onUpdate: (id: string, updates: { pattern_text?: string; confidence_score?: number }) => Promise<void>
+  onDelete?: (pattern: BraniacPattern) => void
 }
 
 const TABS: { key: FilterTab; label: string }[] = [
@@ -19,7 +20,7 @@ const TABS: { key: FilterTab; label: string }[] = [
   { key: 'rejected', label: 'Rejected' },
 ]
 
-export default function BraniacPatternList({ patterns, onApprove, onReject, onUpdate }: BraniacPatternListProps) {
+export default function BraniacPatternList({ patterns, onApprove, onReject, onUpdate, onDelete }: BraniacPatternListProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   const pendingCount = useMemo(
@@ -94,6 +95,7 @@ export default function BraniacPatternList({ patterns, onApprove, onReject, onUp
               onApprove={onApprove}
               onReject={onReject}
               onUpdate={onUpdate}
+              onDelete={onDelete}
             />
           ))
         )}

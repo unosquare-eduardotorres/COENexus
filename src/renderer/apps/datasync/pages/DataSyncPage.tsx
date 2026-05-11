@@ -173,6 +173,7 @@ export default function DataSyncPage() {
             onStartSync={pipeline.handleStartSync}
             onPause={pipeline.handlePause}
             onResume={pipeline.handleResume}
+            onStartOver={pipeline.handleStartOver}
             onRetryAllFailed={pipeline.handleRetryAllFailed}
             onRetrySingle={pipeline.handleRetrySingle}
             isSyncDisabled={!isTokenValid}
@@ -205,10 +206,9 @@ export default function DataSyncPage() {
             onVectorizeSynced={positionPipeline.handleVectorizeSynced}
             onPause={positionPipeline.handlePause}
             onResume={positionPipeline.handleResume}
+            onStartOver={positionPipeline.handleStartOver}
             onRetryAllFailed={positionPipeline.handleRetryAllFailed}
             onRetrySingle={positionPipeline.handleRetrySingle}
-            onResumeSyncAll={positionPipeline.handleResumeSyncAll}
-            savedOffset={positionPipeline.savedOffset}
             isSyncDisabled={!isTokenValid}
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
           />

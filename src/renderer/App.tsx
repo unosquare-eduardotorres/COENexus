@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NexusStatusProvider } from './contexts/NexusStatusContext';
+import { SyncActivityProvider } from './contexts/SyncActivityContext';
 import { ToastProvider } from './shared/components/ToastContext';
 import NexusLanding from './hub/NexusLanding';
 import ResumeApp from './apps/resume/ResumeApp';
@@ -64,23 +65,25 @@ function App() {
             <ErrorCaptureProvider>
               <HashRouter>
                 <NexusStatusProvider>
-                  <AgentActivityBridge />
-                  <AppNavigationBridge />
-                  <Routes>
-                    <Route path="/" element={<NexusLanding />} />
-                    <Route path="/resume/*" element={<ResumeApp />} />
-                    <Route path="/datasync/*" element={<Suspense fallback={null}><DataSyncApp /></Suspense>} />
-                    <Route path="/command-center/*" element={<Suspense fallback={null}><CommandCenterApp /></Suspense>} />
-                    <Route path="/agents/*" element={<Suspense fallback={null}><AgentsApp /></Suspense>} />
-                    <Route path="/path/*" element={<Suspense fallback={null}><PathApp /></Suspense>} />
-                    <Route path="/settings/*" element={<Suspense fallback={null}><SettingsApp /></Suspense>} />
-                    <Route path="/bug/*" element={<Suspense fallback={null}><BugApp /></Suspense>} />
-                    <Route path="/nomicore/*" element={<Suspense fallback={null}><NomicoreApp /></Suspense>} />
-                  </Routes>
-                  <NexusStatusBar />
-                  <ClaudeStatusModal />
-                  <TokenUsageModal />
-                  <SharePointTokenModal />
+                  <SyncActivityProvider>
+                    <AgentActivityBridge />
+                    <AppNavigationBridge />
+                    <Routes>
+                      <Route path="/" element={<NexusLanding />} />
+                      <Route path="/resume/*" element={<ResumeApp />} />
+                      <Route path="/datasync/*" element={<Suspense fallback={null}><DataSyncApp /></Suspense>} />
+                      <Route path="/command-center/*" element={<Suspense fallback={null}><CommandCenterApp /></Suspense>} />
+                      <Route path="/agents/*" element={<Suspense fallback={null}><AgentsApp /></Suspense>} />
+                      <Route path="/path/*" element={<Suspense fallback={null}><PathApp /></Suspense>} />
+                      <Route path="/settings/*" element={<Suspense fallback={null}><SettingsApp /></Suspense>} />
+                      <Route path="/bug/*" element={<Suspense fallback={null}><BugApp /></Suspense>} />
+                      <Route path="/nomicore/*" element={<Suspense fallback={null}><NomicoreApp /></Suspense>} />
+                    </Routes>
+                    <NexusStatusBar />
+                    <ClaudeStatusModal />
+                    <TokenUsageModal />
+                    <SharePointTokenModal />
+                  </SyncActivityProvider>
                 </NexusStatusProvider>
               </HashRouter>
             </ErrorCaptureProvider>

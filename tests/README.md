@@ -132,9 +132,9 @@ This test suite is being built incrementally across 9 runs. See `tests/_meta/dis
 | Run | Focus | Status |
 |-----|-------|--------|
 | 1 | Discovery | ✅ Complete |
-| 2 | Mock harness | ⬜ Pending |
-| 3 | Core agent services (P0) | ⬜ Pending |
-| 4 | Tools, pipelines, schedulers (P1) | ⬜ Pending |
+| 2 | Mock harness | ✅ Complete |
+| 3 | Non-agent unit tests (P1-P2) | ✅ Complete — 14 files, 120 tests |
+| 4 | Core agent services (P0) | ⬜ Pending |
 | 5 | Orchestrators, remaining services | ⬜ Pending |
 | 6 | IPC handlers + sync sub-orchestrators | ⬜ Pending |
 | 7 | Edge cases | ⬜ Pending |

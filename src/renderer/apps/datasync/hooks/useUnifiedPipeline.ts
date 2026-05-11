@@ -35,6 +35,7 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
   const [activeTab, setActiveTab] = useState<'succeeded' | 'failed' | 'skipped'>('succeeded')
 
   const pausedOffsetRef = useRef(0)
+  const prevTokenRef = useRef(token)
 
   useEffect(() => {
     const unsub = pipelineService.onProgress((event: PipelineProgressEvent) => {
@@ -73,14 +74,58 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
       }
       if (event.type === 'error') {
         log.error('Pipeline error', new Error(event.message))
+        setProgress(prev => prev.status === 'processing' ? { ...prev, status: 'paused' } : prev)
       }
     })
 
     return unsub
   }, [source])
 
-  const handleStartSync = useCallback(async () => {
-    log.info('Unified pipeline start', { source })
+  useEffect(() => {
+    pipelineService.getState(source).then(saved => {
+      if (saved && saved.status === 'paused') {
+        log.info('Restoring persisted pipeline state', { source, offset: saved.offset })
+        setProgress({
+          source: saved.source,
+          status: 'paused',
+          totalRecords: saved.totalRecords,
+          processedRecords: saved.processedRecords,
+          succeededCount: saved.succeededCount,
+          failedCount: saved.failedCount,
+          skippedCount: saved.skippedCount,
+          pauseReason: saved.pauseReason as PipelineProgressDto['pauseReason'],
+          errorMessage: saved.errorMessage,
+        })
+        setSucceededRecords(saved.succeededRecords ?? [])
+        setFailedRecords(saved.failedRecords ?? [])
+        setSkippedRecords(saved.skippedRecords ?? [])
+        pausedOffsetRef.current = saved.offset
+      }
+    }).catch(err => log.error('Failed to load persisted state', err))
+  }, [source])
+
+  useEffect(() => {
+    if (prevTokenRef.current !== token) {
+      prevTokenRef.current = token
+      if (
+        progress.status === 'paused'
+        && (progress.pauseReason === 'token-expiring' || progress.pauseReason === 'error')
+        && pausedOffsetRef.current > 0
+        && sharepoint.isValid
+      ) {
+        log.info('Token refreshed — auto-resuming pipeline', { source, skip: pausedOffsetRef.current })
+        setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
+        pipelineService.startPipeline(source, token, {
+          skip: pausedOffsetRef.current,
+          year: source === 'candidates' && selectedYear != null ? selectedYear : undefined,
+        })
+      }
+    }
+  }, [token, progress.status, progress.pauseReason, source, selectedYear, sharepoint.isValid])
+
+  const handleStartSync = useCallback(async (mode?: 'full' | 'sync-only') => {
+    log.info('Unified pipeline start', { source, mode: mode ?? 'full' })
+    await pipelineService.clearState(source)
     setSucceededRecords([])
     setFailedRecords([])
     setSkippedRecords([])
@@ -88,6 +133,7 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
     setProgress({ ...initialProgress(source), status: 'processing' })
 
     await pipelineService.startPipeline(source, token, {
+      mode,
       year: source === 'candidates' && selectedYear != null ? selectedYear : undefined,
     })
   }, [source, token, selectedYear])
@@ -99,7 +145,7 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
 
   const handleResume = useCallback(async () => {
     log.info('Unified pipeline resume', { source, skip: pausedOffsetRef.current })
-    setProgress(prev => ({ ...prev, status: 'processing' }))
+    setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
 
     await pipelineService.startPipeline(source, token, {
       skip: pausedOffsetRef.current,
@@ -135,6 +181,16 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
     }
   }, [source, token])
 
+  const handleStartOver = useCallback(async () => {
+    log.info('Start over', { source })
+    await pipelineService.clearState(source)
+    setSucceededRecords([])
+    setFailedRecords([])
+    setSkippedRecords([])
+    pausedOffsetRef.current = 0
+    setProgress(initialProgress(source))
+  }, [source])
+
   const isRunning = progress.status === 'processing'
   const isPaused = progress.status === 'paused'
   const isCompleted = progress.status === 'completed'
@@ -157,6 +213,7 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
     handleStartSync,
     handlePause,
     handleResume,
+    handleStartOver,
     handleRetryAllFailed,
     handleRetrySingle,
   }

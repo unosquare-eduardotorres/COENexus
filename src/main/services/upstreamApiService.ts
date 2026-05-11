@@ -2,7 +2,7 @@ import { getConfig } from '../config'
 import { createLogger } from './logger'
 import { fetchAuthorized, fetchPaged, type PagedResponse } from './upstream/upstreamApiClient'
 import { getString, getNullableString, getInt, getDecimal, getBool, getDateTime, getNullableDateTime } from './upstream/upstreamRowParsers'
-import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns, buildPrrColumns, buildPrrPresentationColumns } from './upstream/upstreamColumnDefs'
+import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns, buildPrrColumns, buildPrrPresentationColumns, buildTeamCompositionColumns } from './upstream/upstreamColumnDefs'
 import { mapKeysToCamelCase } from './upstream/caseMapper'
 
 export type { ColumnDefinition, PagedRequest, PagedResponse } from './upstream/upstreamApiClient'
@@ -20,6 +20,8 @@ export interface EmployeeDetail {
   jobTitle: string
   mainSkillName: string
   officeName: string
+  functionalUnit: string
+  businessUnit: string
 }
 
 export interface EmployeeContract {
@@ -175,6 +177,15 @@ export interface PrrPresentationItem {
   candidateStatus: string
 }
 
+export interface TeamCompositionEntry {
+  account: string
+  team: string
+  project: string
+  role: string
+  startDate: string
+  endDate: string | null
+}
+
 function mapNoteRows(paged: PagedResponse): PersonaNote[] {
   return paged.payload.map(row => ({
     personaNoteId: getInt(row, 0),
@@ -198,7 +209,9 @@ export const upstreamApiService = {
       email: getString(row, 3),
       jobTitle: getString(row, 4),
       mainSkillName: getString(row, 5),
+      functionalUnit: getString(row, 7),
       officeName: getString(row, 8),
+      businessUnit: getString(row, 10),
       seniority: 0,
       mainSkillId: 0,
       countryId: 0,
@@ -257,6 +270,26 @@ export const upstreamApiService = {
       return mapNoteRows(paged)
     } catch (err) {
       log.error(`getEmployeeNotes failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
+      throw err
+    }
+  },
+
+  async getEmployeeTeamComposition(token: string, id: number): Promise<TeamCompositionEntry[]> {
+    const { upstream } = getConfig()
+    try {
+      const paged = await fetchPaged(`${upstream.apiUrl}employee/${id}/composition`, token, {
+        skip: 0, take: 100, columns: buildTeamCompositionColumns(),
+      })
+      return paged.payload.map(row => ({
+        account: getString(row, 0),
+        team: getString(row, 1),
+        project: getString(row, 2),
+        role: getString(row, 3),
+        startDate: getString(row, 4),
+        endDate: getNullableString(row, 5),
+      }))
+    } catch (err) {
+      log.error(`getEmployeeTeamComposition failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
       throw err
     }
   },

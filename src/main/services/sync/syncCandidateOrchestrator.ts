@@ -143,8 +143,10 @@ export const syncCandidateOrchestrator = {
   async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
     const { seniorities, mainSkills, countries } = await loadCatalogs(token)
 
-    const detail = await upstreamApiService.getCandidateDetail(token, upstreamId)
-    const notes = await loadOrEmpty('Notes', () => upstreamApiService.getCandidateNotes(token, upstreamId))
+    const [detail, notes] = await Promise.all([
+      upstreamApiService.getCandidateDetail(token, upstreamId),
+      loadOrEmpty('Notes', () => upstreamApiService.getCandidateNotes(token, upstreamId)),
+    ])
 
     const basicFallback: CandidateDetail = { candidateId: upstreamId, fullName: '' }
     const entity = buildCandidateEntity(detail, notes, seniorities, mainSkills, countries, basicFallback)

@@ -3,12 +3,13 @@ import type {
   PipelineRecordEvent,
   PipelineProgressDto,
   PipelineFailedRecord,
+  PersistedPipelineState,
 } from '../../../../shared/ipc-types'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
 
 const log = createRendererLogger('positionPipelineService')
 
-export type { PipelineProgressEvent, PipelineRecordEvent, PipelineProgressDto, PipelineFailedRecord }
+export type { PipelineProgressEvent, PipelineRecordEvent, PipelineProgressDto, PipelineFailedRecord, PersistedPipelineState }
 
 export const positionPipelineService = {
   async startPipeline(
@@ -50,12 +51,12 @@ export const positionPipelineService = {
     return window.api.positionPipeline.getFailed()
   },
 
-  async getSavedOffset(): Promise<number | null> {
-    return window.api.positionPipeline.getSavedOffset()
+  async getState(): Promise<PersistedPipelineState | null> {
+    return window.api.positionPipeline.getState()
   },
 
-  async clearSavedOffset(): Promise<void> {
-    await window.api.positionPipeline.clearSavedOffset()
+  async clearState(): Promise<{ cleared: boolean }> {
+    return window.api.positionPipeline.clearState()
   },
 
   onProgress(callback: (event: PipelineProgressEvent) => void): () => void {

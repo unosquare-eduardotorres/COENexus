@@ -101,7 +101,7 @@ export const matchResumeTextSchema = z.object({
 
 export const benchBurnSchema = z.object({
   name: z.string().min(1),
-  matchFlowType: z.enum(['bench-burn', 'delivery-to-op']).optional(),
+  matchFlowType: z.enum(['bench-burn', 'delivery-to-op', 'match-to-positions']).optional(),
   employeeUpstreamIds: z.array(z.number()),
   positionUpstreamIds: z.array(z.number()),
   searchMode: z.literal('opus'),
@@ -294,6 +294,7 @@ export const removeVoyageKeySchema = z.object({
 export const pipelineStartSchema = z.object({
   source: z.enum(['employees', 'candidates']),
   token: z.string().min(1),
+  mode: z.enum(['full', 'sync-only']).optional(),
   model: z.string().optional(),
   limit: z.number().int().positive().optional(),
   skip: z.number().int().nonnegative().optional(),
@@ -325,6 +326,31 @@ export const positionPipelineStartSchema = z.object({
 export const positionPipelineVectorizeSyncedSchema = z.object({
   token: z.string().min(1),
   model: z.string().optional(),
+})
+
+export const matchRankPositionsSchema = z.object({
+  sourceType: z.enum(['candidate', 'employee']),
+  upstreamId: z.number().int().positive(),
+  topN: z.number().int().min(5).max(50),
+})
+
+export const matchRankPositionsForTextSchema = z.object({
+  resumeText: z.string().min(50),
+  topN: z.number().int().min(5).max(50),
+})
+
+export const matchToPositionsSchema = z.object({
+  name: z.string().min(1),
+  matchFlowType: z.literal('match-to-positions'),
+  personSourceType: z.enum(['candidate', 'employee', 'external']),
+  upstreamId: z.number().optional(),
+  candidateName: z.string().optional(),
+  resumeText: z.string().optional(),
+  positionUpstreamIds: z.array(z.number().int()),
+  customPositions: z.array(z.object({
+    name: z.string().min(1),
+    jobDescription: z.string().min(1),
+  })).optional(),
 })
 
 export function validatePayload<T>(schema: z.ZodType<T>, data: unknown, channel: string): T {

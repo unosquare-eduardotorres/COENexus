@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Lightbulb, CheckCircle2, Clock, XCircle, Check, X, Pencil } from 'lucide-react'
+import { Lightbulb, CheckCircle2, Clock, XCircle, Check, X, Pencil, Building, User, Trash2 } from 'lucide-react'
 import type { BraniacPattern, BraniacApprovalStatus } from '../../../../../shared/ipc-types'
 
 interface BraniacPatternReviewCardProps {
@@ -7,6 +7,7 @@ interface BraniacPatternReviewCardProps {
   onApprove: (id: string) => Promise<void>
   onReject: (id: string, reason?: string) => Promise<void>
   onUpdate: (id: string, updates: { pattern_text?: string; confidence_score?: number }) => Promise<void>
+  onDelete?: (pattern: BraniacPattern) => void
 }
 
 function approvalBadge(status: BraniacApprovalStatus) {
@@ -65,6 +66,7 @@ export default function BraniacPatternReviewCard({
   onApprove,
   onReject,
   onUpdate,
+  onDelete,
 }: BraniacPatternReviewCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(pattern.pattern_text)
@@ -114,7 +116,20 @@ export default function BraniacPatternReviewCard({
         <div className="flex items-start gap-2 flex-1 min-w-0">
           <Lightbulb className="h-4 w-4 text-violet-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-primary">{pattern.pattern_name}</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium text-primary">{pattern.pattern_name}</h3>
+              {onDelete && (
+                <button
+                  onClick={() => onDelete(pattern)}
+                  disabled={isActing}
+                  className="p-1 rounded text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors shrink-0"
+                  title="Delete pattern"
+                  aria-label="Delete pattern"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             {isEditing ? (
               <div className="mt-2 space-y-2">
                 <textarea
@@ -151,13 +166,19 @@ export default function BraniacPatternReviewCard({
         <div className="flex-1 max-w-[160px]">
           {confidenceBar(pattern.confidence_score)}
         </div>
-        <span className="text-muted">{pattern.data_points_count} data points</span>
+        <span className="text-muted" title="Total candidate submissions used to infer this pattern">{pattern.data_points_count} data points</span>
         {pattern.account && (
-          <span className="text-muted">{pattern.account}</span>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <Building className="h-3 w-3" /> {pattern.account}
+          </span>
         )}
-        {pattern.stakeholder && (
-          <span className="text-muted">{pattern.stakeholder}</span>
-        )}
+        {pattern.stakeholder ? (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <User className="h-3 w-3" /> {pattern.stakeholder}
+          </span>
+        ) : pattern.account ? (
+          <span className="text-xs text-muted italic">Account-wide</span>
+        ) : null}
         <span className="text-muted">{pattern.source_agent}</span>
       </div>
 

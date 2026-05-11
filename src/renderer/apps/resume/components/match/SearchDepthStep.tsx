@@ -81,11 +81,11 @@ const MODES: ModeOption[] = [
     title: 'Full Analysis',
     badge: '🔬 Deepest',
     badgeClass: 'bg-violet-500/15 text-violet-400',
-    description: 'The complete pipeline. Vector search → Haiku triage → Claude Sonnet deep analysis with fit narratives, skill gaps, leadership assessment, and risk factors.',
+    description: 'The complete pipeline. Vector search → Haiku triage → Claude Opus deep analysis with fit narratives, skill gaps, leadership assessment, and risk factors.',
     defaultTopN: 10,
     topNEditable: false,
     gradient: 'from-violet-500 to-violet-500',
-    stages: ['Vector DB', 'Haiku AI', 'Sonnet Deep Analysis'],
+    stages: ['Vector DB', 'Haiku AI', 'Opus Deep Analysis'],
     icon: (
       <svg className="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 3c-1.1 0-2 .9-2 2v1c0 1.1.9 2 2 2h1v10c0 1.1-.9 2-2 2s-2-.9-2-2" />
@@ -100,7 +100,7 @@ const MODES: ModeOption[] = [
   },
 ];
 
-const FUNNEL_STAGES = ['Vector DB', 'Haiku Filter', 'Sonnet Analysis'];
+const FUNNEL_STAGES = ['Vector DB', 'Haiku Filter', 'Opus Analysis'];
 
 function getActiveStageCount(mode: SearchMode): number {
   if (mode === 'vector') return 1;

@@ -1,9 +1,9 @@
-import { upstreamApiService, type EmployeeDetail, type EmployeeContract, type EmployeeRate } from '../upstreamApiService'
+import { upstreamApiService, type EmployeeDetail, type EmployeeContract, type EmployeeRate, type PersonaNote, type TeamCompositionEntry } from '../upstreamApiService'
 import { syncRepository, type SyncedEmployeeRow } from '../../db/repositories/syncRepository'
 import { createLogger } from '../logger'
 import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeDetection'
 
-import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
+import { findResumeNote, loadOrEmpty, loadCatalogs, isBenchFromComposition } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
 import { salaryNormalizationService } from '../salaryNormalizationService'
 import type { SyncRecordDto, SyncEvent, SyncOptions, EmployeeSyncRecord } from './syncTypes'
@@ -25,6 +25,7 @@ function buildEmployeeEntity(
   contracts: EmployeeContract[],
   rates: EmployeeRate[],
   notes: PersonaNote[],
+  compositions: TeamCompositionEntry[],
   seniorities: Map<number, string>,
   mainSkills: Map<number, string>,
   countries: Map<number, string>,
@@ -47,9 +48,7 @@ function buildEmployeeEntity(
     ? (countries.get(detail.countryId) ?? basicEmployee.officeName)
     : basicEmployee.officeName
 
-  const isBench = rate
-    ? rate.projectName.toLowerCase().includes('bench')
-    : (!detail.accountName || detail.accountName.toLowerCase() === 'bench')
+  const { isBench, benchTeam } = isBenchFromComposition(compositions)
 
   const missingFields: string[] = []
   if (!detail.fullName) missingFields.push('FullName')
@@ -108,7 +107,11 @@ function buildEmployeeEntity(
     resume_date_created: resumeNote?.dateCreated ?? null,
     resume_filename: resumeNote?.filename ?? null,
     is_bench: isBench ? 1 : 0,
+    bench_team: benchTeam,
     job_title: detail.jobTitle || basicEmployee.jobTitle || '',
+    functional_unit: detail.functionalUnit || basicEmployee.functionalUnit || '',
+    office_location: basicEmployee.officeName || detail.officeName || '',
+    business_unit: detail.businessUnit || basicEmployee.businessUnit || '',
     normalized_monthly_usd: normalizedMonthlyUsd,
     inferred_currency: inferredCurrency,
     currency_confidence: currencyConfidence,
@@ -134,8 +137,12 @@ const employeeChangeConfig: ChangeDetectionConfig<SyncedEmployeeRow> = {
     existing.last_account !== entity.last_account ||
     existing.rate !== entity.rate ||
     existing.is_bench !== entity.is_bench ||
+    existing.bench_team !== entity.bench_team ||
     existing.has_resume !== entity.has_resume ||
-    existing.job_title !== entity.job_title,
+    existing.job_title !== entity.job_title ||
+    existing.functional_unit !== entity.functional_unit ||
+    existing.office_location !== entity.office_location ||
+    existing.business_unit !== entity.business_unit,
 }
 
 function mapEmployeeToDto(entity: Omit<SyncedEmployeeRow, 'id'> & { id?: number }, resumeChanged: boolean, syncDetail: string): EmployeeSyncRecord {
@@ -162,6 +169,9 @@ function mapEmployeeToDto(entity: Omit<SyncedEmployeeRow, 'id'> & { id?: number 
     syncedAt: entity.synced_at,
     resumeDateCreated: entity.resume_date_created,
     jobTitle: entity.job_title,
+    functionalUnit: entity.functional_unit,
+    officeLocation: entity.office_location,
+    businessUnit: entity.business_unit,
   }
 }
 
@@ -170,13 +180,24 @@ export const syncEmployeeOrchestrator = {
   async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
     const { seniorities, mainSkills, countries } = await loadCatalogs(token)
 
-    const detail = await upstreamApiService.getEmployeeDetail(token, upstreamId)
-    const contracts = await loadOrEmpty('Contracts', () => upstreamApiService.getEmployeeContracts(token, upstreamId))
-    const rates = await loadOrEmpty('Rates', () => upstreamApiService.getEmployeeRates(token, upstreamId))
-    const notes = await loadOrEmpty('Notes', () => upstreamApiService.getEmployeeNotes(token, upstreamId))
+    const [detail, contracts, rates, notes, compositions] = await Promise.all([
+      upstreamApiService.getEmployeeDetail(token, upstreamId),
+      loadOrEmpty('Contracts', () => upstreamApiService.getEmployeeContracts(token, upstreamId)),
+      loadOrEmpty('Rates', () => upstreamApiService.getEmployeeRates(token, upstreamId)),
+      loadOrEmpty('Notes', () => upstreamApiService.getEmployeeNotes(token, upstreamId)),
+      loadOrEmpty('Compositions', () => upstreamApiService.getEmployeeTeamComposition(token, upstreamId)),
+    ])
 
-    const basicFallback: EmployeeDetail = { userId: upstreamId, fullName: '', email: '', seniority: 0, mainSkillId: 0, countryId: 0, accountName: '', jobTitle: '', mainSkillName: '', officeName: '' }
-    const entity = buildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicFallback)
+    if (compositions.length === 0) {
+      log.warn(`Empty compositions for employee ${upstreamId} (${detail.fullName})`)
+    } else {
+      const { isBench } = isBenchFromComposition(compositions)
+      const activeTeams = compositions.filter(c => !c.endDate).map(c => c.team)
+      log.debug(`Compositions for ${upstreamId}: ${compositions.length} entries, active teams: [${activeTeams.join(', ')}], isBench=${isBench}`)
+    }
+
+    const basicFallback: EmployeeDetail = { userId: upstreamId, fullName: '', email: '', seniority: 0, mainSkillId: 0, countryId: 0, accountName: '', jobTitle: '', mainSkillName: '', officeName: '', functionalUnit: '', businessUnit: '' }
+    const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicFallback)
     const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
     matchEngineService.invalidateFilterCache()
 
@@ -225,13 +246,14 @@ export const syncEmployeeOrchestrator = {
         const chunk = batch.slice(batchStart, batchStart + batchSize)
 
         const fetchResults = await Promise.allSettled(chunk.map(async (basicEmp) => {
-          const [detail, contracts, rates, notes] = await Promise.all([
+          const [detail, contracts, rates, notes, compositions] = await Promise.all([
             upstreamApiService.getEmployeeDetail(token, basicEmp.userId),
             loadOrEmpty('Contracts', () => upstreamApiService.getEmployeeContracts(token, basicEmp.userId)),
             loadOrEmpty('Rates', () => upstreamApiService.getEmployeeRates(token, basicEmp.userId)),
             loadOrEmpty('Notes', () => upstreamApiService.getEmployeeNotes(token, basicEmp.userId)),
+            loadOrEmpty('Compositions', () => upstreamApiService.getEmployeeTeamComposition(token, basicEmp.userId)),
           ])
-          return { basicEmp, detail, contracts, rates, notes }
+          return { basicEmp, detail, contracts, rates, notes, compositions }
         }))
 
         for (let i = 0; i < fetchResults.length; i++) {
@@ -254,10 +276,10 @@ export const syncEmployeeOrchestrator = {
             continue
           }
 
-          const { detail, contracts, rates, notes } = result.value
+          const { detail, contracts, rates, notes, compositions } = result.value
 
           try {
-            const entity = buildEmployeeEntity(detail, contracts, rates, notes, seniorities, mainSkills, countries, basicEmp)
+            const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicEmp)
             const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
             if (entity.status === 'incomplete') incompleteCount++
             else if (entity.status === 'not-processed') notProcessedCount++

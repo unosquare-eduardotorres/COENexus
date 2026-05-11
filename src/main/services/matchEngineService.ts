@@ -71,36 +71,38 @@ interface EnrichedCandidate {
 }
 
 function enrichWithEntityData(vectorResults: { id: number; source_type: string; source_id: number; upstream_id: number; resume_text: string | null; is_bench: number; distance: number }[]): EnrichedCandidate[] {
-  return vectorResults.map(vr => {
-    const similarity = 1 - vr.distance
+  return vectorResults
+    .filter(vr => vr.source_type === 'employees' || vr.source_type === 'candidates')
+    .map(vr => {
+      const similarity = 1 - vr.distance
 
-    if (vr.source_type === 'employees') {
-      const emp = syncRepository.findEmployeeByUpstreamId(vr.upstream_id)
+      if (vr.source_type === 'employees') {
+        const emp = syncRepository.findEmployeeByUpstreamId(vr.upstream_id)
+        return {
+          sourceId: vr.source_id, sourceType: vr.source_type, upstreamId: vr.upstream_id,
+          name: emp?.full_name ?? '', resumeText: vr.resume_text ?? '',
+          cosineSimilarity: similarity, seniority: emp?.seniority ?? '',
+          mainSkill: emp?.main_skill ?? '', country: emp?.country ?? '',
+          rate: emp?.rate ?? 0, currency: emp?.salary_currency ?? '',
+          isBench: emp?.is_bench === 1, jobTitle: emp?.job_title ?? '',
+          grossMonthlySalary: emp?.gross_monthly_salary ?? undefined,
+        }
+      }
+
+      const cand = syncRepository.findCandidateByUpstreamId(vr.upstream_id)
       return {
         sourceId: vr.source_id, sourceType: vr.source_type, upstreamId: vr.upstream_id,
-        name: emp?.full_name ?? '', resumeText: vr.resume_text ?? '',
-        cosineSimilarity: similarity, seniority: emp?.seniority ?? '',
-        mainSkill: emp?.main_skill ?? '', country: emp?.country ?? '',
-        rate: emp?.rate ?? 0, currency: emp?.salary_currency ?? '',
-        isBench: emp?.is_bench === 1, jobTitle: emp?.job_title ?? '',
-        grossMonthlySalary: emp?.gross_monthly_salary ?? undefined,
+        name: cand?.full_name ?? '', resumeText: vr.resume_text ?? '',
+        cosineSimilarity: similarity, seniority: cand?.seniority ?? '',
+        mainSkill: cand?.main_skill ?? '', country: cand?.country ?? '',
+        rate: 0, currency: cand?.salary_currency ?? '',
+        isBench: false, jobTitle: '',
+        candidateStatus: cand?.candidate_status ?? undefined,
+        salaryExpectations: cand?.salary_expectations ?? undefined,
+        salaryExpectationsCurrency: cand?.salary_expectations_currency ?? undefined,
+        grossMonthlySalary: cand?.current_salary ?? undefined,
       }
-    }
-
-    const cand = syncRepository.findCandidateByUpstreamId(vr.upstream_id)
-    return {
-      sourceId: vr.source_id, sourceType: vr.source_type, upstreamId: vr.upstream_id,
-      name: cand?.full_name ?? '', resumeText: vr.resume_text ?? '',
-      cosineSimilarity: similarity, seniority: cand?.seniority ?? '',
-      mainSkill: cand?.main_skill ?? '', country: cand?.country ?? '',
-      rate: 0, currency: cand?.salary_currency ?? '',
-      isBench: false, jobTitle: '',
-      candidateStatus: cand?.candidate_status ?? undefined,
-      salaryExpectations: cand?.salary_expectations ?? undefined,
-      salaryExpectationsCurrency: cand?.salary_expectations_currency ?? undefined,
-      grossMonthlySalary: cand?.current_salary ?? undefined,
-    }
-  })
+    })
 }
 
 const ALLOWED_OPERATORS = new Set([
@@ -224,12 +226,25 @@ async function generateJdEmbedding(jobDescription: string): Promise<Float32Array
 }
 
 function searchVectors(embedding: Float32Array, dataSource: string, topN: number): EnrichedCandidate[] {
-  const sourceType = dataSource === 'bench' ? 'employees'
-    : dataSource === 'candidates' ? 'candidates'
-    : undefined
+  let sourceType: string | undefined
+  let sourceTypes: string[] | undefined
+
+  switch (dataSource) {
+    case 'bench':
+    case 'all-employees':
+      sourceType = 'employees'
+      break
+    case 'candidates':
+      sourceType = 'candidates'
+      break
+    case 'all-sources':
+    default:
+      sourceTypes = ['employees', 'candidates']
+      break
+  }
 
   const vectorLimit = Math.max(topN * 10, 50)
-  const rawResults = embeddingRepository.searchSimilar(embedding, vectorLimit, sourceType)
+  const rawResults = embeddingRepository.searchSimilar(embedding, vectorLimit, sourceType, sourceTypes)
   let enriched = enrichWithEntityData(rawResults)
 
   if (dataSource === 'bench') {
@@ -332,6 +347,14 @@ async function runDeepAnalysis(
       const response = await claudeService.chatAsync(opusModel, prompt, 4096, 0.1)
       const parsed = parseAiResponse(response, opusAnalysisSchema, 'opus-analysis')
 
+      const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
+      const mergedAnalysis = {
+        ...analysisObj,
+        fitVerdict: parsed.fitVerdict ?? (analysisObj.fitVerdict as string | undefined),
+        fitSummary: parsed.fitSummary ?? (analysisObj.fitSummary as string | undefined),
+        whyNotFit: parsed.whyNotFit ?? (analysisObj.whyNotFit as string | undefined),
+      }
+
       const analysisResult: Record<string, unknown> = {
         id: candidate.upstreamId, name: candidate.name, type: candidate.sourceType,
         matchScore: parsed.matchScore, role: parsed.role, years: parsed.years,
@@ -342,7 +365,7 @@ async function runDeepAnalysis(
         summary: parsed.summary, skills: parsed.skills,
         domains: parsed.domains, gaps: parsed.gaps,
         leadership: parsed.leadership, softSkills: parsed.softSkills,
-        analysis: parsed.analysis,
+        analysis: mergedAnalysis,
         seniority: candidate.seniority, expectedRate: candidate.rate,
         currency: candidate.currency, country: candidate.country,
         mainSkill: candidate.mainSkill, isBench: candidate.isBench,
@@ -577,9 +600,10 @@ export const matchEngineService = {
 
   getResumeText(sourceType: string, upstreamId: number): string | null {
     const db = getDatabase()
+    const normalizedType = sourceType.endsWith('s') ? sourceType : `${sourceType}s`
     const row = db.prepare(
       'SELECT resume_text FROM resume_embeddings WHERE source_type = ? AND upstream_id = ?'
-    ).get(sourceType, upstreamId) as { resume_text: string | null } | undefined
+    ).get(normalizedType, upstreamId) as { resume_text: string | null } | undefined
     return row?.resume_text ?? null
   },
 }

@@ -146,10 +146,14 @@ async function migrateEmbeddings(
   `)
 
   let hasVecModule = false
+  let deleteVec: Database.Statement | null = null
   let insertVec: Database.Statement | null = null
   try {
+    deleteVec = sqliteDb.prepare(
+      'DELETE FROM vec_embeddings WHERE rowid = ?'
+    )
     insertVec = sqliteDb.prepare(
-      'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
+      'INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
     )
     hasVecModule = true
   } catch {
@@ -179,7 +183,8 @@ async function migrateEmbeddings(
 
       insertEmbedding.run(id, sourceType, sourceId, upstreamId, embeddingBuffer, resumeText, createdAt, updatedAt, isBench)
 
-      if (embeddingBuffer && hasVecModule && insertVec) {
+      if (embeddingBuffer && hasVecModule && insertVec && deleteVec) {
+        deleteVec.run(id)
         insertVec.run(id, embeddingBuffer)
       }
     }

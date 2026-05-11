@@ -158,6 +158,17 @@ export function buildPrrPresentationColumns(): ColumnDefinition[] {
   ]
 }
 
+export function buildTeamCompositionColumns(): ColumnDefinition[] {
+  return [
+    col('Account', 'Account', { searchable: true, filterOperator: 'None' }),
+    col('Team', 'Team', { searchable: true, filterOperator: 'None' }),
+    col('Project', 'Project', { searchable: true, filterOperator: 'None' }),
+    col('Role', 'Role', { searchable: true, filterOperator: 'None' }),
+    col('StartDate', 'Start Date', { dataType: 'datetimeutc', sortDirection: 'Descending', sortOrder: 1, filterOperator: 'None' }),
+    col('EndDate', 'End Date', { dataType: 'datetimeutc', filterOperator: 'None' }),
+  ]
+}
+
 export function buildPresentedCandidateColumns(): ColumnDefinition[] {
   return [
     col('CandidateRequisitionId', 'Actions', { dataType: 'numeric', isKey: true, filterable: false, exportable: false, sortable: false, filterOperator: 'None' }),

@@ -112,6 +112,18 @@ describe('BraniacDataAggregator', () => {
       expect(result.dataPointsCount).toBe(1)
     })
 
+    it('should normalize minimum_rate=0 to null (treat as missing floor)', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging, minimum_rate, maximum_rate)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5, 0, 100)
+      `).run()
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+
+      expect(result.positions[0].minimumRate).toBeNull()
+      expect(result.positions[0].maximumRate).toBe(100)
+    })
+
     it('should degrade gracefully when feedback_catalog is empty', () => {
       nexusDb.prepare(`
         INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
@@ -301,6 +313,211 @@ describe('BraniacDataAggregator', () => {
       expect(result.positions).toHaveLength(1)
       expect(result.positions[0].stakeholder).toBe('JSmith')
       expect(result.stakeholder).toBe('JSmith')
+    })
+  })
+
+  describe('resume skills enrichment', () => {
+    function addResumeEmbeddingsTable(db: Database.Database): void {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS resume_embeddings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_type TEXT NOT NULL,
+          source_id INTEGER NOT NULL,
+          upstream_id INTEGER NOT NULL,
+          embedding BLOB,
+          resume_text TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          is_bench INTEGER NOT NULL DEFAULT 0,
+          extracted_skills_json TEXT,
+          skills_extracted_at TEXT,
+          skills_extractor_model TEXT,
+          UNIQUE(source_type, source_id)
+        );
+      `)
+    }
+
+    it('should use requisitionTaggedSkill field instead of mainSkill', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'Java', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate)
+        VALUES (1, 100, 200, 'Alice', 'Java', 'Presented', 85)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+
+      expect(result.positions[0].candidates[0].requisitionTaggedSkill).toBe('Java')
+      expect(result.positions[0].candidates[0]).not.toHaveProperty('mainSkill')
+    })
+
+    it('should enrich candidates with resumeSkills when available', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'Java', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate)
+        VALUES (1, 100, 200, 'Alice', 'Java', 'Presented', 85)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const skillsJson = JSON.stringify({
+        primary_tech_stack: ['C#', '.NET'],
+        secondary_tech_stack: ['Docker'],
+        roles: ['Backend Developer'],
+        domains: ['Fintech'],
+        years_experience: 5,
+        seniority_signals: [],
+        certifications: [],
+        languages: [],
+        summary: 'C# developer',
+      })
+
+      nexusDb.prepare(`
+        INSERT INTO resume_embeddings (source_type, source_id, upstream_id, resume_text, extracted_skills_json, skills_extracted_at)
+        VALUES ('candidates', 1, 200, 'Resume text', ?, datetime('now'))
+      `).run(skillsJson)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      const candidate = result.positions[0].candidates[0]
+
+      expect(candidate.requisitionTaggedSkill).toBe('Java')
+      expect(candidate.resumeSkills).not.toBeNull()
+      expect(candidate.resumeSkills!.primaryStack).toContain('C#')
+      expect(candidate.resumeSkills!.source).toBe('candidates')
+    })
+
+    it('should prefer resume-session source over employees/candidates', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate, is_employee)
+        VALUES (1, 100, 300, 'Bob', 'React', 'Hired', 90, 1)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const employeeSkills = JSON.stringify({
+        primary_tech_stack: ['React'],
+        secondary_tech_stack: [],
+        roles: [],
+        domains: [],
+        years_experience: null,
+        seniority_signals: [],
+        certifications: [],
+        languages: [],
+        summary: 'React developer (old)',
+      })
+
+      const sessionSkills = JSON.stringify({
+        primary_tech_stack: ['React', 'Next.js', 'TypeScript'],
+        secondary_tech_stack: ['Node.js'],
+        roles: ['Frontend Lead'],
+        domains: [],
+        years_experience: 6,
+        seniority_signals: ['Lead'],
+        certifications: [],
+        languages: [],
+        summary: 'React lead with Next.js expertise (newer)',
+      })
+
+      nexusDb.prepare(`
+        INSERT INTO resume_embeddings (source_type, source_id, upstream_id, resume_text, extracted_skills_json, skills_extracted_at)
+        VALUES ('employees', 1, 300, 'Old resume', ?, datetime('now', '-1 day')),
+               ('resume-session', 2, 300, 'Newer resume', ?, datetime('now'))
+      `).run(employeeSkills, sessionSkills)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+      const candidate = result.positions[0].candidates[0]
+
+      expect(candidate.resumeSkills).not.toBeNull()
+      expect(candidate.resumeSkills!.source).toBe('resume-session')
+      expect(candidate.resumeSkills!.primaryStack).toContain('Next.js')
+    })
+
+    it('should report resumeSkillsCoverage in dataCompleteness', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate)
+        VALUES (1, 100, 200, 'Alice', 'React', 'Presented', 85),
+               (1, 101, 201, 'Bob', 'React', 'Presented', 90)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const skillsJson = JSON.stringify({
+        primary_tech_stack: ['React'],
+        secondary_tech_stack: [],
+        roles: [],
+        domains: [],
+        years_experience: null,
+        seniority_signals: [],
+        certifications: [],
+        languages: [],
+        summary: '',
+      })
+
+      nexusDb.prepare(`
+        INSERT INTO resume_embeddings (source_type, source_id, upstream_id, resume_text, extracted_skills_json, skills_extracted_at)
+        VALUES ('candidates', 1, 200, 'Resume', ?, datetime('now'))
+      `).run(skillsJson)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+
+      expect(result.dataCompleteness.hasResumeSkills).toBe(true)
+      expect(result.dataCompleteness.resumeSkillsCoverage).toBe(0.5)
+    })
+
+    it('should report zero coverage when no skills extracted', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate)
+        VALUES (1, 100, 200, 'Alice', 'React', 'Presented', 85)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+
+      expect(result.dataCompleteness.hasResumeSkills).toBe(false)
+      expect(result.dataCompleteness.resumeSkillsCoverage).toBe(0)
+    })
+
+    it('should have null resumeSkills when no embedding found for candidate', () => {
+      nexusDb.prepare(`
+        INSERT INTO synced_open_positions (upstream_id, account, stakeholder, main_skill, countries, seniorities, job_title, aging)
+        VALUES (1, 'Acme', 'JSmith', 'React', 'US', 'Senior', 'Dev', 5)
+      `).run()
+
+      nexusDb.prepare(`
+        INSERT INTO open_position_candidates (open_position_id, candidate_requisition_id, candidate_id, candidate_name, main_skill, candidate_status, rate)
+        VALUES (1, 100, 200, 'Alice', 'React', 'Presented', 85)
+      `).run()
+
+      addResumeEmbeddingsTable(nexusDb)
+
+      const result = braniacDataAggregator.aggregateForAccount('Acme')
+
+      expect(result.positions[0].candidates[0].resumeSkills).toBeNull()
     })
   })
 })

@@ -63,7 +63,13 @@ function displayReason(record: SyncRecord): string {
   return detail || record.reason || '';
 }
 
-type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations' | 'account' | 'coe' | 'stakeholder' | 'countries' | 'seniorities' | 'aging' | 'hasJobDescription' | 'candidatesCount' | 'team' | 'transitionStatus' | 'location' | 'impact' | 'attritionRisk' | 'presentationsCount';
+function simplifiedStatus(status: PipelineStatus): 'Succeeded' | 'Failed' | 'Skip' {
+  if (status === 'sync_failed' || status === 'extract_failed' || status === 'vectorize_failed') return 'Failed';
+  if (status === 'incomplete' || status === 'not-processed') return 'Skip';
+  return 'Succeeded';
+}
+
+type SortKey = 'pipelineStatus' | 'name' | 'jobTitle' | 'email' | 'seniority' | 'mainSkill' | 'functionalUnit' | 'officeLocation' | 'businessUnit' | 'salary' | 'country' | 'hasResume' | 'reason' | 'coeCertified' | 'candidateStatus' | 'lastStatusUpdate' | 'salaryExpectations' | 'account' | 'coe' | 'stakeholder' | 'countries' | 'seniorities' | 'aging' | 'hasJobDescription' | 'candidatesCount' | 'team' | 'transitionStatus' | 'location' | 'impact' | 'attritionRisk' | 'presentationsCount';
 type SortDirection = 'asc' | 'desc';
 
 const PIPELINE_ORDER: Record<PipelineStatus, number> = {
@@ -153,7 +159,16 @@ const SyncRecordTable = memo(function SyncRecordTable({
       }
       const q = searchQuery.toLowerCase();
       const displayName = r.name || (r.email ? r.email.split('@')[0] : '');
-      const matchesSearch = !q || displayName.toLowerCase().includes(q) || (r.email ?? '').toLowerCase().includes(q) || (r.account ?? '').toLowerCase().includes(q);
+      const matchesSearch = !q
+        || displayName.toLowerCase().includes(q)
+        || (r.email ?? '').toLowerCase().includes(q)
+        || (r.account ?? '').toLowerCase().includes(q)
+        || (source === 'employees' && (
+          (r.mainSkill ?? '').toLowerCase().includes(q)
+          || (r.functionalUnit ?? '').toLowerCase().includes(q)
+          || (r.businessUnit ?? '').toLowerCase().includes(q)
+          || (r.officeLocation ?? '').toLowerCase().includes(q)
+        ));
       return matchesStatus && matchesSearch;
     });
 
@@ -187,6 +202,18 @@ const SyncRecordTable = memo(function SyncRecordTable({
         case 'mainSkill':
           valA = a.mainSkill;
           valB = b.mainSkill;
+          break;
+        case 'functionalUnit':
+          valA = a.functionalUnit;
+          valB = b.functionalUnit;
+          break;
+        case 'officeLocation':
+          valA = a.officeLocation;
+          valB = b.officeLocation;
+          break;
+        case 'businessUnit':
+          valA = a.businessUnit;
+          valB = b.businessUnit;
           break;
         case 'salary':
           valA = a.grossMonthlySalary ?? null;
@@ -308,12 +335,16 @@ const SyncRecordTable = memo(function SyncRecordTable({
       ];
 
       const employeeColumns: ColumnDef[] = [
+        { header: 'Status', accessor: (r) => simplifiedStatus((r as unknown as SyncRecord).pipelineStatus) },
         { header: 'Pipeline Status', accessor: (r) => PIPELINE_LABELS[(r as unknown as SyncRecord).pipelineStatus] },
         { header: 'Name', accessor: (r) => (r as unknown as SyncRecord).name || (r as unknown as SyncRecord).email?.split('@')[0] || '' },
+        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
+        { header: 'Functional Unit', accessor: (r) => (r as unknown as SyncRecord).functionalUnit ?? '' },
+        { header: 'Office Location', accessor: (r) => (r as unknown as SyncRecord).officeLocation ?? '' },
+        { header: 'Business Unit', accessor: (r) => (r as unknown as SyncRecord).businessUnit ?? '' },
         { header: 'Job Title', accessor: (r) => (r as unknown as SyncRecord).jobTitle },
         { header: 'Email', accessor: (r) => (r as unknown as SyncRecord).email },
         { header: 'Seniority', accessor: (r) => (r as unknown as SyncRecord).seniority },
-        { header: 'Main Skill', accessor: (r) => (r as unknown as SyncRecord).mainSkill },
         { header: 'Salary', accessor: (r) => (r as unknown as SyncRecord).grossMonthlySalary },
         { header: 'Currency', accessor: (r) => (r as unknown as SyncRecord).currency },
         { header: 'Country', accessor: (r) => (r as unknown as SyncRecord).country },
@@ -447,10 +478,13 @@ const SyncRecordTable = memo(function SyncRecordTable({
                 ] : [
                   { key: 'pipelineStatus' as SortKey, label: 'Status', className: '' },
                   { key: 'name' as SortKey, label: 'Name', className: '' },
+                  { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
+                  { key: 'functionalUnit' as SortKey, label: 'Functional Unit', className: 'hidden md:table-cell' },
+                  { key: 'officeLocation' as SortKey, label: 'Office Location', className: 'hidden lg:table-cell' },
+                  { key: 'businessUnit' as SortKey, label: 'Business Unit', className: 'hidden lg:table-cell' },
                   { key: 'jobTitle' as SortKey, label: 'Job Title', className: 'hidden md:table-cell' },
                   { key: 'email' as SortKey, label: 'Email', className: 'hidden md:table-cell' },
                   { key: 'seniority' as SortKey, label: 'Seniority', className: 'hidden lg:table-cell' },
-                  { key: 'mainSkill' as SortKey, label: 'Main Skill', className: 'hidden md:table-cell' },
                   { key: 'salary' as SortKey, label: 'Salary', className: '' },
                   { key: 'country' as SortKey, label: 'Country', className: 'hidden lg:table-cell' },
                   { key: 'hasResume' as SortKey, label: 'Resume', className: '' },
@@ -587,10 +621,13 @@ const SyncRecordTable = memo(function SyncRecordTable({
                     </>
                   ) : (
                     <>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.functionalUnit || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.officeLocation || '—'}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.businessUnit || '—'}</td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary whitespace-nowrap">{record.jobTitle || '—'}</td>
                       <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.email || '—'}</td>
                       <td className="hidden lg:table-cell px-4 py-3 text-secondary">{record.seniority || '—'}</td>
-                      <td className="hidden md:table-cell px-4 py-3 text-secondary">{record.mainSkill || '—'}</td>
                       <td className="px-4 py-3 text-secondary whitespace-nowrap">
                         {record.grossMonthlySalary != null
                           ? formatSalary(record.grossMonthlySalary, record.currency)

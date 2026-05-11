@@ -6,6 +6,7 @@ vi.mock('../upstreamApiService', () => ({
     getEmployeeContracts: vi.fn(),
     getEmployeeRates: vi.fn(),
     getEmployeeNotes: vi.fn(),
+    getEmployeeTeamComposition: vi.fn(),
     getEmployeesPaged: vi.fn(),
   },
 }))
@@ -82,6 +83,16 @@ describe('syncOrchestrator', () => {
         fullName: 'Jane Doe',
         dateCreated: '2024-03-01T00:00:00.000Z',
         filename: 'resume.pdf',
+      },
+    ])
+    vi.mocked(upstreamApiService.getEmployeeTeamComposition).mockResolvedValue([
+      {
+        account: 'Acme',
+        team: 'Center of Excellence (COE)',
+        project: 'PSL: Jane Doe',
+        role: 'Individual Contributor',
+        startDate: '2024-01-15T00:00:00.000Z',
+        endDate: null,
       },
     ])
     vi.mocked(syncRepository.findEmployeeByUpstreamId).mockReturnValue(undefined)

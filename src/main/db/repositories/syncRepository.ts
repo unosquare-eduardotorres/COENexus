@@ -24,7 +24,11 @@ export interface SyncedEmployeeRow {
   resume_date_created: string | null
   resume_filename: string | null
   is_bench: number
+  bench_team: string | null
   job_title: string
+  functional_unit: string
+  office_location: string
+  business_unit: string
   normalized_monthly_usd: number | null
   inferred_currency: string | null
   currency_confidence: string | null
@@ -151,7 +155,8 @@ export interface OpenPositionDiscussionRow {
 const EMPLOYEE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'gross_monthly_salary', 'salary_currency', 'last_account', 'last_account_start_date', 'rate',
-  'has_resume', 'resume_note_id', 'resume_date_created', 'resume_filename', 'is_bench', 'job_title',
+  'has_resume', 'resume_note_id', 'resume_date_created', 'resume_filename', 'is_bench', 'bench_team', 'job_title',
+  'functional_unit', 'office_location', 'business_unit',
   'normalized_monthly_usd', 'inferred_currency', 'currency_confidence',
   'status', 'status_reason', 'synced_at',
 ]
@@ -270,7 +275,27 @@ export const syncRepository = {
 
   getBenchEmployees(limit = 500, offset = 0): SyncedEmployeeRow[] {
     const db = getDatabase()
-    return db.prepare('SELECT * FROM synced_employees WHERE is_bench = 1 ORDER BY full_name LIMIT ? OFFSET ?').all(limit, offset) as SyncedEmployeeRow[]
+    return db.prepare(
+      "SELECT * FROM synced_employees WHERE is_bench = 1 AND status != 'inactive' ORDER BY full_name LIMIT ? OFFSET ?"
+    ).all(limit, offset) as SyncedEmployeeRow[]
+  },
+
+  markStaleEmployees(activeUpstreamIds: Set<number>): number {
+    const db = getDatabase()
+    const allEmployees = db.prepare(
+      'SELECT id, upstream_id FROM synced_employees WHERE status != ?'
+    ).all('inactive') as { id: number; upstream_id: number }[]
+
+    let count = 0
+    for (const emp of allEmployees) {
+      if (!activeUpstreamIds.has(emp.upstream_id)) {
+        db.prepare(
+          "UPDATE synced_employees SET status = 'inactive', is_bench = 0, bench_team = NULL, synced_at = ? WHERE id = ?"
+        ).run(new Date().toISOString(), emp.id)
+        count++
+      }
+    }
+    return count
   },
 
   searchEmployees(query: string, limit: number = 50): SyncedEmployeeRow[] {
@@ -333,10 +358,27 @@ export const syncRepository = {
     return { total, synced, failed, processing }
   },
 
+  getCandidateCount(): number {
+    const db = getDatabase()
+    return (db.prepare('SELECT COUNT(*) as c FROM synced_candidates').get() as { c: number }).c
+  },
+
+  getEmployeeCount(): number {
+    const db = getDatabase()
+    return (db.prepare('SELECT COUNT(*) as c FROM synced_employees').get() as { c: number }).c
+  },
+
+  getAvailableOpenPositions(): SyncedOpenPositionRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      "SELECT * FROM synced_open_positions WHERE position_status IN ('Active', 'Draft') ORDER BY account"
+    ).all() as SyncedOpenPositionRow[]
+  },
+
   getActiveOpenPositions(): SyncedOpenPositionRow[] {
     const db = getDatabase()
     return db.prepare(
-      "SELECT * FROM synced_open_positions ORDER BY aging DESC"
+      "SELECT * FROM synced_open_positions WHERE position_status IN ('Active', 'Draft') ORDER BY aging DESC"
     ).all() as SyncedOpenPositionRow[]
   },
 
@@ -347,8 +389,12 @@ export const syncRepository = {
 
   getOpenPositionSyncStatus(): { total: number; lastSyncedAt: string | null } {
     const db = getDatabase()
-    const total = (db.prepare("SELECT COUNT(*) as c FROM synced_open_positions").get() as { c: number }).c
-    const latest = db.prepare('SELECT MAX(synced_at) as latest FROM synced_open_positions').get() as { latest: string | null }
+    const total = (db.prepare(
+      "SELECT COUNT(*) as c FROM synced_open_positions WHERE position_status IN ('Active', 'Draft')"
+    ).get() as { c: number }).c
+    const latest = db.prepare(
+      "SELECT MAX(synced_at) as latest FROM synced_open_positions WHERE position_status IN ('Active', 'Draft')"
+    ).get() as { latest: string | null }
     return { total, lastSyncedAt: latest?.latest ?? null }
   },
 

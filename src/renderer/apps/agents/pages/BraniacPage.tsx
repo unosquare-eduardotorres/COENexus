@@ -7,6 +7,8 @@ const log = createRendererLogger('BraniacPage')
 const TABS = [
   { path: '', label: 'Home', end: true },
   { path: 'pipeline', label: 'Pipeline', end: false },
+  { path: 'profiles', label: 'Profiles', end: false },
+  { path: 'chat', label: 'Chat', end: false },
   { path: 'history', label: 'Job History', end: false },
   { path: 'patterns', label: 'Patterns', end: false },
 ]

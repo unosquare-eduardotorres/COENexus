@@ -16,9 +16,10 @@ interface PipelineDashboardProps {
   isRunning: boolean
   isPaused: boolean
   progressPercent: number
-  onStartSync: () => void
+  onStartSync: (mode?: 'full' | 'sync-only') => void
   onPause: () => void
   onResume: () => void
+  onStartOver: () => void
   onRetryAllFailed: () => void
   onRetrySingle: (upstreamId: number) => void
   isSyncDisabled?: boolean
@@ -42,6 +43,7 @@ export default memo(function PipelineDashboard({
   onStartSync,
   onPause,
   onResume,
+  onStartOver,
   onRetryAllFailed,
   onRetrySingle,
   isSyncDisabled,
@@ -68,16 +70,28 @@ export default memo(function PipelineDashboard({
       <div className="glass-panel rounded-xl p-4">
         <div className="flex items-center gap-3 flex-wrap">
           {!isRunning && !isPaused && (
-            <button
-              onClick={onStartSync}
-              disabled={isSyncDisabled || !isVoyageKeyConfigured}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 dark:bg-accent-600 dark:hover:bg-accent-500 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Sync {sourceLabel}
-            </button>
+            <>
+              <button
+                onClick={() => onStartSync('full')}
+                disabled={isSyncDisabled || !isVoyageKeyConfigured}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 dark:bg-accent-600 dark:hover:bg-accent-500 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Full Pipeline
+              </button>
+              <button
+                onClick={() => onStartSync('sync-only')}
+                disabled={isSyncDisabled}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/20 rounded-xl hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync Only
+              </button>
+            </>
           )}
 
           {isRunning && (
@@ -93,15 +107,26 @@ export default memo(function PipelineDashboard({
           )}
 
           {isPaused && (
-            <button
-              onClick={onResume}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-accent-700 dark:text-accent-400 bg-accent-100 dark:bg-accent-500/20 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-500/30 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Resume
-            </button>
+            <>
+              <button
+                onClick={onResume}
+                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-accent-700 dark:text-accent-400 bg-accent-100 dark:bg-accent-500/20 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-500/30 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Resume
+              </button>
+              <button
+                onClick={onStartOver}
+                className="glass-button inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                </svg>
+                Start Over
+              </button>
+            </>
           )}
 
           {failedRecords.length > 0 && !isRunning && (
@@ -126,6 +151,17 @@ export default memo(function PipelineDashboard({
         </div>
       </div>
 
+      {/* Restored session banner */}
+      {isPaused && progress.processedRecords > 0 && !isRunning && (
+        <div className="glass-panel-subtle rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm text-secondary">
+            Pipeline paused at record {progress.processedRecords.toLocaleString()} of {progress.totalRecords.toLocaleString()}
+            {progress.pauseReason === 'token-expiring' && ' (token expired)'}
+            {progress.pauseReason === 'error' && ' (error)'}
+          </span>
+        </div>
+      )}
+
       {/* Progress summary */}
       {(isRunning || isPaused || progress.processedRecords > 0) && (
         <div className="glass-panel rounded-xl p-5 space-y-4">
@@ -149,6 +185,16 @@ export default memo(function PipelineDashboard({
             {isPaused && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                 Paused
+              </span>
+            )}
+            {isPaused && progress.pauseReason === 'token-expiring' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                ⏳ Token expiring — paste a new token to auto-resume
+              </span>
+            )}
+            {isPaused && progress.pauseReason === 'error' && progress.errorMessage && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400 max-w-md truncate" title={progress.errorMessage}>
+                ⚠️ {progress.errorMessage}
               </span>
             )}
           </div>

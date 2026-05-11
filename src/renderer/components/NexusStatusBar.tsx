@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useNexusStatus } from '../contexts/NexusStatusContext';
+import { useSyncActivity, SOURCE_LABELS, type SyncProgress } from '../contexts/SyncActivityContext';
 import { formatCountdown } from '../shared/utils/tokenUtils';
 
 function formatTokenCount(count: number): string {
@@ -15,9 +16,74 @@ function getCountdownColor(ms: number): string {
   return 'text-red-400';
 }
 
+function SyncPill({ sync, onClick }: { sync: SyncProgress; onClick: () => void }) {
+  const label = SOURCE_LABELS[sync.source] ?? sync.source
+  const isProcessing = sync.status === 'processing'
+  const isPaused = sync.status === 'paused'
+  const isCompleted = sync.status === 'completed'
+
+  const dotClass = isProcessing
+    ? 'bg-cyan-400 animate-pulse'
+    : isPaused
+      ? 'bg-amber-400'
+      : 'bg-emerald-400'
+
+  const textClass = isProcessing
+    ? 'text-cyan-400'
+    : isPaused
+      ? 'text-amber-400'
+      : 'text-emerald-400'
+
+  const statusIcon = isCompleted
+    ? '✓'
+    : isPaused
+      ? '⏸'
+      : ''
+
+  const progressText = sync.totalRecords > 0
+    ? `${sync.processedRecords}/${sync.totalRecords}`
+    : ''
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-all hover:opacity-80 ${
+        isProcessing
+          ? 'border-cyan-500/30 bg-cyan-500/10'
+          : isPaused
+            ? 'border-amber-500/30 bg-amber-500/10'
+            : 'border-emerald-500/30 bg-emerald-500/10'
+      }`}
+      title={`${label} — ${sync.status}${sync.pauseReason ? ` (${sync.pauseReason})` : ''}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+      <span className={`font-semibold ${textClass}`}>
+        {statusIcon} {label}
+      </span>
+      {progressText && (
+        <span className="text-muted font-mono">{progressText}</span>
+      )}
+      <span className="flex items-center gap-1.5">
+        <span className="text-emerald-400">✓{sync.succeededCount}</span>
+        <span className="text-red-400">✗{sync.failedCount}</span>
+        <span className="text-gray-400">⊘{sync.skippedCount}</span>
+      </span>
+    </button>
+  )
+}
+
 export default function NexusStatusBar() {
   const { claude, tokens, sharepoint, openModal, agentActivities } = useNexusStatus();
+  const { activeSyncs, dismissSync } = useSyncActivity();
   const navigate = useNavigate();
+
+  const handleSyncClick = (sync: SyncProgress) => {
+    if (sync.status === 'completed') {
+      dismissSync(sync.source)
+    }
+    navigate('/datasync')
+  }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 h-7 border-t border-white/5 bg-white/60 dark:bg-dark-surface/80 backdrop-blur-xl flex items-center justify-between px-4 text-[11px] font-medium select-none">
@@ -97,24 +163,38 @@ export default function NexusStatusBar() {
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => openModal('sharepoint')}
-        className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-      >
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            sharepoint.isValid ? 'bg-emerald-400' : 'bg-gray-400'
-          }`}
-        />
-        {sharepoint.isValid ? (
-          <span className={`font-mono ${getCountdownColor(sharepoint.remainingMs)}`}>
-            SP {formatCountdown(sharepoint.remainingMs)}
-          </span>
-        ) : (
-          <span className="text-muted">SP Not Connected</span>
+      <div className="flex items-center gap-3">
+        {activeSyncs.map(sync => (
+          <SyncPill
+            key={sync.source}
+            sync={sync}
+            onClick={() => handleSyncClick(sync)}
+          />
+        ))}
+
+        {activeSyncs.length > 0 && (
+          <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
         )}
-      </button>
+
+        <button
+          type="button"
+          onClick={() => openModal('sharepoint')}
+          className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              sharepoint.isValid ? 'bg-emerald-400' : 'bg-gray-400'
+            }`}
+          />
+          {sharepoint.isValid ? (
+            <span className={`font-mono ${getCountdownColor(sharepoint.remainingMs)}`}>
+              SP {formatCountdown(sharepoint.remainingMs)}
+            </span>
+          ) : (
+            <span className="text-muted">SP Not Connected</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

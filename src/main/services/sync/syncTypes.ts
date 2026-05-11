@@ -25,6 +25,9 @@ export interface EmployeeSyncRecord extends BaseSyncRecord {
   lastAccount?: string | null
   lastAccountStartDate?: string | null
   jobTitle?: string
+  functionalUnit?: string
+  officeLocation?: string
+  businessUnit?: string
 }
 
 export interface CandidateSyncRecord extends BaseSyncRecord {

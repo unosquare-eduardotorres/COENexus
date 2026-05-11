@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { BenchEmployee, BenchOpenPosition, CrossMatchResult } from '../../types';
 import { BenchBurnSearchResult } from '../../services/benchBurnService';
 import ScoreRing from './ScoreRing';
@@ -13,6 +14,9 @@ interface DeliveryToOpResultsProps {
   onReset: () => void;
   onSelectMatch: (match: CrossMatchResult, employee: BenchEmployee, position: BenchOpenPosition) => void;
   onRetryFallbacks?: () => void;
+  avatarGradient?: string;
+  personBadge?: ReactNode;
+  flowLabel?: string;
 }
 
 export default function DeliveryToOpResults({
@@ -22,6 +26,9 @@ export default function DeliveryToOpResults({
   onReset,
   onSelectMatch,
   onRetryFallbacks,
+  avatarGradient = 'from-rose-500 to-pink-500',
+  personBadge,
+  flowLabel = 'Analysis Results',
 }: DeliveryToOpResultsProps) {
   const posLookup = new Map(positions.map(p => [p.upstreamId, p]));
 
@@ -58,7 +65,7 @@ export default function DeliveryToOpResults({
               New Analysis
             </button>
           </div>
-          <h2 className="text-2xl font-bold text-primary">Analysis Results</h2>
+          <h2 className="text-2xl font-bold text-primary">{flowLabel}</h2>
           <p className="text-sm text-secondary mt-1">
             <span className="font-mono font-semibold">{results.stats.analyzed}</span> pair{results.stats.analyzed !== 1 ? 's' : ''} analyzed in{' '}
             <span className="font-mono">{results.stats.time}</span>
@@ -67,19 +74,22 @@ export default function DeliveryToOpResults({
       </div>
 
       <div className="glass-card p-4 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-lg font-bold flex-shrink-0`}>
           {getInitials(employee.name)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-primary">{employee.name}</div>
+          <div className="font-semibold text-primary">
+            {employee.name}
+            {personBadge && <span className="ml-2">{personBadge}</span>}
+          </div>
           <div className="text-xs text-muted">
             {employee.seniority} · {employee.mainSkill} · {employee.country}
-            {employee.isBench && (
+            {!personBadge && employee.isBench && (
               <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
                 Bench
               </span>
             )}
-            {employee.isBench === false && (
+            {!personBadge && employee.isBench === false && (
               <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 Active
               </span>

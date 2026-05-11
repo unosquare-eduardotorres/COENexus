@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createRendererLogger } from '../../../../shared/utils/rendererLogger'
 import { reportError } from '../../../../shared/utils/reportError'
+import AddPatternForm from '../../components/braniac/AddPatternForm'
 import BraniacPatternList from '../../components/braniac/BraniacPatternList'
+import ConfirmDeleteModal from '../../components/braniac/ConfirmDeleteModal'
 import { braniacService } from '../../services/braniacService'
 import type { BraniacPattern } from '../../../../../shared/ipc-types'
 
@@ -10,6 +12,8 @@ const log = createRendererLogger('BraniacPatternsTab')
 export default function PatternsTab() {
   const [patterns, setPatterns] = useState<BraniacPattern[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [patternToDelete, setPatternToDelete] = useState<BraniacPattern | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const loadPatterns = useCallback(async () => {
     try {
@@ -62,6 +66,29 @@ export default function PatternsTab() {
     }
   }, [loadPatterns])
 
+  const handleRequestDelete = useCallback((pattern: BraniacPattern) => {
+    setPatternToDelete(pattern)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!patternToDelete) return
+    try {
+      setIsDeleting(true)
+      const res = await braniacService.deletePattern({ id: patternToDelete.id })
+      if (res.success) {
+        setPatternToDelete(null)
+        void loadPatterns()
+      } else {
+        setError(res.error ?? 'Failed to delete pattern')
+      }
+    } catch (err) {
+      setError(reportError(err))
+      log.error('Failed to delete pattern')
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [patternToDelete, loadPatterns])
+
   return (
     <div className="space-y-4">
       {error && (
@@ -69,12 +96,34 @@ export default function PatternsTab() {
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
+      <AddPatternForm onPatternCreated={() => void loadPatterns()} />
+
       <BraniacPatternList
         patterns={patterns}
         onApprove={handleApprove}
         onReject={handleReject}
         onUpdate={handleUpdate}
+        onDelete={handleRequestDelete}
       />
+
+      {patternToDelete && (
+        <ConfirmDeleteModal
+          title={`Delete "${patternToDelete.pattern_name}"?`}
+          description="This permanently deletes the pattern. It cannot be undone."
+          impactSummary={[
+            patternToDelete.stakeholder
+              ? `Scope: ${patternToDelete.account} / ${patternToDelete.stakeholder}`
+              : patternToDelete.account
+                ? `Scope: ${patternToDelete.account} (account-wide)`
+                : 'Scope: global',
+            `Source: ${patternToDelete.source_agent}`,
+          ]}
+          confirmLabel="Delete Pattern"
+          busy={isDeleting}
+          onConfirm={handleConfirmDelete}
+          onClose={() => setPatternToDelete(null)}
+        />
+      )}
     </div>
   )
 }

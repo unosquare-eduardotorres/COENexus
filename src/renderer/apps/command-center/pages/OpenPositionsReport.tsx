@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOpenPositionReport, COLUMN_VALUE_EXTRACTORS } from '../hooks/useOpenPositionReport'
-import { reportService } from '../services/reportService'
 import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
 import PositionDetailDrawer from '../components/PositionDetailDrawer'
 import { useToast } from '../../../shared/components/ToastContext'
@@ -93,14 +92,6 @@ function ColumnsIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
-    </svg>
-  )
-}
-
-function TrashIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   )
 }
@@ -279,15 +270,9 @@ function getAgingDotColor(aging: number): string {
   return 'bg-emerald-500'
 }
 
-function isInactiveStatus(status: string): boolean {
-  return status !== 'Active' && status !== 'Draft'
-}
-
 function getStatusBadgeStyle(status: string): string {
   if (status === 'Active') return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
   if (status === 'Draft') return 'bg-slate-500/15 text-slate-400 border-slate-500/25'
-  if (status === 'Closed') return 'bg-red-500/10 text-red-400/70 border-red-500/15'
-  if (status === 'On Hold') return 'bg-amber-500/10 text-amber-400/70 border-amber-500/15'
   return 'bg-gray-500/10 text-gray-400/70 border-gray-500/15'
 }
 
@@ -302,19 +287,9 @@ const COLUMN_DEFINITIONS: ColumnDef[] = [
     key: 'account',
     label: 'Account',
     defaultVisible: true,
-    render: (r) => {
-      const inactive = isInactiveStatus(r.position.position_status)
-      return (
-        <div className="flex items-center gap-2">
-          <span className={inactive ? 'text-muted' : 'text-primary font-medium'}>{r.position.account}</span>
-          {inactive && (
-            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
-              {r.position.position_status}
-            </span>
-          )}
-        </div>
-      )
-    },
+    render: (r) => (
+      <span className="text-primary font-medium">{r.position.account}</span>
+    ),
   },
   {
     key: 'status',
@@ -360,15 +335,12 @@ const COLUMN_DEFINITIONS: ColumnDef[] = [
     key: 'aging',
     label: 'Aging',
     defaultVisible: true,
-    render: r => {
-      const inactive = isInactiveStatus(r.position.position_status)
-      return (
-        <div className="flex items-center gap-1.5">
-          <span className={`w-2 h-2 rounded-full ${inactive ? 'bg-gray-500/50' : getAgingDotColor(r.position.aging)}`} />
-          <span className={`font-mono font-bold ${inactive ? 'text-muted' : 'text-primary'}`}>{r.position.aging}d</span>
-        </div>
-      )
-    },
+    render: r => (
+      <div className="flex items-center gap-1.5">
+        <span className={`w-2 h-2 rounded-full ${getAgingDotColor(r.position.aging)}`} />
+        <span className="font-mono font-bold text-primary">{r.position.aging}d</span>
+      </div>
+    ),
   },
   {
     key: 'action_needed',
@@ -390,26 +362,18 @@ const COLUMN_DEFINITIONS: ColumnDef[] = [
     key: 'criteria',
     label: 'Criteria',
     defaultVisible: true,
-    render: r => {
-      const inactive = isInactiveStatus(r.position.position_status)
-      return (
-        <div className="flex flex-wrap gap-1">
-          {inactive && (
-            <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
-              {r.position.position_status}
-            </span>
-          )}
-          {!inactive && r.matchingCriteria.length === 0 && (
-            <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/25">Healthy</span>
-          )}
-          {r.matchingCriteria.map(key => {
-            const config = CRITERIA_CONFIG.find(c => c.key === key)
-            if (!config) return null
-            return <span key={key} className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>{config.label}</span>
-          })}
-        </div>
-      )
-    },
+    render: r => (
+      <div className="flex flex-wrap gap-1">
+        {r.matchingCriteria.length === 0 && (
+          <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/25">Healthy</span>
+        )}
+        {r.matchingCriteria.map(key => {
+          const config = CRITERIA_CONFIG.find(c => c.key === key)
+          if (!config) return null
+          return <span key={key} className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>{config.label}</span>
+        })}
+      </div>
+    ),
   },
   {
     key: 'job_title',
@@ -542,31 +506,14 @@ export default function OpenPositionsReport() {
     setColumnConfig({ visible: defaultVisible, order: COLUMN_DEFINITIONS.map(c => c.key) })
   }, [])
 
-  const [deletingId, setDeletingId] = useState<number | null>(null)
   const { showToast } = useToast()
 
   useEffect(() => {
     log.info('Open positions report viewed')
   }, [])
 
-  const handleDeletePosition = useCallback(async (upstreamId: number) => {
-    log.info('Open position delete requested', { upstreamId })
-    setDeletingId(upstreamId)
-    try {
-      await reportService.deletePosition(upstreamId)
-      report.evaluate()
-    } catch (err) {
-      log.error('Open position delete failed', err)
-      console.error('Failed to delete position:', err)
-    } finally {
-      setDeletingId(null)
-    }
-  }, [report])
-
-  const activeResults = report.filteredResults.filter(r => !isInactiveStatus(r.position.position_status))
-  const inactiveResults = report.filteredResults.filter(r => isInactiveStatus(r.position.position_status))
-  const flaggedResults = activeResults.filter(r => r.matchingCriteria.length > 0)
-  const healthyResults = activeResults.filter(r => r.matchingCriteria.length === 0)
+  const flaggedResults = report.filteredResults.filter(r => r.matchingCriteria.length > 0)
+  const healthyResults = report.filteredResults.filter(r => r.matchingCriteria.length === 0)
 
   if (report.hasData === false) {
     return (
@@ -604,7 +551,7 @@ export default function OpenPositionsReport() {
       <h1 className="text-base font-semibold text-primary">Open Positions</h1>
 
       {!report.isLoading && report.results.length > 0 && (
-        <div className="grid grid-cols-6 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Total</p>
             <p className="text-lg font-bold text-primary font-mono">{report.results.length}</p>
@@ -616,16 +563,6 @@ export default function OpenPositionsReport() {
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Healthy</p>
             <p className="text-lg font-bold text-emerald-400 font-mono">{report.healthCounts.healthy}</p>
-          </div>
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Inactive</p>
-            <p className="text-lg font-bold text-gray-400 font-mono">{report.results.filter(r => isInactiveStatus(r.position.position_status)).length}</p>
-          </div>
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Closed</p>
-            <p className="text-lg font-bold text-red-400 font-mono">
-              {report.results.filter(r => r.position.position_status === 'Closed').length}
-            </p>
           </div>
           <div className="glass-panel-subtle rounded-xl px-3 py-2">
             <p className="text-[11px] text-muted uppercase tracking-wide">Avg. Aging</p>
@@ -1048,44 +985,7 @@ export default function OpenPositionsReport() {
             </>
           )}
 
-          {inactiveResults.length > 0 && (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mt-4">
-                Inactive Positions ({inactiveResults.length})
-              </p>
-              <div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-3">
-                {inactiveResults.map(r => (
-                  <div
-                    key={r.position.upstream_id}
-                    className="glass-card-hover p-2.5 text-left transition-all border-l-[3px] border-l-gray-500/40 opacity-40 hover:opacity-70 flex items-center justify-between"
-                  >
-                    <button
-                      onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                      className="flex-1 min-w-0 flex items-center gap-2"
-                    >
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
-                        {r.position.position_status}
-                      </span>
-                      <p className="text-sm font-medium text-primary truncate">{r.position.account}</p>
-                      <span className="text-xs text-muted">·</span>
-                      <span className="text-xs text-muted truncate">{r.position.main_skill}</span>
-                      <span className="shrink-0 text-xs font-mono text-muted">{r.position.aging}d</span>
-                    </button>
-                    {r.position.position_status === 'Closed' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeletePosition(r.position.upstream_id) }}
-                        disabled={deletingId === r.position.upstream_id}
-                        title="Remove closed position from database"
-                        className="ml-2 shrink-0 p-1.5 rounded-lg text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
-                      >
-                        <TrashIcon />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+
         </div>
       )}
 
@@ -1111,38 +1011,22 @@ export default function OpenPositionsReport() {
                     </div>
                   </th>
                 ))}
-                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
-              {report.filteredResults.map((r, i) => {
-                const inactive = isInactiveStatus(r.position.position_status)
-                return (
-                  <tr
-                    key={r.position.upstream_id}
-                    className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-white/[0.02]'} ${inactive ? 'opacity-40 hover:opacity-70' : ''}`}
-                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                  >
-                    {visibleColumns.map(col => (
-                      <td key={col.key} className="px-3 py-2.5 first:pl-4 last:pr-4">
-                        {col.render(r)}
-                      </td>
-                    ))}
-                    <td className="px-2 py-2.5">
-                      {r.position.position_status === 'Closed' && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeletePosition(r.position.upstream_id) }}
-                          disabled={deletingId === r.position.upstream_id}
-                          title="Remove closed position from database"
-                          className="p-1 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
-                        >
-                          <TrashIcon />
-                        </button>
-                      )}
+              {report.filteredResults.map((r, i) => (
+                <tr
+                  key={r.position.upstream_id}
+                  className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
+                  onClick={() => setSelectedPositionId(r.position.upstream_id)}
+                >
+                  {visibleColumns.map(col => (
+                    <td key={col.key} className="px-3 py-2.5 first:pl-4 last:pr-4">
+                      {col.render(r)}
                     </td>
-                  </tr>
-                )
-              })}
+                  ))}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

@@ -10,7 +10,24 @@ interface EmbeddingRow {
   created_at: string
   updated_at: string
   is_bench: number
+  extracted_skills_json: string | null
+  skills_extracted_at: string | null
+  skills_extractor_model: string | null
 }
+
+export interface ResumeSkills {
+  primary_tech_stack: string[]
+  secondary_tech_stack: string[]
+  roles: string[]
+  domains: string[]
+  years_experience: number | null
+  seniority_signals: string[]
+  certifications: string[]
+  languages: string[]
+  summary: string
+}
+
+export type { EmbeddingRow }
 
 interface VectorSearchResult {
   id: number
@@ -78,13 +95,30 @@ export const embeddingRepository = {
     }
 
     if (row.embedding.length > 0) {
+      const bigId = BigInt(embeddingId)
+      const deleteVecStmt = db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?')
+      const insertVecStmt = db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)')
+      const rebuildVec = db.transaction((id: bigint, buf: Buffer) => {
+        deleteVecStmt.run(id)
+        insertVecStmt.run(id, buf)
+      })
+
       try {
-        db.prepare(
-          'INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)'
-        ).run(BigInt(embeddingId), embeddingBuffer)
+        rebuildVec(bigId, embeddingBuffer)
       } catch (vecErr) {
-        db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
-        throw vecErr
+        const isUniqueConstraint = vecErr instanceof Error && vecErr.message.includes('UNIQUE constraint failed')
+        if (isUniqueConstraint) {
+          try {
+            deleteVecStmt.run(bigId)
+            insertVecStmt.run(bigId, embeddingBuffer)
+          } catch (retryErr) {
+            db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
+            throw retryErr
+          }
+        } else {
+          db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
+          throw vecErr
+        }
       }
     }
 
@@ -129,7 +163,8 @@ export const embeddingRepository = {
   searchSimilar(
     queryEmbedding: Float32Array,
     limit: number,
-    sourceType?: string
+    sourceType?: string,
+    sourceTypes?: string[]
   ): VectorSearchResult[] {
     const db = getDatabase()
     const queryBuffer = Buffer.from(queryEmbedding.buffer, queryEmbedding.byteOffset, queryEmbedding.byteLength)
@@ -149,6 +184,22 @@ export const embeddingRepository = {
         .slice(0, limit) as VectorSearchResult[]
     }
 
+    if (sourceTypes && sourceTypes.length > 0) {
+      const placeholders = sourceTypes.map(() => '?').join(',')
+      return db.prepare(`
+        SELECT re.id, re.source_type, re.source_id, re.upstream_id,
+               re.resume_text, re.is_bench, re.created_at, re.updated_at,
+               ve.distance
+        FROM vec_embeddings ve
+        JOIN resume_embeddings re ON re.id = ve.rowid
+        WHERE ve.embedding MATCH ?
+          AND k = ?
+          AND re.source_type IN (${placeholders})
+        ORDER BY ve.distance
+      `).all(queryBuffer, limit * 2, ...sourceTypes)
+        .slice(0, limit) as VectorSearchResult[]
+    }
+
     return db.prepare(`
       SELECT re.id, re.source_type, re.source_id, re.upstream_id,
              re.resume_text, re.is_bench, re.created_at, re.updated_at,
@@ -161,9 +212,146 @@ export const embeddingRepository = {
     `).all(queryBuffer, limit) as VectorSearchResult[]
   },
 
+  findNeedingSkillExtraction(sourceType?: string, limit = 100): EmbeddingRow[] {
+    const db = getDatabase()
+    if (sourceType) {
+      return db.prepare(`
+        SELECT * FROM resume_embeddings
+        WHERE resume_text IS NOT NULL
+          AND extracted_skills_json IS NULL
+          AND source_type = ?
+        ORDER BY updated_at DESC
+        LIMIT ?
+      `).all(sourceType, limit) as EmbeddingRow[]
+    }
+    return db.prepare(`
+      SELECT * FROM resume_embeddings
+      WHERE resume_text IS NOT NULL
+        AND extracted_skills_json IS NULL
+      ORDER BY updated_at DESC
+      LIMIT ?
+    `).all(limit) as EmbeddingRow[]
+  },
+
+  updateExtractedSkills(id: number, skillsJson: string, model: string): void {
+    const db = getDatabase()
+    db.prepare(`
+      UPDATE resume_embeddings
+      SET extracted_skills_json = ?, skills_extracted_at = ?, skills_extractor_model = ?
+      WHERE id = ?
+    `).run(skillsJson, new Date().toISOString(), model, id)
+  },
+
+  getSkillsByUpstreamId(sourceType: string, upstreamId: number): ResumeSkills | null {
+    const db = getDatabase()
+    const row = db.prepare(`
+      SELECT extracted_skills_json FROM resume_embeddings
+      WHERE source_type = ? AND upstream_id = ? AND extracted_skills_json IS NOT NULL
+      ORDER BY skills_extracted_at DESC
+      LIMIT 1
+    `).get(sourceType, upstreamId) as { extracted_skills_json: string } | undefined
+    if (!row) return null
+    try {
+      return JSON.parse(row.extracted_skills_json) as ResumeSkills
+    } catch {
+      return null
+    }
+  },
+
+  getSkillsWithFallback(upstreamId: number, preferredSourceType: 'employees' | 'candidates'): { skills: ResumeSkills; source: string } | null {
+    const fallbackOrder = [
+      'resume-session',
+      preferredSourceType,
+      preferredSourceType === 'employees' ? 'candidates' : 'employees',
+    ]
+    for (const st of fallbackOrder) {
+      const skills = this.getSkillsByUpstreamId(st, upstreamId)
+      if (skills) return { skills, source: st }
+    }
+    return null
+  },
+
+  getSkillsBatchByUpstreamIds(upstreamIds: number[]): Map<number, { skills: ResumeSkills; source: string }> {
+    if (upstreamIds.length === 0) return new Map()
+    const db = getDatabase()
+    const placeholders = upstreamIds.map(() => '?').join(',')
+    const rows = db.prepare(`
+      SELECT source_type, upstream_id, extracted_skills_json, skills_extracted_at
+      FROM resume_embeddings
+      WHERE extracted_skills_json IS NOT NULL
+        AND upstream_id IN (${placeholders})
+      ORDER BY
+        CASE source_type
+          WHEN 'resume-session' THEN 0
+          WHEN 'employees' THEN 1
+          WHEN 'candidates' THEN 2
+          ELSE 3
+        END,
+        skills_extracted_at DESC
+    `).all(...upstreamIds) as { source_type: string; upstream_id: number; extracted_skills_json: string }[]
+
+    const result = new Map<number, { skills: ResumeSkills; source: string }>()
+    for (const row of rows) {
+      if (result.has(row.upstream_id)) continue
+      try {
+        const skills = JSON.parse(row.extracted_skills_json) as ResumeSkills
+        result.set(row.upstream_id, { skills, source: row.source_type })
+      } catch { /* skip malformed */ }
+    }
+    return result
+  },
+
+  countExtractedSkills(): { total: number; extracted: number; pending: number } {
+    const db = getDatabase()
+    const row = db.prepare(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN extracted_skills_json IS NOT NULL THEN 1 ELSE 0 END) as extracted,
+        SUM(CASE WHEN resume_text IS NOT NULL AND extracted_skills_json IS NULL THEN 1 ELSE 0 END) as pending
+      FROM resume_embeddings
+      WHERE resume_text IS NOT NULL
+    `).get() as { total: number; extracted: number; pending: number }
+    return row
+  },
+
+  getEmbeddingByUpstreamId(
+    sourceType: string,
+    upstreamId: number
+  ): Buffer | null {
+    const db = getDatabase()
+    const row = db.prepare(`
+      SELECT embedding FROM resume_embeddings
+      WHERE source_type = ? AND upstream_id = ? AND embedding IS NOT NULL
+      LIMIT 1
+    `).get(sourceType, upstreamId) as { embedding: Buffer } | undefined
+    return row?.embedding ?? null
+  },
+
+  searchPositionsBySimilarity(
+    personEmbedding: Float32Array,
+    limit: number
+  ): VectorSearchResult[] {
+    const db = getDatabase()
+    const queryBuffer = Buffer.from(
+      personEmbedding.buffer, personEmbedding.byteOffset, personEmbedding.byteLength
+    )
+    return db.prepare(`
+      SELECT re.id, re.source_type, re.source_id, re.upstream_id,
+             re.resume_text, re.is_bench, re.created_at, re.updated_at,
+             ve.distance
+      FROM vec_embeddings ve
+      JOIN resume_embeddings re ON re.id = ve.rowid
+      WHERE ve.embedding MATCH ?
+        AND k = ?
+        AND re.source_type = 'positions'
+      ORDER BY ve.distance
+    `).all(queryBuffer, limit * 2).slice(0, limit) as VectorSearchResult[]
+  },
+
   crossSimilarity(
     empIds: number[],
-    posIds: number[]
+    posIds: number[],
+    personSourceType: string = 'employees'
   ): { empUpstreamId: number; posUpstreamId: number; similarity: number }[] {
     const db = getDatabase()
 
@@ -174,9 +362,9 @@ export const embeddingRepository = {
 
     const empEmbeddings = db.prepare(`
       SELECT upstream_id, embedding FROM resume_embeddings
-      WHERE source_type = 'employees' AND upstream_id IN (${empPlaceholders})
+      WHERE source_type = ? AND upstream_id IN (${empPlaceholders})
         AND embedding IS NOT NULL
-    `).all(...empIds) as { upstream_id: number; embedding: Buffer }[]
+    `).all(personSourceType, ...empIds) as { upstream_id: number; embedding: Buffer }[]
 
     const posEmbeddings = db.prepare(`
       SELECT upstream_id, embedding FROM resume_embeddings

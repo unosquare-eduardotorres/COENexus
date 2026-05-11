@@ -11,7 +11,8 @@ import { syncRepository } from '../../db/repositories/syncRepository'
 import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow } from '../../db/repositories/syncRepository'
 import { matchRepository } from '../../db/repositories/matchRepository'
 import { claudeService } from '../../services/claudeService'
-import { validatePayload, matchSearchSchema, matchConfirmHaikuSchema, matchResumeTextSchema, benchBurnSchema, externalCandidateSchema } from '../schemas'
+import type { MatchRankPositionsParams, MatchRankPositionsForTextParams, MatchToPositionsParams } from '../../../shared/ipc-types'
+import { validatePayload, matchSearchSchema, matchConfirmHaikuSchema, matchResumeTextSchema, benchBurnSchema, externalCandidateSchema, matchRankPositionsSchema, matchRankPositionsForTextSchema, matchToPositionsSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { createLogger } from '../../services/logger'
 
@@ -30,6 +31,7 @@ function mapEmployeeToBenchDto(row: SyncedEmployeeRow) {
     lastAccount: row.last_account,
     isVectorized: row.status === 'vectorized',
     isBench: row.is_bench === 1,
+    hasResume: row.has_resume === 1,
   }
 }
 
@@ -61,6 +63,12 @@ function mapPositionToBenchDto(row: SyncedOpenPositionRow) {
     mainSkill: row.main_skill,
     jobTitle: row.job_title,
     jobDescription: row.job_description,
+    verticalIndustry: row.vertical_industry,
+    seniorities: row.seniorities,
+    positionStatus: row.position_status,
+    aging: row.aging,
+    availableRange: row.available_range,
+    countries: row.countries,
     isVectorized: row.status === 'vectorized',
   }
 }
@@ -162,10 +170,22 @@ export function registerMatchHandlers(): void {
       return syncRepository.searchEmployees(query).map(mapEmployeeToBenchDto)
     })
 
+  registerIpcHandler(IPC_CHANNELS.MATCH_CANDIDATE_COUNT,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return syncRepository.getCandidateCount()
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_EMPLOYEE_COUNT,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      return syncRepository.getEmployeeCount()
+    })
+
   registerIpcHandler(IPC_CHANNELS.MATCH_OPEN_POSITIONS,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return syncRepository.getAllOpenPositions().map(mapPositionToBenchDto)
+      return syncRepository.getAvailableOpenPositions().map(mapPositionToBenchDto)
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_BENCH_BURN_SESSION,
@@ -224,5 +244,32 @@ export function registerMatchHandlers(): void {
       const result = matchRepository.clearAnalysisCache()
       log.info('Analysis cache cleared', { deleted: result.deleted })
       return result
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_RANK_POSITIONS,
+    async (event: IpcMainInvokeEvent, params: MatchRankPositionsParams) => {
+      validateSender(event)
+      const validated = validatePayload(matchRankPositionsSchema, params, IPC_CHANNELS.MATCH_RANK_POSITIONS)
+      return { positions: benchBurnService.rankPositionsForPerson(validated.sourceType, validated.upstreamId, validated.topN) }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_RANK_POSITIONS_FOR_TEXT,
+    async (event: IpcMainInvokeEvent, params: MatchRankPositionsForTextParams) => {
+      validateSender(event)
+      const validated = validatePayload(matchRankPositionsForTextSchema, params, IPC_CHANNELS.MATCH_RANK_POSITIONS_FOR_TEXT)
+      return { positions: await benchBurnService.rankPositionsForText(validated.resumeText, validated.topN) }
+    })
+
+  registerIpcHandler(IPC_CHANNELS.MATCH_TO_POSITIONS,
+    async (event: IpcMainInvokeEvent, params: MatchToPositionsParams) => {
+      validateSender(event)
+      const validated = validatePayload(matchToPositionsSchema, params, IPC_CHANNELS.MATCH_TO_POSITIONS)
+      log.info('Match-to-positions requested', { personSourceType: validated.personSourceType, positions: validated.positionUpstreamIds.length })
+      const win = getMainWindow()
+      const sessionId = await benchBurnService.executeCandidateToPositionsAsync(validated, (evt) => {
+        win?.webContents.send(IPC_CHANNELS.MATCH_BENCH_BURN_EVENT, evt)
+      })
+      win?.webContents.send(IPC_CHANNELS.MATCH_BENCH_BURN_EVENT, { type: 'complete' })
+      return { sessionId }
     })
 }

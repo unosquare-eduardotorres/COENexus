@@ -6,9 +6,10 @@ interface FinalizeActionsProps {
   onGenerateHtml: () => Promise<void>
   hasHtml: boolean
   saving: boolean
+  saved: boolean
 }
 
-export default function FinalizeActions({ htmlContent, onSave, onGenerateHtml, hasHtml, saving }: FinalizeActionsProps) {
+export default function FinalizeActions({ htmlContent, onSave, onGenerateHtml, hasHtml, saving, saved }: FinalizeActionsProps) {
   const [copied, setCopied] = useState(false)
   const [generating, setGenerating] = useState(false)
 
@@ -88,16 +89,34 @@ export default function FinalizeActions({ htmlContent, onSave, onGenerateHtml, h
         </div>
         <button
           onClick={onSave}
-          disabled={saving}
-          className="glass-button px-5 py-2.5 text-sm flex items-center gap-2"
+          disabled={saving || saved}
+          className={`px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+            saved
+              ? 'bg-green-600 text-white cursor-default'
+              : 'glass-button'
+          }`}
         >
           {saving && <div className="w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />}
-          Save Session
+          {saved ? (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Session Saved
+            </>
+          ) : (
+            'Save Session'
+          )}
         </button>
       </div>
       {copied && (
         <div className="mt-3 p-2 rounded bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm text-center">
           ✓ Rich HTML copied to clipboard — paste directly into Outlook or Gmail
+        </div>
+      )}
+      {saved && (
+        <div className="mt-3 p-2 rounded bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm text-center">
+          ✓ Session saved successfully — status set to completed
         </div>
       )}
     </div>

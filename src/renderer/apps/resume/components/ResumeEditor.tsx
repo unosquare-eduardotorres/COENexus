@@ -33,9 +33,8 @@ const ResumeEditor = memo(function ResumeEditor({
   originalResume,
 }: ResumeEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['summary', 'experience', 'education', 'skills', 'certifications'])
-  );
+  const ALL_SECTIONS = ['summary', 'experience', 'education', 'skills', 'certifications'];
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [expandedOriginals, setExpandedOriginals] = useState<Set<string>>(new Set());
 
   const toggleSection = useCallback((section: string) => {
@@ -128,6 +127,21 @@ const ResumeEditor = memo(function ResumeEditor({
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center justify-between mb-1 px-1">
+        <span className="text-xs text-muted">{expandedSections.size} of {ALL_SECTIONS.length} sections expanded</span>
+        <button
+          onClick={() => {
+            if (expandedSections.size === ALL_SECTIONS.length) {
+              setExpandedSections(new Set());
+            } else {
+              setExpandedSections(new Set(ALL_SECTIONS));
+            }
+          }}
+          className="text-xs text-accent-500 hover:text-accent-600 dark:hover:text-accent-400 font-medium transition-colors"
+        >
+          {expandedSections.size === ALL_SECTIONS.length ? 'Collapse All' : 'Expand All'}
+        </button>
+      </div>
       <div className="glass-card p-5">
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-accent-500 to-violet-600 flex items-center justify-center text-white text-xl font-semibold">

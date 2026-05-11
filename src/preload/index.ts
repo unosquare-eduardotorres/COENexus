@@ -15,6 +15,9 @@ import type {
   MatchSearchRequest,
   MatchConfirmHaikuParams,
   MatchResumeTextParams,
+  MatchRankPositionsParams,
+  MatchRankPositionsForTextParams,
+  MatchToPositionsParams,
   AiChatParams,
   DatabaseSaveConfigParams,
   DatabaseImportParams,
@@ -149,6 +152,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_RETRY_SINGLE, params),
     getFailed: (source: 'employees' | 'candidates') =>
       ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_GET_FAILED, source),
+    getState: (source: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_GET_STATE, source),
+    clearState: (source: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PIPELINE_CLEAR_STATE, source),
     onProgress: (callback: (data: PipelineProgressEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: PipelineProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.PIPELINE_PROGRESS_EVENT, handler)
@@ -169,10 +176,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE, params),
     getFailed: () =>
       ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED),
-    getSavedOffset: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET) as Promise<number | null>,
-    clearSavedOffset: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET),
+    getState: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_GET_STATE),
+    clearState: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_STATE),
     onProgress: (callback: (data: PipelineProgressEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: PipelineProgressEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT, handler)
@@ -209,6 +216,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH_CANDIDATES, query),
     searchEmployees: (query: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_SEARCH_EMPLOYEES, query),
+    getCandidateCount: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_CANDIDATE_COUNT) as Promise<number>,
+    getEmployeeCount: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_EMPLOYEE_COUNT) as Promise<number>,
     getOpenPositions: () =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_OPEN_POSITIONS),
     getBenchBurnSession: (id: number) =>
@@ -225,6 +236,12 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_ANALYSIS_CACHE_STATS) as Promise<{ totalEntries: number; oldestEntry: string | null }>,
     clearAnalysisCache: () =>
       ipcRenderer.invoke(IPC_CHANNELS.MATCH_CLEAR_ANALYSIS_CACHE) as Promise<{ deleted: number }>,
+    rankPositions: (params: MatchRankPositionsParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_RANK_POSITIONS, params),
+    rankPositionsForText: (params: MatchRankPositionsForTextParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_RANK_POSITIONS_FOR_TEXT, params),
+    matchToPositions: (params: MatchToPositionsParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.MATCH_TO_POSITIONS, params),
     onSearchEvent: (callback: (data: MatchSearchEvent) => void) => {
       const handler = (_e: IpcRendererEvent, data: MatchSearchEvent) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.MATCH_SEARCH_EVENT, handler)
@@ -683,6 +700,44 @@ const api = {
       const handler = (_e: IpcRendererEvent, data: IpcEventContracts[typeof IPC_CHANNELS.BRANIAC_STATUS_EVENT]) => callback(data)
       ipcRenderer.on(IPC_CHANNELS.BRANIAC_STATUS_EVENT, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.BRANIAC_STATUS_EVENT, handler)
+    },
+    getStakeholders: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_STAKEHOLDERS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_STAKEHOLDERS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_STAKEHOLDERS]['response']>,
+    getAnalysisStatus: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ANALYSIS_STATUS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_ANALYSIS_STATUS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ANALYSIS_STATUS]['response']>,
+    createPattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CREATE_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CREATE_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CREATE_PATTERN]['response']>,
+    beautifyPattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_BEAUTIFY_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_BEAUTIFY_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_BEAUTIFY_PATTERN]['response']>,
+    clearPatterns: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_PATTERNS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CLEAR_PATTERNS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_PATTERNS]['response']>,
+    listAccountSummaries: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_LIST_ACCOUNT_SUMMARIES) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_LIST_ACCOUNT_SUMMARIES]['response']>,
+    getAccountSummary: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ACCOUNT_SUMMARY]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_ACCOUNT_SUMMARY, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_ACCOUNT_SUMMARY]['response']>,
+    deletePattern: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_DELETE_PATTERN]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_DELETE_PATTERN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_DELETE_PATTERN]['response']>,
+    deleteProfile: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_DELETE_PROFILE]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_DELETE_PROFILE, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_DELETE_PROFILE]['response']>,
+    clearStakeholder: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_STAKEHOLDER]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CLEAR_STAKEHOLDER, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_STAKEHOLDER]['response']>,
+    clearAccount: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_ACCOUNT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CLEAR_ACCOUNT, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CLEAR_ACCOUNT]['response']>,
+    chat: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_CHAT]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_CHAT, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_CHAT]['response']>,
+    extractResumeSkills: (params: IpcContracts[typeof IPC_CHANNELS.BRANIAC_EXTRACT_RESUME_SKILLS]['request']) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_EXTRACT_RESUME_SKILLS, params) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_EXTRACT_RESUME_SKILLS]['response']>,
+    getExtractionStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.BRANIAC_GET_EXTRACTION_STATUS) as Promise<IpcContracts[typeof IPC_CHANNELS.BRANIAC_GET_EXTRACTION_STATUS]['response']>,
+    onChatStepEvent: (callback: (data: string) => void) => {
+      const handler = (_e: IpcRendererEvent, data: string) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.BRANIAC_CHAT_STEP_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BRANIAC_CHAT_STEP_EVENT, handler)
+    },
+    onChatChunkEvent: (callback: (data: ChatChunkEvent) => void) => {
+      const handler = (_e: IpcRendererEvent, data: ChatChunkEvent) => callback(data)
+      ipcRenderer.on(IPC_CHANNELS.BRANIAC_CHAT_CHUNK_EVENT, handler)
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.BRANIAC_CHAT_CHUNK_EVENT, handler)
     },
   },
   nomicore: {

@@ -1,6 +1,8 @@
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Database, Workflow, Sparkles, Brain, ArrowRight, Users, TrendingUp, Shield } from 'lucide-react'
+import { Database, Workflow, Sparkles, Brain, ArrowRight, Users, TrendingUp, Shield, FileSearch, Loader2, AlertTriangle } from 'lucide-react'
 import { AGENT_IMAGES } from '../../assets'
+import { braniacService } from '../../services/braniacService'
 
 const images = AGENT_IMAGES['braniac']
 
@@ -55,6 +57,40 @@ const DATA_SOURCES = [
 
 export default function BraniacHomeTab() {
   const navigate = useNavigate()
+  const [extractionStatus, setExtractionStatus] = useState<{ total: number; extracted: number; pending: number } | null>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [extractionResult, setExtractionResult] = useState<{ extracted: number; failed: number } | null>(null)
+
+  const loadExtractionStatus = useCallback(async () => {
+    try {
+      const result = await braniacService.getExtractionStatus()
+      if (result.success && result.data) {
+        setExtractionStatus(result.data)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    loadExtractionStatus()
+  }, [loadExtractionStatus])
+
+  const handleExtract = async () => {
+    setIsExtracting(true)
+    setExtractionResult(null)
+    try {
+      const result = await braniacService.extractResumeSkills({ limit: 500 })
+      if (result.success && result.data) {
+        setExtractionResult({ extracted: result.data.extracted, failed: result.data.failed })
+      }
+      await loadExtractionStatus()
+    } catch { /* ignore */ } finally {
+      setIsExtracting(false)
+    }
+  }
+
+  const coveragePct = extractionStatus && extractionStatus.total > 0
+    ? Math.round((extractionStatus.extracted / extractionStatus.total) * 100)
+    : 0
 
   return (
     <div className="space-y-6">
@@ -141,6 +177,71 @@ export default function BraniacHomeTab() {
           ))}
         </div>
       </div>
+
+      {extractionStatus && (
+        <div className="glass-panel p-6 space-y-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileSearch size={20} className="text-violet-500 dark:text-violet-400" />
+            <h2 className="text-lg font-semibold text-primary">Resume Skill Extraction</h2>
+          </div>
+          <p className="text-sm text-secondary leading-relaxed">
+            Extract structured skill profiles from candidate resumes using AI. These profiles replace
+            the inaccurate requisition-tagged skills with actual resume-derived tech stacks, improving
+            Braniac&apos;s pattern accuracy.
+          </p>
+
+          <div className="flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center justify-between text-xs text-secondary mb-1">
+                <span>{extractionStatus.extracted.toLocaleString()} / {extractionStatus.total.toLocaleString()} resumes parsed</span>
+                <span>{coveragePct}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-gray-200 dark:bg-dark-border overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                  style={{ width: `${coveragePct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {coveragePct < 50 && extractionStatus.total > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+              <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Braniac skill analysis quality is limited — only {coveragePct}% of candidate resumes have been parsed.
+                Run extraction to improve pattern accuracy.
+              </p>
+            </div>
+          )}
+
+          {extractionResult && (
+            <div className="text-xs text-secondary">
+              Last run: {extractionResult.extracted} extracted{extractionResult.failed > 0 ? `, ${extractionResult.failed} failed` : ''}
+            </div>
+          )}
+
+          <button
+            onClick={handleExtract}
+            disabled={isExtracting || extractionStatus.pending === 0}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors shadow-sm"
+          >
+            {isExtracting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <FileSearch size={14} />
+                {extractionStatus.pending > 0
+                  ? `Extract Resume Skills (${extractionStatus.pending.toLocaleString()} pending)`
+                  : 'All Resumes Parsed'}
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <button

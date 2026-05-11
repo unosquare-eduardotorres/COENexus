@@ -27,6 +27,7 @@ export function useAgentActivityListener() {
     agentId: string,
     status: NormalizedStatus,
     runId: string | null,
+    errorMessage?: string,
   ) => {
     const label = AGENT_LABELS[agentId] ?? agentId
 
@@ -38,7 +39,10 @@ export function useAgentActivityListener() {
       if (status === 'completed') {
         showToast(`${label} completed successfully`, 'success', 5000)
       } else if (status === 'failed') {
-        showToast(`${label} failed — check activity log`, 'error', 8000)
+        const reason = errorMessage
+          ? `${label} failed: ${errorMessage}`
+          : `${label} failed — check activity log`
+        showToast(reason, 'error', 10000)
       } else if (status === 'canceled') {
         showToast(`${label} was canceled`, 'warning', 4000)
       }
@@ -63,7 +67,7 @@ export function useAgentActivityListener() {
     })
 
     const unsubBraniac = window.api?.braniac?.onStatusEvent((e) => {
-      handleAgentStatus('braniac', e.status as NormalizedStatus, e.job_id)
+      handleAgentStatus('braniac', e.status as NormalizedStatus, e.job_id, e.error_message)
     })
 
     window.api?.braniac?.getStatus().then((res) => {

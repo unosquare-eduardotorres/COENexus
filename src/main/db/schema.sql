@@ -19,7 +19,11 @@ CREATE TABLE IF NOT EXISTS synced_employees (
   resume_date_created TEXT,
   resume_filename TEXT,
   is_bench INTEGER NOT NULL DEFAULT 0,
+  bench_team TEXT,
   job_title TEXT NOT NULL DEFAULT '',
+  functional_unit TEXT NOT NULL DEFAULT '',
+  office_location TEXT NOT NULL DEFAULT '',
+  business_unit TEXT NOT NULL DEFAULT '',
   normalized_monthly_usd REAL,
   inferred_currency TEXT,
   currency_confidence TEXT CHECK (currency_confidence IN ('high', 'medium', 'low', 'exact')),
@@ -122,6 +126,9 @@ CREATE TABLE IF NOT EXISTS resume_embeddings (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   is_bench INTEGER NOT NULL DEFAULT 0,
+  extracted_skills_json TEXT,
+  skills_extracted_at TEXT,
+  skills_extractor_model TEXT,
   UNIQUE(source_type, source_id)
 );
 

@@ -101,7 +101,37 @@ describe('embeddingRepository', () => {
     expect(count).toBe(1)
   })
 
+  it('should re-upsert when embedding already exists for same source', () => {
+    const first = Float32Array.from([0.1, 0.2, 0.3, 0.4])
+    const second = Float32Array.from([0.5, 0.6, 0.7, 0.8])
+
+    const firstId = embeddingRepository.upsert({
+      sourceType: 'positions',
+      sourceId: 42,
+      upstreamId: 9001,
+      embedding: first,
+      resumeText: 'v1',
+      isBench: false,
+    })
+    const secondId = embeddingRepository.upsert({
+      sourceType: 'positions',
+      sourceId: 42,
+      upstreamId: 9001,
+      embedding: second,
+      resumeText: 'v2',
+      isBench: false,
+    })
+
+    expect(secondId).toBe(firstId)
+    const row = embeddingRepository.findBySource('positions', 42)
+    expect(row?.resume_text).toBe('v2')
+  })
+
   it.skip('should perform vector search operations', () => {
+    expect(true).toBe(true)
+  })
+
+  it.skip('should filter by sourceTypes when multiple sources requested', () => {
     expect(true).toBe(true)
   })
 })

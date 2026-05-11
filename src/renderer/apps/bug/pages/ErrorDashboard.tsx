@@ -26,7 +26,7 @@ interface ErrorListResponse {
   fileSize: number
 }
 
-const SCOPES = ['All', 'IPC', 'Main', 'DB', 'Renderer', 'ErrorBoundary', 'Preload', 'Unknown'] as const
+const SCOPES = ['All', 'IPC', 'Main', 'DB', 'Agent', 'Renderer', 'ErrorBoundary', 'Preload', 'Unknown'] as const
 const SEVERITIES = ['All', 'warning', 'error', 'critical'] as const
 const STATUSES = ['All', 'new', 'reported'] as const
 
@@ -62,8 +62,16 @@ function SeverityBadge({ severity }: { severity: string }) {
 }
 
 function ScopeBadge({ scope }: { scope: string }) {
+  const colorMap: Record<string, string> = {
+    IPC: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    DB: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    Agent: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+    Renderer: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    ErrorBoundary: 'bg-red-500/10 text-red-600 dark:text-red-400',
+    Preload: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+  }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-gray-500/10 text-gray-500 dark:text-gray-400">
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${colorMap[scope] ?? 'bg-gray-500/10 text-gray-500 dark:text-gray-400'}`}>
       {scope}
     </span>
   )

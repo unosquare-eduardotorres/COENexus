@@ -58,8 +58,9 @@ function writeLog(entry: LogEntry): void {
   if (entry.level === 'error') {
     try {
       const { captureError } = require('./errorTransport')
+      const errorDetail = entry.error?.message
       captureError({
-        message: entry.message,
+        message: errorDetail ? `${entry.message}: ${errorDetail}` : entry.message,
         stack: entry.error?.stack,
         scope: inferScope(entry.module),
         source: entry.module,
@@ -69,9 +70,12 @@ function writeLog(entry: LogEntry): void {
   }
 }
 
+const AGENT_MODULES = ['Braniac', 'Vigil', 'Scout', 'AgentStub', 'Nomicore', 'Oracle', 'Switchboard', 'Sensei', 'Payday']
+
 function inferScope(module: string): ErrorScope {
   if (module.startsWith('IPC') || module.includes('ipc')) return 'IPC'
   if (module.includes('DB') || module.includes('database') || module.includes('Repository')) return 'DB'
+  if (AGENT_MODULES.some(a => module.includes(a))) return 'Agent'
   return 'Main'
 }
 

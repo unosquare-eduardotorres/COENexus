@@ -58,6 +58,7 @@ export interface StructuredResume {
   validationResults: ValidationResult[];
   overallValidationStatus: ValidationStatus;
   originalFileUrl?: string;
+  originalFileBuffer?: ArrayBuffer;
 }
 
 export type ResumeStatus =
@@ -430,7 +431,48 @@ export interface SearchProgress {
 
 export type MatchFlowType = 'find-for-position' | 'match-to-positions' | 'delivery-to-op' | 'bench-burn' | 'external-candidate-to-op';
 
-export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn' | 'delivery-to-op' | 'external-candidate-to-op';
+export type MatchStepKey = 'intent' | 'job-description' | 'data-source' | 'filters' | 'search-depth' | 'searching' | 'results' | 'deep-dive' | 'bench-burn' | 'delivery-to-op' | 'external-candidate-to-op' | 'match-to-positions';
+
+export type MatchToPositionsStepKey = 'select-person' | 'position-ranking' | 'summary' | 'analyzing' | 'results';
+
+export type PersonSourceType = 'candidate' | 'employee' | 'external';
+
+export interface MatchToPositionsPerson {
+  sourceType: PersonSourceType;
+  upstreamId: number;
+  name: string;
+  seniority: string;
+  mainSkill: string;
+  country: string;
+  resumeText?: string;
+  isBench?: boolean;
+  candidateStatus?: string;
+}
+
+export interface RankedPositionDto {
+  upstreamId: number;
+  account: string;
+  jobTitle: string;
+  mainSkill: string;
+  seniorities: string;
+  positionStatus: string;
+  aging: number;
+  countries: string;
+  coe: string;
+  cosineSimilarity: number;
+  isVectorized: boolean;
+}
+
+export interface MatchToPositionsRequest {
+  name: string;
+  matchFlowType: 'match-to-positions';
+  personSourceType: PersonSourceType;
+  upstreamId?: number;
+  candidateName?: string;
+  resumeText?: string;
+  positionUpstreamIds: number[];
+  customPositions?: { name: string; jobDescription: string }[];
+}
 
 export type DeliveryToOpStepKey = 'employee' | 'positions' | 'summary' | 'analyzing' | 'results';
 
@@ -503,6 +545,9 @@ export interface SyncRecord {
   grossMonthlySalary?: number;
   resumeDateCreated?: string;
   jobTitle?: string;
+  functionalUnit?: string;
+  officeLocation?: string;
+  businessUnit?: string;
   coeCertified?: boolean;
   candidateStatus?: string;
   lastStatusUpdate?: string;
@@ -692,6 +737,7 @@ export interface BenchEmployee {
   lastAccount: string | null;
   isVectorized: boolean;
   isBench?: boolean;
+  hasResume?: boolean;
 }
 
 export interface SyncedCandidateListItem {
@@ -719,12 +765,18 @@ export interface BenchOpenPosition {
   mainSkill: string;
   jobTitle: string;
   jobDescription?: string;
+  verticalIndustry?: string;
+  seniorities?: string;
+  positionStatus?: string;
+  aging?: number;
+  availableRange?: string;
+  countries?: string;
   isVectorized: boolean;
 }
 
 export interface BenchBurnRequest {
   name: string;
-  matchFlowType?: 'bench-burn' | 'delivery-to-op';
+  matchFlowType?: 'bench-burn' | 'delivery-to-op' | 'match-to-positions';
   employeeUpstreamIds: number[];
   positionUpstreamIds: number[];
   searchMode: 'opus';

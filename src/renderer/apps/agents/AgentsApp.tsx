@@ -21,9 +21,10 @@ const BraniacHomeTab = lazy(() => import('./pages/braniac/HomeTab'))
 const BraniacPipelineTab = lazy(() => import('./pages/braniac/PipelineTab'))
 const BraniacJobHistoryTab = lazy(() => import('./pages/braniac/JobHistoryTab'))
 const BraniacPatternsTab = lazy(() => import('./pages/braniac/PatternsTab'))
-const OraclePage = lazy(() => import('./pages/OraclePage'))
-const OracleHomeTab = lazy(() => import('./pages/oracle/OracleHomeTab'))
-const OracleChatTab = lazy(() => import('./pages/oracle/OracleChatTab'))
+const BraniacChatTab = lazy(() => import('./pages/braniac/BraniacChatTab'))
+const BraniacProfilesTab = lazy(() => import('./pages/braniac/ProfilesTab'))
+const BraniacProfileDetailPage = lazy(() => import('./pages/braniac/ProfileDetailPage'))
+const BraniacAccountDetailPage = lazy(() => import('./pages/braniac/AccountDetailPage'))
 const OraclePage = lazy(() => import('./pages/OraclePage'))
 const OracleHomeTab = lazy(() => import('./pages/oracle/OracleHomeTab'))
 const OracleChatTab = lazy(() => import('./pages/oracle/OracleChatTab'))
@@ -61,12 +62,12 @@ export default function AgentsApp() {
           <Route path="braniac" element={<BraniacPage />}>
             <Route index element={<BraniacHomeTab />} />
             <Route path="pipeline" element={<BraniacPipelineTab />} />
+            <Route path="profiles" element={<BraniacProfilesTab />} />
+            <Route path="profiles/account/:account" element={<BraniacAccountDetailPage />} />
+            <Route path="profiles/:profileId" element={<BraniacProfileDetailPage />} />
+            <Route path="chat" element={<BraniacChatTab />} />
             <Route path="history" element={<BraniacJobHistoryTab />} />
             <Route path="patterns" element={<BraniacPatternsTab />} />
-          </Route>
-          <Route path="oracle" element={<OraclePage />}>
-            <Route index element={<OracleHomeTab />} />
-            <Route path="chat" element={<OracleChatTab />} />
           </Route>
           <Route path="oracle" element={<OraclePage />}>
             <Route index element={<OracleHomeTab />} />

@@ -1,10 +1,11 @@
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { MakerDMG } from '@electron-forge/maker-dmg'
 import { MakerSquirrel } from '@electron-forge/maker-squirrel'
-import { MakerZip } from '@electron-forge/maker-zip'
+import { MakerZIP } from '@electron-forge/maker-zip'
 import FusesPlugin from '@electron-forge/plugin-fuses'
 import AutoUnpackNativesPlugin from '@electron-forge/plugin-auto-unpack-natives'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
+import { resolve } from 'path'
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -12,10 +13,17 @@ const config: ForgeConfig = {
       unpack: '**/*.node',
     },
     icon: './resources/icon',
-    appBundleId: 'com.unosquare.operation-nexus',
-    name: 'Operation Nexus',
-    executableName: 'operation-nexus',
-    osxSign: {},
+    appBundleId: 'com.unosquare.coe-nexus',
+    name: 'COE Nexus',
+    executableName: 'coe-nexus',
+    osxSign: {
+      identity: process.env.APPLE_SIGNING_IDENTITY || undefined,
+      optionsForFile: () => ({
+        hardenedRuntime: true,
+        entitlements: resolve(__dirname, 'entitlements.mac.plist'),
+        'entitlements-inherit': resolve(__dirname, 'entitlements.mac.inherit.plist'),
+      }),
+    },
     osxNotarize: process.env.APPLE_ID && process.env.APPLE_TEAM_ID && process.env.APPLE_NOTARIZE
       ? {
           appleId: process.env.APPLE_ID,
@@ -32,18 +40,20 @@ const config: ForgeConfig = {
       /^\/\.claude/,
       /^\/\.git/,
       /^\/node_modules\/\.cache/,
+      /^\/entitlements\.mac/,
     ],
   },
 
   makers: [
     new MakerDMG({
       format: 'ULFO',
+      name: 'COE Nexus',
     }),
     new MakerSquirrel({
-      name: 'OperationNexus',
+      name: 'COENexus',
       setupIcon: './resources/icon.ico',
     }),
-    new MakerZip({}, ['linux']),
+    new MakerZIP({}, ['linux']),
   ],
 
   plugins: [
@@ -56,6 +66,8 @@ const config: ForgeConfig = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+
+  outDir: './dist',
 
   hooks: {
     postPackage: async (_forgeConfig, options) => {

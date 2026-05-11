@@ -25,7 +25,7 @@ export default function TransformPage() {
 
   const {
     wizard: { currentStepKey, completedSteps, stepLabels, stepSummaries, handleStepClick },
-    session: { savedSessionId, savingSession, showSaveSessionModal, setShowSaveSessionModal, isSavingSession, defaultSessionName, handleSaveSession },
+    session: { savedSessionId, savingSession, showSaveSessionModal, setShowSaveSessionModal, isSavingSession, defaultSessionName, handleSaveAndEnhance },
     claude: { claudeConnected, setClaudeConnected },
     modals: { showPreviewModal, setShowPreviewModal },
     transform: { transformedResumes },
@@ -102,9 +102,8 @@ export default function TransformPage() {
 
         {showSaveSessionModal && (
           <SaveSessionModal
-            isOpen={showSaveSessionModal}
-            onClose={() => setShowSaveSessionModal(false)}
-            onSave={handleSaveSession}
+            onCancel={() => setShowSaveSessionModal(false)}
+            onSave={handleSaveAndEnhance}
             defaultName={defaultSessionName}
             isSaving={isSavingSession}
           />

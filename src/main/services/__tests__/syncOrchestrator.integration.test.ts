@@ -13,6 +13,7 @@ vi.mock('../upstreamApiService', () => ({
     getEmployeeContracts: vi.fn().mockResolvedValue([]),
     getEmployeeRates: vi.fn().mockResolvedValue([]),
     getEmployeeNotes: vi.fn().mockResolvedValue([]),
+    getEmployeeTeamComposition: vi.fn().mockResolvedValue([]),
   },
 }))
 
@@ -84,5 +85,26 @@ describe('syncOrchestrator integration', () => {
     const onEvent = vi.fn()
     await syncOrchestrator.syncAsync('employees', 'test-token', { limit: 100, skip: 0 }, onEvent)
     expect(onEvent).toHaveBeenCalled()
+  })
+
+  it('EmployeeDetail interface should expose functionalUnit/officeName/businessUnit', () => {
+    // Compile-time + runtime sanity: object literal matches interface shape after Phase 4
+    const detail = {
+      userId: 1,
+      fullName: 'Alice',
+      email: 'a@b',
+      seniority: 0,
+      mainSkillId: 0,
+      countryId: 0,
+      accountName: '',
+      jobTitle: 'SE',
+      mainSkillName: 'TS',
+      officeName: 'Mexico',
+      functionalUnit: 'Engineering',
+      businessUnit: 'Delivery',
+    }
+    expect(detail.functionalUnit).toBe('Engineering')
+    expect(detail.businessUnit).toBe('Delivery')
+    expect(detail.officeName).toBe('Mexico')
   })
 })

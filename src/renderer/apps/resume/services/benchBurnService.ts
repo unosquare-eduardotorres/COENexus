@@ -7,6 +7,8 @@ import {
   CandidateTiming,
   SearchProgress,
   SyncedCandidateListItem,
+  RankedPositionDto,
+  MatchToPositionsRequest,
 } from '../types';
 
 export interface BenchBurnSearchResult {
@@ -43,7 +45,7 @@ function createStreamingPromise(
             positionResults: data.candidates?.positionResults ?? {},
             stats: data.stats ?? { totalPairs: 0, analyzed: 0, time: '0s', searchCost: '$0' },
           };
-          if (!result.employeeResults || typeof result.employeeResults !== 'object') {
+          if (!result.employeeResults || typeof result.employeeResults !== 'object' || Object.keys(result.employeeResults).length === 0) {
             result.employeeResults = {};
             result.positionResults = {};
             const allResults = Array.isArray(data.candidates) ? data.candidates : [];
@@ -100,6 +102,14 @@ export const benchBurnService = {
     return window.api.match.searchEmployees(query) as Promise<BenchEmployee[]>;
   },
 
+  async getCandidateCount(): Promise<number> {
+    return window.api.match.getCandidateCount();
+  },
+
+  async getEmployeeCount(): Promise<number> {
+    return window.api.match.getEmployeeCount();
+  },
+
   executeBenchBurn(
     request: BenchBurnRequest,
     onProgress: (p: SearchProgress) => void,
@@ -136,5 +146,48 @@ export const benchBurnService = {
   async getResumeText(sourceType: string, upstreamId: number): Promise<string | null> {
     const result = await window.api.match.getResumeText({ sourceType, upstreamId }) as { text: string | null };
     return result.text;
+  },
+
+  async rankPositionsForPerson(
+    sourceType: 'candidate' | 'employee',
+    upstreamId: number,
+    topN: number
+  ): Promise<{ positions: RankedPositionDto[] }> {
+    return window.api.match.rankPositions({ sourceType, upstreamId, topN }) as Promise<{ positions: RankedPositionDto[] }>;
+  },
+
+  async rankPositionsForText(
+    resumeText: string,
+    topN: number
+  ): Promise<{ positions: RankedPositionDto[] }> {
+    return window.api.match.rankPositionsForText({ resumeText, topN }) as Promise<{ positions: RankedPositionDto[] }>;
+  },
+
+  executeMatchToPositions(
+    request: MatchToPositionsRequest,
+    onProgress: (p: SearchProgress) => void,
+  ): Promise<BenchBurnSearchResult> {
+    return createStreamingPromise(
+      () => window.api.match.matchToPositions(request),
+      (cb) => window.api.match.onBenchBurnEvent(cb),
+      onProgress,
+    );
+  },
+
+  async getSession(id: number): Promise<BenchBurnSearchResult> {
+    const raw = await window.api.match.getBenchBurnSession(id) as Record<string, unknown>;
+    if (!raw) throw new Error(`Session ${id} not found`);
+    const results = raw.results as Record<string, unknown> | undefined;
+    return {
+      sessionId: raw.id as number,
+      employeeResults: (results?.employeeResults as Record<number, CrossMatchResult[]>) ?? {},
+      positionResults: (results?.positionResults as Record<number, CrossMatchResult[]>) ?? {},
+      stats: {
+        totalPairs: (raw.pipelineStats as Record<string, unknown>)?.totalPairs as number ?? 0,
+        analyzed: (raw.pipelineStats as Record<string, unknown>)?.analyzed as number ?? 0,
+        time: (raw.pipelineStats as Record<string, unknown>)?.time as string ?? '0s',
+        searchCost: '$0',
+      },
+    };
   },
 };

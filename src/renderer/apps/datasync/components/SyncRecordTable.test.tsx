@@ -82,4 +82,52 @@ describe('SyncRecordTable', () => {
     const cells = screen.getAllByText('—');
     expect(cells.length).toBeGreaterThan(0);
   });
+
+  it('should render new employee org columns: Functional Unit, Office Location, Business Unit', () => {
+    renderTable([
+      buildRecord({
+        functionalUnit: 'Engineering',
+        officeLocation: 'Mexico City',
+        businessUnit: 'Delivery',
+      }),
+    ]);
+
+    expect(screen.getByText('Functional Unit')).toBeInTheDocument();
+    expect(screen.getByText('Office Location')).toBeInTheDocument();
+    expect(screen.getByText('Business Unit')).toBeInTheDocument();
+    expect(screen.getByText('Engineering')).toBeInTheDocument();
+    expect(screen.getByText('Mexico City')).toBeInTheDocument();
+    expect(screen.getByText('Delivery')).toBeInTheDocument();
+  });
+
+  it('should render Main Skill column for employees', () => {
+    renderTable([buildRecord({ mainSkill: 'TypeScript' })]);
+    expect(screen.getByText('Main Skill')).toBeInTheDocument();
+    expect(screen.getByText('TypeScript')).toBeInTheDocument();
+  });
+});
+
+describe('simplifiedStatus mapping (Excel export)', () => {
+  function simplifiedStatus(status: SyncRecord['pipelineStatus']): 'Succeeded' | 'Failed' | 'Skip' {
+    if (status === 'sync_failed' || status === 'extract_failed' || status === 'vectorize_failed') return 'Failed';
+    if (status === 'incomplete' || status === 'not-processed') return 'Skip';
+    return 'Succeeded';
+  }
+
+  it('maps synced/extracted/vectorized to Succeeded', () => {
+    expect(simplifiedStatus('synced')).toBe('Succeeded');
+    expect(simplifiedStatus('extracted')).toBe('Succeeded');
+    expect(simplifiedStatus('vectorized')).toBe('Succeeded');
+  });
+
+  it('maps *_failed statuses to Failed', () => {
+    expect(simplifiedStatus('sync_failed')).toBe('Failed');
+    expect(simplifiedStatus('extract_failed')).toBe('Failed');
+    expect(simplifiedStatus('vectorize_failed')).toBe('Failed');
+  });
+
+  it('maps incomplete and not-processed to Skip', () => {
+    expect(simplifiedStatus('incomplete')).toBe('Skip');
+    expect(simplifiedStatus('not-processed')).toBe('Skip');
+  });
 });

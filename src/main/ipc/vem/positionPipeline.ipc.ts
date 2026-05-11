@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { PositionPipelineStartParams, PositionPipelineVectorizeSyncedParams, PipelineRetryParams, PipelineRetrySingleParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
-import { positionPipelineOrchestrator } from '../../services/positionPipelineOrchestrator'
+import { positionPipelineOrchestrator, loadPositionPipelineState, clearPositionPipelineState } from '../../services/positionPipelineOrchestrator'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { validatePayload, positionPipelineStartSchema, positionPipelineVectorizeSyncedSchema, pipelineRetrySchema, pipelineRetrySingleSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
@@ -69,16 +69,17 @@ export function registerPositionPipelineHandlers(): void {
       return syncRepository.getFailedRecords('synced_open_positions')
     })
 
-  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET,
+  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_GET_STATE,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return positionPipelineOrchestrator.getSavedSyncAllOffset()
+      return loadPositionPipelineState()
     })
 
-  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET,
+  registerIpcHandler(IPC_CHANNELS.POSITION_PIPELINE_CLEAR_STATE,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      positionPipelineOrchestrator.clearSavedSyncAllOffset()
+      clearPositionPipelineState()
       return { cleared: true }
     })
+
 }

@@ -32,6 +32,7 @@ export interface CreateAgentJobInput {
   pipeline_phase?: string
   metadata_json?: string
   agent_type?: AgentType
+  started_at?: string | null
 }
 
 export interface UpdateAgentJobInput {
@@ -68,9 +69,9 @@ export const jobRepository = {
     const db = getAgentsDatabase()
     const row = db.prepare(`
       INSERT INTO agent_jobs (
-        status, scope_type, scope_value, initiated_by, run_reason, pipeline_phase, metadata_json, agent_type, updated_at
+        status, scope_type, scope_value, initiated_by, run_reason, pipeline_phase, metadata_json, agent_type, started_at, updated_at
       ) VALUES (
-        @status, @scope_type, @scope_value, @initiated_by, @run_reason, @pipeline_phase, @metadata_json, @agent_type, datetime('now')
+        @status, @scope_type, @scope_value, @initiated_by, @run_reason, @pipeline_phase, @metadata_json, @agent_type, @started_at, datetime('now')
       )
       RETURNING *
     `).get({
@@ -82,6 +83,7 @@ export const jobRepository = {
       pipeline_phase: input.pipeline_phase ?? 'idle',
       metadata_json: input.metadata_json ?? '{}',
       agent_type: input.agent_type ?? 'scout9',
+      started_at: input.started_at ?? null,
     }) as AgentJobRow | undefined
     if (!row) throw new Error('Failed to create agent job')
     return row
@@ -121,5 +123,13 @@ export const jobRepository = {
     const db = getAgentsDatabase()
     const result = db.prepare('DELETE FROM agent_jobs WHERE id = ?').run(id)
     return result.changes > 0
+  },
+
+  deleteByScopeAndAgent(agentType: AgentType, scopeType: Scout9ScopeType, scopeValue: string): number {
+    const db = getAgentsDatabase()
+    const result = db.prepare(
+      'DELETE FROM agent_jobs WHERE agent_type = ? AND scope_type = ? AND scope_value = ?',
+    ).run(agentType, scopeType, scopeValue)
+    return result.changes
   },
 }

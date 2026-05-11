@@ -116,6 +116,19 @@ External Candidate:
 Name: {{candidateName}}
 Source File: {{sourceFileName}}`
 
+export const CANDIDATE_TO_POSITIONS_CONTEXT_BLOCK = `Open Position:
+Account: {{account}}
+Job Title: {{jobTitle}}
+Main Skill: {{positionMainSkill}}
+Job Description:
+{{jobDescription}}
+
+Candidate Name: {{candidateName}}
+Seniority: {{seniority}}
+Main Skill: {{candidateMainSkill}}
+Country: {{country}}
+Source: {{sourceLabel}}`
+
 export function fillTemplate(template: string, replacements: Record<string, string>): string {
   let result = template
   for (const [key, value] of Object.entries(replacements)) {

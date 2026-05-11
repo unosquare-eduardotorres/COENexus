@@ -153,6 +153,7 @@ export function useTransformPipeline({
         try {
           const content = await fileExtractionService.extractText(file);
           const { resume, metrics } = await aiService.transformResume(content, file.name, refinementMode, jobDescription);
+          resume.originalFileBuffer = await file.arrayBuffer();
           resume.originalFileUrl = URL.createObjectURL(file);
           results.push(resume);
           allMetrics.push(metrics);

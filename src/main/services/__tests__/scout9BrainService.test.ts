@@ -48,7 +48,7 @@ describe('scout9BrainService', () => {
     vi.mocked(knowledgeRepository.listOverrides).mockReturnValue([])
     vi.mocked(patternRepository.listPatterns).mockReturnValue([])
     vi.mocked(stakeholderProfileRepository.listByAccount).mockReturnValue([])
-    vi.mocked(stakeholderProfileRepository.getByStakeholderAndAccount).mockReturnValue(null)
+    vi.mocked(stakeholderProfileRepository.getByStakeholderAndAccount).mockReturnValue(undefined)
     vi.mocked(stakeholderProfileRepository.listAll).mockReturnValue([])
     vi.mocked(brainRepository.create).mockReturnValue({ id: 'snap-1' } as ReturnType<typeof brainRepository.create>)
   })

@@ -82,6 +82,7 @@ export function useMatchEngine() {
       if (flow === 'bench-burn') { navigateToStep('bench-burn'); return; }
       if (flow === 'delivery-to-op') { navigateToStep('delivery-to-op'); return; }
       if (flow === 'external-candidate-to-op') { navigateToStep('external-candidate-to-op'); return; }
+      if (flow === 'match-to-positions') { navigateToStep('match-to-positions'); return; }
       navigateToStep('data-source');
     },
     [completeStep, navigateToStep]
@@ -202,8 +203,8 @@ export function useMatchEngine() {
 
   const handleStartSearch = useCallback(async () => {
     if (!pendingDataSource) return;
-    const { connected } = await matchEngineService.getProxyStatus();
-    if (!connected) {
+    const { available } = await matchEngineService.getProxyStatus();
+    if (!available) {
       log.warn('Match search blocked by unavailable AI proxy');
       setShowSessionNamePrompt(false);
       setShowAiWarningModal(true);
@@ -237,7 +238,7 @@ export function useMatchEngine() {
       setSessionId(detail.id);
       setMatchFlow(detail.matchFlowType);
       setShowSessionHistory(false);
-      if (detail.matchFlowType === 'delivery-to-op' || detail.matchFlowType === 'bench-burn' || detail.matchFlowType === 'external-candidate-to-op') {
+      if (detail.matchFlowType === 'delivery-to-op' || detail.matchFlowType === 'bench-burn' || detail.matchFlowType === 'external-candidate-to-op' || detail.matchFlowType === 'match-to-positions') {
         setCompletedSteps(new Set<MatchStepKey>(['intent']));
         navigateToStep(detail.matchFlowType);
         setTimeout(() => setAnimateIn(true), 50);

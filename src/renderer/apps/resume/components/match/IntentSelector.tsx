@@ -109,12 +109,12 @@ const INTENTS: IntentOption[] = [
     id: 'match-to-positions',
     title: 'Match a candidate to open positions',
     description:
-      'Select a candidate and discover the best-fitting open positions based on their profile.',
+      'Select a candidate, employee, or upload a resume — then discover the best-fitting open positions based on their profile.',
     tags: ['Profile Analysis', 'Position Matching', 'Fit Score'],
     icon: <GitCompareArrowsIcon />,
     gradient: 'from-indigo-500 to-violet-500',
     tagColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
-    enabled: false,
+    enabled: true,
   },
   {
     id: 'delivery-to-op',

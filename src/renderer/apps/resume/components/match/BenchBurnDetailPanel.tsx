@@ -171,7 +171,7 @@ const BenchBurnDetailPanel = memo(function BenchBurnDetailPanel({ match, employe
               onClick={() => setActiveTab(index)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === index
-                  ? 'bg-white/10 text-accent border-b-2 border-accent'
+                  ? 'bg-accent-50/50 dark:bg-accent-500/10 text-accent-600 dark:text-accent-400 border-b-2 border-accent-500'
                   : 'text-muted hover:text-secondary'
               }`}
             >

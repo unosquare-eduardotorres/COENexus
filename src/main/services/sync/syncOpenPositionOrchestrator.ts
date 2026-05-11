@@ -40,13 +40,42 @@ export const syncOpenPositionOrchestrator = {
         batch = batch.slice(toSkip)
       }
 
+      const pageUpstreamIds = items.map(p => p.id)
+      const existingMap = syncRepository.findPositionsByUpstreamIds(pageUpstreamIds)
+
+      const allUnchanged = items.every(pos => {
+        const existing = existingMap.get(pos.id)
+        if (!existing) return false
+        return existing.last_modification === (pos.lastModification || null)
+          && existing.candidates_presented === (pos.candidatesPresented ?? 0)
+          && existing.last_discussion_date === (pos.lastDiscussionDate || null)
+      })
+
+      if (allUnchanged) {
+        const pageSkipped = items.length
+        fetchedRecords += pageSkipped
+        processedInRun += pageSkipped
+        unchangedCount += pageSkipped
+        for (const pos of items) syncedUpstreamIds.add(pos.id)
+
+        emitEvent({ type: 'progress', progress: {
+          source: 'open-positions', totalRecords, fetchedRecords, syncedCount,
+          incompleteCount: 0, notProcessedCount: 0, updatedCount, unchangedCount,
+          skippedCount: 0, currentRecord: `Skipped page (${items.length} unchanged)`, status: 'syncing',
+        }})
+
+        pageOffset += items.length
+        if (pageOffset >= totalRecords) break
+        continue
+      }
+
       for (const pos of batch) {
         if (signal.aborted) break
         fetchedRecords++
         processedInRun++
 
         try {
-          const existing = syncRepository.findPositionByUpstreamId(pos.id)
+          const existing = existingMap.get(pos.id)
 
           const lastModUnchanged = existing
             && existing.last_modification === (pos.lastModification || null)

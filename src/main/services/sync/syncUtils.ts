@@ -1,4 +1,4 @@
-import type { PersonaNote } from '../upstreamApiService'
+import type { PersonaNote, TeamCompositionEntry } from '../upstreamApiService'
 import { catalogService } from '../catalogService'
 import { createLogger } from '../logger'
 
@@ -34,6 +34,32 @@ export async function loadOrEmpty<T>(name: string, getter: () => Promise<T[]>): 
     log.warn(`Failed to load ${name} — continuing with empty list`)
     return []
   }
+}
+
+export function isBenchFromComposition(
+  compositions: TeamCompositionEntry[]
+): { isBench: boolean; benchTeam: string | null } {
+  if (compositions.length === 0) return { isBench: false, benchTeam: null }
+
+  const activeEntries = compositions.filter(c => !c.endDate)
+  const pool = activeEntries.length > 0 ? activeEntries : compositions
+
+  const maxStart = Math.max(...pool.map(c => Date.parse(c.startDate) || 0))
+  const ONE_DAY = 86_400_000
+  const currentEntries = pool.filter(c => {
+    const d = Date.parse(c.startDate) || 0
+    return (maxStart - d) < ONE_DAY
+  })
+
+  const benchEntry = currentEntries.find(c =>
+    c.team.toLowerCase().includes('bench') || c.project.toLowerCase().includes('bench')
+  )
+
+  if (benchEntry) {
+    return { isBench: true, benchTeam: `${benchEntry.account} - ${benchEntry.team} - ${benchEntry.project}` }
+  }
+
+  return { isBench: false, benchTeam: null }
 }
 
 export async function loadCatalogs(token: string) {

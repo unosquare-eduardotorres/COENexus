@@ -27,7 +27,7 @@ export default function AiWarningModal({ onContinue, onCancel }: AiWarningModalP
           </li>
           <li className="flex items-start gap-2">
             <span className="text-red-400 mt-0.5">✕</span>
-            <span><strong>Sonnet Deep Analysis</strong> — detailed fit narratives, skill gaps, leadership assessment</span>
+            <span><strong>Opus Deep Analysis</strong> — detailed fit narratives, skill gaps, leadership assessment</span>
           </li>
         </ul>
 

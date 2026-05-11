@@ -1,6 +1,6 @@
 import { getAgentsDatabase } from '../agentsConnection'
 
-export type PatternApprovalStatus = 'auto_applied' | 'pending_review'
+export type PatternApprovalStatus = 'auto_applied' | 'pending_review' | 'approved' | 'rejected'
 
 export interface LearnedPatternRow {
   id: string
@@ -14,6 +14,7 @@ export interface LearnedPatternRow {
   stakeholder: string | null
   source_agent: string
   data_points_count: number
+  rejection_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +63,7 @@ export interface UpdatePatternInput {
   stakeholder?: string | null
   source_agent?: string
   data_points_count?: number
+  rejection_reason?: string | null
 }
 
 export interface CreatePatternApplicationInput {
@@ -141,6 +143,20 @@ export const patternRepository = {
     const db = getAgentsDatabase()
     const result = db.prepare('DELETE FROM learned_patterns WHERE id = ?').run(id)
     return result.changes > 0
+  },
+
+  deletePatternsByAccount(account: string, stakeholder?: string | null): number {
+    const db = getAgentsDatabase()
+    if (stakeholder === undefined) {
+      const result = db.prepare('DELETE FROM learned_patterns WHERE account = ?').run(account)
+      return result.changes
+    }
+    if (stakeholder === null) {
+      const result = db.prepare('DELETE FROM learned_patterns WHERE account = ? AND stakeholder IS NULL').run(account)
+      return result.changes
+    }
+    const result = db.prepare('DELETE FROM learned_patterns WHERE account = ? AND stakeholder = ?').run(account, stakeholder)
+    return result.changes
   },
 
   incrementUsage(patternId: string): boolean {

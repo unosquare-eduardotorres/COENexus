@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS scout9_schema_migrations (
 CREATE TABLE IF NOT EXISTS agent_jobs (
   id TEXT PRIMARY KEY NOT NULL DEFAULT (lower(hex(randomblob(16)))),
   status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed', 'canceled')),
-  scope_type TEXT NOT NULL DEFAULT 'org' CHECK (scope_type IN ('org', 'project', 'custom')),
+  scope_type TEXT NOT NULL DEFAULT 'org' CHECK (scope_type IN ('org', 'project', 'custom', 'account', 'stakeholder')),
   scope_value TEXT,
   initiated_by TEXT NOT NULL DEFAULT 'system',
   run_reason TEXT NOT NULL DEFAULT '',

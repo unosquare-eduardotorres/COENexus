@@ -21,7 +21,7 @@ import type {
 } from '../renderer/apps/resume/types'
 
 export type ErrorSeverity = 'warning' | 'error' | 'critical'
-export type ErrorScope = 'IPC' | 'Main' | 'DB' | 'Renderer' | 'ErrorBoundary' | 'Preload' | 'Unknown'
+export type ErrorScope = 'IPC' | 'Main' | 'DB' | 'Agent' | 'Renderer' | 'ErrorBoundary' | 'Preload' | 'Unknown'
 export type ErrorStatus = 'new' | 'reported'
 
 export interface ErrorEntry {
@@ -105,9 +105,12 @@ export interface SyncUploadNoteParams {
 export type SyncDataSource = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations'
 export type SyncClearDataSource = 'employees' | 'candidates' | 'positions' | 'project-reallocations'
 
+export type PipelineMode = 'full' | 'sync-only'
+
 export interface PipelineStartParams {
   source: 'employees' | 'candidates'
   token: string
+  mode?: PipelineMode
   model?: string
   limit?: number
   skip?: number
@@ -147,6 +150,8 @@ export interface PipelineProgressDto {
   failedCount: number
   skippedCount: number
   currentRecord?: string
+  pauseReason?: 'user' | 'token-expiring' | 'error'
+  errorMessage?: string
 }
 
 export type PipelineProgressEvent =
@@ -179,6 +184,25 @@ export interface PipelineFailedRecord {
   resume_filename: string | null
 }
 
+export interface PersistedPipelineState {
+  source: string
+  status: 'paused'
+  pauseReason?: string
+  errorMessage?: string
+  offset: number
+  totalRecords: number
+  processedRecords: number
+  succeededCount: number
+  failedCount: number
+  skippedCount: number
+  succeededRecords: PipelineRecordEvent[]
+  failedRecords: PipelineRecordEvent[]
+  skippedRecords: PipelineRecordEvent[]
+  year?: number
+  activeOnly?: boolean
+  savedAt: string
+}
+
 export interface SyncRecordDto {
   id: string
   source: string
@@ -208,6 +232,9 @@ export interface SyncRecordDto {
   salaryExpectations?: number | null
   salaryExpectationsCurrency?: string | null
   jobTitle?: string
+  functionalUnit?: string
+  officeLocation?: string
+  businessUnit?: string
   candidateStatus?: string | null
   account?: string | null
   coe?: string | null
@@ -260,6 +287,7 @@ export interface SyncedEmployeeRow {
   resume_date_created: string | null
   resume_filename: string | null
   is_bench: number
+  bench_team: string | null
   job_title: string
   normalized_monthly_usd: number | null
   inferred_currency: string | null
@@ -409,6 +437,44 @@ export interface MatchConfirmHaikuParams {
 export interface MatchResumeTextParams {
   sourceType: string
   upstreamId: number
+}
+
+export interface MatchRankPositionsParams {
+  sourceType: 'candidate' | 'employee'
+  upstreamId: number
+  topN: number
+}
+
+export interface MatchRankPositionsForTextParams {
+  resumeText: string
+  topN: number
+}
+
+export interface MatchRankPositionsResult {
+  positions: {
+    upstreamId: number
+    account: string
+    jobTitle: string
+    mainSkill: string
+    seniorities: string
+    positionStatus: string
+    aging: number
+    countries: string
+    coe: string
+    cosineSimilarity: number
+    isVectorized: boolean
+  }[]
+}
+
+export interface MatchToPositionsParams {
+  name: string
+  matchFlowType: 'match-to-positions'
+  personSourceType: 'candidate' | 'employee' | 'external'
+  upstreamId?: number
+  candidateName?: string
+  resumeText?: string
+  positionUpstreamIds: number[]
+  customPositions?: { name: string; jobDescription: string }[]
 }
 
 export interface PresentCreateSessionParams {
@@ -1606,6 +1672,107 @@ export interface BraniacUpdatePatternParams {
   confidence_score?: number
 }
 
+export interface BraniacGetStakeholdersParams {
+  account: string
+}
+
+export interface BraniacAnalysisStatusItem {
+  scope: 'account' | 'stakeholder'
+  account: string
+  stakeholder: string | null
+  currentDataPoints: number
+  currentPositions: number
+  lastAnalyzedDataPoints: number | null
+  lastAnalyzedPositions: number | null
+  lastAnalyzedAt: string | null
+  lastJobId: string | null
+  hasNewData: boolean
+}
+
+export interface BraniacGetAnalysisStatusParams {
+  account: string
+}
+
+export interface BraniacCreatePatternParams {
+  pattern_name: string
+  pattern_text: string
+  account: string
+  stakeholder?: string | null
+  confidence_score?: number
+}
+
+export interface BraniacBeautifyPatternParams {
+  text: string
+  account: string
+  stakeholder?: string | null
+}
+
+export interface BraniacBeautifyPatternResult {
+  pattern_name: string
+  pattern_text: string
+}
+
+export interface BraniacClearPatternsParams {
+  account: string
+  stakeholder?: string
+}
+
+export interface BraniacDeletePatternParams {
+  id: string
+}
+
+export interface BraniacDeleteProfileParams {
+  stakeholder: string
+  account: string
+}
+
+export interface BraniacClearStakeholderParams {
+  account: string
+  stakeholder: string
+  include_jobs?: boolean
+}
+
+export interface BraniacClearAccountParams {
+  account: string
+  include_jobs?: boolean
+}
+
+export interface BraniacClearResult {
+  patternsDeleted: number
+  profilesDeleted: number
+  jobsDeleted: number
+}
+
+export interface BraniacChatParams {
+  message: string
+  scopeAccount?: string
+}
+
+export interface BraniacChatResult {
+  content: string
+  toolCalls: number
+  inputTokens: number
+  outputTokens: number
+}
+
+export interface BraniacExtractResumeSkillsParams {
+  sourceType?: string
+  limit?: number
+  force?: boolean
+}
+
+export interface BraniacExtractResumeSkillsResult {
+  extracted: number
+  skipped: number
+  failed: number
+}
+
+export interface BraniacExtractionStatusResult {
+  total: number
+  extracted: number
+  pending: number
+}
+
 export interface Scout9ChatParams {
   message: string
   scopeClient?: string
@@ -1646,8 +1813,42 @@ export interface BraniacPattern {
   stakeholder: string | null
   source_agent: string
   data_points_count: number
+  rejection_reason: string | null
   created_at: string
   updated_at: string
+}
+
+export interface BraniacAccountSummary {
+  account: string
+  stakeholder_count: number
+  total_candidates_presented: number
+  total_candidates_accepted: number
+  success_rate: number | null
+  total_closed_positions: number
+  total_won_positions: number
+  win_rate: number | null
+  avg_days_to_close: number | null
+  observed_rate_floor: number | null
+  observed_rate_ceiling: number | null
+  avg_accepted_rate: number | null
+  avg_published_rate: number | null
+  avg_time_to_decision_days: number | null
+  accepted_countries: string[]
+  rejected_countries: string[]
+  top_rejection_reasons: string[]
+  top_acceptance_signals: string[]
+  avg_confidence_score: number
+  total_data_points: number
+  last_analyzed_at: string | null
+  last_inference_job_id: string | null
+}
+
+export interface BraniacListAccountSummariesResult {
+  summaries: BraniacAccountSummary[]
+}
+
+export interface BraniacGetAccountSummaryParams {
+  account: string
 }
 
 export interface BraniacStakeholderProfile {
@@ -1667,6 +1868,18 @@ export interface BraniacStakeholderProfile {
   top_rejection_reasons: string
   top_acceptance_signals: string
   preference_summary: string
+  actual_accepted_tech_stacks_json: string | null
+  actual_rejected_tech_stacks_json: string | null
+  tech_stack_flexibility: string | null
+  tag_vs_resume_divergence_rate: number | null
+  total_candidates_presented: number
+  total_candidates_accepted: number
+  success_rate: number | null
+  avg_published_rate: number | null
+  avg_days_to_close: number | null
+  total_closed_positions: number
+  total_won_positions: number
+  win_rate: number | null
   data_points_count: number
   confidence_score: number
   last_inference_job_id: string | null
@@ -1674,10 +1887,21 @@ export interface BraniacStakeholderProfile {
   updated_at: string
 }
 
+export interface BraniacProgressInfo {
+  batch: number
+  totalBatches: number
+  positionsProcessed: number
+  totalPositions: number
+  progressPct: number
+  phase: 'aggregating' | 'analyzing' | 'synthesizing' | 'persisting' | 'done'
+}
+
 export interface BraniacStatusEvent {
   status: 'idle' | 'running' | 'completed' | 'failed'
   job_id: string | null
   timestamp: string
+  error_message?: string
+  progress?: BraniacProgressInfo
 }
 
 export interface BraniacResponse<T = unknown> {
@@ -1706,6 +1930,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.PIPELINE_RETRY_ALL_FAILED]: { request: PipelineRetryParams; response: { started: boolean } }
   [IPC_CHANNELS.PIPELINE_RETRY_SINGLE]: { request: PipelineRetrySingleParams; response: PipelineRecordEvent }
   [IPC_CHANNELS.PIPELINE_GET_FAILED]: { request: 'employees' | 'candidates'; response: PipelineFailedRecord[] }
+  [IPC_CHANNELS.PIPELINE_GET_STATE]: { request: string; response: PersistedPipelineState | null }
+  [IPC_CHANNELS.PIPELINE_CLEAR_STATE]: { request: string; response: { cleared: boolean } }
 
   [IPC_CHANNELS.POSITION_PIPELINE_START]: { request: PositionPipelineStartParams; response: { started: boolean } }
   [IPC_CHANNELS.POSITION_PIPELINE_PAUSE]: { request: void; response: { paused: boolean } }
@@ -1713,8 +1939,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.POSITION_PIPELINE_RETRY_ALL_FAILED]: { request: PipelineRetryParams; response: { started: boolean } }
   [IPC_CHANNELS.POSITION_PIPELINE_RETRY_SINGLE]: { request: PipelineRetrySingleParams; response: PipelineRecordEvent }
   [IPC_CHANNELS.POSITION_PIPELINE_GET_FAILED]: { request: void; response: PipelineFailedRecord[] }
-  [IPC_CHANNELS.POSITION_PIPELINE_GET_SAVED_OFFSET]: { request: void; response: number | null }
-  [IPC_CHANNELS.POSITION_PIPELINE_CLEAR_SAVED_OFFSET]: { request: void; response: { cleared: boolean } }
+  [IPC_CHANNELS.POSITION_PIPELINE_GET_STATE]: { request: void; response: PersistedPipelineState | null }
+  [IPC_CHANNELS.POSITION_PIPELINE_CLEAR_STATE]: { request: void; response: { cleared: boolean } }
 
   [IPC_CHANNELS.PROCESSING_VOYAGE_KEY_STATUS]: { request: void; response: VoyageKeyStatus }
   [IPC_CHANNELS.PROCESSING_GET_STATUS]: { request: void; response: ProcessingStatusBySource }
@@ -1752,6 +1978,9 @@ export interface IpcContracts {
   [IPC_CHANNELS.MATCH_EXTERNAL_CANDIDATE]: { request: ExternalCandidateMatchRequest; response: { sessionId: number | null } }
   [IPC_CHANNELS.MATCH_ANALYSIS_CACHE_STATS]: { request: readonly []; response: { totalEntries: number; oldestEntry: string | null } }
   [IPC_CHANNELS.MATCH_CLEAR_ANALYSIS_CACHE]: { request: readonly []; response: { deleted: number } }
+  [IPC_CHANNELS.MATCH_RANK_POSITIONS]: { request: MatchRankPositionsParams; response: MatchRankPositionsResult }
+  [IPC_CHANNELS.MATCH_RANK_POSITIONS_FOR_TEXT]: { request: MatchRankPositionsForTextParams; response: MatchRankPositionsResult }
+  [IPC_CHANNELS.MATCH_TO_POSITIONS]: { request: MatchToPositionsParams; response: { sessionId: number | null } }
 
   [IPC_CHANNELS.SESSIONS_CREATE]: { request: CreateOrUpdateTransformSession; response: { id: number } }
   [IPC_CHANNELS.SESSIONS_UPDATE]: { request: [id: number, data: Partial<CreateOrUpdateTransformSession>]; response: { success: boolean } }
@@ -1904,6 +2133,20 @@ export interface IpcContracts {
   [IPC_CHANNELS.BRANIAC_APPROVE_PATTERN]: { request: BraniacApprovePatternParams; response: BraniacResponse<{ updated: boolean }> }
   [IPC_CHANNELS.BRANIAC_REJECT_PATTERN]: { request: BraniacRejectPatternParams; response: BraniacResponse<{ updated: boolean }> }
   [IPC_CHANNELS.BRANIAC_UPDATE_PATTERN]: { request: BraniacUpdatePatternParams; response: BraniacResponse<{ updated: boolean }> }
+  [IPC_CHANNELS.BRANIAC_GET_STAKEHOLDERS]: { request: BraniacGetStakeholdersParams; response: BraniacResponse<string[]> }
+  [IPC_CHANNELS.BRANIAC_GET_ANALYSIS_STATUS]: { request: BraniacGetAnalysisStatusParams; response: BraniacResponse<BraniacAnalysisStatusItem[]> }
+  [IPC_CHANNELS.BRANIAC_CREATE_PATTERN]: { request: BraniacCreatePatternParams; response: BraniacResponse<BraniacPattern> }
+  [IPC_CHANNELS.BRANIAC_BEAUTIFY_PATTERN]: { request: BraniacBeautifyPatternParams; response: BraniacResponse<BraniacBeautifyPatternResult> }
+  [IPC_CHANNELS.BRANIAC_CLEAR_PATTERNS]: { request: BraniacClearPatternsParams; response: BraniacResponse<{ deleted: number }> }
+  [IPC_CHANNELS.BRANIAC_LIST_ACCOUNT_SUMMARIES]: { request: void; response: BraniacResponse<BraniacListAccountSummariesResult> }
+  [IPC_CHANNELS.BRANIAC_GET_ACCOUNT_SUMMARY]: { request: BraniacGetAccountSummaryParams; response: BraniacResponse<BraniacAccountSummary | null> }
+  [IPC_CHANNELS.BRANIAC_DELETE_PATTERN]: { request: BraniacDeletePatternParams; response: BraniacResponse<{ deleted: boolean }> }
+  [IPC_CHANNELS.BRANIAC_DELETE_PROFILE]: { request: BraniacDeleteProfileParams; response: BraniacResponse<{ deleted: boolean }> }
+  [IPC_CHANNELS.BRANIAC_CLEAR_STAKEHOLDER]: { request: BraniacClearStakeholderParams; response: BraniacResponse<BraniacClearResult> }
+  [IPC_CHANNELS.BRANIAC_CLEAR_ACCOUNT]: { request: BraniacClearAccountParams; response: BraniacResponse<BraniacClearResult> }
+  [IPC_CHANNELS.BRANIAC_CHAT]: { request: BraniacChatParams; response: BraniacResponse<BraniacChatResult> }
+  [IPC_CHANNELS.BRANIAC_EXTRACT_RESUME_SKILLS]: { request: BraniacExtractResumeSkillsParams; response: BraniacResponse<BraniacExtractResumeSkillsResult> }
+  [IPC_CHANNELS.BRANIAC_GET_EXTRACTION_STATUS]: { request: void; response: BraniacResponse<BraniacExtractionStatusResult> }
 
   [IPC_CHANNELS.SCOUT9_CHAT]: { request: Scout9ChatParams; response: BraniacResponse<Scout9ChatResponse> }
 
@@ -1955,6 +2198,8 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STEP_EVENT]: AgentStepEvent
   [IPC_CHANNELS.BRANIAC_STATUS_EVENT]: BraniacStatusEvent
+  [IPC_CHANNELS.BRANIAC_CHAT_STEP_EVENT]: string
+  [IPC_CHANNELS.BRANIAC_CHAT_CHUNK_EVENT]: ChatChunkEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
   [IPC_CHANNELS.APP_NAVIGATE]: { path: string }

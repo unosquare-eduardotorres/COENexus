@@ -21,7 +21,7 @@ const log = createRendererLogger('matchEngineService');
 function normalizeConstraints(constraints: AdvancedConstraints | null | undefined): unknown {
   if (!constraints) return null;
   const normalize = (rules: FilterRule[]) =>
-    rules.map(({ id: _id, ...rule }) => ({
+    rules.map((rule) => ({
       ...rule,
       value: String(rule.value),
     }));
@@ -151,6 +151,11 @@ export const matchEngineService = {
       window.api.match.searchSession({
         ...request,
         constraints: normalizeConstraints(request.constraints),
+      }).then((result: any) => {
+        if (result?.__ipcError) {
+          cleanup();
+          reject(new Error(result.message || 'Search request failed'));
+        }
       });
     });
   },

@@ -59,13 +59,15 @@ export default function PresentationPage() {
   const [generatingProfiles, setGeneratingProfiles] = useState<Set<number>>(new Set())
   const [regeneratingIntro, setRegeneratingIntro] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+  const [manualJobDescription, setManualJobDescription] = useState('')
 
   const positionTitle = skipPosition ? manualTitle : (selectedPosition?.jobTitle ?? '')
   const accountName = skipPosition ? manualAccount : (selectedPosition?.account ?? '')
   const positionUpstreamId = skipPosition ? null : (selectedPosition?.upstreamId ?? null)
-  const jobDescription = selectedPosition?.jobDescription ?? ''
+  const jobDescription = skipPosition ? manualJobDescription : (selectedPosition?.jobDescription ?? '')
 
   useEffect(() => {
     const candidateIds = searchParams.get('candidates')?.split(',').map(Number).filter(Boolean) ?? []
@@ -97,7 +99,7 @@ export default function PresentationPage() {
               preselected.push({
                 sourceType: 'employee', upstreamId: e.upstreamId, fullName: e.name,
                 mainSkill: e.mainSkill, seniority: e.seniority, country: e.country,
-                hasResume: false, resumeNoteId: null, resumeFilename: null,
+                hasResume: e.hasResume ?? false, resumeNoteId: null, resumeFilename: null,
                 isBench: e.isBench,
               })
             }
@@ -324,9 +326,11 @@ export default function PresentationPage() {
   const handleSave = useCallback(async () => {
     if (!sessionId) return
     setSaving(true)
+    setSaved(false)
     try {
       await presentationService.updateSession(sessionId, { status: 'completed', introText })
       completeStep('finalize')
+      setSaved(true)
     } catch (err) {
       log.error('Failed to save session', err)
       setError('Failed to save session')
@@ -419,12 +423,50 @@ export default function PresentationPage() {
             ))}
           </div>
 
+          {currentStep !== 'select-people' && selectedPeople.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-lg bg-white/50 dark:bg-dark-card/50 border border-gray-200 dark:border-dark-border">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted uppercase tracking-wider">People</span>
+                {selectedPeople.slice(0, 3).map(p => (
+                  <span
+                    key={`ctx-${p.sourceType}:${p.upstreamId}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                      ${p.sourceType === 'candidate'
+                        ? 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'
+                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'}`}
+                  >
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${p.sourceType === 'candidate' ? 'bg-accent-500' : 'bg-emerald-500'}`} />
+                    {p.fullName}
+                  </span>
+                ))}
+                {selectedPeople.length > 3 && (
+                  <span className="text-xs text-muted">+{selectedPeople.length - 3} more</span>
+                )}
+                <button onClick={() => navigateStep('select-people')} className="text-xs text-accent-500 hover:underline ml-1">Edit</button>
+              </div>
+
+              {currentStep !== 'position-context' && (selectedPosition || skipPosition) && (
+                <>
+                  <div className="w-px h-4 bg-gray-300 dark:bg-dark-border" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted uppercase tracking-wider">Position</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                      {positionTitle || 'Manual Entry'}
+                      {accountName && ` · ${accountName}`}
+                    </span>
+                    <button onClick={() => navigateStep('position-context')} className="text-xs text-accent-500 hover:underline ml-1">Edit</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="glass-panel p-6">
             {currentStep === 'select-people' && (
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-primary">Select Candidates & Employees</h2>
-                <PeopleSelector selectedPeople={selectedPeople} onSelectionChange={setSelectedPeople} />
                 <SelectedPeopleCart selectedPeople={selectedPeople} onRemove={handleRemovePerson} />
+                <PeopleSelector selectedPeople={selectedPeople} onSelectionChange={setSelectedPeople} />
                 <div className="flex justify-end pt-4">
                   <button
                     onClick={handleNextFromPeople}
@@ -450,6 +492,8 @@ export default function PresentationPage() {
                     onManualChange={handleManualChange}
                     skipPosition={skipPosition}
                     onSkipChange={setSkipPosition}
+                    manualJobDescription={manualJobDescription}
+                    onManualJobDescriptionChange={setManualJobDescription}
                   />
                 </div>
                 <div>
@@ -557,6 +601,7 @@ export default function PresentationPage() {
                   onGenerateHtml={handleGenerateHtml}
                   hasHtml={!!htmlContent}
                   saving={saving}
+                  saved={saved}
                 />
                 <div className="flex justify-start pt-4">
                   <button onClick={() => navigateStep('generate')} className="glass-button px-6 py-2.5 text-sm">

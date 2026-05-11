@@ -7,6 +7,7 @@ import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { extractPositionText } from './processingUtils'
 import { createLogger } from './logger'
 import { getConfig } from '../config'
+import { tokenWatchdog, isTokenExpiringSoon } from './tokenWatchdog'
 
 const log = createLogger('PositionPipeline')
 
@@ -29,6 +30,8 @@ interface PipelineProgress {
   failedCount: number
   skippedCount: number
   currentRecord?: string
+  pauseReason?: 'user' | 'token-expiring' | 'error'
+  errorMessage?: string
 }
 
 type PipelineEvent =
@@ -51,7 +54,6 @@ export interface PositionPipelineVectorizeSyncedParams {
 }
 
 let activeController: AbortController | null = null
-let pausedOffset = 0
 
 function getModel(model?: string): string {
   if (model) return model
@@ -59,11 +61,33 @@ function getModel(model?: string): string {
   return voyage.defaultModel ?? 'voyage-3-large'
 }
 
+function savePositionPipelineState(state: {
+  offset: number; totalRecords: number; processedRecords: number
+  succeededCount: number; failedCount: number; skippedCount: number
+  pauseReason?: string; errorMessage?: string
+  succeededRecords: PipelineRecordEvent[]; failedRecords: PipelineRecordEvent[]; skippedRecords: PipelineRecordEvent[]
+  activeOnly?: boolean
+}): void {
+  const persisted = { ...state, source: 'open-positions', status: 'paused' as const, savedAt: new Date().toISOString() }
+  syncRepository.saveSyncMetadata('pipeline-state:open-positions', JSON.stringify(persisted))
+}
+
+export function clearPositionPipelineState(): void {
+  syncRepository.clearSyncMetadata('pipeline-state:open-positions')
+}
+
+export function loadPositionPipelineState(): Record<string, unknown> | null {
+  const raw = syncRepository.getSyncMetadata('pipeline-state:open-positions')
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+}
+
 function makeProgress(
   total: number, processed: number, succeeded: number, failed: number, skipped: number,
   status: 'processing' | 'paused' | 'completed' = 'processing', currentRecord?: string,
+  pauseReason?: 'user' | 'token-expiring' | 'error', errorMessage?: string,
 ): PipelineProgress {
-  return { source: 'open-positions', status, totalRecords: total, processedRecords: processed, succeededCount: succeeded, failedCount: failed, skippedCount: skipped, currentRecord }
+  return { source: 'open-positions', status, totalRecords: total, processedRecords: processed, succeededCount: succeeded, failedCount: failed, skippedCount: skipped, currentRecord, pauseReason, errorMessage }
 }
 
 export const positionPipelineOrchestrator = {
@@ -74,17 +98,6 @@ export const positionPipelineOrchestrator = {
     }
   },
 
-  getSavedSyncAllOffset(): number | null {
-    const raw = syncRepository.getSyncMetadata('position_sync_all_offset')
-    if (!raw) return null
-    const parsed = parseInt(raw, 10)
-    return isNaN(parsed) ? null : parsed
-  },
-
-  clearSavedSyncAllOffset(): void {
-    syncRepository.clearSyncMetadata('position_sync_all_offset')
-  },
-
   async run(
     params: PositionPipelineStartParams,
     emitEvent: (event: PipelineEvent) => void,
@@ -93,32 +106,36 @@ export const positionPipelineOrchestrator = {
     const { signal } = activeController
     const { token, activeOnly, limit, skip } = params
     const model = getModel(params.model)
+    const pipelineLabel = 'position-pipeline'
+
+    tokenWatchdog.updateToken(token)
+    tokenWatchdog.register(pipelineLabel, () => activeController?.abort())
 
     log.info('Position pipeline started', { activeOnly, limit, skip, model })
 
     let totalRecords = 0
-    let processedRecords = 0
+    const resumeFrom = skip ?? 0
+    let processedRecords = resumeFrom
     let succeededCount = 0
     let failedCount = 0
     let skippedCount = 0
+    const accSucceeded: PipelineRecordEvent[] = []
+    const accFailed: PipelineRecordEvent[] = []
+    const accSkipped: PipelineRecordEvent[] = []
     const pageSize = 100
-    let pageOffset = skip ?? pausedOffset
-    pausedOffset = 0
+    let pageOffset = resumeFrom
     const maxToProcess = limit ?? Infinity
     let processedInRun = 0
     const syncedUpstreamIds = new Set<number>()
 
-    if (!skip && pageOffset === 0) {
-      const savedOffset = syncRepository.getSyncMetadata('position_sync_all_offset')
-      if (savedOffset) {
-        const parsed = parseInt(savedOffset, 10)
-        if (!isNaN(parsed) && parsed > 0) {
-          pageOffset = parsed
-          processedRecords = parsed
-          processedInRun = parsed
-          log.info('Resuming position sync from saved offset', { pageOffset })
-        }
+    const emitAndAccumulate = (event: PipelineEvent): void => {
+      if (event.type === 'record') {
+        const r = event.record
+        if (r.outcome === 'vectorized') accSucceeded.push(r)
+        else if (r.outcome === 'failed') accFailed.push(r)
+        else if (r.outcome === 'skipped') accSkipped.push(r)
       }
+      emitEvent(event)
     }
 
     try {
@@ -129,7 +146,7 @@ export const positionPipelineOrchestrator = {
           ? await upstreamApiService.getOpenPositionsPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun))
           : await upstreamApiService.getAllOpenPositionsPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun))
 
-        totalRecords = total
+        totalRecords = Math.max(total, processedRecords)
         if (items.length === 0) break
 
         const pageUpstreamIds = items.map(p => p.id)
@@ -157,7 +174,6 @@ export const positionPipelineOrchestrator = {
           )})
 
           pageOffset += items.length
-          syncRepository.saveSyncMetadata('position_sync_all_offset', String(pageOffset))
           if (pageOffset >= totalRecords) break
           continue
         }
@@ -185,17 +201,40 @@ export const positionPipelineOrchestrator = {
               const alreadyVectorized = existing.status === 'vectorized'
               if (alreadyVectorized) {
                 skippedCount++
-                emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
+                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
                 emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
                 continue
               }
 
               if (!activeOnly) {
                 skippedCount++
-                emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
+                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
                 emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
                 continue
               }
+
+              const hasJd = !!existing.job_description?.trim()
+              if (hasJd) {
+                const enrichedText = extractPositionText({
+                  account: existing.account,
+                  job_title: existing.job_title,
+                  main_skill: existing.main_skill,
+                  job_description: existing.job_description,
+                })
+                const vecResult = await vectorizePosition(existing.id, pos.id, enrichedText, model)
+                if ('error' in vecResult) {
+                  failedCount++
+                  emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
+                } else {
+                  succeededCount++
+                  emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
+                }
+              } else {
+                failedCount++
+                syncRepository.markFailed('synced_open_positions', existing.id, 'incomplete', 'No job description')
+                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' } })
+              }
+              continue
             }
 
             const [detail, candidates, discussions] = await Promise.all([
@@ -207,6 +246,12 @@ export const positionPipelineOrchestrator = {
             const latestDiscussionDate = discussions.length > 0
               ? discussions.reduce((max, d) => (d.date > max ? d.date : max), '')
               : null
+
+            const jdUnchanged = !!existing
+              && existing.job_description === (detail?.jobDescription ?? '')
+              && existing.job_title === (detail?.jobTitle ?? '')
+              && existing.account === (pos.account || '')
+              && existing.main_skill === (pos.mainSkill || '')
 
             const entity = {
               upstream_id: pos.id,
@@ -242,7 +287,7 @@ export const positionPipelineOrchestrator = {
               created_with_assignments_tool: detail?.createdWithAssignmentsTool == null ? null : detail.createdWithAssignmentsTool ? 1 : 0,
               candidates_presented: candidates.length,
               last_discussion_date: latestDiscussionDate,
-              status: 'synced' as const,
+              status: (jdUnchanged && existing?.status === 'vectorized' ? 'vectorized' : 'synced') as string,
               status_reason: null,
               synced_at: new Date().toISOString(),
             }
@@ -299,7 +344,10 @@ export const positionPipelineOrchestrator = {
 
             if (activeOnly) {
               const hasJd = !!(detail?.jobDescription?.trim())
-              if (hasJd) {
+              if (entity.status === 'vectorized') {
+                skippedCount++
+                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
+              } else if (hasJd) {
                 const row = syncRepository.findPositionByUpstreamId(pos.id)
                 if (row) {
                   const enrichedText = extractPositionText({
@@ -312,20 +360,20 @@ export const positionPipelineOrchestrator = {
                   const vecResult = await vectorizePosition(row.id, pos.id, enrichedText, model)
                   if ('error' in vecResult) {
                     failedCount++
-                    emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
+                    emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
                   } else {
                     succeededCount++
-                    emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
+                    emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
                   }
                 }
               } else {
                 failedCount++
                 syncRepository.markFailed('synced_open_positions', syncRepository.findPositionByUpstreamId(pos.id)?.id ?? 0, 'incomplete', 'No job description')
-                emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' } })
+                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' } })
               }
             } else {
               succeededCount++
-              emitEvent({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
+              emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
             }
           } catch (err) {
             failedCount++
@@ -337,19 +385,14 @@ export const positionPipelineOrchestrator = {
               status: 'sync_failed',
               status_reason: error,
             })
-            emitEvent({ type: 'record', record: { upstreamId: pos.id, name: pos.account || 'Unknown', outcome: 'failed', failedStep: 'sync', error } })
+            emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: pos.account || 'Unknown', outcome: 'failed', failedStep: 'sync', error } })
           }
 
           emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
         }
 
         pageOffset += items.length
-        syncRepository.saveSyncMetadata('position_sync_all_offset', String(pageOffset))
         if (pageOffset >= totalRecords) break
-      }
-
-      if (!signal.aborted) {
-        syncRepository.clearSyncMetadata('position_sync_all_offset')
       }
 
       if (!signal.aborted && activeOnly) {
@@ -369,21 +412,28 @@ export const positionPipelineOrchestrator = {
 
       matchEngineService.invalidateFilterCache()
       const finalStatus = signal.aborted ? 'paused' as const : 'completed' as const
-      if (signal.aborted) {
-        pausedOffset = pageOffset
-      }
+      const pauseReason = signal.aborted ? (isTokenExpiringSoon() ? 'token-expiring' as const : 'user' as const) : undefined
       log.info('Position pipeline finished', { totalRecords, processedRecords, succeededCount, failedCount, skippedCount, status: finalStatus })
-      emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, finalStatus) })
+      if (finalStatus === 'paused') {
+        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+      } else {
+        clearPositionPipelineState()
+      }
+      emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, finalStatus, undefined, pauseReason) })
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        pausedOffset = pageOffset
-        emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused') })
+        const reason = isTokenExpiringSoon() ? 'token-expiring' as const : 'user' as const
+        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: reason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+        emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused', undefined, reason) })
         return
       }
       log.error('Position pipeline failed', err instanceof Error ? err : new Error(String(err)))
-      syncRepository.clearSyncMetadata('position_sync_all_offset')
-      emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Pipeline failed' })
+      const errMsg = err instanceof Error ? err.message : 'Pipeline failed'
+      savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: 'error', errorMessage: errMsg, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+      emitEvent({ type: 'error', message: errMsg })
+      emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused', undefined, 'error', errMsg) })
     } finally {
+      tokenWatchdog.unregister(pipelineLabel)
       activeController = null
     }
   },
@@ -450,6 +500,7 @@ export const positionPipelineOrchestrator = {
     } catch (err) {
       log.error('Position vectorize synced failed', err instanceof Error ? err : new Error(String(err)))
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Vectorize synced failed' })
+      emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, 0, 'paused') })
     } finally {
       activeController = null
     }
@@ -500,6 +551,7 @@ export const positionPipelineOrchestrator = {
     } catch (err) {
       log.error('Position retry all failed error', err instanceof Error ? err : new Error(String(err)))
       emitEvent({ type: 'error', message: err instanceof Error ? err.message : 'Retry failed' })
+      emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused') })
     } finally {
       activeController = null
     }

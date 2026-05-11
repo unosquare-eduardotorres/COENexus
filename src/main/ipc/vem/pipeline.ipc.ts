@@ -3,7 +3,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { PipelineStartParams, PipelineRetryParams, PipelineRetrySingleParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
-import { unifiedPipelineOrchestrator } from '../../services/unifiedPipelineOrchestrator'
+import { unifiedPipelineOrchestrator, loadPipelineState, clearPipelineState } from '../../services/unifiedPipelineOrchestrator'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { validatePayload, pipelineStartSchema, pipelineRetrySchema, pipelineRetrySingleSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
@@ -56,5 +56,18 @@ export function registerPipelineHandlers(): void {
       validateSender(event)
       const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
       return syncRepository.getFailedRecords(table)
+    })
+
+  registerIpcHandler(IPC_CHANNELS.PIPELINE_GET_STATE,
+    async (event: IpcMainInvokeEvent, source: string) => {
+      validateSender(event)
+      return loadPipelineState(source)
+    })
+
+  registerIpcHandler(IPC_CHANNELS.PIPELINE_CLEAR_STATE,
+    async (event: IpcMainInvokeEvent, source: string) => {
+      validateSender(event)
+      clearPipelineState(source)
+      return { cleared: true }
     })
 }

@@ -21,6 +21,7 @@ import PipelineStageDrawer from '../components/match/PipelineStageDrawer';
 import BenchBurnPage from './BenchBurnPage';
 import DeliveryToOpPage from './DeliveryToOpPage';
 import ExternalCandidateToOpPage from './ExternalCandidateToOpPage';
+import MatchToPositionsPage from './MatchToPositionsPage';
 import MatchResultsStep from '../components/match/steps/MatchResultsStep';
 import SessionNameModal from '../components/match/steps/SessionNameModal';
 import AiWarningModal from '../components/match/steps/AiWarningModal';
@@ -51,7 +52,7 @@ const PIPELINE_STAGE_LABELS: Record<PipelineStageKey, string> = {
   vectorResults: 'Pre-filtered — Vector Results',
   afterConstraints: 'After Constraints Applied',
   afterHaikuTriage: 'After Haiku Triage',
-  sonnetAnalyzed: 'Sonnet Analyzed',
+  sonnetAnalyzed: 'Opus Analyzed',
 };
 
 const STEP_LABELS: { key: MatchStepKey; title: string; icon: ReactNode }[] = [
@@ -204,7 +205,7 @@ export default function MatchEnginePage() {
           </div>
         )}
 
-        {currentStepKey !== 'bench-burn' && currentStepKey !== 'delivery-to-op' && currentStepKey !== 'external-candidate-to-op' && (
+        {currentStepKey !== 'bench-burn' && currentStepKey !== 'delivery-to-op' && currentStepKey !== 'external-candidate-to-op' && currentStepKey !== 'match-to-positions' && (
           <StepperBar
             stepLabels={STEP_LABELS}
             currentStepKey={currentStepKey}
@@ -233,6 +234,7 @@ export default function MatchEnginePage() {
         {currentStepKey === 'bench-burn' && <BenchBurnPage onReset={handleReset} />}
         {currentStepKey === 'delivery-to-op' && <DeliveryToOpPage onReset={handleReset} initialSessionId={sessionId} />}
         {currentStepKey === 'external-candidate-to-op' && <ExternalCandidateToOpPage onReset={handleReset} initialSessionId={sessionId} />}
+        {currentStepKey === 'match-to-positions' && <MatchToPositionsPage onReset={handleReset} />}
         {currentStepKey === 'data-source' && <DataSourceStep onNext={handleDataSourceNext} initialSource={dataSource} poolCounts={poolCounts} />}
         {currentStepKey === 'search-depth' && <SearchDepthStep onNext={handleSearchDepthNext} initialMode={searchMode} />}
         {currentStepKey === 'searching' && <SearchProgressComponent progress={progress} isPaused={haikuConfirm !== null} />}

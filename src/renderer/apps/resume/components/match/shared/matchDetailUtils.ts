@@ -77,10 +77,10 @@ export const PRIORITY_LABELS: Record<string, string> = { required: 'Required', '
 
 export function parseSummaryVerdict(summary: string): { verdict: FitVerdict | null; reasoning: string } {
   const patterns: { match: RegExp; verdict: FitVerdict }[] = [
-    { match: /^NOT\s+A\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'not-a-fit' },
-    { match: /^PARTIAL\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'partial-fit' },
-    { match: /^GOOD\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'good-fit' },
-    { match: /^STRONG\s+FIT[\.\:\-\u2014]\s*/i, verdict: 'strong-fit' },
+    { match: /^NOT\s+A\s+FIT\b[\s,\.;:\-\u2014]*/i, verdict: 'not-a-fit' },
+    { match: /^PARTIAL\s+FIT\b[\s,\.;:\-\u2014]*/i, verdict: 'partial-fit' },
+    { match: /^GOOD\s+FIT\b[\s,\.;:\-\u2014]*/i, verdict: 'good-fit' },
+    { match: /^STRONG\s+FIT\b[\s,\.;:\-\u2014]*/i, verdict: 'strong-fit' },
   ];
 
   for (const { match, verdict } of patterns) {

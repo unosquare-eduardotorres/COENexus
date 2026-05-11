@@ -152,20 +152,21 @@ function rebuildVecIndex(): number {
     return 0
   }
 
-  const existingIds = new Set(
-    (db.prepare('SELECT rowid FROM vec_embeddings').all() as { rowid: number }[]).map(r => r.rowid)
-  )
-
   const embeddings = db.prepare(
     'SELECT id, embedding FROM resume_embeddings WHERE embedding IS NOT NULL'
   ).all() as { id: number; embedding: Buffer }[]
 
   let rebuilt = 0
-  const insertStmt = db.prepare('INSERT OR REPLACE INTO vec_embeddings(rowid, embedding) VALUES (?, ?)')
+  const deleteStmt = db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?')
+  const insertStmt = db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)')
+  const rebuildVec = db.transaction((id: bigint, buf: Buffer) => {
+    deleteStmt.run(id)
+    insertStmt.run(id, buf)
+  })
 
   for (const row of embeddings) {
-    if (!existingIds.has(row.id) && row.embedding.length > 0) {
-      insertStmt.run(BigInt(row.id), row.embedding)
+    if (row.embedding.length > 0) {
+      rebuildVec(BigInt(row.id), row.embedding)
       rebuilt++
     }
   }

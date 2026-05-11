@@ -27,7 +27,7 @@ const PHASE_LABELS: Record<string, string> = {
   enrichmentMs: 'Metadata Enrichment',
   constraintsMs: 'Constraint Filtering',
   haikuTriageMs: 'Haiku Triage',
-  sonnetAnalysisMs: 'Sonnet Analysis',
+  sonnetAnalysisMs: 'Opus Analysis',
 };
 
 const PHASE_ORDER = ['embeddingMs', 'vectorSearchMs', 'totalCountMs', 'enrichmentMs', 'constraintsMs', 'haikuTriageMs', 'sonnetAnalysisMs'];
@@ -45,7 +45,7 @@ const PipelineStats = memo(function PipelineStats({ stats, pipelineStages, onSta
     { label: 'Pre-filtered', value: stats.preFiltered, stageKey: 'vectorResults' },
     { label: 'Constraints Applied', value: stats.constraintsApplied, stageKey: 'afterConstraints' },
     { label: 'Haiku Triage', value: stats.haikuTriage, stageKey: 'afterHaikuTriage' },
-    { label: 'Sonnet Analyzed', value: stats.sonnetAnalyzed, stageKey: 'sonnetAnalyzed' },
+    { label: 'Opus Analyzed', value: stats.sonnetAnalyzed, stageKey: 'sonnetAnalyzed' },
   ];
 
   const metaStats: StatBadge[] = [
