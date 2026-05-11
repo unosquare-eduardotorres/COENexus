@@ -117,6 +117,26 @@ export function SyncActivityProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    if (window.api?.positionPipeline?.getState) {
+      window.api.positionPipeline.getState().then((saved: { status: string; totalRecords: number; processedRecords: number; succeededCount: number; failedCount: number; skippedCount: number; pauseReason?: string; errorMessage?: string } | null) => {
+        if (saved && saved.status === 'paused') {
+          updateSync('open-positions', () => ({
+            source: 'open-positions',
+            status: 'paused',
+            totalRecords: saved.totalRecords,
+            processedRecords: saved.processedRecords,
+            succeededCount: saved.succeededCount,
+            failedCount: saved.failedCount,
+            skippedCount: saved.skippedCount,
+            pauseReason: saved.pauseReason as SyncProgress['pauseReason'],
+            errorMessage: saved.errorMessage,
+          }))
+        }
+      }).catch(() => {})
+    }
+  }, [updateSync])
+
+  useEffect(() => {
     const unsubs: Array<() => void> = []
 
     if (window.api?.positionPipeline?.onProgress) {

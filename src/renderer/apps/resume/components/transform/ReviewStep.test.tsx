@@ -15,17 +15,30 @@ vi.mock('./OriginalDocxViewer', () => ({
   default: () => <div data-testid="docx-viewer">DocxViewer</div>,
 }))
 vi.mock('./review/ReviewToolbar', () => ({
-  default: (props: { reviewViewMode: string }) => <div data-testid="review-toolbar">{props.reviewViewMode}</div>,
+  default: (props: { reviewViewMode: string; onBack: () => void; onNext: () => void }) => (
+    <div data-testid="review-toolbar">
+      {props.reviewViewMode}
+      <button onClick={props.onBack}>Back</button>
+      <button onClick={props.onNext}>Next</button>
+    </div>
+  ),
 }))
 vi.mock('./review/ChecksView', () => ({
   default: () => <div data-testid="checks-view">ChecksView</div>,
 }))
+vi.mock('./TransformProgressOverlay', () => ({
+  default: (props: { progress: { currentFile: string } }) => (
+    <div data-testid="transform-progress-overlay">{props.progress.currentFile}</div>
+  ),
+}))
 
 const mockContext = {
   wizard: { handleBack: vi.fn(), handleNext: vi.fn() },
-  refinement: { enhancerMode: 'grammar', enhancerModeLabel: (m: string) => m, handleEnhanceClick: vi.fn() },
+  refinement: { enhancerMode: 'grammar', enhancerModeLabel: (m: string) => m, handleEnhanceClick: vi.fn(), handleEnhanceResume: vi.fn(), confirmReEnhance: vi.fn(), setEnhancerMode: vi.fn() },
   transform: {
     isTransforming: false,
+    isEnhancing: false,
+    transformPhase: null,
     transformProgress: null,
     transformedResumes: [{
       id: 'r1',
@@ -67,7 +80,16 @@ const mockContext = {
   },
   suggestions: { aiSuggestions: {} },
   session: { sessionSaved: false, savedSessionName: '' },
-  modals: { setShowWarningsModal: vi.fn(), setShowEnhancerModal: vi.fn() },
+  modals: {
+    showWarningsModal: false,
+    setShowWarningsModal: vi.fn(),
+    showEnhancerModal: false,
+    setShowEnhancerModal: vi.fn(),
+    showEnhanceWarningModal: false,
+    setShowEnhanceWarningModal: vi.fn(),
+    showReEnhanceConfirm: false,
+    setShowReEnhanceConfirm: vi.fn(),
+  },
   misc: { originalResume: null },
 }
 
@@ -99,11 +121,11 @@ describe('ReviewStep', () => {
     expect(mockContext.wizard.handleNext).toHaveBeenCalledOnce()
   })
 
-  it('should show loading spinner when isTransforming with progress', () => {
+  it('should show progress overlay when isTransforming with progress', () => {
     mockContext.transform.isTransforming = true
     mockContext.transform.transformProgress = { current: 1, total: 3, currentFile: 'resume1.pdf' } as unknown as null
     render(<ReviewStep />)
-    expect(screen.getByText('Processing...')).toBeInTheDocument()
+    expect(screen.getByTestId('transform-progress-overlay')).toBeInTheDocument()
     expect(screen.getByText('resume1.pdf')).toBeInTheDocument()
     mockContext.transform.isTransforming = false
     mockContext.transform.transformProgress = null

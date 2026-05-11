@@ -25,6 +25,7 @@ interface PositionPipelineDashboardProps {
   onRetrySingle: (upstreamId: number) => void
   isSyncDisabled?: boolean
   isVoyageKeyConfigured?: boolean
+  syncMode?: 'active' | 'full'
 }
 
 export default memo(function PositionPipelineDashboard({
@@ -49,6 +50,7 @@ export default memo(function PositionPipelineDashboard({
   onRetrySingle,
   isSyncDisabled,
   isVoyageKeyConfigured,
+  syncMode,
 }: PositionPipelineDashboardProps) {
   return (
     <div className="space-y-6">
@@ -162,7 +164,7 @@ export default memo(function PositionPipelineDashboard({
       {isPaused && progress.processedRecords > 0 && !isRunning && (
         <div className="glass-panel-subtle rounded-lg p-3 flex items-center justify-between">
           <span className="text-sm text-secondary">
-            Pipeline paused at record {progress.processedRecords.toLocaleString()} of {progress.totalRecords.toLocaleString()}
+            {syncMode === 'full' ? 'Full Sync' : 'Active Sync'} paused at record {progress.processedRecords.toLocaleString()} of {progress.totalRecords.toLocaleString()}
             {progress.pauseReason === 'token-expiring' && ' (token expired)'}
             {progress.pauseReason === 'error' && ' (error)'}
           </span>
@@ -188,6 +190,15 @@ export default memo(function PositionPipelineDashboard({
               <span className="w-2 h-2 rounded-full bg-gray-400" />
               <span className="font-semibold text-muted">{progress.skippedCount}</span>
             </span>
+            {(isRunning || isPaused) && syncMode && (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                syncMode === 'full'
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400'
+                  : 'bg-accent-100 text-accent-700 dark:bg-accent-500/20 dark:text-accent-400'
+              }`}>
+                {syncMode === 'full' ? 'Full Sync' : 'Active Sync'}
+              </span>
+            )}
             {isPaused && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                 Paused

@@ -282,6 +282,11 @@ Return ONLY valid JSON (no markdown, no explanation) with this structure:
   "cloudSkills": ["all AI/cloud-related skills"]
 }
 
+CONSTRAINTS:
+- The enhanced summary MUST be between 100 and 480 characters. If the current summary exceeds 500 characters, condense it.
+- Remove first-person pronouns (I, me, my) from the summary.
+- Each achievement should start with a strong action verb.
+
 Keep the same number of experience entries in the same order. Only enhance summary and experience descriptions/achievements/technologies. When returning technologies, split compound entries (e.g. 'Entity Framework/Dapper' → separate items).
 
 Current resume data:
@@ -342,10 +347,33 @@ export const aiService = {
   async transformResume(
     rawContent: string,
     fileName: string,
-    _refinementMode?: RefinementMode,
-    _jobDescription?: string
-  ): Promise<{ resume: StructuredResume; metrics: ResumeProcessingMetrics }> {
-    return this.extractResumeData(rawContent, fileName);
+    refinementMode?: RefinementMode,
+    _jobDescription?: string,
+    onPhaseChange?: (phase: 'extracting' | 'enhancing') => void,
+  ): Promise<{ resume: StructuredResume; preEnhancementResume: StructuredResume; metrics: ResumeProcessingMetrics }> {
+    onPhaseChange?.('extracting');
+    const { resume, metrics } = await this.extractResumeData(rawContent, fileName);
+    const preEnhancementResume = structuredClone(resume);
+
+    const mode = refinementMode ?? 'professional-polish';
+    if (mode !== 'job-tailoring' || _jobDescription) {
+      onPhaseChange?.('enhancing');
+      try {
+        const { resume: enhanced, usage } = await this.enhanceFullResume(resume, mode);
+        if (usage) {
+          metrics.totalTokens = {
+            promptTokens: (metrics.totalTokens?.promptTokens ?? 0) + usage.promptTokens,
+            completionTokens: (metrics.totalTokens?.completionTokens ?? 0) + usage.completionTokens,
+            totalTokens: (metrics.totalTokens?.totalTokens ?? 0) + usage.totalTokens,
+          };
+        }
+        return { resume: enhanced, preEnhancementResume, metrics };
+      } catch (err) {
+        console.warn('Auto-enhancement failed, returning extracted resume:', err);
+        return { resume, preEnhancementResume, metrics };
+      }
+    }
+    return { resume, preEnhancementResume, metrics };
   },
 
   async enhanceFullResume(resume: StructuredResume, mode: RefinementMode): Promise<{ resume: StructuredResume; usage: TokenUsage | null }> {

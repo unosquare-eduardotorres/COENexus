@@ -446,7 +446,8 @@ export default function OpenPositionsReport() {
   const [selectedPositionId, setSelectedPositionId] = useState<number | null>(null)
   const [showThresholds, setShowThresholds] = useState(false)
   const [showLegend, setShowLegend] = useState(false)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showColumnConfig, setShowColumnConfig] = useState(false)
   const columnConfigRef = useRef<HTMLDivElement>(null)
@@ -551,25 +552,42 @@ export default function OpenPositionsReport() {
       <h1 className="text-base font-semibold text-primary">Open Positions</h1>
 
       {!report.isLoading && report.results.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Total</p>
-            <p className="text-lg font-bold text-primary font-mono">{report.results.length}</p>
-          </div>
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Flagged</p>
-            <p className="text-lg font-bold text-red-400 font-mono">{report.healthCounts.flagged}</p>
-          </div>
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Healthy</p>
-            <p className="text-lg font-bold text-emerald-400 font-mono">{report.healthCounts.healthy}</p>
-          </div>
-          <div className="glass-panel-subtle rounded-xl px-3 py-2">
-            <p className="text-[11px] text-muted uppercase tracking-wide">Avg. Aging</p>
-            <p className="text-lg font-bold text-primary font-mono">
-              {Math.round(report.filteredResults.reduce((s, r) => s + r.position.aging, 0) / (report.filteredResults.length || 1))}d
-            </p>
-          </div>
+        <div>
+          <button
+            onClick={() => setSummaryCollapsed(!summaryCollapsed)}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-secondary transition-colors mb-1.5"
+          >
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+              className={`transition-transform ${summaryCollapsed ? '-rotate-90' : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            Summary
+          </button>
+          {!summaryCollapsed && (
+            <div className="grid grid-cols-4 gap-2">
+              <div className="glass-panel-subtle rounded-xl px-3 py-2">
+                <p className="text-[11px] text-muted uppercase tracking-wide">Total</p>
+                <p className="text-lg font-bold text-primary font-mono">{report.results.length}</p>
+              </div>
+              <div className="glass-panel-subtle rounded-xl px-3 py-2">
+                <p className="text-[11px] text-muted uppercase tracking-wide">Flagged</p>
+                <p className="text-lg font-bold text-red-400 font-mono">{report.healthCounts.flagged}</p>
+              </div>
+              <div className="glass-panel-subtle rounded-xl px-3 py-2">
+                <p className="text-[11px] text-muted uppercase tracking-wide">Healthy</p>
+                <p className="text-lg font-bold text-emerald-400 font-mono">{report.healthCounts.healthy}</p>
+              </div>
+              <div className="glass-panel-subtle rounded-xl px-3 py-2">
+                <p className="text-[11px] text-muted uppercase tracking-wide">Avg. Aging</p>
+                <p className="text-lg font-bold text-primary font-mono">
+                  {Math.round(report.filteredResults.reduce((s, r) => s + r.position.aging, 0) / (report.filteredResults.length || 1))}d
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -835,6 +853,25 @@ export default function OpenPositionsReport() {
                   )
                 })}
               </div>
+            </div>
+
+            <div className="minimal-divider" />
+
+            <div className="flex items-center gap-3">
+              <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Scope</p>
+              <button
+                onClick={() => report.setExcludeInternal(!report.excludeInternal)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  report.excludeInternal
+                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
+                    : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
+                }`}
+              >
+                {report.excludeInternal ? '✓ ' : ''}Exclude Internal
+              </button>
+              <span className="text-[10px] text-muted">
+                Hide proactive-hire positions (no vertical / country-based accounts)
+              </span>
             </div>
 
             {Object.keys(report.columnFilters).length > 0 && (

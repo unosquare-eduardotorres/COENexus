@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ResumeEditor from '../ResumeEditor';
 import PdfPreviewPanel from '../PdfPreviewPanel';
 import OriginalDocxViewer from './OriginalDocxViewer';
 import ReviewToolbar from './review/ReviewToolbar';
 import ChecksView from './review/ChecksView';
+import TransformProgressOverlay from './TransformProgressOverlay';
 import { useTransformContext } from '../../contexts/TransformContext';
 import { RefinementMode } from '../../types';
 
@@ -13,11 +14,53 @@ const ENHANCER_MODES: { value: RefinementMode; label: string; description: strin
   { value: 'ats-optimized', label: 'ATS-Optimized', description: 'Optimize formatting and keywords for Applicant Tracking Systems compatibility.' },
 ];
 
+function OriginalPdfViewer({ buffer, fallbackUrl, originalContent }: {
+  buffer?: ArrayBuffer;
+  fallbackUrl?: string;
+  originalContent?: string;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
+
+  useEffect(() => {
+    if (buffer) {
+      const blob = new Blob([buffer], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    if (fallbackUrl) {
+      setBlobUrl(fallbackUrl);
+    }
+    return undefined;
+  }, [buffer, fallbackUrl]);
+
+  if (showFallback || !blobUrl) {
+    return (
+      <div className="bg-gray-50/50 dark:bg-dark-bg/50 rounded-xl border border-gray-200/30 dark:border-dark-border/30 p-4">
+        <pre className="text-secondary whitespace-pre-wrap font-mono text-xs leading-relaxed">
+          {originalContent || 'Original content not available for this source type.'}
+        </pre>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      src={blobUrl}
+      className="w-full rounded-xl border border-gray-200/30 dark:border-dark-border/30"
+      style={{ height: '70vh' }}
+      title="Original Resume"
+      onError={() => setShowFallback(true)}
+    />
+  );
+}
+
 export default function ReviewStep() {
   const {
     wizard: { handleBack: onBack, handleNext: onNext },
     refinement: { enhancerMode, setEnhancerMode, enhancerModeLabel, handleEnhanceClick: onEnhanceClick, handleEnhanceResume, confirmReEnhance },
-    transform: { isTransforming, transformProgress, transformedResumes, error, handleTransform: onRetryTransform },
+    transform: { isTransforming, isEnhancing, transformPhase, transformProgress, transformedResumes, error, handleTransform: onRetryTransform },
     review: {
       activeResumeId,
       setActiveResumeId,
@@ -43,16 +86,24 @@ export default function ReviewStep() {
     },
     misc: { originalResume },
   } = useTransformContext();
-  const isEnhancing = isTransforming;
 
   const [pendingEnhancerMode, setPendingEnhancerMode] = useState<RefinementMode>(enhancerMode);
-  const [pdfError, setPdfError] = useState(false);
 
   const onShowWarningsModal = () => setShowWarningsModal(true);
   const onShowEnhancerModal = () => {
     setPendingEnhancerMode(enhancerMode);
     setShowEnhancerModal(true);
   };
+
+  const handleGoToEditor = useCallback((section: string) => {
+    void section;
+    setReviewViewMode('editor');
+  }, [setReviewViewMode]);
+
+  const handleAiFix = useCallback((_field: string, _message: string) => {
+    setReviewViewMode('editor');
+    onEnhanceClick();
+  }, [setReviewViewMode, onEnhanceClick]);
 
   return (
     <>
@@ -72,33 +123,10 @@ export default function ReviewStep() {
         )}
 
         {isTransforming && transformProgress ? (
-          <div className="glass-card p-6 text-center py-8 flex-1">
-            <div className="relative w-16 h-16 mx-auto mb-6">
-              <svg className="w-16 h-16 animate-spin text-accent-500" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-sm font-semibold text-accent-600 dark:text-accent-400">
-                  {transformProgress.current}/{transformProgress.total}
-                </span>
-              </div>
-            </div>
-            <h3 className="text-base font-semibold text-primary mb-1">Processing...</h3>
-            <p className="text-sm text-muted mb-4">{transformProgress.currentFile}</p>
-            <div className="w-full h-1.5 bg-gray-100 dark:bg-dark-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent-500 transition-all duration-500"
-                style={{
-                  width: `${(transformProgress.current / transformProgress.total) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
+          <TransformProgressOverlay
+            progress={transformProgress}
+            phase={transformPhase}
+          />
         ) : error ? (
           <div className="glass-card p-6 text-center py-8 flex-1">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
@@ -210,15 +238,13 @@ export default function ReviewStep() {
                         </div>
                       </div>
                       <div className="p-4">
-                        {activeResume.originalFileUrl && activeResume.originalFileType === 'pdf' && !pdfError ? (
-                          <iframe
-                            src={activeResume.originalFileUrl}
-                            className="w-full rounded-xl border border-gray-200/30 dark:border-dark-border/30"
-                            style={{ height: '70vh' }}
-                            title="Original Resume"
-                            onError={() => setPdfError(true)}
+                        {activeResume.originalFileType === 'pdf' ? (
+                          <OriginalPdfViewer
+                            buffer={activeResume.originalFileBuffer}
+                            fallbackUrl={activeResume.originalFileUrl}
+                            originalContent={activeResume.originalContent}
                           />
-                        ) : activeResume.originalFileUrl && activeResume.originalFileType === 'docx' ? (
+                        ) : activeResume.originalFileType === 'docx' ? (
                           <OriginalDocxViewer fileUrl={activeResume.originalFileUrl} buffer={activeResume.originalFileBuffer} />
                         ) : (
                           <div className="bg-gray-50/50 dark:bg-dark-bg/50 rounded-xl border border-gray-200/30 dark:border-dark-border/30 p-4">
@@ -232,7 +258,13 @@ export default function ReviewStep() {
                   )}
 
                   {reviewViewMode === 'checks' && activeResume && (
-                    <ChecksView resume={activeResume} completeness={completeness} validationResults={validationResults} />
+                    <ChecksView
+                      resume={activeResume}
+                      completeness={completeness}
+                      validationResults={validationResults}
+                      onGoToEditor={handleGoToEditor}
+                      onAiFix={handleAiFix}
+                    />
                   )}
                 </div>
               </div>
@@ -240,6 +272,46 @@ export default function ReviewStep() {
           </div>
         ) : null}
       </div>
+
+      {isEnhancing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="glass-card p-8 max-w-sm w-full mx-4 shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto mb-5 relative">
+              <div className="absolute inset-0 animate-spin-slow">
+                <svg className="w-16 h-16 text-violet-500/30" viewBox="0 0 64 64" fill="none">
+                  <circle cx="32" cy="4" r="3" fill="currentColor" />
+                  <circle cx="32" cy="60" r="3" fill="currentColor" />
+                  <circle cx="4" cy="32" r="3" fill="currentColor" />
+                  <circle cx="60" cy="32" r="3" fill="currentColor" />
+                  <circle cx="12" cy="12" r="2" fill="currentColor" />
+                  <circle cx="52" cy="52" r="2" fill="currentColor" />
+                  <circle cx="52" cy="12" r="2" fill="currentColor" />
+                  <circle cx="12" cy="52" r="2" fill="currentColor" />
+                </svg>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="w-7 h-7 text-violet-500 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-primary mb-2">Re-Enhancing Resume</h3>
+            <p className="text-sm text-muted mb-1">
+              Polishing with <strong className="text-violet-500">{enhancerModeLabel(enhancerMode)}</strong>
+            </p>
+            <p className="text-xs text-muted">Improving language, achievements, and skill selection…</p>
+            <div className="flex justify-center gap-1.5 mt-4">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showReEnhanceConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">

@@ -41,8 +41,20 @@ function SyncPill({ sync, onClick }: { sync: SyncProgress; onClick: () => void }
       : ''
 
   const progressText = sync.totalRecords > 0
-    ? `${sync.processedRecords}/${sync.totalRecords}`
+    ? `${sync.processedRecords.toLocaleString()}/${sync.totalRecords.toLocaleString()}`
     : ''
+
+  const pauseReasonText = sync.pauseReason === 'token-expiring'
+    ? 'token expired'
+    : sync.pauseReason === 'error'
+      ? 'error'
+      : 'user paused'
+
+  const tooltip = isPaused
+    ? `${label} ${progressText} — Paused (${pauseReasonText}) · Click to resume`
+    : isCompleted
+      ? `${label} — Completed`
+      : `${label} — Syncing ${progressText}`
 
   return (
     <button
@@ -52,10 +64,10 @@ function SyncPill({ sync, onClick }: { sync: SyncProgress; onClick: () => void }
         isProcessing
           ? 'border-cyan-500/30 bg-cyan-500/10'
           : isPaused
-            ? 'border-amber-500/30 bg-amber-500/10'
+            ? 'border-amber-500/40 bg-amber-500/10 animate-pulse'
             : 'border-emerald-500/30 bg-emerald-500/10'
       }`}
-      title={`${label} — ${sync.status}${sync.pauseReason ? ` (${sync.pauseReason})` : ''}`}
+      title={tooltip}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
       <span className={`font-semibold ${textClass}`}>
@@ -82,7 +94,11 @@ export default function NexusStatusBar() {
     if (sync.status === 'completed') {
       dismissSync(sync.source)
     }
-    navigate('/datasync')
+    if (sync.source === 'open-positions') {
+      navigate('/command-center/open-positions')
+    } else {
+      navigate('/datasync')
+    }
   }
 
   return (

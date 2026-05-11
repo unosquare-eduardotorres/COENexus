@@ -47,6 +47,7 @@ interface FilterState {
   filterActors: CriterionActor[]
   filterHealthStatus: 'all' | 'flagged' | 'healthy'
   sortOrder: 'aging-desc' | 'aging-asc'
+  excludeInternal: boolean
 }
 
 function loadFilters(): Partial<FilterState> {
@@ -74,12 +75,13 @@ export function useOpenPositionReport() {
   const [filterActors, setFilterActors] = useState<CriterionActor[]>(persisted.current.filterActors ?? [])
   const [filterHealthStatus, setFilterHealthStatus] = useState<'all' | 'flagged' | 'healthy'>(persisted.current.filterHealthStatus ?? 'all')
   const [sortOrder, setSortOrder] = useState<'aging-desc' | 'aging-asc'>(persisted.current.sortOrder ?? 'aging-desc')
+  const [excludeInternal, setExcludeInternal] = useState(persisted.current.excludeInternal ?? false)
 
   useEffect(() => {
     sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
-      searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder,
+      searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder, excludeInternal,
     }))
-  }, [searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder])
+  }, [searchText, columnFilters, criteriaFilter, filterActors, filterHealthStatus, sortOrder, excludeInternal])
 
   const checkSyncStatus = useCallback(async () => {
     try {
@@ -166,8 +168,9 @@ export function useOpenPositionReport() {
       criteriaFilter.length > 0 ||
       filterActors.length > 0 ||
       filterHealthStatus !== 'all' ||
+      excludeInternal ||
       Object.keys(columnFilters).length > 0
-  }, [searchText, criteriaFilter, filterActors, filterHealthStatus, columnFilters])
+  }, [searchText, criteriaFilter, filterActors, filterHealthStatus, columnFilters, excludeInternal])
 
   const activeFilterCount = useMemo(() => {
     let count = 0
@@ -175,9 +178,10 @@ export function useOpenPositionReport() {
     if (filterActors.length > 0) count++
     if (filterHealthStatus !== 'all') count++
     if (searchText.trim()) count++
+    if (excludeInternal) count++
     count += Object.keys(columnFilters).length
     return count
-  }, [criteriaFilter, filterActors, filterHealthStatus, searchText, columnFilters])
+  }, [criteriaFilter, filterActors, filterHealthStatus, searchText, columnFilters, excludeInternal])
 
   const clearAllFilters = useCallback(() => {
     setSearchText('')
@@ -185,6 +189,7 @@ export function useOpenPositionReport() {
     setFilterActors([])
     setFilterHealthStatus('all')
     setColumnFilters({})
+    setExcludeInternal(false)
   }, [])
 
   const filteredResults = useMemo(() => {
@@ -203,6 +208,10 @@ export function useOpenPositionReport() {
           p.main_skill.toLowerCase().includes(lower)
         )
       })
+    }
+
+    if (excludeInternal) {
+      filtered = filtered.filter(r => r.position.vertical_industry.trim() !== '')
     }
 
     if (filterHealthStatus === 'healthy') {
@@ -235,7 +244,7 @@ export function useOpenPositionReport() {
         ? b.position.aging - a.position.aging
         : a.position.aging - b.position.aging
     )
-  }, [results, searchText, criteriaFilter, filterActors, filterHealthStatus, columnFilters, availableColumnValues, sortOrder])
+  }, [results, searchText, excludeInternal, criteriaFilter, filterActors, filterHealthStatus, columnFilters, availableColumnValues, sortOrder])
 
   const exportCsv = useCallback(async () => {
     return reportService.exportXlsx(filteredResults)
@@ -270,6 +279,8 @@ export function useOpenPositionReport() {
     setFilterHealthStatus,
     sortOrder,
     setSortOrder,
+    excludeInternal,
+    setExcludeInternal,
     hasActiveFilters,
     activeFilterCount,
     clearAllFilters,

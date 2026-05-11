@@ -96,28 +96,26 @@ export const embeddingRepository = {
 
     if (row.embedding.length > 0) {
       const bigId = BigInt(embeddingId)
-      const deleteVecStmt = db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?')
-      const insertVecStmt = db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)')
-      const rebuildVec = db.transaction((id: bigint, buf: Buffer) => {
-        deleteVecStmt.run(id)
-        insertVecStmt.run(id, buf)
-      })
-
       try {
-        rebuildVec(bigId, embeddingBuffer)
-      } catch (vecErr) {
-        const isUniqueConstraint = vecErr instanceof Error && vecErr.message.includes('UNIQUE constraint failed')
+        db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(bigId)
+      } catch {
+        // vec0 DELETE may fail if rowid doesn't exist — safe to ignore
+      }
+      try {
+        db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)').run(bigId, embeddingBuffer)
+      } catch (insertErr) {
+        const isUniqueConstraint = insertErr instanceof Error && insertErr.message.includes('UNIQUE constraint failed')
         if (isUniqueConstraint) {
           try {
-            deleteVecStmt.run(bigId)
-            insertVecStmt.run(bigId, embeddingBuffer)
+            db.prepare('DELETE FROM vec_embeddings WHERE rowid = ?').run(bigId)
+            db.prepare('INSERT INTO vec_embeddings(rowid, embedding) VALUES (?, ?)').run(bigId, embeddingBuffer)
           } catch (retryErr) {
             db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
             throw retryErr
           }
         } else {
           db.prepare('UPDATE resume_embeddings SET embedding = NULL WHERE id = ?').run(embeddingId)
-          throw vecErr
+          throw insertErr
         }
       }
     }

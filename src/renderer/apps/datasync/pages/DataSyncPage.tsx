@@ -211,6 +211,7 @@ export default function DataSyncPage() {
             onRetrySingle={positionPipeline.handleRetrySingle}
             isSyncDisabled={!isTokenValid}
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
+            syncMode={positionPipeline.syncMode}
           />
         </>
       );

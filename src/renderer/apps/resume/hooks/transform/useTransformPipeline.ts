@@ -52,6 +52,7 @@ export function useTransformPipeline({
   const [activeResumeId, setActiveResumeId] = useState<string | null>(null);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [transformPhase, setTransformPhase] = useState<'extracting' | 'enhancing' | null>(null);
   const [enhancerMode, setEnhancerMode] = useState<RefinementMode>('professional-polish');
   const [originalResume, setOriginalResume] = useState<StructuredResume | null>(null);
   const [showEnhanceWarningModal, setShowEnhanceWarningModal] = useState(false);
@@ -93,6 +94,7 @@ export function useTransformPipeline({
 
     const results: StructuredResume[] = [];
     const allMetrics: ResumeProcessingMetrics[] = [];
+    const preEnhancementSnapshots: StructuredResume[] = [];
     const jobDescription =
       refinementMode === 'job-tailoring'
         ? jobDescriptionSource === 'custom'
@@ -110,17 +112,19 @@ export function useTransformPipeline({
       setTransformProgress({ current: 1, total: 1, currentFile: `${selectedCandidate.name}'s resume` });
       try {
         const resumeText = await benchBurnService.getResumeText('candidates', selectedCandidate.upstreamId!);
-        const { resume, metrics } = await aiService.transformResume(
+        const result = await aiService.transformResume(
           resumeText,
           `${selectedCandidate.name.replace(/\s+/g, '_')}_resume.pdf`,
           refinementMode,
           jobDescription,
+          setTransformPhase,
         );
-        allMetrics.push(metrics);
+        allMetrics.push(result.metrics);
+        preEnhancementSnapshots.push(result.preEnhancementResume);
         if (selectedPosition && refinementMode === 'job-tailoring') {
-          resume.summary = `${resume.summary} Targeting position: ${selectedPosition.title}`;
+          result.resume.summary = `${result.resume.summary} Targeting position: ${selectedPosition.title}`;
         }
-        results.push(resume);
+        results.push(result.resume);
       } catch (err) {
         log.error('[TransformPipeline] Failed to transform ATS candidate resume', err);
         setError('Resume text not available for this candidate. Ensure their resume has been synced and vectorized.');
@@ -134,14 +138,16 @@ export function useTransformPipeline({
       setTransformProgress({ current: 1, total: 1, currentFile: `${selectedEmployee.name}'s resume` });
       try {
         const resumeText = await benchBurnService.getResumeText('employees', selectedEmployee.upstreamId);
-        const { resume, metrics } = await aiService.transformResume(
+        const result = await aiService.transformResume(
           resumeText,
           `${selectedEmployee.name.replace(/\s+/g, '_')}_resume.pdf`,
           refinementMode,
           jobDescription,
+          setTransformPhase,
         );
-        allMetrics.push(metrics);
-        results.push(resume);
+        allMetrics.push(result.metrics);
+        preEnhancementSnapshots.push(result.preEnhancementResume);
+        results.push(result.resume);
       } catch (err) {
         log.error('[TransformPipeline] Failed to transform employee resume', err);
         setError('Resume text not available for this employee. Ensure their resume has been synced and vectorized.');
@@ -152,11 +158,12 @@ export function useTransformPipeline({
         setTransformProgress({ current: i + 1, total: selectedFiles.length, currentFile: file.name });
         try {
           const content = await fileExtractionService.extractText(file);
-          const { resume, metrics } = await aiService.transformResume(content, file.name, refinementMode, jobDescription);
-          resume.originalFileBuffer = await file.arrayBuffer();
-          resume.originalFileUrl = URL.createObjectURL(file);
-          results.push(resume);
-          allMetrics.push(metrics);
+          const result = await aiService.transformResume(content, file.name, refinementMode, jobDescription, setTransformPhase);
+          result.resume.originalFileBuffer = await file.arrayBuffer();
+          result.resume.originalFileUrl = URL.createObjectURL(file);
+          results.push(result.resume);
+          allMetrics.push(result.metrics);
+          preEnhancementSnapshots.push(result.preEnhancementResume);
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error';
           setError(`Failed to process ${file.name}: ${message}`);
@@ -167,7 +174,7 @@ export function useTransformPipeline({
     setTransformedResumes(results);
     setProcessingMetrics(allMetrics);
     if (results.length > 0) {
-      setOriginalResume(structuredClone(results[0]));
+      setOriginalResume(preEnhancementSnapshots[0] ?? structuredClone(results[0]));
       setActiveResumeId(results[0].id);
       try {
         const docxBlob = await templateFillService.fillTemplate(results[0]);
@@ -177,6 +184,7 @@ export function useTransformPipeline({
       }
     }
     setTransformProgress(null);
+    setTransformPhase(null);
     setIsTransforming(false);
   }, [
     sourceType,
@@ -246,6 +254,8 @@ export function useTransformPipeline({
     setIsTransforming,
     transformProgress,
     setTransformProgress,
+    transformPhase,
+    setTransformPhase,
     transformedResumes,
     setTransformedResumes,
     processingMetrics,

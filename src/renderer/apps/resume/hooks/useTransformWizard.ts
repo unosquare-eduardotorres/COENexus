@@ -303,6 +303,7 @@ export function useTransformWizard(
     setCustomJobDescription('');
     pipeline.setIsTransforming(false);
     pipeline.setTransformProgress(null);
+    pipeline.setTransformPhase(null);
     pipeline.setEditedResumes(new Map());
     pipeline.setActiveResumeId(null);
     validation.suggestions.setAiSuggestions([]);
@@ -460,6 +461,8 @@ export function useTransformWizard(
     },
     transform: {
       isTransforming: pipeline.isTransforming,
+      isEnhancing: pipeline.isEnhancing,
+      transformPhase: pipeline.transformPhase,
       transformProgress: pipeline.transformProgress,
       transformedResumes: pipeline.transformedResumes,
       setTransformedResumes: pipeline.setTransformedResumes,
