@@ -152,4 +152,18 @@ export function registerDatabaseHandlers(): void {
       syncWatcherService.clearUpdateFlag()
       return result
     })
+
+  registerIpcHandler(IPC_CHANNELS.DATABASE_SELECT_DIRECTORY,
+    async (event: IpcMainInvokeEvent) => {
+      validateSender(event)
+      const win = BrowserWindow.fromWebContents(event.sender)
+      const result = await dialog.showOpenDialog(win!, {
+        title: 'Select Shared Folder',
+        properties: ['openDirectory', 'createDirectory'],
+      })
+      if (result.canceled || result.filePaths.length === 0) {
+        return { cancelled: true, path: null }
+      }
+      return { cancelled: false, path: result.filePaths[0] }
+    })
 }

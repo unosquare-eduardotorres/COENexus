@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import GlobalTitleBar from '../../../components/GlobalTitleBar';
 
@@ -49,6 +50,14 @@ function ArrowsIcon() {
   );
 }
 
+function TargetIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
 interface SidebarItem {
   label: string;
   path: string;
@@ -64,60 +73,112 @@ const REPORT_ITEMS: SidebarItem[] = [
   { label: 'Open Positions', path: '/command-center/open-positions', active: true, icon: <BarChartIcon /> },
   { label: 'Placements', path: '/command-center/placements', active: false, icon: <UsersIcon /> },
   { label: 'Project Reallocation', path: '/command-center/reallocation', active: true, icon: <ArrowsIcon /> },
+  { label: 'C.O.E. Tracking', path: '/command-center/coe-tracking', active: true, icon: <TargetIcon /> },
 ];
 
 export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const sidebarWidth = collapsed ? 'w-[52px]' : 'w-[220px]';
+  const contentMargin = collapsed ? 'md:ml-[52px]' : 'md:ml-[220px]';
 
   return (
     <div className="min-h-screen pb-8 gradient-subtle transition-colors duration-300">
       <GlobalTitleBar />
 
-      <aside className="fixed top-10 left-0 bottom-0 z-50 flex flex-col w-[220px] border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl no-print">
-        <div className="flex items-center h-12 px-4 gap-2.5 border-b border-gray-200/30 dark:border-dark-border/30">
-          <Link to="/command-center" className="flex items-center gap-2.5">
+      <aside className={`fixed top-10 left-0 bottom-7 z-50 flex flex-col ${sidebarWidth} border-r border-gray-200/30 dark:border-dark-border/30 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-xl no-print transition-all duration-200`}>
+        <div className={`flex items-center h-12 ${collapsed ? 'justify-center px-0' : 'px-4'} gap-2.5 border-b border-gray-200/30 dark:border-dark-border/30`}>
+          <Link to="/command-center" className="flex items-center gap-2.5" title="C.O.R.E.">
             <div className="w-8 h-8 rounded-lg bg-emerald-500/15 dark:bg-emerald-400/15 flex-shrink-0 flex items-center justify-center text-emerald-500 dark:text-emerald-400">
               <CoreIcon />
             </div>
-            <span className="text-sm font-bold text-primary tracking-tight">C.O.R.E.</span>
+            {!collapsed && <span className="text-sm font-bold text-primary tracking-tight">C.O.R.E.</span>}
           </Link>
         </div>
 
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 px-4 py-2 text-xs text-muted hover:text-secondary transition-colors"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Nexus
-        </Link>
+        <div className={`flex items-center ${collapsed ? 'justify-center px-0' : 'justify-between px-4'} py-1.5`}>
+          {!collapsed ? (
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 text-xs text-muted hover:text-secondary transition-colors"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Nexus
+            </Link>
+          ) : (
+            <Link
+              to="/"
+              className="text-muted hover:text-secondary transition-colors"
+              title="Back to Nexus"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </Link>
+          )}
+          {!collapsed && (
+            <button
+              onClick={() => setCollapsed(true)}
+              className="p-1 rounded-md text-muted hover:text-secondary hover:bg-white/5 dark:hover:bg-dark-hover/50 transition-all"
+              title="Collapse sidebar"
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="11 17 6 12 11 7" />
+                <polyline points="18 17 13 12 18 7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {collapsed && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="flex items-center justify-center py-1 text-muted hover:text-secondary hover:bg-white/5 dark:hover:bg-dark-hover/50 transition-all"
+            title="Expand sidebar"
+          >
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+              className="rotate-180"
+            >
+              <polyline points="11 17 6 12 11 7" />
+              <polyline points="18 17 13 12 18 7" />
+            </svg>
+          </button>
+        )}
 
         <nav className="flex-1 py-2 overflow-hidden">
-          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Overview</p>
+          {!collapsed && <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Overview</p>}
           {(() => {
-            const isActive = location.pathname === OVERVIEW_ITEM.path && !location.pathname.includes('/open-positions') && !location.pathname.includes('/placements') && !location.pathname.includes('/reallocation');
+            const isActive = location.pathname === OVERVIEW_ITEM.path && !location.pathname.includes('/open-positions') && !location.pathname.includes('/placements') && !location.pathname.includes('/reallocation') && !location.pathname.includes('/coe-tracking');
             return (
               <button
                 type="button"
                 onClick={() => navigate(OVERVIEW_ITEM.path)}
-                className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                title={collapsed ? OVERVIEW_ITEM.label : undefined}
+                className={`w-full flex items-center ${collapsed ? 'justify-center gap-0 mx-0 px-0 py-2.5' : 'gap-3 mx-2 px-3 py-2.5'} my-0.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
                 }`}
-                style={{ maxWidth: 'calc(100% - 16px)' }}
+                style={collapsed ? undefined : { maxWidth: 'calc(100% - 16px)' }}
               >
                 <span className="flex-shrink-0">{OVERVIEW_ITEM.icon}</span>
-                <span className="truncate">{OVERVIEW_ITEM.label}</span>
+                {!collapsed && <span className="truncate">{OVERVIEW_ITEM.label}</span>}
               </button>
             );
           })()}
 
           <div className="minimal-divider mx-3 my-2" />
 
-          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Reports</p>
+          {!collapsed && <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Reports</p>}
           {REPORT_ITEMS.map(item => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
@@ -126,18 +187,19 @@ export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayou
                 type="button"
                 onClick={() => item.active && navigate(item.path)}
                 disabled={!item.active}
-                className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                title={collapsed ? item.label : undefined}
+                className={`w-full flex items-center ${collapsed ? 'justify-center gap-0 mx-0 px-0 py-2.5' : 'gap-3 mx-2 px-3 py-2.5'} my-0.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : item.active
                       ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
                       : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
                 }`}
-                style={{ maxWidth: 'calc(100% - 16px)' }}
+                style={collapsed ? undefined : { maxWidth: 'calc(100% - 16px)' }}
               >
                 <span className="flex-shrink-0">{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-                {!item.active && (
+                {!collapsed && <span className="truncate">{item.label}</span>}
+                {!collapsed && !item.active && (
                   <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted flex-shrink-0">Soon</span>
                 )}
               </button>
@@ -145,15 +207,21 @@ export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayou
           })}
         </nav>
 
-        <div className="border-t border-gray-200/30 dark:border-dark-border/30 px-4 py-3">
-          <div className="flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${lastSyncedAt ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            <span className="text-[10px] text-muted font-mono">Synced: {formatRelativeTime(lastSyncedAt)}</span>
-          </div>
+        <div className="border-t border-gray-200/30 dark:border-dark-border/30 px-2 py-2">
+          {!collapsed ? (
+            <div className="flex items-center gap-1.5 px-2">
+              <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${lastSyncedAt ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span className="text-[10px] text-muted font-mono">Synced: {formatRelativeTime(lastSyncedAt)}</span>
+            </div>
+          ) : (
+            <div className="flex justify-center" title={`Synced: ${formatRelativeTime(lastSyncedAt)}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${lastSyncedAt ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            </div>
+          )}
         </div>
       </aside>
 
-      <div className="flex flex-col min-h-screen md:ml-[220px]">
+      <div className={`flex flex-col min-h-screen ${contentMargin} transition-all duration-200`}>
         <main className="flex-1 pt-10 p-4 overflow-y-auto">
           <Outlet />
         </main>

@@ -324,6 +324,8 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.DATABASE_SYNC_UPDATE, handler)
       return () => { ipcRenderer.removeListener(IPC_CHANNELS.DATABASE_SYNC_UPDATE, handler) }
     },
+    selectDirectory: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DATABASE_SELECT_DIRECTORY),
   },
 
   ai: {
@@ -358,6 +360,25 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_PDF),
     exportXlsx: (results: ReportStalledPositionResult[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_XLSX, results) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_EXPORT_XLSX]['response']>,
+  },
+
+  coeTracking: {
+    getOverview: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_OVERVIEW),
+    getCoeDetail: (coe: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_COE_DETAIL, coe),
+    getPracticeDetail: (coe: string, practice: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_PRACTICE_DETAIL, { coe, practice }),
+    getPracticePositions: (coe: string, practice: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_PRACTICE_POSITIONS, { coe, practice }),
+    getSkillPositions: (coe: string, practice: string, skill: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_SKILL_POSITIONS, { coe, practice, skill }),
+    getCoePositions: (coe: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_COE_POSITIONS, coe),
+    getPositionDetail: (upstreamId: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_POSITION_DETAIL, upstreamId),
+    getSyncStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.COE_TRACKING_GET_SYNC_STATUS),
   },
 
   prr: {

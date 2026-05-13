@@ -8,13 +8,11 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
-import StepperBar from '../../../shared/components/StepperBar';
 import ExternalResumeUploader from '../components/match/ExternalResumeUploader';
 import ExternalPositionStep from '../components/match/ExternalPositionStep';
 import ExternalCandidateToOpSummary from '../components/match/ExternalCandidateToOpSummary';
 import SearchProgressComponent from '../components/match/SearchProgress';
 import ExternalCandidateToOpResults from '../components/match/ExternalCandidateToOpResults';
-import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
@@ -23,13 +21,14 @@ import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 
 const log = createRendererLogger('useExternalCandidateToOp');
 
-export function useExternalCandidateToOp(parentReset: () => void) {
+export function useExternalCandidateToOp(parentReset: () => void, propSessionId?: number | null) {
   const initialSessionId = useMemo(() => {
+    if (propSessionId != null) return propSessionId;
     const rawSessionId = new URLSearchParams(window.location.search).get('session');
     if (!rawSessionId) return null;
     const parsed = parseInt(rawSessionId, 10);
     return Number.isNaN(parsed) ? null : parsed;
-  }, []);
+  }, [propSessionId]);
 
   const {
     data: initialSession,
@@ -257,36 +256,6 @@ export function useExternalCandidateToOp(parentReset: () => void) {
     return summaries;
   }, [completedSteps, uploadedResumes, selectedPosition, customPosition]);
 
-  if (detailMatch && detailEmployee && detailPosition) {
-    return (
-      <div className="space-y-4">
-        <button
-          onClick={handleBackFromDetail}
-          className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Results
-        </button>
-        <StepperBar
-          stepLabels={STEP_LABELS}
-          currentStepKey={currentStep}
-          completedSteps={completedSteps}
-          onStepClick={handleStepClick}
-          stepSummaries={stepSummaries}
-        />
-        <BenchBurnDetailPanel
-          match={detailMatch}
-          employee={detailEmployee}
-          position={detailPosition}
-          onBack={handleBackFromDetail}
-        />
-      </div>
-    );
-  }
-
-
   return {
     wizard: { currentStep, completedSteps, stepSummaries },
     upload: { uploadedResumes, handleUploadNext },
@@ -294,7 +263,7 @@ export function useExternalCandidateToOp(parentReset: () => void) {
     summary: { handleSummaryNext, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     search: { progress, error, executeExternalCandidateMatch },
     results: { results },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   };
 }

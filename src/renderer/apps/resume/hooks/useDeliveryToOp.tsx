@@ -7,13 +7,11 @@ import {
   SearchProgress as SearchProgressType,
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
-import StepperBar from '../../../shared/components/StepperBar';
 import DeliveryEmployeeSelector from '../components/match/DeliveryEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
 import DeliveryToOpSummary from '../components/match/DeliveryToOpSummary';
 import SearchProgressComponent from '../components/match/SearchProgress';
 import DeliveryToOpResults from '../components/match/DeliveryToOpResults';
-import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
@@ -22,13 +20,14 @@ import { STEP_ICONS } from '../../../shared/components/icons/stepIcons';
 
 const log = createRendererLogger('useDeliveryToOp');
 
-export function useDeliveryToOp(parentReset: () => void) {
+export function useDeliveryToOp(parentReset: () => void, propSessionId?: number | null) {
   const initialSessionId = useMemo(() => {
+    if (propSessionId != null) return propSessionId;
     const rawSessionId = new URLSearchParams(window.location.search).get('session');
     if (!rawSessionId) return null;
     const parsed = parseInt(rawSessionId, 10);
     return Number.isNaN(parsed) ? null : parsed;
-  }, []);
+  }, [propSessionId]);
 
   const {
     data: initialSession,
@@ -280,36 +279,6 @@ export function useDeliveryToOp(parentReset: () => void) {
     return summaries;
   }, [completedSteps, selectedEmployee, selectedPositions.length, customPositions.length]);
 
-  if (detailMatch && detailEmployee && detailPosition) {
-    return (
-      <div className="space-y-4">
-        <button
-          onClick={handleBackFromDetail}
-          className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Results
-        </button>
-        <StepperBar
-          stepLabels={STEP_LABELS}
-          currentStepKey={currentStep}
-          completedSteps={completedSteps}
-          onStepClick={handleStepClick}
-          stepSummaries={stepSummaries}
-        />
-        <BenchBurnDetailPanel
-          match={detailMatch}
-          employee={detailEmployee}
-          position={detailPosition}
-          onBack={handleBackFromDetail}
-        />
-      </div>
-    );
-  }
-
-
   return {
     wizard: { currentStep, completedSteps, stepSummaries },
     employee: { selectedEmployee, handleEmployeeNext },
@@ -317,7 +286,7 @@ export function useDeliveryToOp(parentReset: () => void) {
     summary: { customPositions, setCustomPositions, handleSummaryNext, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     search: { progress, error, executeDeliveryToOp },
     results: { results, handleRetryFallbacks },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
   };
 }

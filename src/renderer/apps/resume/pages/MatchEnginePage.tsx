@@ -231,10 +231,10 @@ export default function MatchEnginePage() {
           <FilterStep dataSource={dataSource} filterOptions={filterOptions} initialConstraints={advancedConstraints} onNext={handleFiltersNext} />
         )}
 
-        {currentStepKey === 'bench-burn' && <BenchBurnPage onReset={handleReset} />}
+        {currentStepKey === 'bench-burn' && <BenchBurnPage onReset={handleReset} initialSessionId={sessionId} />}
         {currentStepKey === 'delivery-to-op' && <DeliveryToOpPage onReset={handleReset} initialSessionId={sessionId} />}
         {currentStepKey === 'external-candidate-to-op' && <ExternalCandidateToOpPage onReset={handleReset} initialSessionId={sessionId} />}
-        {currentStepKey === 'match-to-positions' && <MatchToPositionsPage onReset={handleReset} />}
+        {currentStepKey === 'match-to-positions' && <MatchToPositionsPage onReset={handleReset} initialSessionId={sessionId} />}
         {currentStepKey === 'data-source' && <DataSourceStep onNext={handleDataSourceNext} initialSource={dataSource} poolCounts={poolCounts} />}
         {currentStepKey === 'search-depth' && <SearchDepthStep onNext={handleSearchDepthNext} initialMode={searchMode} />}
         {currentStepKey === 'searching' && <SearchProgressComponent progress={progress} isPaused={haikuConfirm !== null} />}

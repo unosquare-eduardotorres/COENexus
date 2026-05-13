@@ -130,6 +130,14 @@ IMPORTANT: For skills and technologies, split compound entries. E.g. 'Entity Fra
 For cloudSkills, classify skills related to AI, cloud platforms, or cloud-native tools. E.g. 'Azure CosmosDB', 'Azure Functions', 'AWS Lambda', 'OpenAI' are cloud/AI skills. Standard frameworks like 'React', '.NET', 'Entity Framework' are NOT cloud skills.
 For each work experience entry, extract a 'technologies' array listing the individual technologies, frameworks, tools, and platforms mentioned. Split compound entries. Also extract 'projectName' if the resume mentions a specific project name for that role.
 
+TITLE HANDLING: If an experience entry does not have an explicit job title (e.g., it describes a training period, program participation, bench time, or internal department assignment without a named role), infer a professional title from the candidate's overall career profile and technology stack. Use the pattern "[Specialization] [Level]" based on the candidate's primary domain — for example:
+- Software developers → "Software Engineer"
+- QA/testing roles → "QA Engineer"
+- DevOps/infra roles → "DevOps Engineer"
+- Data roles → "Data Engineer"
+- Design roles → "UX Designer"
+Never default to generic low-seniority titles like "Trainee" or "Intern" unless the original resume text explicitly and unambiguously uses that exact title as the candidate's role. "Training" as an activity does not mean the title is "Trainee".
+
 Resume text:
 ${rawText}`;
 }
@@ -199,7 +207,8 @@ function mapToStructuredResume(
   }));
 
   const processedSkills = splitCompoundSkills(skills);
-  const allExtractedSkills = processedSkills.flatMap(cat => cat.skills);
+  const expTechs = experience.flatMap(e => e.technologies || []);
+  const allExtractedSkills = [...new Set([...processedSkills.flatMap(cat => cat.skills), ...expTechs])];
   const classified = classifyCloudSkills(allExtractedSkills);
 
   return {
@@ -257,42 +266,85 @@ function classifyCloudSkills(allSkills: string[]): { techSkills: string[]; cloud
   return { techSkills, cloudSkills };
 }
 
-function buildEnhancementPrompt(resume: StructuredResume, mode: RefinementMode): string {
-  const modeInstructions: Record<RefinementMode, string> = {
-    'professional-polish': 'Refine the language to be more professional and polished. Use strong action verbs, eliminate filler words, and improve clarity.',
-    'impact-focused': 'Rewrite to emphasize measurable impact and achievements. Add quantified results where possible (percentages, dollar amounts, team sizes).',
-    'ats-optimized': 'Optimize for Applicant Tracking Systems. Use industry-standard keywords, remove creative formatting, and ensure keyword density.',
-    'job-tailoring': 'Enhance the content to be more compelling and tailored for the target role.',
-  };
-
-  const allSkills = resume.skills.flatMap(cat => cat.skills);
+function buildEnhancementPrompt(resume: StructuredResume, mode: RefinementMode, jobDescription?: string): string {
+  const categorySkills = resume.skills.flatMap(cat => cat.skills);
+  const expTechnologies = resume.experience.flatMap(e => e.technologies || []);
+  const allSkills = [...new Set([...categorySkills, ...expTechnologies])];
   const today = new Date().toISOString().split('T')[0];
 
-  return `Enhance this resume content. Mode: ${mode}. Instructions: ${modeInstructions[mode]}
+  const modeBlock = mode === 'job-tailoring' && jobDescription
+    ? `MODE: Job Description Tailoring
 
-Today's date is ${today}. When the summary mentions years of experience, recalculate from the earliest experience start date to today and use the correct number.
+You are reshaping this resume to align with a specific role. Read the job description carefully and apply these principles:
 
-Return ONLY valid JSON (no markdown, no explanation) with this structure:
+RELEVANCE STRATEGY:
+- Reorder the content within each experience description to lead with the responsibilities and accomplishments most relevant to the target role — but keep ALL the original content, just reorganize emphasis
+- Mirror the terminology and priorities from the job description where the candidate's experience genuinely supports it
+- In the summary, draw a clear line between the candidate's background and what the role demands
+- Do not fabricate experience — only foreground what is authentically in the candidate's background
+
+CRITICAL — PRESERVE DEPTH:
+- Every experience description must remain a full paragraph (3–6 sentences). Do NOT convert paragraphs into bullet points or bullet-separated fragments
+- If the original description mentions specific projects, clients, team dynamics, technologies, or methodologies, ALL of those details must appear in the enhanced version — reorganized for relevance, never deleted
+- The enhanced description should be the same length or longer than the original, never shorter
+- Do NOT use bullet-point characters (•, -, *) inside the description field — write flowing prose sentences
+
+TARGET JOB DESCRIPTION:
+${jobDescription}`
+    : `MODE: Professional Polish
+
+You are a senior technical recruiter refining this resume for clarity and impact. Your goal is to make each section read as though written by someone who deeply understands the candidate's work:
+- Replace vague language ("worked on", "was responsible for", "helped with") with specific, active descriptions of what the candidate actually built, led, or delivered
+- Preserve every concrete detail: project names, team sizes, technologies used, client-facing work, methodologies, mentorship, and outcomes
+- Improve sentence flow and eliminate genuine filler, but never strip out substantive content to make things shorter
+- Use professional tone without corporate jargon — clear, direct, human-readable`;
+
+  return `${modeBlock}
+
+Today's date is ${today}. When the summary mentions years of experience, recalculate from the earliest experience start date to today.
+
+WRITING GUIDELINES FOR EXPERIENCE DESCRIPTIONS:
+Write each experience description as a cohesive paragraph (3–6 sentences). The paragraph should read like a professional narrative that a hiring manager can scan and immediately understand: what the person did, the context they operated in, the technologies they used, and any notable outcomes or contributions. Avoid bullet-point style inside the description field — that is what the achievements array is for.
+
+Think of the description as the "story" of what this person did in the role, and the achievements as the "highlight reel" of measurable wins.
+
+Return ONLY valid JSON (no markdown, no explanation) matching this structure:
 {
-  "summary": "enhanced summary text",
+  "summary": "Enhanced professional summary (100–480 characters). Remove first-person pronouns. Focus on the candidate's core identity, domain expertise, and what makes them distinctive.",
   "experience": [
-    { "description": "enhanced description", "achievements": ["enhanced achievement 1"], "technologies": ["technology1", "technology2"] }
+    {
+      "description": "A well-crafted paragraph (3–6 sentences) covering responsibilities, context, team dynamics, methodologies, and contributions. Must preserve all specific details from the original.",
+      "achievements": ["Concise achievement starting with a strong action verb — quantify where the original provides evidence"],
+      "technologies": ["individual", "technology", "items"]
+    }
   ],
-  "templateSkills": ["top 14 technical skills — prioritize the candidate's primary tech domain"],
-  "cloudSkills": ["all AI/cloud-related skills"]
+  "templateSkills": ["top 14 technical skills"],
+  "cloudSkills": ["AI/cloud-related skills"]
 }
 
 CONSTRAINTS:
-- The enhanced summary MUST be between 100 and 480 characters. If the current summary exceeds 500 characters, condense it.
-- Remove first-person pronouns (I, me, my) from the summary.
-- Each achievement should start with a strong action verb.
-
-Keep the same number of experience entries in the same order. Only enhance summary and experience descriptions/achievements/technologies. When returning technologies, split compound entries (e.g. 'Entity Framework/Dapper' → separate items).
+- Keep the same number of experience entries in the same order.
+- Each description MUST be a substantive paragraph. If the original has rich detail, the enhanced version should have comparable depth — do not summarize a detailed paragraph into a single sentence.
+- Each achievement starts with an action verb. Keep achievements that are in the original; improve their phrasing. Do not invent achievements that aren't supported by the source material. If the original achievements array is empty or absent, return an empty achievements array []. Do not extract or reframe sentences from the description as achievements.
+- When returning technologies, split compound entries (e.g. "Entity Framework/Dapper" → separate items).
+- Do NOT use bullet-point separators (•, -, *) inside description text. Descriptions must be flowing prose paragraphs, not inline bullet lists.
 
 Current resume data:
-${JSON.stringify({ summary: resume.summary, experience: resume.experience.map(e => ({ startDate: e.startDate, endDate: e.endDate, description: e.description, achievements: e.achievements, technologies: e.technologies || [] })) })}
+${JSON.stringify({
+  summary: resume.summary,
+  experience: resume.experience.map(e => ({
+    company: e.company,
+    title: e.title,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    description: e.description,
+    achievements: e.achievements,
+    technologies: e.technologies || [],
+  })),
+})}
+
 Select the TOP 14 most relevant technical skills from: ${JSON.stringify(allSkills)}
-IMPORTANT for templateSkills selection: First identify the candidate's primary technology domain from their experience entries (e.g., iOS/Swift, .NET/C#, React/TypeScript, Java/Android, Python/ML). Ensure at least 8 of the 14 skills are core technologies from that domain (languages, frameworks, SDKs, testing tools). Fill the remaining slots with supporting tools. Do NOT prioritize generic project management tools (Jira, SCRUM, Confluence) over domain-specific technologies.
+IMPORTANT for templateSkills: First identify the candidate's primary technology domain from their experience (e.g., iOS/Swift, .NET/C#, React/TypeScript). Ensure at least 8 of the 14 are core technologies from that domain. Fill remaining slots with supporting tools. Do NOT prioritize generic project management tools (Jira, SCRUM) over domain-specific technologies.
 Also select all AI/cloud-related skills for cloudSkills.`;
 }
 
@@ -359,7 +411,7 @@ export const aiService = {
     if (mode !== 'job-tailoring' || _jobDescription) {
       onPhaseChange?.('enhancing');
       try {
-        const { resume: enhanced, usage } = await this.enhanceFullResume(resume, mode);
+        const { resume: enhanced, usage } = await this.enhanceFullResume(resume, mode, _jobDescription);
         if (usage) {
           metrics.totalTokens = {
             promptTokens: (metrics.totalTokens?.promptTokens ?? 0) + usage.promptTokens,
@@ -376,10 +428,11 @@ export const aiService = {
     return { resume, preEnhancementResume, metrics };
   },
 
-  async enhanceFullResume(resume: StructuredResume, mode: RefinementMode): Promise<{ resume: StructuredResume; usage: TokenUsage | null }> {
+  async enhanceFullResume(resume: StructuredResume, mode: RefinementMode, jobDescription?: string): Promise<{ resume: StructuredResume; usage: TokenUsage | null }> {
     const config = this.getConfig();
-    const prompt = buildEnhancementPrompt(resume, mode);
-    const { content, usage } = await callClaudeLocal(config, prompt);
+    const prompt = buildEnhancementPrompt(resume, mode, jobDescription);
+    const enhanceConfig = { ...config, maxTokens: Math.max(config.maxTokens, 8192) };
+    const { content, usage } = await callClaudeLocal(enhanceConfig, prompt);
     const parsed = parseAiJson(content, enhancementResponseSchema, 'enhanceFullResume');
     const enhanced = {
       ...resume,

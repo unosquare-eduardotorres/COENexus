@@ -64,7 +64,7 @@ const STEP_LABELS: { key: ExternalCandidateToOpStepKey; title: string; icon: Rea
   },
 ];
 
-export default function ExternalCandidateToOpPage({ onReset: parentReset }: ExternalCandidateToOpPageProps) {
+export default function ExternalCandidateToOpPage({ onReset: parentReset, initialSessionId }: ExternalCandidateToOpPageProps) {
   const {
     wizard: { currentStep, completedSteps, stepSummaries },
     upload: { uploadedResumes, handleUploadNext },
@@ -72,13 +72,42 @@ export default function ExternalCandidateToOpPage({ onReset: parentReset }: Exte
     summary: { handleSummaryNext, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     search: { progress, error, executeExternalCandidateMatch },
     results: { results },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
-  } = useExternalCandidateToOp(parentReset);
+  } = useExternalCandidateToOp(parentReset, initialSessionId);
 
   useEffect(() => {
     log.info('External candidate-to-OP page viewed');
   }, []);
+
+  if (detailMatch && detailEmployee && detailPosition) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={handleBackFromDetail}
+          className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Results
+        </button>
+        <StepperBar
+          stepLabels={STEP_LABELS}
+          currentStepKey={currentStep}
+          completedSteps={completedSteps}
+          onStepClick={handleStepClick}
+          stepSummaries={stepSummaries}
+        />
+        <BenchBurnDetailPanel
+          match={detailMatch}
+          employee={detailEmployee}
+          position={detailPosition}
+          onBack={handleBackFromDetail}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

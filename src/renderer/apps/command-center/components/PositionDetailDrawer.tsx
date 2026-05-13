@@ -221,6 +221,22 @@ export default function PositionDetailDrawer({ upstreamId, onClose }: PositionDe
                   <p className="text-sm text-primary">{row.value}</p>
                 </div>
               ))}
+              <div>
+                <p className="text-xs text-muted uppercase tracking-wide mb-1.5">SharePoint</p>
+                <button
+                  onClick={() => window.api.app.openExternal(
+                    `https://unosquare.sharepoint.com/sites/CoE-Core/SitePages/Open-Positions.aspx?OpenPositionId=${detail.position.upstream_id}`
+                  )}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open in SharePoint
+                </button>
+              </div>
             </div>
 
             <div className="glass-panel-subtle p-4 flex items-center justify-between">

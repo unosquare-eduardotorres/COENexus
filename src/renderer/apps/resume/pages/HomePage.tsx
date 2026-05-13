@@ -9,7 +9,7 @@ const log = createRendererLogger('ResumeHomePage');
 const primaryActions = [
   {
     title: 'Resume',
-    description: 'Upload or select resumes and enhance them with AI-powered professional polish, impact-focused rewriting, and ATS optimization.',
+    description: 'Upload or select resumes and enhance them with AI-powered Professional Polish or Job Description Tailoring.',
     href: '/resume/enhance',
     cta: 'Get Started',
     icon: (
@@ -135,7 +135,7 @@ const secondaryActions = [
 const resumeSteps = [
   { number: '1', title: 'Processing Mode', description: 'Choose single resume processing for full control over each enhancement' },
   { number: '2', title: 'Select Resume', description: 'Upload resume files or pick candidates directly from your ATS' },
-  { number: '3', title: 'Enhancement Mode', description: 'Choose Professional Polish, Impact-Focused, ATS-Optimized, or Job Tailoring' },
+  { number: '3', title: 'Enhancement Mode', description: 'Choose Professional Polish or Job Description Tailoring' },
   { number: '3b', title: 'Job Description', description: 'Provide a job description or pick an open position', isConditional: true },
   { number: '4', title: 'Review & Refine', description: 'Preview the enhanced resume, compare original vs enhanced, and run AI enhancements' },
   { number: '5', title: 'Save / Export', description: 'Download as DOCX, sync to ATS, or present to a position' },

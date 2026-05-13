@@ -186,3 +186,68 @@ export interface PrrDetailResult {
     candidateStatus: string
   }>
 }
+
+// ── COE Tracking ─────────────────────────────────────────
+
+export type HealthTier = 'critical' | 'warning' | 'good' | 'excellent'
+
+export interface HealthBreakdown {
+  critical: number
+  warning: number
+  good: number
+  excellent: number
+}
+
+export interface CoeTrackingSummary {
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+  topPractices: string[]
+}
+
+export interface PracticeTrackingSummary {
+  practice: string
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+  skillCount: number
+  singleSkill?: string
+}
+
+export interface SkillTrackingSummary {
+  skill: string
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+}
+
+export interface TrackedPosition {
+  position: StalledPositionResult['position']
+  activeCandidateCount: number
+  healthTier: HealthTier
+  totalCandidates: number
+  matchingCriteria: StalledCriterionKey[]
+  actors: CriterionActor[]
+}
+
+export interface CoeTrackingTimelineEvent {
+  type: 'created' | 'ready' | 'modified' | 'candidate-presented' | 'candidate-rejected' | 'discussion'
+  date: string
+  label: string
+  detail?: string
+}
+
+export interface TrackedPositionDetail {
+  position: StalledPositionResult['position']
+  activeCandidateCount: number
+  healthTier: HealthTier
+  candidates: PositionDetailResult['candidates']
+  discussions: PositionDetailResult['discussions']
+  timelineEvents: CoeTrackingTimelineEvent[]
+}

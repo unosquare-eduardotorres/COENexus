@@ -20,6 +20,22 @@ function MailIcon() {
   )
 }
 
+function VectorizationIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+    </svg>
+  )
+}
+
+function DataMaintenanceIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+    </svg>
+  )
+}
+
 function GearIcon() {
   return (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -35,11 +51,19 @@ interface SidebarItem {
   path: string
   icon: React.ReactNode
   active: boolean
+  group: 'configuration' | 'infrastructure'
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'database', label: 'Database', path: '/settings', icon: <DatabaseIcon />, active: true },
-  { id: 'email', label: 'Email', path: '/settings/email', icon: <MailIcon />, active: true },
+  { id: 'database', label: 'Database', path: '/settings', icon: <DatabaseIcon />, active: true, group: 'configuration' },
+  { id: 'email', label: 'Email', path: '/settings/email', icon: <MailIcon />, active: true, group: 'configuration' },
+  { id: 'vectorization', label: 'Vectorization', path: '/settings/vectorization', icon: <VectorizationIcon />, active: true, group: 'infrastructure' },
+  { id: 'data-maintenance', label: 'Data Maintenance', path: '/settings/data-maintenance', icon: <DataMaintenanceIcon />, active: true, group: 'infrastructure' },
+]
+
+const GROUPS = [
+  { key: 'configuration' as const, label: 'Configuration' },
+  { key: 'infrastructure' as const, label: 'Infrastructure' },
 ]
 
 export default function SettingsLayout() {
@@ -76,32 +100,41 @@ export default function SettingsLayout() {
         </Link>
 
         <nav className="flex-1 py-2 overflow-hidden">
-          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Configuration</p>
-          {SIDEBAR_ITEMS.map(item => {
-            const isActive = item.path === '/settings'
-              ? location.pathname === '/settings'
-              : location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+          {GROUPS.map((group, groupIndex) => {
+            const items = SIDEBAR_ITEMS.filter(i => i.group === group.key)
+            if (!items.length) return null
             return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => item.active && navigate(item.path)}
-                disabled={!item.active}
-                className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
-                    : item.active
-                      ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
-                      : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                }`}
-                style={{ maxWidth: 'calc(100% - 16px)' }}
-              >
-                <span className="flex-shrink-0">{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-                {!item.active && (
-                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted flex-shrink-0">Soon</span>
-                )}
-              </button>
+              <div key={group.key}>
+                {groupIndex > 0 && <div className="minimal-divider mx-3 my-1" />}
+                <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">{group.label}</p>
+                {items.map(item => {
+                  const isActive = item.path === '/settings'
+                    ? location.pathname === '/settings'
+                    : location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => item.active && navigate(item.path)}
+                      disabled={!item.active}
+                      className={`w-full flex items-center gap-3 mx-2 my-0.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? 'bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                          : item.active
+                            ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
+                            : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                      }`}
+                      style={{ maxWidth: 'calc(100% - 16px)' }}
+                    >
+                      <span className="flex-shrink-0">{item.icon}</span>
+                      <span className="truncate">{item.label}</span>
+                      {!item.active && (
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted flex-shrink-0">Soon</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             )
           })}
         </nav>

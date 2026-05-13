@@ -25,26 +25,6 @@ const REFINEMENT_MODES: RefinementOption[] = [
     ),
   },
   {
-    id: 'impact-focused',
-    name: 'Impact-Focused',
-    description: 'Rewrite achievements to emphasize measurable impact and quantified results.',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    ),
-  },
-  {
-    id: 'ats-optimized',
-    name: 'ATS-Optimized',
-    description: 'Optimize keyword density and formatting for applicant tracking systems.',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    ),
-  },
-  {
     id: 'job-tailoring',
     name: 'Job Tailoring',
     description: 'Tailor each resume to a specific job description for maximum relevance.',

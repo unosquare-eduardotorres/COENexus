@@ -254,7 +254,7 @@ export interface ATSPosition {
   candidatesPresented: PresentedCandidate[];
 }
 
-export type RefinementMode = 'professional-polish' | 'impact-focused' | 'ats-optimized' | 'job-tailoring';
+export type RefinementMode = 'professional-polish' | 'job-tailoring';
 
 export type ResumeSourceType = 'ats-candidates' | 'employees' | 'upload';
 

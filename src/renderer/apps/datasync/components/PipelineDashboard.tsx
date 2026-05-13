@@ -149,6 +149,12 @@ export default memo(function PipelineDashboard({
             <p className="text-xs text-amber-600 dark:text-amber-400">Voyage API key not configured — vectorization will fail</p>
           )}
         </div>
+        {!isRunning && !isPaused && (
+          <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-dark-border/60 flex gap-6 text-xs text-muted">
+            <p><span className="font-medium text-secondary">Full Pipeline</span> — Syncs data from upstream, extracts resume text, and generates vector embeddings for matching.</p>
+            <p><span className="font-medium text-secondary">Sync Only</span> — Updates employee metadata (bench status, skills, seniority) without re-processing resumes. Faster.</p>
+          </div>
+        )}
       </div>
 
       {/* Restored session banner */}

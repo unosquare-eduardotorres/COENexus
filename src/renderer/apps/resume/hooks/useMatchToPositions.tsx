@@ -16,13 +16,14 @@ import { STEP_ICONS } from '../../../shared/components/icons/stepIcons'
 
 const log = createRendererLogger('useMatchToPositions')
 
-export function useMatchToPositions(parentReset: () => void) {
+export function useMatchToPositions(parentReset: () => void, propSessionId?: number | null) {
   const initialSessionId = useMemo(() => {
+    if (propSessionId != null) return propSessionId
     const rawSessionId = new URLSearchParams(window.location.search).get('session')
     if (!rawSessionId) return null
     const parsed = parseInt(rawSessionId, 10)
     return Number.isNaN(parsed) ? null : parsed
-  }, [])
+  }, [propSessionId])
 
   const {
     data: initialSession,

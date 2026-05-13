@@ -41,10 +41,8 @@ const enhancerModeLabel = (mode: RefinementMode): string => {
   switch (mode) {
     case 'professional-polish':
       return 'Professional Polish';
-    case 'impact-focused':
-      return 'Impact-Focused';
-    case 'ats-optimized':
-      return 'ATS-Optimized';
+    case 'job-tailoring':
+      return 'Job Description Tailoring';
     default:
       return 'Professional Polish';
   }
@@ -62,7 +60,7 @@ export function useTransformWizard(
   const [processingMode, setProcessingMode] = useState<'single' | 'batch'>('single');
   const [sourceType, setSourceType] = useState<ResumeSourceType>('upload');
   const [refinementMode, setRefinementMode] = useState<RefinementMode>('professional-polish');
-  const [jobDescriptionSource, setJobDescriptionSource] = useState<'positions' | 'custom'>('custom');
+  const [jobDescriptionSource, setJobDescriptionSource] = useState<'positions' | 'custom'>('positions');
   const [customJobDescription, setCustomJobDescription] = useState('');
   const [selectedPosition, setSelectedPosition] = useState<ATSPosition | null>(null);
   const [reviewViewMode, setReviewViewMode] = useState<ReviewViewMode>('editor');
@@ -247,6 +245,12 @@ export function useTransformWizard(
     session.handleNextFromStep3(refinementMode, handleTransform);
   }, [handleTransform, refinementMode, session]);
 
+  const handleNextFromJobDescription = useCallback(() => {
+    session.setCompletedSteps(prev => new Set([...prev, 'job-description']));
+    session.setCurrentStepKey('review');
+    handleTransform();
+  }, [handleTransform, session]);
+
   const handleSaveSession = useCallback(async () => {
     try {
       log.info('Transform session save requested', {
@@ -413,6 +417,7 @@ export function useTransformWizard(
       handleNext,
       handleBack,
       handleNextFromStep3,
+      handleNextFromJobDescription,
       handleStepClick: session.handleStepClick,
     },
     intent: {

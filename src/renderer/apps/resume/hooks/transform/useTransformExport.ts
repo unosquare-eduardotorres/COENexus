@@ -17,8 +17,6 @@ const log = createRendererLogger('useTransformExport');
 
 const refinementModeLabelMap: Record<RefinementMode, string> = {
   'professional-polish': 'Professional Polish',
-  'impact-focused': 'Impact-Focused',
-  'ats-optimized': 'ATS-Optimized',
   'job-tailoring': 'Job Description Tailoring',
 };
 

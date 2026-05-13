@@ -167,7 +167,9 @@ export function SkillsSection({
                     <span className="text-xs font-normal text-gray-400">{(resume.cloudSkills || []).filter(Boolean).length}</span>
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
-                    {(resume.cloudSkills || []).map((skill, i) => (
+                    {[...(resume.cloudSkills || [])].sort((a, b) =>
+                      a.localeCompare(b, undefined, { sensitivity: 'base' })
+                    ).map((skill, i) => (
                       <div
                         key={i}
                         className="px-2.5 py-1.5 rounded-lg border border-violet-300/50 bg-violet-50/80 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400 text-xs cursor-pointer hover:border-red-300 hover:bg-red-50/50 transition-all flex items-center gap-1.5"

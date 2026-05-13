@@ -14,6 +14,12 @@ import { useToast } from '../../../shared/components/ToastContext';
 
 const log = createRendererLogger('useDatabaseSharing');
 
+function assertIpcSuccess<T>(result: T): asserts result is T {
+  if (result && typeof result === 'object' && '__ipcError' in result) {
+    throw new Error((result as Record<string, unknown>).message as string || 'IPC call failed');
+  }
+}
+
 export function useDatabaseSharing() {
   const { showToast } = useToast();
   const [config, setConfig] = useState<DatabaseSharingConfig | null>(null);
@@ -132,6 +138,7 @@ export function useDatabaseSharing() {
     setImportResult(null);
     try {
       const result = await databaseSharingService.exportSnapshot();
+      assertIpcSuccess(result);
       setExportResult(result);
       showToast(`Snapshot exported: ${result.filename}`, 'success');
       await Promise.all([refetchSnapshots(), refetchStatus()]);
@@ -150,6 +157,7 @@ export function useDatabaseSharing() {
       setExportResult(null);
       try {
         const result = await databaseSharingService.importSnapshot(filename);
+        assertIpcSuccess(result);
         setImportResult(result);
         setSyncUpdateAvailable(false);
         setSyncManifest(null);
@@ -173,6 +181,7 @@ export function useDatabaseSharing() {
     setExportResult(null);
     try {
       const result = await databaseSharingService.importLatest();
+      assertIpcSuccess(result);
       setImportResult(result);
       setSyncUpdateAvailable(false);
       setSyncManifest(null);
@@ -193,6 +202,17 @@ export function useDatabaseSharing() {
       log.error('[DatabaseSharingPanel] Failed to refresh snapshots:', error);
     });
   }, [refetchSnapshots]);
+
+  const handleSelectDirectory = useCallback(async () => {
+    try {
+      const result = await databaseSharingService.selectDirectory();
+      if (!result.cancelled && result.path) {
+        setSharedPath(result.path);
+      }
+    } catch (error) {
+      log.error('Failed to select directory:', error);
+    }
+  }, []);
 
   const handleCheckForUpdates = useCallback(async () => {
     try {
@@ -241,6 +261,7 @@ export function useDatabaseSharing() {
       handleImportSnapshot,
       handleImportLatest,
       handleCheckForUpdates,
+      handleSelectDirectory,
       refreshSnapshots,
     },
   };

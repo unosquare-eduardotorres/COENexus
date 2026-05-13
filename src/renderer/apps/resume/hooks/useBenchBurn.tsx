@@ -8,13 +8,11 @@ import {
 } from '../types';
 import { BenchBurnSearchResult, benchBurnService } from '../services/benchBurnService';
 import { exportToExcel, ColumnDef } from '../utils/exportToExcel';
-import StepperBar from '../../../shared/components/StepperBar';
 import BenchEmployeeSelector from '../components/match/BenchEmployeeSelector';
 import BenchPositionSelector from '../components/match/BenchPositionSelector';
 import BenchBurnSearchDepth from '../components/match/BenchBurnSearchDepth';
 import SearchProgressComponent from '../components/match/SearchProgress';
 import BenchBurnResults from '../components/match/BenchBurnResults';
-import BenchBurnDetailPanel from '../components/match/BenchBurnDetailPanel';
 import { getMatchPrompts } from '../data/defaultMatchPrompts';
 import { useIpcQuery } from '../../../shared/hooks/useIpcQuery';
 import { useStepWizard } from './useStepWizard';
@@ -24,14 +22,15 @@ import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('useBenchBurn');
 
-export function useBenchBurn(parentReset?: () => void) {
+export function useBenchBurn(parentReset?: () => void, propSessionId?: number | null) {
   const { showToast } = useToast();
   const initialSessionId = useMemo(() => {
+    if (propSessionId != null) return propSessionId;
     const rawSessionId = new URLSearchParams(window.location.search).get('session');
     if (!rawSessionId) return null;
     const parsed = parseInt(rawSessionId, 10);
     return Number.isNaN(parsed) ? null : parsed;
-  }, []);
+  }, [propSessionId]);
 
   const {
     data: initialSession,
@@ -316,43 +315,13 @@ export function useBenchBurn(parentReset?: () => void) {
     return summaries;
   }, [completedSteps, selectedEmployees.length, selectedPositions.length, customPositions.length]);
 
-  if (detailMatch && detailEmployee && detailPosition) {
-    return (
-      <div className="space-y-4">
-        <button
-          onClick={handleBackFromDetail}
-          className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Back to Results
-        </button>
-        <StepperBar
-          stepLabels={STEP_LABELS}
-          currentStepKey={currentStep}
-          completedSteps={completedSteps}
-          onStepClick={handleStepClick}
-          stepSummaries={stepSummaries}
-        />
-        <BenchBurnDetailPanel
-          match={detailMatch}
-          employee={detailEmployee}
-          position={detailPosition}
-          onBack={handleBackFromDetail}
-        />
-      </div>
-    );
-  }
-
-
   return {
     wizard: { currentStep, completedSteps, stepSummaries },
     employees: { selectedEmployees, handleEmployeesNext },
     positions: { selectedPositions, customPositions, handlePositionsNext },
     search: { progress, error, handleSearchDepthNext, executeBenchBurn, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     results: { results, handleRetryFallbacks, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, setDetailEmployee, detailPosition, setDetailPosition, handleShowDetail, handleSelectMatch },
+    detail: { detailMatch, setDetailMatch, detailEmployee, setDetailEmployee, detailPosition, setDetailPosition, handleShowDetail, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset, handleStepClick, handleBackToIntents },
   };
 }

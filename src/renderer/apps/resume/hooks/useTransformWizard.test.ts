@@ -354,10 +354,10 @@ describe('useTransformWizard', () => {
     );
 
     act(() => {
-      result.current.refinement.setRefinementMode('impact-focused');
+      result.current.refinement.setRefinementMode('job-tailoring');
     });
 
-    expect(result.current.refinement.refinementMode).toBe('impact-focused');
+    expect(result.current.refinement.refinementMode).toBe('job-tailoring');
   });
 
   it('should manage review view mode', () => {

@@ -42,7 +42,8 @@ function formatTableName(name: string): string {
     .join(' ');
 }
 
-function summarizeRecordCounts(recordCounts: Record<string, number>): string {
+function summarizeRecordCounts(recordCounts: Record<string, number> | null | undefined): string {
+  if (!recordCounts || typeof recordCounts !== 'object') return '0 records';
   const entries = Object.entries(recordCounts);
   if (!entries.length) return '0 records';
   const total = entries.reduce((sum, [, value]) => sum + value, 0);
@@ -88,6 +89,7 @@ const DatabaseSharingPanel = memo(function DatabaseSharingPanel() {
       handleImportSnapshot,
       handleImportLatest,
       handleCheckForUpdates,
+      handleSelectDirectory,
       refreshSnapshots,
     },
   } = useDatabaseSharing();
@@ -158,13 +160,26 @@ const DatabaseSharingPanel = memo(function DatabaseSharingPanel() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-secondary mb-1.5">Shared Folder Path</label>
-            <input
-              type="text"
-              value={sharedPath}
-              onChange={event => setSharedPath(event.target.value)}
-              placeholder="/shared/database/snapshots"
-              className="glass-input w-full px-3 py-2 text-sm text-primary"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={sharedPath}
+                onChange={event => setSharedPath(event.target.value)}
+                placeholder="/shared/database/snapshots"
+                className="glass-input flex-1 px-3 py-2 text-sm text-primary"
+              />
+              <button
+                type="button"
+                onClick={handleSelectDirectory}
+                className="glass-button px-3 py-2 text-sm font-medium text-secondary hover:text-primary flex items-center gap-1.5 shrink-0"
+                title="Browse for folder"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+                </svg>
+                Browse
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-secondary mb-1.5">Exporter Name</label>
@@ -398,7 +413,7 @@ const DatabaseSharingPanel = memo(function DatabaseSharingPanel() {
                   <td className="px-4 py-3 text-primary">
                     <p className="font-medium">{summarizeRecordCounts(snapshot.recordCounts)}</p>
                     <p className="text-xs text-muted mt-0.5">
-                      {Object.entries(snapshot.recordCounts)
+                      {Object.entries(snapshot.recordCounts ?? {})
                         .map(([table, count]) => `${formatTableName(table)}: ${count.toLocaleString()}`)
                         .join(' • ')}
                     </p>

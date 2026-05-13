@@ -36,7 +36,7 @@ interface ChecksViewProps {
 }
 
 export default function ChecksView({ resume, completeness, validationResults, onGoToEditor, onAiFix }: ChecksViewProps) {
-  const { hardRules, tips } = validationService.getRuleCatalog(resume)
+  const { hardRules } = validationService.getRuleCatalog(resume)
   const sections = [...new Set(hardRules.map(r => r.section))]
   const applicableRules = hardRules.filter(r => r.status !== 'not-applicable')
   const passedCount = applicableRules.filter(r => r.status === 'pass').length
@@ -44,7 +44,6 @@ export default function ChecksView({ resume, completeness, validationResults, on
   const warningCount = applicableRules.filter(r => r.status !== 'pass' && r.severity === 'warning').length
   const totalCount = applicableRules.length
 
-  const valWarnings = validationResults.filter(r => r.status !== 'valid' && r.category === 'warning')
   const valImprovements = validationResults.filter(r => r.status !== 'valid' && r.category === 'improvement')
   const valPassed = validationResults.filter(r => r.status === 'valid')
 
@@ -126,8 +125,8 @@ export default function ChecksView({ resume, completeness, validationResults, on
         <div className="grid grid-cols-4 gap-0 border-b border-gray-200/30 dark:border-dark-border/30">
           {([
             { key: 'all' as FilterType, label: 'All', count: totalCount, color: 'text-accent-600 dark:text-accent-400', bg: 'bg-accent-50/60 dark:bg-accent-500/10', ring: 'ring-accent-500' },
-            { key: 'warnings' as FilterType, label: 'Warnings', count: valWarnings.length + warningCount + failedCount, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50/60 dark:bg-amber-500/10', ring: 'ring-amber-500' },
-            { key: 'improvements' as FilterType, label: 'Tips', count: valImprovements.length + tips.length, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50/60 dark:bg-indigo-500/10', ring: 'ring-indigo-500' },
+            { key: 'warnings' as FilterType, label: 'Warnings', count: warningCount, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50/60 dark:bg-amber-500/10', ring: 'ring-amber-500' },
+            { key: 'improvements' as FilterType, label: 'Tips', count: valImprovements.length, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50/60 dark:bg-indigo-500/10', ring: 'ring-indigo-500' },
             { key: 'passed' as FilterType, label: 'Passed', count: valPassed.length + passedCount, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50/60 dark:bg-emerald-500/10', ring: 'ring-emerald-500' },
           ]).map((f) => (
             <button
@@ -219,57 +218,7 @@ export default function ChecksView({ resume, completeness, validationResults, on
         </div>
       )}
 
-      {(filter === 'all' || filter === 'warnings') && valWarnings.length > 0 && (
-        <div className="glass-card overflow-hidden">
-          <div className="flex items-center gap-2 p-3 bg-amber-50/40 dark:bg-amber-500/10 border-b border-amber-200/30 dark:border-amber-500/20">
-            <svg className="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <h3 className="text-sm font-semibold text-amber-700 dark:text-amber-400">Validation Warnings</h3>
-            <span className="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100/80 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400">{valWarnings.length}</span>
-          </div>
-          <div className="divide-y divide-amber-200/20 dark:divide-amber-500/10">
-            {valWarnings.map((result, i) => {
-              const actionConfig = getFieldAction(result.field)
-              return (
-                <div key={i} className="flex items-start gap-2.5 p-3 hover:bg-amber-50/30 dark:hover:bg-amber-500/5 transition-colors">
-                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-amber-700 dark:text-amber-300">{formatFieldName(result.field)}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{result.message}</p>
-                  </div>
-                  {actionConfig?.type === 'ai-fix' && onAiFix && (
-                    <button
-                      onClick={() => onAiFix(result.field, result.message)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-violet-600 dark:text-violet-400 bg-violet-50/60 dark:bg-violet-500/10 rounded-lg hover:bg-violet-100/60 dark:hover:bg-violet-500/20 transition-colors flex-shrink-0"
-                    >
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0L14.59 8.41L23 11L14.59 13.59L12 22L9.41 13.59L1 11L9.41 8.41L12 0Z" />
-                      </svg>
-                      Fix with AI
-                    </button>
-                  )}
-                  {actionConfig?.type === 'navigate' && onGoToEditor && (
-                    <button
-                      onClick={() => onGoToEditor(actionConfig.section!)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-accent-600 dark:text-accent-400 bg-accent-50/60 dark:bg-accent-500/10 rounded-lg hover:bg-accent-100/60 dark:hover:bg-accent-500/20 transition-colors flex-shrink-0"
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Edit
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {(filter === 'all' || filter === 'improvements') && (tips.length > 0 || valImprovements.length > 0) && (
+      {(filter === 'all' || filter === 'improvements') && valImprovements.length > 0 && (
         <div className="glass-card overflow-hidden">
           <div className="flex items-center gap-2 p-3 bg-indigo-50/40 dark:bg-indigo-500/10 border-b border-indigo-200/30 dark:border-indigo-500/20">
             <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +226,7 @@ export default function ChecksView({ resume, completeness, validationResults, on
             </svg>
             <h3 className="text-sm font-semibold text-indigo-700 dark:text-indigo-400">Tips & Improvements</h3>
             <span className="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100/80 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400">
-              {valImprovements.length + tips.length}
+              {valImprovements.length}
             </span>
           </div>
           <div className="divide-y divide-indigo-200/20 dark:divide-indigo-500/10">
@@ -317,16 +266,6 @@ export default function ChecksView({ resume, completeness, validationResults, on
                 </div>
               )
             })}
-            {tips.map((tip, i) => (
-              <div key={`tip-${i}`} className="flex items-start gap-2.5 p-3 hover:bg-indigo-50/20 dark:hover:bg-indigo-500/5 transition-colors">
-                <svg className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm text-indigo-700 dark:text-indigo-300">{tip.message}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}

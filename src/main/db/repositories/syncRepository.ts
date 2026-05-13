@@ -300,7 +300,7 @@ export const syncRepository = {
 
   searchEmployees(query: string, limit: number = 50): SyncedEmployeeRow[] {
     const db = getDatabase()
-    const pattern = `%${query}%`
+    const pattern = `%${query.replace(/\s+/g, '%')}%`
     return db.prepare(`
       SELECT * FROM synced_employees
       WHERE full_name LIKE ? OR email LIKE ? OR main_skill LIKE ?
@@ -310,7 +310,7 @@ export const syncRepository = {
 
   searchCandidates(query: string, limit: number = 50): SyncedCandidateRow[] {
     const db = getDatabase()
-    const pattern = `%${query}%`
+    const pattern = `%${query.replace(/\s+/g, '%')}%`
     return db.prepare(`
       SELECT * FROM synced_candidates
       WHERE full_name LIKE ? OR email LIKE ? OR main_skill LIKE ?

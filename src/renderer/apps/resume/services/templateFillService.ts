@@ -93,10 +93,7 @@ function buildTokenMap(resume: StructuredResume): Record<string, string> {
       tokens[`${prefix}DATES}}`] = `${exp.startDate} - ${exp.endDate}`;
       tokens[`${prefix}ROLE}}`] = exp.title;
       tokens[`${prefix}PROJECT}}`] = exp.projectName || '';
-      const achievementText = exp.achievements?.length
-        ? exp.achievements.map(a => `• ${a}`).join('\n')
-        : '';
-      tokens[`${prefix}DESC}}`] = achievementText || exp.description;
+      tokens[`${prefix}DESC}}`] = exp.description || '';
       tokens[`${prefix}TECH}}`] = exp.technologies?.join(', ') || '';
     } else {
       tokens[`${prefix}COMPANY}}`] = '';
@@ -437,6 +434,40 @@ function forcePageBreakBeforeTechnicalSkills(xml: string): string {
   return new XMLSerializer().serializeToString(doc);
 }
 
+function reorderSkillColumnTables(xml: string): string {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'application/xml');
+  const tables = doc.getElementsByTagNameNS(ns, 'tbl');
+  const tableArray = Array.from(tables);
+
+  const cloudTable =
+    findInnermostTable(tableArray, ns, 'AI Cloud Skills and Tools') ||
+    findInnermostTable(tableArray, ns, 'AI Cloud Tools') ||
+    findInnermostTable(tableArray, ns, '{{CLOUD_');
+  const certTable =
+    findInnermostTable(tableArray, ns, 'Certifications') ||
+    findInnermostTable(tableArray, ns, '{{CERT_');
+
+  if (!cloudTable || !certTable) return xml;
+
+  const parent = cloudTable.parentNode;
+  if (!parent || parent !== certTable.parentNode) return xml;
+
+  const children = Array.from(parent.childNodes);
+  const cloudIdx = children.indexOf(cloudTable);
+  const certIdx = children.indexOf(certTable);
+
+  if (cloudIdx < certIdx) return xml;
+
+  const placeholder = doc.createComment('swap');
+  parent.replaceChild(placeholder, certTable);
+  parent.replaceChild(certTable, cloudTable);
+  parent.replaceChild(cloudTable, placeholder);
+
+  return new XMLSerializer().serializeToString(doc);
+}
+
 export const templateFillService = {
   async getTemplateBuffer(): Promise<ArrayBuffer> {
     const stored = localStorage.getItem('output_template_docx');
@@ -491,7 +522,11 @@ export const templateFillService = {
       for (const [token, value] of Object.entries(tokenMap)) {
         docXml = replaceTokenInXml(docXml, token, value);
       }
-      docXml = fillCloudSkillsTable(docXml, resume.cloudSkills || []);
+      docXml = reorderSkillColumnTables(docXml);
+      const sortedCloudSkills = [...(resume.cloudSkills || [])]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      docXml = fillCloudSkillsTable(docXml, sortedCloudSkills);
       docXml = removeEmptyCertificationsTable(docXml, resume.certifications || []);
       docXml = clearEmptyExperienceBlocks(docXml);
       docXml = keepExperienceBlocksTogether(docXml);

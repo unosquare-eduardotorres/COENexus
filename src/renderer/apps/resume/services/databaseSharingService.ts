@@ -75,8 +75,13 @@ export interface SyncWatcherStatus {
 }
 
 export const databaseSharingService = {
-  getConfig: (): Promise<DatabaseSharingConfig> =>
-    window.api.database.getConfig() as Promise<DatabaseSharingConfig>,
+  getConfig: async (): Promise<DatabaseSharingConfig> => {
+    const raw = await window.api.database.getConfig() as { sharing?: { sharedPath?: string; exporterName?: string } }
+    const sharing = raw?.sharing ?? {}
+    const sharedPath = sharing.sharedPath ?? ''
+    const exporterName = sharing.exporterName ?? ''
+    return { sharedPath, exporterName, isConfigured: sharedPath.length > 0 }
+  },
   saveConfig: (config: { sharedPath: string; exporterName: string }): Promise<{ success: boolean }> =>
     window.api.database.saveConfig({ sharing: config }) as Promise<{ success: boolean }>,
   exportSnapshot: (): Promise<ExportResult> =>
@@ -95,6 +100,8 @@ export const databaseSharingService = {
     window.api.database.syncStatus() as Promise<SyncWatcherStatus>,
   importLatest: (): Promise<ImportResult> =>
     window.api.database.importLatest() as Promise<ImportResult>,
+  selectDirectory: (): Promise<{ cancelled: boolean; path: string | null }> =>
+    window.api.database.selectDirectory() as Promise<{ cancelled: boolean; path: string | null }>,
   onSyncUpdate: (callback: (manifest: SyncManifest) => void): (() => void) =>
     window.api.database.onSyncUpdate(callback as (manifest: unknown) => void),
 };

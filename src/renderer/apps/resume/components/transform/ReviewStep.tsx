@@ -10,8 +10,6 @@ import { RefinementMode } from '../../types';
 
 const ENHANCER_MODES: { value: RefinementMode; label: string; description: string }[] = [
   { value: 'professional-polish', label: 'Professional Polish', description: 'Refine language, fix grammar, and improve readability while preserving technical accuracy.' },
-  { value: 'impact-focused', label: 'Impact-Focused', description: 'Rewrite accomplishments with measurable impact, strong action verbs, and quantified results.' },
-  { value: 'ats-optimized', label: 'ATS-Optimized', description: 'Optimize formatting and keywords for Applicant Tracking Systems compatibility.' },
 ];
 
 function OriginalPdfViewer({ buffer, fallbackUrl, originalContent }: {
@@ -107,7 +105,7 @@ export default function ReviewStep() {
 
   return (
     <>
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 220px)' }}>
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 160px)' }}>
         {sessionSaved && (
           <div className="glass-card p-3 mb-3 flex items-center gap-3 bg-emerald-50/80 dark:bg-emerald-500/10 border border-emerald-200/50 dark:border-emerald-500/20 flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">

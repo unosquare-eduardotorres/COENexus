@@ -97,9 +97,7 @@ export function useTransformPipeline({
     const preEnhancementSnapshots: StructuredResume[] = [];
     const jobDescription =
       refinementMode === 'job-tailoring'
-        ? jobDescriptionSource === 'custom'
-          ? customJobDescription
-          : selectedPosition?.title
+        ? customJobDescription || undefined
         : undefined;
 
     if (sourceType === 'ats-candidates' && selectedCandidate) {

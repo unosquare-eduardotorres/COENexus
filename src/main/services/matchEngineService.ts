@@ -595,7 +595,25 @@ export const matchEngineService = {
   },
 
   getSession(id: number) {
-    return matchRepository.getSessionParsed(id)
+    const s = matchRepository.getSessionParsed(id)
+    if (!s) return undefined
+    return {
+      id: s.id,
+      name: s.name,
+      matchFlowType: s.match_flow_type,
+      dataSource: s.data_source,
+      topN: s.top_n,
+      searchMode: s.search_mode,
+      jobDescription: s.job_description,
+      jdSource: s.jd_source,
+      status: s.status,
+      createdAt: s.created_at,
+      completedAt: s.completed_at,
+      constraints: s.constraints,
+      stats: s.pipelineStats,
+      pipelineStages: s.pipelineStages,
+      candidates: Array.isArray(s.results) ? s.results : [],
+    }
   },
 
   getResumeText(sourceType: string, upstreamId: number): string | null {

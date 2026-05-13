@@ -1567,6 +1567,82 @@ export interface PrrSyncStatus {
   lastSyncedAt: string | null
 }
 
+// ── COE Tracking ─────────────────────────────────────────
+
+export type HealthTier = 'critical' | 'warning' | 'good' | 'excellent'
+
+export interface HealthBreakdown {
+  critical: number
+  warning: number
+  good: number
+  excellent: number
+}
+
+export interface CoeTrackingSummary {
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+  topPractices: string[]
+}
+
+export interface PracticeTrackingSummary {
+  practice: string
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+  skillCount: number
+  singleSkill?: string
+}
+
+export interface SkillTrackingSummary {
+  skill: string
+  coe: string
+  totalPositions: number
+  coveredPositions: number
+  effectivenessPercent: number
+  healthBreakdown: HealthBreakdown
+}
+
+export interface TrackedPosition {
+  position: SyncedOpenPositionRow
+  activeCandidateCount: number
+  healthTier: HealthTier
+  totalCandidates: number
+  matchingCriteria: ReportStalledCriterionKey[]
+  actors: ('COE' | 'CGX')[]
+}
+
+export interface CoeTrackingTimelineEvent {
+  type: 'created' | 'ready' | 'modified' | 'candidate-presented' | 'candidate-rejected' | 'discussion'
+  date: string
+  label: string
+  detail?: string
+}
+
+export interface TrackedPositionDetail {
+  position: SyncedOpenPositionRow
+  activeCandidateCount: number
+  healthTier: HealthTier
+  candidates: ReportPositionDetailResult['candidates']
+  discussions: ReportPositionDetailResult['discussions']
+  timelineEvents: CoeTrackingTimelineEvent[]
+}
+
+export interface CoeTrackingSkillPositionsParams {
+  coe: string
+  practice: string
+  skill: string
+}
+
+export interface CoeTrackingPracticeDetailParams {
+  coe: string
+  practice: string
+}
+
 export interface NomicoreCalculateParams {
   country: string
   contractType: string
@@ -2013,6 +2089,7 @@ export interface IpcContracts {
   [IPC_CHANNELS.DATABASE_SYNC_CHECK]: { request: void; response: SyncCheckResult }
   [IPC_CHANNELS.DATABASE_SYNC_STATUS]: { request: void; response: SyncWatcherStatus }
   [IPC_CHANNELS.DATABASE_IMPORT_LATEST]: { request: void; response: DatabaseImportResult }
+  [IPC_CHANNELS.DATABASE_SELECT_DIRECTORY]: { request: void; response: { cancelled: boolean; path: string | null } }
 
   [IPC_CHANNELS.AI_CHAT]: { request: AiChatParams; response: AiChatResponse }
   [IPC_CHANNELS.AI_CHECK_CONNECTION]: { request: void; response: { available: boolean } }
@@ -2029,6 +2106,15 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
   [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
   [IPC_CHANNELS.REPORT_EXPORT_XLSX]: { request: readonly [ReportStalledPositionResult[]]; response: ExcelExportResult }
+
+  [IPC_CHANNELS.COE_TRACKING_GET_OVERVIEW]: { request: void; response: CoeTrackingSummary[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_COE_DETAIL]: { request: string; response: PracticeTrackingSummary[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_PRACTICE_DETAIL]: { request: CoeTrackingPracticeDetailParams; response: SkillTrackingSummary[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_PRACTICE_POSITIONS]: { request: CoeTrackingPracticeDetailParams; response: TrackedPosition[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_SKILL_POSITIONS]: { request: CoeTrackingSkillPositionsParams; response: TrackedPosition[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_COE_POSITIONS]: { request: string; response: TrackedPosition[] }
+  [IPC_CHANNELS.COE_TRACKING_GET_POSITION_DETAIL]: { request: number; response: TrackedPositionDetail | null }
+  [IPC_CHANNELS.COE_TRACKING_GET_SYNC_STATUS]: { request: void; response: ReportSyncStatus }
 
   [IPC_CHANNELS.PRR_GET_ALL]: { request: void; response: { results: PrrReportItem[]; lastSyncedAt: string | null } }
   [IPC_CHANNELS.PRR_GET_DETAIL]: { request: number; response: PrrDetailResult | null }

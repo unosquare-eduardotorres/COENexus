@@ -41,8 +41,13 @@ export interface ImportFileResult {
 }
 
 export const databaseSharingService = {
-  getConfig: (): Promise<DatabaseSharingConfig> =>
-    window.api.database.getConfig() as Promise<DatabaseSharingConfig>,
+  getConfig: async (): Promise<DatabaseSharingConfig> => {
+    const raw = await window.api.database.getConfig() as { sharing?: { sharedPath?: string; exporterName?: string } }
+    const sharing = raw?.sharing ?? {}
+    const sharedPath = sharing.sharedPath ?? ''
+    const exporterName = sharing.exporterName ?? ''
+    return { sharedPath, exporterName, isConfigured: sharedPath.length > 0 }
+  },
   saveConfig: (config: { sharedPath: string; exporterName: string }): Promise<{ success: boolean }> =>
     window.api.database.saveConfig({ sharing: config }) as Promise<{ success: boolean }>,
   exportSnapshot: (): Promise<ExportResult> =>

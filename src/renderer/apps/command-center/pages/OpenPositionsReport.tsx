@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useOpenPositionReport, COLUMN_VALUE_EXTRACTORS } from '../hooks/useOpenPositionReport'
 import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
@@ -131,7 +132,9 @@ interface ExcelFilterDropdownProps {
 function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered, onChangeFilter, onClearFilter }: ExcelFilterDropdownProps) {
   const [open, setOpen] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
 
   const effectiveSelected = !isFiltered ? allValues : selectedValues
   const isAllSelected = effectiveSelected.length === allValues.length
@@ -141,14 +144,22 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        panelRef.current && !panelRef.current.contains(target)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
   useEffect(() => {
-    if (!open) setSearchText('')
+    if (!open) { setSearchText(''); return }
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left })
+    }
   }, [open])
 
   const toggleAll = () => {
@@ -177,7 +188,7 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
   if (allValues.length === 0) return null
 
   return (
-    <div className="relative inline-flex" ref={ref}>
+    <div className="relative inline-flex" ref={triggerRef}>
       <button
         onClick={e => { e.stopPropagation(); setOpen(!open) }}
         className={`p-0.5 rounded transition-colors ${
@@ -189,9 +200,11 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
       >
         <SmallFilterIcon active={isActive} />
       </button>
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute top-full left-0 mt-1 z-50 w-60 glass-panel border border-white/10 rounded-lg shadow-xl overflow-hidden"
+          ref={panelRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left }}
+          className="z-[9999] w-60 glass-panel border border-white/10 rounded-lg shadow-xl overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           <div className="p-1.5 border-b border-white/5">
@@ -200,14 +213,14 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               placeholder="Search..."
-              className="glass-input w-full text-xs py-1.5 px-2"
+              className="glass-input w-full text-sm py-1.5 px-2"
               autoFocus
             />
           </div>
           <div className="max-h-56 overflow-y-auto p-1">
             <button
               onClick={toggleAll}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/5"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-white/5"
             >
               <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
                 isAllSelected
@@ -216,7 +229,7 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
               }`}>
                 {isAllSelected && <CheckIcon />}
               </span>
-              <span className="text-primary font-medium">Select All ({allValues.length})</span>
+              <span className="text-sm text-primary font-medium">Select All ({allValues.length})</span>
             </button>
             <div className="my-0.5 border-b border-white/5" />
             {filtered.length === 0 && <p className="text-xs text-muted px-2 py-1">No matches</p>}
@@ -226,7 +239,7 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
                 <button
                   key={value}
                   onClick={() => toggleValue(value)}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-xs transition-colors hover:bg-white/5"
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-sm transition-colors hover:bg-white/5"
                 >
                   <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
                     checked
@@ -235,7 +248,7 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
                   }`}>
                     {checked && <CheckIcon />}
                   </span>
-                  <span className={`truncate ${checked ? 'text-secondary' : 'text-muted'}`}>{value}</span>
+                  <span className={`truncate text-sm ${checked ? 'text-secondary' : 'text-muted'}`}>{value}</span>
                 </button>
               )
             })}
@@ -250,7 +263,8 @@ function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered,
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -610,7 +624,7 @@ export default function OpenPositionsReport() {
           </div>
 
           <div className="flex items-center gap-0.5 rounded-lg border border-white/5 p-0.5">
-            {(['all', 'flagged', 'healthy'] as const).map(status => (
+            {(['all', 'flagged', 'healthy', 'external'] as const).map(status => (
               <button
                 key={status}
                 onClick={() => report.setFilterHealthStatus(status)}
@@ -618,13 +632,16 @@ export default function OpenPositionsReport() {
                   report.filterHealthStatus === status
                     ? status === 'healthy' ? 'bg-emerald-500/15 text-emerald-400'
                       : status === 'flagged' ? 'bg-red-500/15 text-red-400'
+                      : status === 'external' ? 'bg-amber-500/15 text-amber-400'
                       : 'bg-white/10 text-primary'
                     : 'text-muted hover:text-secondary'
                 }`}
+                title={status === 'external' ? 'Exclude proactive-hire positions (no vertical / country-based accounts)' : undefined}
               >
                 {status === 'all' ? `All (${report.results.length})`
                  : status === 'flagged' ? `Flagged (${report.healthCounts.flagged})`
-                 : `Healthy (${report.healthCounts.healthy})`}
+                 : status === 'healthy' ? `Healthy (${report.healthCounts.healthy})`
+                 : `External (${report.healthCounts.external})`}
               </button>
             ))}
           </div>
@@ -653,7 +670,9 @@ export default function OpenPositionsReport() {
             <span className={`transition-transform ${report.sortOrder === 'aging-asc' ? 'rotate-180' : ''}`}><SortIcon /></span>
             Aging
           </button>
+        </div>
 
+        <div className="flex items-center gap-2">
           <div className="flex items-center rounded-lg border border-white/5 overflow-hidden">
             <button
               onClick={() => setViewMode('grid')}
@@ -855,25 +874,6 @@ export default function OpenPositionsReport() {
               </div>
             </div>
 
-            <div className="minimal-divider" />
-
-            <div className="flex items-center gap-3">
-              <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Scope</p>
-              <button
-                onClick={() => report.setExcludeInternal(!report.excludeInternal)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  report.excludeInternal
-                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-                    : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
-                }`}
-              >
-                {report.excludeInternal ? '✓ ' : ''}Exclude Internal
-              </button>
-              <span className="text-[10px] text-muted">
-                Hide proactive-hire positions (no vertical / country-based accounts)
-              </span>
-            </div>
-
             {Object.keys(report.columnFilters).length > 0 && (
               <>
                 <div className="minimal-divider" />
@@ -915,7 +915,7 @@ export default function OpenPositionsReport() {
         </div>
       )}
 
-      {!report.isLoading && !report.error && report.filteredResults.length > 0 && viewMode === 'grid' && (
+      {!report.isLoading && !report.error && report.results.length > 0 && viewMode === 'grid' && (
         <div className="space-y-4">
           {Object.keys(report.columnFilters).length > 0 && (
             <div className="flex flex-wrap gap-1.5 items-center">
@@ -1022,17 +1022,22 @@ export default function OpenPositionsReport() {
             </>
           )}
 
+          {report.filteredResults.length === 0 && (
+            <div className="glass-panel p-8 text-center text-sm text-muted">
+              No positions match the selected filters.
+            </div>
+          )}
 
         </div>
       )}
 
-      {!report.isLoading && !report.error && report.filteredResults.length > 0 && viewMode === 'list' && (
+      {!report.isLoading && !report.error && report.results.length > 0 && viewMode === 'list' && (
         <div className="glass-panel overflow-hidden rounded-xl">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-dark-bg/95 backdrop-blur">
               <tr className="border-b border-white/10">
                 {visibleColumns.map(col => (
-                  <th key={col.key} className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted px-3 py-3 first:pl-4 last:pr-4">
+                  <th key={col.key} className="text-left text-sm font-bold uppercase tracking-wider text-muted px-3 py-3 first:pl-4 last:pr-4">
                     <div className="flex items-center gap-1">
                       {col.label}
                       {COLUMN_VALUE_EXTRACTORS[col.key] && (
@@ -1051,74 +1056,84 @@ export default function OpenPositionsReport() {
               </tr>
             </thead>
             <tbody>
-              {report.filteredResults.map((r, i) => (
-                <tr
-                  key={r.position.upstream_id}
-                  className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
-                  onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                >
-                  {visibleColumns.map(col => (
-                    <td key={col.key} className="px-3 py-2.5 first:pl-4 last:pr-4">
-                      {col.render(r)}
-                    </td>
-                  ))}
+              {report.filteredResults.length > 0 ? (
+                report.filteredResults.map((r, i) => (
+                  <tr
+                    key={r.position.upstream_id}
+                    className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
+                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
+                  >
+                    {visibleColumns.map(col => (
+                      <td key={col.key} className="px-3 py-2.5 first:pl-4 last:pr-4">
+                        {col.render(r)}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={visibleColumns.length} className="px-4 py-8 text-center text-sm text-muted">
+                    No positions match the selected filters.
+                  </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
       )}
 
-      {!report.isLoading && !report.error && report.filteredResults.length === 0 && report.results.length > 0 && (
-        <div className="glass-panel p-6 text-center text-sm text-muted">
-          No positions match the selected filters.
-        </div>
-      )}
-
       {showThresholds && (
-        <>
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} />
-          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-dark-bg border-l border-white/5 z-50 overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <SettingsIcon />
-                  <h2 className="text-sm font-semibold text-primary">Staleness Thresholds</h2>
-                </div>
-                <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
-                  <XIcon />
-                </button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }}>
+          <div className="glass-panel border border-white/10 rounded-xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <SettingsIcon />
+                <h2 className="text-sm font-semibold text-primary">Staleness Thresholds</h2>
               </div>
-              <div className="space-y-4">
-                {CRITERIA_CONFIG.map(config => (
-                  <div key={config.key} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-primary">{config.label}</label>
-                      <span className="text-xs text-muted font-mono">Current: {report.thresholds[config.key]}d</span>
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={report.draftThresholds[config.key]}
-                      onChange={e => report.setDraftThreshold(config.key, Number(e.target.value))}
-                      className="glass-input w-full text-sm font-mono"
-                    />
-                    <p className="text-xs text-muted">{config.description}</p>
-                  </div>
-                ))}
-              </div>
+              <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
+                <XIcon />
+              </button>
             </div>
-            <div className="sticky bottom-0 bg-dark-bg border-t border-white/5 p-4 flex justify-end gap-2">
-              <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs text-secondary hover:text-primary transition-colors">
-                Cancel
-              </button>
-              <button onClick={() => { report.applyThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
-                Apply
-              </button>
+            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {CRITERIA_CONFIG.map(config => (
+                <div key={config.key} className="flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.colorClass}`}>
+                        {config.label}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        config.actor === 'COE'
+                          ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
+                          : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
+                      }`}>{config.actor}</span>
+                    </div>
+                    <p className="text-xs text-muted leading-snug">{config.description.replace(/\bX\b/, String(report.draftThresholds[config.key]))}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => report.setDraftThreshold(config.key, Math.max(1, report.draftThresholds[config.key] - 1))}
+                      className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
+                    <span className="w-10 text-center text-sm font-mono font-bold text-primary">{report.draftThresholds[config.key]}d</span>
+                    <button
+                      onClick={() => report.setDraftThreshold(config.key, report.draftThresholds[config.key] + 1)}
+                      className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/5">
+              <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs text-secondary hover:text-primary transition-colors">Cancel</button>
+              <button onClick={() => { report.applyThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">Apply</button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {showLegend && (

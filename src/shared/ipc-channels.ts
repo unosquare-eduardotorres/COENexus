@@ -73,6 +73,7 @@ export const IPC_CHANNELS = {
   DATABASE_SYNC_STATUS: 'database:sync-status',
   DATABASE_IMPORT_LATEST: 'database:import-latest',
   DATABASE_SYNC_UPDATE: 'database:sync-update',
+  DATABASE_SELECT_DIRECTORY: 'database:select-directory',
 
   PIPELINE_START: 'pipeline:start',
   PIPELINE_PAUSE: 'pipeline:pause',
@@ -116,6 +117,15 @@ export const IPC_CHANNELS = {
   REPORT_DELETE_POSITION: 'report:delete-position',
   REPORT_EXPORT_PDF: 'report:export-pdf',
   REPORT_EXPORT_XLSX: 'report:export-xlsx',
+
+  COE_TRACKING_GET_OVERVIEW: 'coe-tracking:get-overview',
+  COE_TRACKING_GET_COE_DETAIL: 'coe-tracking:get-coe-detail',
+  COE_TRACKING_GET_PRACTICE_DETAIL: 'coe-tracking:get-practice-detail',
+  COE_TRACKING_GET_PRACTICE_POSITIONS: 'coe-tracking:get-practice-positions',
+  COE_TRACKING_GET_SKILL_POSITIONS: 'coe-tracking:get-skill-positions',
+  COE_TRACKING_GET_POSITION_DETAIL: 'coe-tracking:get-position-detail',
+  COE_TRACKING_GET_COE_POSITIONS: 'coe-tracking:get-coe-positions',
+  COE_TRACKING_GET_SYNC_STATUS: 'coe-tracking:get-sync-status',
 
   PRR_GET_ALL: 'prr:get-all',
   PRR_GET_DETAIL: 'prr:get-detail',

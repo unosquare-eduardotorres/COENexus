@@ -74,7 +74,7 @@ function PersonSourceBadge({ sourceType }: { sourceType: string }) {
   )
 }
 
-export default function MatchToPositionsPage({ onReset: parentReset }: { onReset: () => void }) {
+export default function MatchToPositionsPage({ onReset: parentReset, initialSessionId }: { onReset: () => void; initialSessionId?: number | null }) {
   const {
     wizard: { currentStep, completedSteps, stepSummaries },
     person: { selectedPerson, handlePersonNext },
@@ -85,7 +85,7 @@ export default function MatchToPositionsPage({ onReset: parentReset }: { onReset
     detail: { detailMatch, detailEmployee, detailPosition, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
     adaptedEmployee,
-  } = useMatchToPositions(parentReset)
+  } = useMatchToPositions(parentReset, initialSessionId)
 
   useEffect(() => {
     log.info('Match-to-positions page viewed')

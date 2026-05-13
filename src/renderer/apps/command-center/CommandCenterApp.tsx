@@ -7,6 +7,11 @@ const CommandCenterHome = lazy(() => import('./pages/CommandCenterHome'))
 const OpenPositionsReport = lazy(() => import('./pages/OpenPositionsReport'))
 const PrrReport = lazy(() => import('./pages/PrrReport'))
 const UnderConstruction = lazy(() => import('./pages/UnderConstruction'))
+const CoeTrackingPage = lazy(() => import('./pages/CoeTrackingPage'))
+const CoePracticesPage = lazy(() => import('./pages/CoePracticesPage'))
+const PracticeSkillsPage = lazy(() => import('./pages/PracticeSkillsPage'))
+const CoePositionsPage = lazy(() => import('./pages/CoePositionsPage'))
+const CoePositionDetailPage = lazy(() => import('./pages/CoePositionDetailPage'))
 
 function RouteFallback() {
   return (
@@ -34,6 +39,11 @@ export default function CommandCenterApp() {
           <Route path="open-positions" element={<OpenPositionsReport />} />
           <Route path="placements" element={<UnderConstruction title="Placements" />} />
           <Route path="reallocation" element={<PrrReport />} />
+          <Route path="coe-tracking" element={<CoeTrackingPage />} />
+          <Route path="coe-tracking/:coe" element={<CoePracticesPage />} />
+          <Route path="coe-tracking/:coe/:practice" element={<PracticeSkillsPage />} />
+          <Route path="coe-tracking/:coe/:practice/:skill" element={<CoePositionsPage />} />
+          <Route path="coe-tracking/:coe/:practice/:skill/:positionId" element={<CoePositionDetailPage />} />
         </Route>
       </Routes>
     </Suspense>

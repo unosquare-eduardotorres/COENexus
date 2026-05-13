@@ -163,12 +163,19 @@ function setupCSP(): void {
     const connectSrc = isDev
       ? "connect-src 'self' http://localhost:* ws://localhost:* https://unpkg.com https://www.gstatic.com;"
       : "connect-src 'self' http://localhost:* https://unpkg.com https://www.gstatic.com;"
+    const workerSrc = "worker-src 'self' blob:;"
+
+    const filteredHeaders = Object.fromEntries(
+      Object.entries(details.responseHeaders ?? {}).filter(
+        ([key]) => key.toLowerCase() !== 'content-security-policy'
+      )
+    )
 
     callback({
       responseHeaders: {
-        ...details.responseHeaders,
+        ...filteredHeaders,
         'Content-Security-Policy': [
-          `default-src 'self'; ${scriptSrc} style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; ${connectSrc}`
+          `default-src 'self'; ${scriptSrc} ${workerSrc} style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; ${connectSrc}`
         ]
       }
     })

@@ -12,6 +12,7 @@ import { registerNomicoreHandlers } from './nomicore.ipc'
 import { registerMailHandlers } from './mail.ipc'
 import { registerBraniacHandlers } from './braniac.ipc'
 import { registerOracleHandlers } from './oracle.ipc'
+import { registerCoeTrackingHandlers } from './coeTracking'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -28,4 +29,5 @@ export function registerAllHandlers(): void {
   registerMailHandlers()
   registerBraniacHandlers()
   registerOracleHandlers()
+  registerCoeTrackingHandlers()
 }

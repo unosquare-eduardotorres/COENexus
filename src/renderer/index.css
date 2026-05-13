@@ -246,3 +246,8 @@
     background: rgba(255, 255, 255, 0.08) !important;
   }
 }
+
+/* Hide docx-preview library headers — we render our own branded overlay */
+.docx-wrapper > section.docx-preview > header {
+  display: none !important;
+}

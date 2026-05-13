@@ -20,7 +20,7 @@
     "postinstall": "npx tsx scripts/download-sqlite-vec.ts && npx electron-rebuild -w better-sqlite3"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.96",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.140",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@splinetool/react-spline": "^4.0.0",
     "@splinetool/runtime": "^1.9.0",

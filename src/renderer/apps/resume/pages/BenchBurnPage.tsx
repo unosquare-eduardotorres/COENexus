@@ -15,6 +15,7 @@ const log = createRendererLogger('BenchBurnPage');
 
 interface BenchBurnPageProps {
   onReset: () => void;
+  initialSessionId?: number | null;
 }
 
 const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] = [
@@ -66,22 +67,51 @@ const STEP_LABELS: { key: BenchBurnStepKey; title: string; icon: ReactNode }[] =
 ];
 
 
-export default function BenchBurnPage({ onReset: parentReset }: BenchBurnPageProps) {
+export default function BenchBurnPage({ onReset: parentReset, initialSessionId }: BenchBurnPageProps) {
   const {
     wizard: { currentStep, completedSteps, stepSummaries },
     employees: { selectedEmployees, handleEmployeesNext },
     positions: { selectedPositions, customPositions, handlePositionsNext },
     search: { progress, error, handleSearchDepthNext, executeBenchBurn, showSessionNamePrompt, setShowSessionNamePrompt, sessionName, setSessionName },
     results: { results, handleRetryFallbacks, handleExportToExcel },
-    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail, handleSelectMatch },
+    detail: { detailMatch, setDetailMatch, detailEmployee, detailPosition, handleShowDetail, handleSelectMatch, handleBackFromDetail },
     actions: { handleReset: handleFullReset, handleStepClick, handleBackToIntents },
-  } = useBenchBurn(parentReset);
+  } = useBenchBurn(parentReset, initialSessionId);
 
   const presentNavigate = useNavigate();
 
   useEffect(() => {
     log.info('Bench burn page viewed');
   }, []);
+
+  if (detailMatch && detailEmployee && detailPosition) {
+    return (
+      <div className="space-y-4">
+        <button
+          onClick={handleBackFromDetail}
+          className="flex items-center gap-2 text-sm text-muted hover:text-secondary transition-colors mb-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Results
+        </button>
+        <StepperBar
+          stepLabels={STEP_LABELS}
+          currentStepKey={currentStep}
+          completedSteps={completedSteps}
+          onStepClick={handleStepClick}
+          stepSummaries={stepSummaries}
+        />
+        <BenchBurnDetailPanel
+          match={detailMatch}
+          employee={detailEmployee}
+          position={detailPosition}
+          onBack={handleBackFromDetail}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

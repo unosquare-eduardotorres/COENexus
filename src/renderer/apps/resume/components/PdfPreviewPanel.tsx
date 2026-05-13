@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import JSZip from 'jszip';
 import { StructuredResume } from '../types';
 import { templateFillService } from '../services/templateFillService';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
@@ -9,11 +10,20 @@ interface PdfPreviewPanelProps {
   resume: StructuredResume;
 }
 
+function getNameFontSize(name: string): string {
+  const len = name.length;
+  if (len <= 25) return '32px';
+  if (len <= 35) return '26px';
+  if (len <= 45) return '22px';
+  return '18px';
+}
+
 export default function PdfPreviewPanel({ resume }: PdfPreviewPanelProps) {
-  const [scale, setScale] = useState(0.75);
+  const [scale, setScale] = useState(0.85);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [headerImgUrl, setHeaderImgUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,13 +34,28 @@ export default function PdfPreviewPanel({ resume }: PdfPreviewPanelProps) {
     setError(null);
 
     let cancelled = false;
+    let blobUrl: string | null = null;
 
     (async () => {
       try {
         const docxBlob = await templateFillService.fillTemplate(resume);
         if (cancelled) return;
+
         const arrayBuffer = await docxBlob.arrayBuffer();
         if (cancelled || !containerRef.current) return;
+
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const headerImgFile = zip.file('word/media/image2.png');
+        if (headerImgFile) {
+          const imgBlob = await headerImgFile.async('blob');
+          blobUrl = URL.createObjectURL(imgBlob);
+          if (!cancelled) setHeaderImgUrl(blobUrl);
+        } else {
+          if (!cancelled) setHeaderImgUrl(null);
+        }
+
+        if (cancelled || !containerRef.current) return;
+
         const docxPreview = await import('docx-preview');
         await docxPreview.renderAsync(arrayBuffer, container, undefined, {
           className: 'docx-preview',
@@ -53,8 +78,21 @@ export default function PdfPreviewPanel({ resume }: PdfPreviewPanelProps) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
   }, [resume, retryCount]);
+
+  useEffect(() => {
+    return () => {
+      if (headerImgUrl) URL.revokeObjectURL(headerImgUrl);
+    };
+  }, []);
+
+  const latestTitle = resume.experience?.[0]?.title || 'Professional';
 
   return (
     <div className="glass-card h-full flex flex-col">
@@ -124,6 +162,29 @@ export default function PdfPreviewPanel({ resume }: PdfPreviewPanelProps) {
             transformOrigin: 'top center',
           }}
         >
+          {headerImgUrl && !isLoading && !error && (
+            <div
+              className="relative w-full overflow-hidden bg-white shadow-xl mx-auto"
+              style={{
+                aspectRatio: '2570 / 540',
+                backgroundImage: `url(${headerImgUrl}), linear-gradient(135deg, #1a237e 0%, #304FF3 50%, #1565c0 100%)`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div className="absolute inset-0 flex flex-col justify-center px-8">
+                <h2
+                  className="font-bold text-white leading-tight"
+                  style={{ fontSize: getNameFontSize(resume.candidateName) }}
+                >
+                  {resume.candidateName}
+                </h2>
+                <p className="text-white/90 mt-1" style={{ fontSize: '14px' }}>
+                  {latestTitle}
+                </p>
+              </div>
+            </div>
+          )}
           <div
             ref={containerRef}
             className="bg-white shadow-xl rounded-sm mx-auto"

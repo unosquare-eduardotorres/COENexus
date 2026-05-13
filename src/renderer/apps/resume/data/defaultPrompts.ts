@@ -28,61 +28,6 @@ Return only the polished text without explanations.`,
     updatedAt: '2026-01-01T00:00:00Z',
   },
   {
-    id: 'prompt-impact-focused',
-    mode: 'impact-focused',
-    name: 'Impact-Focused',
-    description: 'Transforms responsibility-focused language into achievement-focused language with quantifiable results.',
-    promptTemplate: `You are an executive resume strategist. Transform the following resume text from responsibility-focused to achievement-focused language.
-
-Original text:
-{{originalText}}
-
-Role: {{role}}
-Company: {{company}}
-
-Instructions:
-- Convert "responsible for" language into accomplishment statements
-- Add quantifiable metrics where reasonable (percentages, dollar amounts, team sizes, timeframes)
-- Start each bullet with a power verb (Led, Drove, Architected, Spearheaded, Delivered, etc.)
-- Follow the CAR format: Challenge → Action → Result
-- Ensure each statement demonstrates measurable impact
-- Keep the content truthful — infer reasonable metrics from context
-
-Return only the transformed text without explanations.`,
-    variables: ['originalText', 'role', 'company'],
-    isDefault: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  },
-  {
-    id: 'prompt-ats-optimized',
-    mode: 'ats-optimized',
-    name: 'ATS-Optimized',
-    description: 'Maximizes compatibility with Applicant Tracking Systems through strategic keyword optimization.',
-    promptTemplate: `You are an ATS optimization specialist. Rewrite the following {{sectionType}} section to maximize ATS compatibility.
-
-Original text:
-{{originalText}}
-
-Target keywords to incorporate naturally:
-{{targetKeywords}}
-
-Instructions:
-- Integrate target keywords naturally into the text (do NOT keyword-stuff)
-- Use standard section headers and formatting that ATS systems recognize
-- Spell out acronyms on first use, then use the abbreviation
-- Use standard job titles and industry-recognized terminology
-- Avoid tables, columns, headers/footers, and special characters that ATS may not parse
-- Include both the spelled-out and abbreviated forms of technical terms
-- Maintain readability for human reviewers while optimizing for ATS parsing
-
-Return only the optimized text without explanations.`,
-    variables: ['sectionType', 'originalText', 'targetKeywords'],
-    isDefault: true,
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-01-01T00:00:00Z',
-  },
-  {
     id: 'prompt-job-tailoring',
     mode: 'job-tailoring',
     name: 'Job Description Tailoring',

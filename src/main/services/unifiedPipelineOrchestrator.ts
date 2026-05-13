@@ -129,7 +129,9 @@ export const unifiedPipelineOrchestrator = {
 
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
     let totalRecords = 0
-    let processedRecords = 0
+    const resumeFrom = skip ?? pausedOffset
+    pausedOffset = 0
+    let processedRecords = resumeFrom
     let succeededCount = 0
     let failedCount = 0
     let skippedCount = 0
@@ -137,8 +139,7 @@ export const unifiedPipelineOrchestrator = {
     const accFailed: PipelineRecordEvent[] = []
     const accSkipped: PipelineRecordEvent[] = []
     const pageSize = 100
-    let pageOffset = skip ?? pausedOffset
-    pausedOffset = 0
+    let pageOffset = resumeFrom
     const maxToProcess = limit ?? Infinity
     let processedInRun = 0
     const seenUpstreamIds = new Set<number>()

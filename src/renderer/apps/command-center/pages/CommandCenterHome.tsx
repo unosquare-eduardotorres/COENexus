@@ -29,6 +29,14 @@ function ArrowsIcon() {
   )
 }
 
+function TargetIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
+    </svg>
+  )
+}
+
 interface SyncStatus {
   total: number
   lastSyncedAt: string | null
@@ -67,6 +75,17 @@ const reports = [
     iconText: 'text-amber-600 dark:text-amber-400',
     borderColor: 'border-amber-500 dark:border-amber-400',
     ctaText: 'text-amber-600 dark:text-amber-400',
+  },
+  {
+    title: 'C.O.E. Tracking',
+    description: 'Track open position coverage and candidate pipeline health across Centers of Excellence. Monitor effectiveness by COE and main skill.',
+    href: '/command-center/coe-tracking',
+    available: true,
+    icon: <TargetIcon />,
+    iconBg: 'from-blue-500/15 to-blue-600/10 dark:from-blue-500/20 dark:to-blue-600/15',
+    iconText: 'text-blue-600 dark:text-blue-400',
+    borderColor: 'border-blue-500 dark:border-blue-400',
+    ctaText: 'text-blue-600 dark:text-blue-400',
   },
 ]
 
@@ -119,7 +138,7 @@ export default function CommandCenterHome() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {reports.map(report => (
           <div key={report.title} className="relative group">
             {report.available ? (
