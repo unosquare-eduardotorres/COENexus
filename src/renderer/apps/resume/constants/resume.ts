@@ -1,1 +1,1 @@
-export const TECH_SKILL_SLOTS = 14;
+export const TECH_SKILL_SLOTS = 20;
