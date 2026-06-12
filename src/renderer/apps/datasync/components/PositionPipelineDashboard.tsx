@@ -26,6 +26,8 @@ interface PositionPipelineDashboardProps {
   isSyncDisabled?: boolean
   isVoyageKeyConfigured?: boolean
   syncMode?: 'active' | 'full'
+  syncYear?: number | null
+  onSyncYearChange: (year: number | null) => void
 }
 
 export default memo(function PositionPipelineDashboard({
@@ -51,6 +53,8 @@ export default memo(function PositionPipelineDashboard({
   isSyncDisabled,
   isVoyageKeyConfigured,
   syncMode,
+  syncYear,
+  onSyncYearChange,
 }: PositionPipelineDashboardProps) {
   return (
     <div className="space-y-6">
@@ -86,6 +90,34 @@ export default memo(function PositionPipelineDashboard({
                 </svg>
                 Sync All
               </button>
+
+              <div className="flex items-center gap-1.5">
+                {[2025, 2026].map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => onSyncYearChange(y)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      syncYear === y
+                        ? 'ring-2 ring-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                        : 'bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border text-secondary hover:border-accent-400/40'
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => onSyncYearChange(null)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    syncYear == null
+                      ? 'ring-2 ring-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                      : 'bg-white/50 dark:bg-dark-hover/50 border border-gray-200 dark:border-dark-border text-secondary hover:border-accent-400/40'
+                  }`}
+                >
+                  ALL
+                </button>
+              </div>
 
             </>
           )}

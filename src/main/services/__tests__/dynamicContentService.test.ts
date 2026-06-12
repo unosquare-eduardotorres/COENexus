@@ -42,10 +42,10 @@ describe('dynamicContentService', () => {
 
   it('should parse JSON array from Claude response', async () => {
     mockCheckAvailability.mockResolvedValue(true)
-    mockChatAsync.mockResolvedValue(JSON.stringify([
+    mockChatAsync.mockResolvedValue({ text: JSON.stringify([
       { title: 'React Hooks Guide', url: 'https://react.dev', source: 'React Docs', relevanceScore: 0.95, format: 'documentation' },
       { title: 'useEffect Deep Dive', url: 'https://example.com', source: 'Blog', relevanceScore: 0.8, format: 'article' },
-    ]))
+    ]), usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await dynamicContentService.searchResources(baseParams)
 
@@ -55,7 +55,7 @@ describe('dynamicContentService', () => {
 
   it('should return empty array when response is unparseable', async () => {
     mockCheckAvailability.mockResolvedValue(true)
-    mockChatAsync.mockResolvedValue('Sorry, I cannot help with that.')
+    mockChatAsync.mockResolvedValue({ text: 'Sorry, I cannot help with that.', usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await dynamicContentService.searchResources(baseParams)
 
@@ -64,11 +64,11 @@ describe('dynamicContentService', () => {
 
   it('should sort results by relevanceScore descending', async () => {
     mockCheckAvailability.mockResolvedValue(true)
-    mockChatAsync.mockResolvedValue(JSON.stringify([
+    mockChatAsync.mockResolvedValue({ text: JSON.stringify([
       { title: 'Low', url: 'https://a.com', source: 'A', relevanceScore: 0.3, format: 'article' },
       { title: 'High', url: 'https://b.com', source: 'B', relevanceScore: 0.9, format: 'article' },
       { title: 'Medium', url: 'https://c.com', source: 'C', relevanceScore: 0.6, format: 'article' },
-    ]))
+    ]), usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await dynamicContentService.searchResources(baseParams)
 

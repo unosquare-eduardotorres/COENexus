@@ -202,7 +202,11 @@ export default function TransformHistoryPage() {
             const statusStyle = STATUS_STYLES[session.status] || STATUS_STYLES.draft;
             const isExpanded = expandedId === session.id;
             return (
-              <div key={session.id} className="glass-panel rounded-xl overflow-hidden">
+              <div
+                key={session.id}
+                className="glass-panel rounded-xl overflow-hidden cursor-pointer hover:ring-1 hover:ring-accent-500/30 transition-all"
+                onClick={() => navigate(`/resume/enhance?session=${session.id}`)}
+              >
                 <div className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
@@ -236,7 +240,7 @@ export default function TransformHistoryPage() {
 
                   <div className="flex items-center gap-2 mt-4">
                     <button
-                      onClick={() => navigate(`/resume/enhance?session=${session.id}`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/resume/enhance?session=${session.id}`); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-accent-500 rounded-lg hover:bg-accent-600 transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,7 +250,7 @@ export default function TransformHistoryPage() {
                       Resume
                     </button>
                     <button
-                      onClick={() => handleViewDetails(session.id)}
+                      onClick={(e) => { e.stopPropagation(); handleViewDetails(session.id); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-secondary bg-white/50 dark:bg-dark-hover/50 rounded-lg hover:bg-white/80 dark:hover:bg-dark-hover transition-colors"
                     >
                       <ChevronIcon
@@ -257,7 +261,7 @@ export default function TransformHistoryPage() {
                       Details
                     </button>
                     <button
-                      onClick={() => setDeleteTarget(session.id)}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(session.id); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-500/5 rounded-lg hover:bg-red-500/10 transition-colors ml-auto"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

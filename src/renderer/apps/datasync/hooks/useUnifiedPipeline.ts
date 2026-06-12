@@ -1,12 +1,21 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { pipelineService } from '../services/pipelineService'
 import type { PipelineRecordEvent, PipelineProgressDto, PipelineProgressEvent } from '../services/pipelineService'
+import { dataSyncService } from '../services/dataSyncService'
+import type { SyncRecord } from '../types'
 import { useNexusStatus } from '../../../contexts/NexusStatusContext'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
 
 const log = createRendererLogger('useUnifiedPipeline')
 
 export type { PipelineRecordEvent, PipelineProgressDto }
+
+function statusToFailedStep(status: string): 'sync' | 'extract' | 'vectorize' | 'no_resume' {
+  if (status === 'sync_failed') return 'sync'
+  if (status === 'extract_failed') return 'extract'
+  if (status === 'vectorize_failed') return 'vectorize'
+  return 'no_resume'
+}
 
 const initialProgress = (source: string): PipelineProgressDto => ({
   source,
@@ -32,10 +41,49 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
   const [failedRecords, setFailedRecords] = useState<PipelineRecordEvent[]>([])
   const [skippedRecords, setSkippedRecords] = useState<PipelineRecordEvent[]>([])
   const [retryingId, setRetryingId] = useState<number | undefined>()
-  const [activeTab, setActiveTab] = useState<'succeeded' | 'failed' | 'skipped'>('succeeded')
+  const [activeTab, setActiveTab] = useState<'all-records' | 'succeeded' | 'failed' | 'skipped'>('all-records')
+
+  const [allRecords, setAllRecords] = useState<SyncRecord[]>([])
+  const [isLoadingAllRecords, setIsLoadingAllRecords] = useState(false)
+  const [dbFailedCount, setDbFailedCount] = useState(0)
 
   const pausedOffsetRef = useRef(0)
   const prevTokenRef = useRef(token)
+
+  const fetchAllRecords = useCallback(async () => {
+    setIsLoadingAllRecords(true)
+    try {
+      const records = await dataSyncService.fetchRecords(source)
+      setAllRecords(records)
+    } catch (err) {
+      log.error('Failed to load all records', err)
+    } finally {
+      setIsLoadingAllRecords(false)
+    }
+  }, [source])
+
+  useEffect(() => {
+    fetchAllRecords()
+  }, [fetchAllRecords])
+
+  useEffect(() => {
+    pipelineService.getFailedRecords(source).then(dbFailed => {
+      setDbFailedCount(dbFailed.length)
+      if (dbFailed.length > 0) {
+        setFailedRecords(prev => {
+          if (prev.length > 0) return prev
+          return dbFailed.map(r => ({
+            upstreamId: r.upstream_id,
+            name: r.full_name,
+            outcome: 'failed' as const,
+            failedStep: statusToFailedStep(r.status),
+            error: r.status_reason ?? undefined,
+            hasResume: r.has_resume === 1,
+          }))
+        })
+      }
+    }).catch(err => log.error('Failed to load DB failed records', err))
+  }, [source])
 
   useEffect(() => {
     const unsub = pipelineService.onProgress((event: PipelineProgressEvent) => {
@@ -69,6 +117,20 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
           setProgress(event.progress)
           if (event.progress.status === 'paused') {
             pausedOffsetRef.current = event.progress.processedRecords
+          }
+          if (event.progress.status === 'completed') {
+            fetchAllRecords()
+            pipelineService.getFailedRecords(source).then(dbFailed => {
+              setDbFailedCount(dbFailed.length)
+              setFailedRecords(dbFailed.map(r => ({
+                upstreamId: r.upstream_id,
+                name: r.full_name,
+                outcome: 'failed' as const,
+                failedStep: statusToFailedStep(r.status),
+                error: r.status_reason ?? undefined,
+                hasResume: r.has_resume === 1,
+              })))
+            }).catch(err => log.error('Failed to refresh DB failed records', err))
           }
         }
       }
@@ -216,5 +278,9 @@ export function useUnifiedPipeline({ source, selectedYear }: UseUnifiedPipelineO
     handleStartOver,
     handleRetryAllFailed,
     handleRetrySingle,
+    allRecords,
+    isLoadingAllRecords,
+    refreshAllRecords: fetchAllRecords,
+    dbFailedCount,
   }
 }

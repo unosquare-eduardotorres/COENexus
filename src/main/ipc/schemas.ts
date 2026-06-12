@@ -321,6 +321,7 @@ export const positionPipelineStartSchema = z.object({
   activeOnly: z.boolean(),
   limit: z.number().int().positive().optional(),
   skip: z.number().int().nonnegative().optional(),
+  year: z.number().int().optional(),
 })
 
 export const positionPipelineVectorizeSyncedSchema = z.object({

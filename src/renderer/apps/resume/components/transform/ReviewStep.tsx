@@ -58,7 +58,7 @@ export default function ReviewStep() {
   const {
     wizard: { handleBack: onBack, handleNext: onNext },
     refinement: { enhancerMode, setEnhancerMode, enhancerModeLabel, handleEnhanceClick: onEnhanceClick, handleEnhanceResume, confirmReEnhance },
-    transform: { isTransforming, isEnhancing, transformPhase, transformProgress, transformedResumes, error, handleTransform: onRetryTransform },
+    transform: { isTransforming, isEnhancing, transformPhase, transformProgress, transformedResumes, error, handleRetryTransform: onRetryTransform },
     review: {
       activeResumeId,
       setActiveResumeId,

@@ -163,7 +163,7 @@ export function SkillsSection({
                 <div className="p-3 bg-violet-50/30 dark:bg-violet-500/5 rounded-xl border border-violet-200/30 dark:border-violet-500/10">
                   <h4 className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-                    AI Cloud Skills and Tools
+                    AI & Cloud - Skills and Tools
                     <span className="text-xs font-normal text-gray-400">{(resume.cloudSkills || []).filter(Boolean).length}</span>
                   </h4>
                   <div className="flex flex-wrap gap-1.5">

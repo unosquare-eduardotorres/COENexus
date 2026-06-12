@@ -68,9 +68,10 @@ interface EnrichedCandidate {
   salaryExpectations?: number
   salaryExpectationsCurrency?: string
   grossMonthlySalary?: number
+  extractedSkillsJson: string | null
 }
 
-function enrichWithEntityData(vectorResults: { id: number; source_type: string; source_id: number; upstream_id: number; resume_text: string | null; is_bench: number; distance: number }[]): EnrichedCandidate[] {
+function enrichWithEntityData(vectorResults: { id: number; source_type: string; source_id: number; upstream_id: number; resume_text: string | null; is_bench: number; extracted_skills_json: string | null; distance: number }[]): EnrichedCandidate[] {
   return vectorResults
     .filter(vr => vr.source_type === 'employees' || vr.source_type === 'candidates')
     .map(vr => {
@@ -86,6 +87,7 @@ function enrichWithEntityData(vectorResults: { id: number; source_type: string; 
           rate: emp?.rate ?? 0, currency: emp?.salary_currency ?? '',
           isBench: emp?.is_bench === 1, jobTitle: emp?.job_title ?? '',
           grossMonthlySalary: emp?.gross_monthly_salary ?? undefined,
+          extractedSkillsJson: vr.extracted_skills_json ?? null,
         }
       }
 
@@ -101,6 +103,7 @@ function enrichWithEntityData(vectorResults: { id: number; source_type: string; 
         salaryExpectations: cand?.salary_expectations ?? undefined,
         salaryExpectationsCurrency: cand?.salary_expectations_currency ?? undefined,
         grossMonthlySalary: cand?.current_salary ?? undefined,
+        extractedSkillsJson: vr.extracted_skills_json ?? null,
       }
     })
 }
@@ -197,7 +200,7 @@ function mapFieldToColumn(field: string, dataSource: string): string | null {
 
 import { runConcurrent } from './utils/concurrency'
 import { parseAiResponse } from './utils/aiResponseParser'
-import { haikuTriageSchema, opusAnalysisSchema } from './utils/aiResponseSchemas'
+import { haikuBatchTriageSchema, opusAnalysisSchema } from './utils/aiResponseSchemas'
 
 interface HaikuResult {
   candidate: EnrichedCandidate
@@ -282,18 +285,74 @@ async function runHaikuTriage(
 ): Promise<HaikuResult[]> {
   const haikuCandidates = candidates.slice(0, Math.max(topN * 3, 20))
 
-  return runConcurrent(haikuCandidates, concurrency, async (candidate) => {
-    try {
-      const prompt = `Evaluate if this candidate is relevant for the job. Return JSON: {"relevant": true/false, "score": 0-100, "reason": "..."}\n\nJob Description:\n${jobDescription}\n\nCandidate: ${candidate.name}\nSkill: ${candidate.mainSkill}\nSeniority: ${candidate.seniority}\nResume excerpt: ${candidate.resumeText.slice(0, 2000)}`
+  // Step 4: Auto-pass high-similarity candidates (skip Haiku call)
+  const AUTO_PASS_THRESHOLD = 0.85
+  const autoPassResults: HaikuResult[] = []
+  const needsTriage: EnrichedCandidate[] = []
 
-      const response = await claudeService.chatAsync(haikuModel, prompt, 256, 0.1)
-      const parsed = parseAiResponse(response, haikuTriageSchema, 'haiku-triage')
-      return { candidate, relevant: parsed.relevant, score: parsed.score, reason: parsed.reason }
+  for (const c of haikuCandidates) {
+    if (c.cosineSimilarity >= AUTO_PASS_THRESHOLD) {
+      autoPassResults.push({
+        candidate: c,
+        relevant: true,
+        score: Math.round(c.cosineSimilarity * 100),
+        reason: 'Auto-passed: high vector similarity',
+      })
+    } else {
+      needsTriage.push(c)
+    }
+  }
+
+  log.info('Haiku triage split', { autoPass: autoPassResults.length, needsTriage: needsTriage.length })
+
+  // Step 3: Batch 10 candidates per prompt to reduce JD repetition
+  const BATCH_SIZE = 10
+  const batches: EnrichedCandidate[][] = []
+  for (let i = 0; i < needsTriage.length; i += BATCH_SIZE) {
+    batches.push(needsTriage.slice(i, i + BATCH_SIZE))
+  }
+
+  const batchResults = await runConcurrent(batches, Math.ceil(concurrency / 2), async (batch) => {
+    try {
+      const candidateList = batch.map((c, idx) => {
+        // Step 2: Use extracted skills when available, fall back to resume excerpt
+        const context = c.extractedSkillsJson
+          ? `Skills: ${c.extractedSkillsJson}`
+          : `Resume excerpt: ${c.resumeText.slice(0, 1500)}`
+        return `[Candidate ${idx}] ${c.name} | Skill: ${c.mainSkill} | Seniority: ${c.seniority}\n${context}`
+      }).join('\n\n')
+
+      const prompt = `Evaluate each candidate's relevance for the job. Return a JSON array with one entry per candidate:
+[{"candidateIndex": 0, "relevant": true/false, "score": 0-100, "reason": "..."}]
+
+Job Description:
+${jobDescription}
+
+${candidateList}
+
+Return ONLY the JSON array, no explanation.`
+
+      const { text: response } = await claudeService.chatAsync(haikuModel, prompt, 512, 0.1)
+      const parsed = parseAiResponse(response, haikuBatchTriageSchema, 'haiku-triage-batch')
+
+      return batch.map((candidate, idx) => {
+        const result = parsed.find((r: { candidateIndex: number }) => r.candidateIndex === idx)
+        return {
+          candidate,
+          relevant: result?.relevant ?? true,
+          score: result?.score ?? 50,
+          reason: result?.reason ?? 'Batch parse fallback',
+        }
+      })
     } catch (err) {
-      log.error(`Haiku triage failed for candidate ${candidate.upstreamId}`, err instanceof Error ? err : new Error(String(err)))
-      return { candidate, relevant: true, score: 50, reason: 'Haiku triage failed — included by default' }
+      log.error('Haiku batch triage failed', err instanceof Error ? err : new Error(String(err)))
+      return batch.map(candidate => ({
+        candidate, relevant: true, score: 50, reason: 'Haiku batch triage failed — included by default',
+      }))
     }
   })
+
+  return [...autoPassResults, ...batchResults.flat()]
 }
 
 interface DeepAnalysisStats {
@@ -344,7 +403,7 @@ async function runDeepAnalysis(
         availabilityDisplay: candidate.isBench ? 'Immediately available (bench)' : 'Currently assigned',
       })
 
-      const response = await claudeService.chatAsync(opusModel, prompt, 4096, 0.1)
+      const { text: response } = await claudeService.chatAsync(opusModel, prompt, 4096, 0.1)
       const parsed = parseAiResponse(response, opusAnalysisSchema, 'opus-analysis')
 
       const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>

@@ -122,7 +122,7 @@ describe('BraniacExecutor', () => {
       makeBatches([makePosition()])
     )
 
-    vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+    vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
       patterns: [
         { pattern_name: 'Rate ceiling', pattern_text: 'Max rate is 100', confidence_score: 0.7, data_points_count: 5 },
       ],
@@ -139,7 +139,7 @@ describe('BraniacExecutor', () => {
           tag_vs_resume_divergence_rate: 0.2,
         },
       ],
-    }))
+    }), usage: { inputTokens: 0, outputTokens: 0 } })
 
     const result = await braniacExecutor.run({ scope: 'account', account: 'TestAccount' })
 
@@ -169,12 +169,12 @@ describe('BraniacExecutor', () => {
       )
     )
 
-    vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+    vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
       patterns: [
         { pattern_name: 'High confidence pattern', pattern_text: 'Very strong signal', confidence_score: 0.95, data_points_count: 20 },
       ],
       stakeholder_profiles: [],
-    }))
+    }), usage: { inputTokens: 0, outputTokens: 0 } })
 
     await braniacExecutor.run({ scope: 'account', account: 'TestAccount' })
 
@@ -198,7 +198,7 @@ describe('BraniacExecutor', () => {
     )
 
     vi.mocked(claudeService.chatAsync).mockImplementation(() =>
-      new Promise((resolve) => setTimeout(() => resolve('{"patterns":[],"stakeholder_profiles":[]}'), 100))
+      new Promise((resolve) => setTimeout(() => resolve({ text: '{"patterns":[],"stakeholder_profiles":[]}', usage: { inputTokens: 0, outputTokens: 0 } }), 100))
     )
 
     const firstRun = braniacExecutor.run({ scope: 'account', account: 'TestAccount' })
@@ -254,7 +254,7 @@ describe('BraniacExecutor', () => {
         )
       )
 
-      vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
         patterns: [],
         stakeholder_profiles: [{
           stakeholder_name: 'MGarcia',
@@ -268,7 +268,7 @@ describe('BraniacExecutor', () => {
           tech_stack_flexibility: 'flexible',
           tag_vs_resume_divergence_rate: 0.6,
         }],
-      }))
+      }), usage: { inputTokens: 0, outputTokens: 0 } })
 
       await braniacExecutor.run({ scope: 'account', account: 'TechAccount' })
 
@@ -288,7 +288,7 @@ describe('BraniacExecutor', () => {
         makeBatches([makePosition({ account: 'NoTechAccount', stakeholder: 'JSmith' })])
       )
 
-      vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
         patterns: [],
         stakeholder_profiles: [{
           stakeholder_name: 'JSmith',
@@ -298,7 +298,7 @@ describe('BraniacExecutor', () => {
           avg_time_to_decision_days: null, top_rejection_reasons: [], top_acceptance_signals: [],
           preference_summary: 'Insufficient data.',
         }],
-      }))
+      }), usage: { inputTokens: 0, outputTokens: 0 } })
 
       await braniacExecutor.run({ scope: 'account', account: 'NoTechAccount' })
 
@@ -317,7 +317,7 @@ describe('BraniacExecutor', () => {
         makeBatches([makePosition({ account: 'PromptTest' })])
       )
 
-      vi.mocked(claudeService.chatAsync).mockResolvedValue('{"patterns":[],"stakeholder_profiles":[]}')
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: '{"patterns":[],"stakeholder_profiles":[]}', usage: { inputTokens: 0, outputTokens: 0 } })
 
       await braniacExecutor.run({ scope: 'account', account: 'PromptTest' })
 

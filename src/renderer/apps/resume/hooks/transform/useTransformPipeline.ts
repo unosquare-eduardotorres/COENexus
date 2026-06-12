@@ -13,6 +13,7 @@ import {
   StructuredResume,
 } from '../../types';
 import { createRendererLogger } from '../../../../shared/utils/rendererLogger';
+import { useNexusStatus } from '../../../../contexts/NexusStatusContext';
 
 const log = createRendererLogger('useTransformPipeline');
 
@@ -57,6 +58,7 @@ export function useTransformPipeline({
   const [originalResume, setOriginalResume] = useState<StructuredResume | null>(null);
   const [showEnhanceWarningModal, setShowEnhanceWarningModal] = useState(false);
   const [showReEnhanceConfirm, setShowReEnhanceConfirm] = useState(false);
+  const { refreshTokenUsage } = useNexusStatus();
 
   const activeResume = useMemo((): StructuredResume | null => {
     const targetId = activeResumeId || transformedResumes[0]?.id || null;
@@ -184,6 +186,7 @@ export function useTransformPipeline({
     setTransformProgress(null);
     setTransformPhase(null);
     setIsTransforming(false);
+    void refreshTokenUsage();
   }, [
     sourceType,
     selectedCandidate,
@@ -195,6 +198,7 @@ export function useTransformPipeline({
     jobDescriptionSource,
     customJobDescription,
     onDocxGenerated,
+    refreshTokenUsage,
   ]);
 
   const handleEnhanceResume = useCallback(async () => {
@@ -223,8 +227,9 @@ export function useTransformPipeline({
       setError('AI enhancement failed. You can still edit manually.');
     } finally {
       setIsEnhancing(false);
+      void refreshTokenUsage();
     }
-  }, [activeResume, originalResume, enhancerMode, handleUpdateResume]);
+  }, [activeResume, originalResume, enhancerMode, handleUpdateResume, refreshTokenUsage]);
 
   const handleEnhanceClick = useCallback(() => {
     if (originalResume) {

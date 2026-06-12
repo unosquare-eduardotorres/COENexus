@@ -44,15 +44,13 @@ export function useTransformExport({
   const setGeneratedDocx = externalSetGeneratedDocx ?? setInternalGeneratedDocx;
 
   const getFileName = useCallback((resume: StructuredResume, ext: string): string => {
-    const name = resume.candidateName.replace(/\s+/g, '_');
-    if (refinementMode === 'job-tailoring') {
-      if (jobDescriptionSource === 'positions' && selectedPosition) {
-        return `Resume_${name}_-_${selectedPosition.id}_-_${selectedPosition.accountName}.${ext}`;
-      }
-      return `Resume_${name}_-_Custom_OP.${ext}`;
-    }
-    return `Resume_${name}.${ext}`;
-  }, [jobDescriptionSource, refinementMode, selectedPosition]);
+    const mainSkill = resume.templateSkills?.[0] || '';
+    const candidateName = resume.candidateName.trim();
+    const base = mainSkill
+      ? `Unosquare - ${mainSkill} ${candidateName}`
+      : `Unosquare - ${candidateName}`;
+    return `${base}.${ext}`;
+  }, []);
 
   const handleExportDocx = useCallback(async (resume?: StructuredResume) => {
     const resumeToExport = resume ?? activeExportResume ?? activeResume;

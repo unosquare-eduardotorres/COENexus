@@ -1,4 +1,5 @@
-import type { PersonaNote, TeamCompositionEntry } from '../upstreamApiService'
+import type { OpenPositionListItem, PersonaNote, TeamCompositionEntry } from '../upstreamApiService'
+import type { SyncedOpenPositionRow } from '../../db/repositories/syncRepository'
 import { catalogService } from '../catalogService'
 import { createLogger } from '../logger'
 
@@ -62,9 +63,29 @@ export function isBenchFromComposition(
   return { isBench: false, benchTeam: null }
 }
 
-export async function loadCatalogs(token: string) {
-  const seniorities = await catalogService.getSeniorities(token)
-  const mainSkills = await loadCatalogOrEmpty('MainSkill', () => catalogService.getMainSkills(token))
-  const countries = await loadCatalogOrEmpty('Country', () => catalogService.getCountries(token))
+/**
+ * True when upstream now carries close info the stored row is missing/stale —
+ * i.e. a real close date we don't have, or a granular Closed* status we haven't
+ * captured (e.g. an absence-detected bare 'Closed' that upstream reports as
+ * 'ClosedWon'). Used to force a re-upsert even when the 3 tracked change-fields
+ * (last_modification / candidates_presented / last_discussion_date) didn't move.
+ * Returns false for active positions (pos.dateClosed null, status not Closed*),
+ * so it never increases fetch volume for open roles, and converges to false once
+ * the row has been corrected.
+ */
+export function isClosedInfoStale(
+  existing: SyncedOpenPositionRow | undefined,
+  pos: OpenPositionListItem,
+): boolean {
+  if (!existing) return false
+  const dateStale = pos.dateClosed != null && existing.closed_date !== pos.dateClosed
+  const statusStale = pos.status.startsWith('Closed') && existing.position_status !== pos.status
+  return dateStale || statusStale
+}
+
+export async function loadCatalogs(token: string, signal?: AbortSignal) {
+  const seniorities = await catalogService.getSeniorities(token, signal)
+  const mainSkills = await loadCatalogOrEmpty('MainSkill', () => catalogService.getMainSkills(token, signal))
+  const countries = await loadCatalogOrEmpty('Country', () => catalogService.getCountries(token, signal))
   return { seniorities, mainSkills, countries }
 }

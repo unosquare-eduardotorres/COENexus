@@ -117,6 +117,8 @@ export const IPC_CHANNELS = {
   REPORT_DELETE_POSITION: 'report:delete-position',
   REPORT_EXPORT_PDF: 'report:export-pdf',
   REPORT_EXPORT_XLSX: 'report:export-xlsx',
+  REPORT_ACCEPTANCE_RATE: 'report:acceptance-rate',
+  REPORT_ACCEPTANCE_RATE_COES: 'report:acceptance-rate-coes',
 
   COE_TRACKING_GET_OVERVIEW: 'coe-tracking:get-overview',
   COE_TRACKING_GET_COE_DETAIL: 'coe-tracking:get-coe-detail',

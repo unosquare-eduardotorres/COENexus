@@ -633,12 +633,6 @@ export interface SonnetAnalysis {
   immediateValue: string;
   rampUpEstimate: string;
   riskFactors: string;
-  beyondJd: string;
-  leadershipDynamics: string;
-  industryDepth: string;
-  trackRecord: string;
-  culturalFit: string;
-  retentionPotential: string;
 }
 
 export interface PoolCounts {

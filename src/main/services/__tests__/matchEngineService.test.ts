@@ -9,7 +9,7 @@ vi.mock('../voyageEmbeddingService', () => ({
 
 vi.mock('../claudeService', () => ({
   claudeService: {
-    chatAsync: vi.fn(),
+    chatAsync: vi.fn().mockResolvedValue({ text: '{}', usage: { inputTokens: 0, outputTokens: 0 } }),
   },
 }))
 
@@ -85,6 +85,7 @@ vi.mock('../utils/aiResponseParser', () => ({
 
 vi.mock('../utils/aiResponseSchemas', () => ({
   haikuTriageSchema: {},
+  haikuBatchTriageSchema: {},
   opusAnalysisSchema: {},
 }))
 

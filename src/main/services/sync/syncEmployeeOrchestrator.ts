@@ -29,7 +29,8 @@ function buildEmployeeEntity(
   seniorities: Map<number, string>,
   mainSkills: Map<number, string>,
   countries: Map<number, string>,
-  basicEmployee: EmployeeDetail
+  basicEmployee: EmployeeDetail,
+  benchUpstreamIds?: Set<number>,
 ): Omit<SyncedEmployeeRow, 'id'> {
   const contract = contracts[0]
   const rate = rates
@@ -48,7 +49,11 @@ function buildEmployeeEntity(
     ? (countries.get(detail.countryId) ?? basicEmployee.officeName)
     : basicEmployee.officeName
 
-  const { isBench, benchTeam } = isBenchFromComposition(compositions)
+  const compositionBench = isBenchFromComposition(compositions)
+  const isInBenchApi = benchUpstreamIds?.has(detail.userId) ?? false
+  const isBench = compositionBench.isBench || isInBenchApi
+  const benchTeam = compositionBench.benchTeam
+    ?? (isInBenchApi ? 'Bench (upstream API)' : null)
 
   const missingFields: string[] = []
   if (!detail.fullName) missingFields.push('FullName')
@@ -177,15 +182,15 @@ function mapEmployeeToDto(entity: Omit<SyncedEmployeeRow, 'id'> & { id?: number 
 
 
 export const syncEmployeeOrchestrator = {
-  async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
-    const { seniorities, mainSkills, countries } = await loadCatalogs(token)
+  async syncSingle(token: string, upstreamId: number, signal?: AbortSignal, benchUpstreamIds?: Set<number>): Promise<SyncRecordDto> {
+    const { seniorities, mainSkills, countries } = await loadCatalogs(token, signal)
 
     const [detail, contracts, rates, notes, compositions] = await Promise.all([
-      upstreamApiService.getEmployeeDetail(token, upstreamId),
-      loadOrEmpty('Contracts', () => upstreamApiService.getEmployeeContracts(token, upstreamId)),
-      loadOrEmpty('Rates', () => upstreamApiService.getEmployeeRates(token, upstreamId)),
-      loadOrEmpty('Notes', () => upstreamApiService.getEmployeeNotes(token, upstreamId)),
-      loadOrEmpty('Compositions', () => upstreamApiService.getEmployeeTeamComposition(token, upstreamId)),
+      upstreamApiService.getEmployeeDetail(token, upstreamId, signal),
+      loadOrEmpty('Contracts', () => upstreamApiService.getEmployeeContracts(token, upstreamId, signal)),
+      loadOrEmpty('Rates', () => upstreamApiService.getEmployeeRates(token, upstreamId, signal)),
+      loadOrEmpty('Notes', () => upstreamApiService.getEmployeeNotes(token, upstreamId, signal)),
+      loadOrEmpty('Compositions', () => upstreamApiService.getEmployeeTeamComposition(token, upstreamId, signal)),
     ])
 
     if (compositions.length === 0) {
@@ -197,14 +202,14 @@ export const syncEmployeeOrchestrator = {
     }
 
     const basicFallback: EmployeeDetail = { userId: upstreamId, fullName: '', email: '', seniority: 0, mainSkillId: 0, countryId: 0, accountName: '', jobTitle: '', mainSkillName: '', officeName: '', functionalUnit: '', businessUnit: '' }
-    const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicFallback)
+    const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicFallback, benchUpstreamIds)
     const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
     matchEngineService.invalidateFilterCache()
 
     return mapEmployeeToDto(entity, resumeChanged, syncDetail)
   },
 
-  async sync(token: string, options: SyncOptions, emitEvent: (event: SyncEvent) => void, signal: AbortSignal): Promise<void> {
+  async sync(token: string, options: SyncOptions, emitEvent: (event: SyncEvent) => void, signal: AbortSignal, benchUpstreamIds?: Set<number>): Promise<void> {
     log.info('Employee sync started', { limit: options.limit, skip: options.skip })
 
     const { seniorities, mainSkills, countries } = await loadCatalogs(token)
@@ -279,7 +284,7 @@ export const syncEmployeeOrchestrator = {
           const { detail, contracts, rates, notes, compositions } = result.value
 
           try {
-            const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicEmp)
+            const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicEmp, benchUpstreamIds)
             const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
             if (entity.status === 'incomplete') incompleteCount++
             else if (entity.status === 'not-processed') notProcessedCount++

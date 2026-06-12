@@ -44,7 +44,7 @@ Error Details:
 - Occurrences: ${error.occurrences}
 - Module: ${error.source ?? 'Unknown'}`
 
-      const description = await claudeService.chatAsync(
+      const { text: description } = await claudeService.chatAsync(
         'haiku',
         prompt,
         1024,

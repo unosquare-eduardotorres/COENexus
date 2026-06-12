@@ -218,6 +218,7 @@ export default function CoePositionDetailPage() {
             { label: 'Stakeholder', value: p.stakeholder },
             { label: 'CSU / CS', value: `${p.csu || '—'} / ${p.cs || '—'}` },
             { label: 'Countries', value: p.countries || '—' },
+            { label: 'Seniority', value: p.seniorities || '—' },
             { label: 'Rate Range', value: rateRange },
             { label: 'Sourcing', value: p.sourcing || '—' },
             { label: 'Vertical', value: p.vertical_industry || '—' },

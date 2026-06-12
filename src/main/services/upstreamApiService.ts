@@ -2,7 +2,7 @@ import { getConfig } from '../config'
 import { createLogger } from './logger'
 import { fetchAuthorized, fetchPaged, type PagedResponse } from './upstream/upstreamApiClient'
 import { getString, getNullableString, getInt, getDecimal, getBool, getDateTime, getNullableDateTime } from './upstream/upstreamRowParsers'
-import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns, buildPrrColumns, buildPrrPresentationColumns, buildTeamCompositionColumns } from './upstream/upstreamColumnDefs'
+import { buildEmployeeColumns, buildCandidateColumns, buildRateColumns, buildNoteColumns, buildOpenPositionColumns, buildPresentedCandidateColumns, buildPrrColumns, buildPrrPresentationColumns, buildTeamCompositionColumns, buildBenchColumns } from './upstream/upstreamColumnDefs'
 import { mapKeysToCamelCase } from './upstream/caseMapper'
 
 export type { ColumnDefinition, PagedRequest, PagedResponse } from './upstream/upstreamApiClient'
@@ -84,6 +84,7 @@ export interface OpenPositionListItem {
   candidatesPresented: number
   lastDiscussionDate: string
   closedReason: string
+  dateClosed: string | null
 }
 
 export interface OpenPositionDetail {
@@ -198,11 +199,11 @@ function mapNoteRows(paged: PagedResponse): PersonaNote[] {
 }
 
 export const upstreamApiService = {
-  async getEmployeesPaged(token: string, skip: number, take: number): Promise<{ items: EmployeeDetail[]; totalRecords: number }> {
+  async getEmployeesPaged(token: string, skip: number, take: number, signal?: AbortSignal): Promise<{ items: EmployeeDetail[]; totalRecords: number }> {
     const { upstream } = getConfig()
     const paged = await fetchPaged(`${upstream.apiUrl}employee/paged`, token, {
       skip, take, columns: buildEmployeeColumns(),
-    })
+    }, signal)
     const items = paged.payload.map(row => ({
       userId: getInt(row, 0),
       fullName: getString(row, 2),
@@ -221,10 +222,10 @@ export const upstreamApiService = {
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
-  async getEmployeeDetail(token: string, id: number): Promise<EmployeeDetail> {
+  async getEmployeeDetail(token: string, id: number, signal?: AbortSignal): Promise<EmployeeDetail> {
     const { upstream } = getConfig()
     try {
-      const raw = await fetchAuthorized<Record<string, unknown>>('GET', `${upstream.apiUrl}employee/get/${id}`, token)
+      const raw = await fetchAuthorized<Record<string, unknown>>('GET', `${upstream.apiUrl}employee/get/${id}`, token, undefined, signal)
       return mapKeysToCamelCase<EmployeeDetail>(raw)
     } catch (err) {
       log.error(`getEmployeeDetail failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
@@ -232,10 +233,10 @@ export const upstreamApiService = {
     }
   },
 
-  async getEmployeeContracts(token: string, id: number): Promise<EmployeeContract[]> {
+  async getEmployeeContracts(token: string, id: number, signal?: AbortSignal): Promise<EmployeeContract[]> {
     const { upstream } = getConfig()
     try {
-      const raw = await fetchAuthorized<Record<string, unknown>[]>('GET', `${upstream.apiUrl}contract/${id}`, token)
+      const raw = await fetchAuthorized<Record<string, unknown>[]>('GET', `${upstream.apiUrl}contract/${id}`, token, undefined, signal)
       return Array.isArray(raw) ? raw.map(item => mapKeysToCamelCase<EmployeeContract>(item)) : []
     } catch (err) {
       log.error(`getEmployeeContracts failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
@@ -243,12 +244,12 @@ export const upstreamApiService = {
     }
   },
 
-  async getEmployeeRates(token: string, id: number): Promise<EmployeeRate[]> {
+  async getEmployeeRates(token: string, id: number, signal?: AbortSignal): Promise<EmployeeRate[]> {
     const { upstream } = getConfig()
     try {
       const paged = await fetchPaged(`${upstream.apiUrl}employee/${id}/rate`, token, {
         skip: 0, take: 100, counter: 3, columns: buildRateColumns(),
-      })
+      }, signal)
       return paged.payload.map(row => ({
         accountName: getString(row, 0),
         projectName: getString(row, 1),
@@ -261,12 +262,12 @@ export const upstreamApiService = {
     }
   },
 
-  async getEmployeeNotes(token: string, id: number): Promise<PersonaNote[]> {
+  async getEmployeeNotes(token: string, id: number, signal?: AbortSignal): Promise<PersonaNote[]> {
     const { upstream } = getConfig()
     try {
       const paged = await fetchPaged(`${upstream.apiUrl}personanote/pagedByUser/${id}`, token, {
         skip: 0, take: 100, columns: buildNoteColumns(),
-      })
+      }, signal)
       return mapNoteRows(paged)
     } catch (err) {
       log.error(`getEmployeeNotes failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
@@ -274,12 +275,12 @@ export const upstreamApiService = {
     }
   },
 
-  async getEmployeeTeamComposition(token: string, id: number): Promise<TeamCompositionEntry[]> {
+  async getEmployeeTeamComposition(token: string, id: number, signal?: AbortSignal): Promise<TeamCompositionEntry[]> {
     const { upstream } = getConfig()
     try {
       const paged = await fetchPaged(`${upstream.apiUrl}employee/${id}/composition`, token, {
         skip: 0, take: 100, columns: buildTeamCompositionColumns(),
-      })
+      }, signal)
       return paged.payload.map(row => ({
         account: getString(row, 0),
         team: getString(row, 1),
@@ -294,11 +295,11 @@ export const upstreamApiService = {
     }
   },
 
-  async getCandidatesPaged(token: string, skip: number, take: number, year?: number): Promise<{ items: CandidateDetail[]; totalRecords: number }> {
+  async getCandidatesPaged(token: string, skip: number, take: number, year?: number, signal?: AbortSignal): Promise<{ items: CandidateDetail[]; totalRecords: number }> {
     const { upstream } = getConfig()
     const paged = await fetchPaged(`${upstream.apiUrl}Candidate/paged`, token, {
       skip, take, columns: buildCandidateColumns(year),
-    })
+    }, signal)
     const items = paged.payload.map(row => ({
       candidateId: getInt(row, 0),
       fullName: getString(row, 1),
@@ -314,10 +315,10 @@ export const upstreamApiService = {
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
-  async getCandidateDetail(token: string, id: number): Promise<CandidateDetail> {
+  async getCandidateDetail(token: string, id: number, signal?: AbortSignal): Promise<CandidateDetail> {
     const { upstream } = getConfig()
     try {
-      const raw = await fetchAuthorized<Record<string, unknown>>('GET', `${upstream.apiUrl}Candidate/${id}`, token)
+      const raw = await fetchAuthorized<Record<string, unknown>>('GET', `${upstream.apiUrl}Candidate/${id}`, token, undefined, signal)
       return mapKeysToCamelCase<CandidateDetail>(raw)
     } catch (err) {
       log.error(`getCandidateDetail failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
@@ -325,12 +326,12 @@ export const upstreamApiService = {
     }
   },
 
-  async getCandidateNotes(token: string, id: number): Promise<PersonaNote[]> {
+  async getCandidateNotes(token: string, id: number, signal?: AbortSignal): Promise<PersonaNote[]> {
     const { upstream } = getConfig()
     try {
       const paged = await fetchPaged(`${upstream.apiUrl}personanote/pagedByCandidate/${id}`, token, {
         skip: 0, take: 100, columns: buildNoteColumns(),
-      })
+      }, signal)
       return mapNoteRows(paged)
     } catch (err) {
       log.error(`getCandidateNotes failed for id=${id}`, err instanceof Error ? err : new Error(String(err)), { upstreamId: id })
@@ -338,11 +339,12 @@ export const upstreamApiService = {
     }
   },
 
-  async getNoteFile(token: string, noteId: number): Promise<ArrayBuffer> {
+  async getNoteFile(token: string, noteId: number, signal?: AbortSignal): Promise<ArrayBuffer> {
     const { upstream } = getConfig()
     try {
       const response = await fetch(`${upstream.apiUrl}personanote/file/${noteId}`, {
         headers: { 'x-sharepoint-token': token },
+        signal,
       })
       if (!response.ok) throw new Error(`Note file download failed: ${response.status}`)
       return response.arrayBuffer()
@@ -378,15 +380,16 @@ export const upstreamApiService = {
       candidatesPresented: row.length > 21 ? getInt(row, 21) : 0,
       lastDiscussionDate: row.length > 22 ? getString(row, 22) : '',
       closedReason: row.length > 23 ? getString(row, 23) : '',
+      dateClosed: row.length > 21 ? getNullableString(row, 21) : null,
     }))
     log.debug('getOpenPositionsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
-  async getAllOpenPositionsPaged(token: string, skip: number, take: number): Promise<{ items: OpenPositionListItem[]; totalRecords: number }> {
+  async getAllOpenPositionsPaged(token: string, skip: number, take: number, year?: number): Promise<{ items: OpenPositionListItem[]; totalRecords: number }> {
     const { upstream } = getConfig()
     const paged = await fetchPaged(`${upstream.apiUrl}op/paged/false//`, token, {
-      skip, take, columns: buildOpenPositionColumns(),
+      skip, take, columns: buildOpenPositionColumns(year),
     })
     const items = paged.payload.map(row => ({
       id: getInt(row, 1),
@@ -409,8 +412,9 @@ export const upstreamApiService = {
       candidatesPresented: row.length > 21 ? getInt(row, 21) : 0,
       lastDiscussionDate: row.length > 22 ? getString(row, 22) : '',
       closedReason: row.length > 23 ? getString(row, 23) : '',
+      dateClosed: row.length > 21 ? getNullableString(row, 21) : null,
     }))
-    log.debug('getAllOpenPositionsPaged', { skip, take, resultCount: items.length, totalRecords: paged.filteredRecordCount })
+    log.debug('getAllOpenPositionsPaged', { skip, take, year, resultCount: items.length, totalRecords: paged.filteredRecordCount })
     return { items, totalRecords: paged.filteredRecordCount }
   },
 
@@ -558,5 +562,36 @@ export const upstreamApiService = {
       log.error(`Failed to fetch PRR presentations for ${prrId}`, err instanceof Error ? err : new Error(String(err)))
       return []
     }
+  },
+
+  async getBenchEmployeeIds(token: string, signal?: AbortSignal): Promise<Set<number>> {
+    const { upstream } = getConfig()
+    const benchIds = new Set<number>()
+    let skip = 0
+    const take = 500
+
+    try {
+      while (true) {
+        if (signal?.aborted) break
+        const paged = await fetchPaged(
+          `${upstream.apiUrl}Bench/paged/true`, token,
+          { skip, take, columns: buildBenchColumns() }, signal
+        )
+        for (const row of paged.payload) {
+          const userId = getInt(row, 0)
+          if (userId > 0) benchIds.add(userId)
+        }
+        skip += paged.payload.length
+        if (skip >= paged.filteredRecordCount || paged.payload.length === 0) break
+      }
+      log.info('Bench employee IDs loaded from upstream', { count: benchIds.size })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err
+      log.warn('Failed to load bench employee IDs from upstream — falling back to composition-only detection', {
+        error: err instanceof Error ? err.message : String(err),
+        partialCount: benchIds.size,
+      })
+    }
+    return benchIds
   },
 }

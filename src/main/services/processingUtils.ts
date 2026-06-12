@@ -63,9 +63,11 @@ export async function extractSingleRecord(
   dbId: number,
   upstreamId: number,
   isBench: boolean,
+  signal?: AbortSignal,
 ): Promise<{ text: string; fileSize: number } | { error: string }> {
   try {
-    const fileBytes = await upstreamApiService.getNoteFile(token, noteId)
+    if (signal?.aborted) return { error: 'Pipeline paused' }
+    const fileBytes = await upstreamApiService.getNoteFile(token, noteId, signal)
     const buffer = Buffer.from(fileBytes)
     const rawText = await resumeTextExtractor.extractText(buffer, filename)
     const text = sanitizeUnicode(rawText)
@@ -91,6 +93,11 @@ export async function extractSingleRecord(
 
     return { text: enrichedText, fileSize: buffer.length }
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
+      syncRepository.markFailed(table, dbId, 'extract_failed', 'Pipeline paused during extraction')
+      return { error: 'Pipeline paused' }
+    }
     log.error('Single record extraction failed', err instanceof Error ? err : new Error(String(err)), { source, upstreamId })
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
     syncRepository.markFailed(table, dbId, 'extract_failed', err instanceof Error ? err.message : 'Extraction failed')
@@ -105,9 +112,11 @@ export async function vectorizeSingleRecord(
   resumeText: string,
   isBench: boolean,
   model: string,
+  signal?: AbortSignal,
 ): Promise<{ dimensions: number } | { error: string }> {
   try {
-    const vector = await voyageEmbeddingService.generateEmbedding(resumeText, model)
+    if (signal?.aborted) return { error: 'Pipeline paused' }
+    const vector = await voyageEmbeddingService.generateEmbedding(resumeText, model, signal)
 
     embeddingRepository.upsert({
       sourceType: source,
@@ -123,6 +132,11 @@ export async function vectorizeSingleRecord(
 
     return { dimensions: vector.length }
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
+      syncRepository.markFailed(table, dbId, 'vectorize_failed', 'Pipeline paused during vectorization')
+      return { error: 'Pipeline paused' }
+    }
     log.error('Single record vectorization failed', err instanceof Error ? err : new Error(String(err)), { source, upstreamId })
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
     syncRepository.markFailed(table, dbId, 'vectorize_failed', err instanceof Error ? err.message : 'Vectorization failed')

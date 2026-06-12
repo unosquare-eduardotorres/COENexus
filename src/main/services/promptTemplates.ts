@@ -38,13 +38,7 @@ Analyze this person's fit for the role. Return a JSON object with this exact str
     "whyRightFit": "<detailed narrative on why this person fits>",
     "immediateValue": "<what value they bring day one>",
     "rampUpEstimate": "<realistic ramp-up time and what they need to learn>",
-    "riskFactors": "<risks and how to mitigate them>",
-    "beyondJd": "<hidden strengths beyond the JD requirements>",
-    "leadershipDynamics": "<leadership style and team dynamics>",
-    "industryDepth": "<industry and domain knowledge depth>",
-    "trackRecord": "<proof points and track record>",
-    "culturalFit": "<cultural and work style compatibility>",
-    "retentionPotential": "<long-term retention potential and growth path>"
+    "riskFactors": "<risks and how to mitigate them>"
   }
 }
 

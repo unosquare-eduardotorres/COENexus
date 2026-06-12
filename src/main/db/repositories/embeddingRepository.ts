@@ -38,6 +38,7 @@ interface VectorSearchResult {
   is_bench: number
   created_at: string
   updated_at: string
+  extracted_skills_json: string | null
   distance: number
 }
 
@@ -140,6 +141,18 @@ export const embeddingRepository = {
     return resultRow.id
   },
 
+  getVectorizedSourceIds(sourceType: string, sourceIds: number[]): Set<number> {
+    if (sourceIds.length === 0) return new Set()
+    const db = getDatabase()
+    const placeholders = sourceIds.map(() => '?').join(',')
+    const rows = db.prepare(
+      `SELECT source_id FROM resume_embeddings
+       WHERE source_type = ? AND source_id IN (${placeholders})
+         AND embedding IS NOT NULL`
+    ).all(sourceType, ...sourceIds) as { source_id: number }[]
+    return new Set(rows.map(r => r.source_id))
+  },
+
   deleteBySource(sourceType: string, sourceId: number): void {
     const db = getDatabase()
     const existing = this.findBySource(sourceType, sourceId)
@@ -162,6 +175,7 @@ export const embeddingRepository = {
       return db.prepare(`
         SELECT re.id, re.source_type, re.source_id, re.upstream_id,
                re.resume_text, re.is_bench, re.created_at, re.updated_at,
+               re.extracted_skills_json,
                ve.distance
         FROM vec_embeddings ve
         JOIN resume_embeddings re ON re.id = ve.rowid
@@ -178,6 +192,7 @@ export const embeddingRepository = {
       return db.prepare(`
         SELECT re.id, re.source_type, re.source_id, re.upstream_id,
                re.resume_text, re.is_bench, re.created_at, re.updated_at,
+               re.extracted_skills_json,
                ve.distance
         FROM vec_embeddings ve
         JOIN resume_embeddings re ON re.id = ve.rowid
@@ -192,6 +207,7 @@ export const embeddingRepository = {
     return db.prepare(`
       SELECT re.id, re.source_type, re.source_id, re.upstream_id,
              re.resume_text, re.is_bench, re.created_at, re.updated_at,
+             re.extracted_skills_json,
              ve.distance
       FROM vec_embeddings ve
       JOIN resume_embeddings re ON re.id = ve.rowid

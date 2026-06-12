@@ -8,6 +8,7 @@ import { extractPositionText } from './processingUtils'
 import { createLogger } from './logger'
 import { getConfig } from '../config'
 import { tokenWatchdog, isTokenExpiringSoon } from './tokenWatchdog'
+import { isClosedInfoStale } from './sync/syncUtils'
 
 const log = createLogger('PositionPipeline')
 
@@ -19,6 +20,10 @@ interface PipelineRecordEvent {
   error?: string
   seniority?: string
   mainSkill?: string
+  jobTitle?: string
+  functionalUnit?: string
+  businessUnit?: string
+  hasResume?: boolean
 }
 
 interface PipelineProgress {
@@ -46,6 +51,7 @@ export interface PositionPipelineStartParams {
   activeOnly: boolean
   limit?: number
   skip?: number
+  year?: number
 }
 
 export interface PositionPipelineVectorizeSyncedParams {
@@ -67,6 +73,7 @@ function savePositionPipelineState(state: {
   pauseReason?: string; errorMessage?: string
   succeededRecords: PipelineRecordEvent[]; failedRecords: PipelineRecordEvent[]; skippedRecords: PipelineRecordEvent[]
   activeOnly?: boolean
+  year?: number
 }): void {
   const persisted = { ...state, source: 'open-positions', status: 'paused' as const, savedAt: new Date().toISOString() }
   syncRepository.saveSyncMetadata('pipeline-state:open-positions', JSON.stringify(persisted))
@@ -104,7 +111,7 @@ export const positionPipelineOrchestrator = {
   ): Promise<void> {
     activeController = new AbortController()
     const { signal } = activeController
-    const { token, activeOnly, limit, skip } = params
+    const { token, activeOnly, limit, skip, year } = params
     const model = getModel(params.model)
     const pipelineLabel = 'position-pipeline'
 
@@ -144,7 +151,7 @@ export const positionPipelineOrchestrator = {
 
         const { items, totalRecords: total } = activeOnly
           ? await upstreamApiService.getOpenPositionsPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun))
-          : await upstreamApiService.getAllOpenPositionsPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun))
+          : await upstreamApiService.getAllOpenPositionsPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun), year)
 
         totalRecords = Math.max(total, processedRecords)
         if (items.length === 0) break
@@ -159,6 +166,7 @@ export const positionPipelineOrchestrator = {
             && existing.candidates_presented === (pos.candidatesPresented ?? 0)
             && existing.last_discussion_date === (pos.lastDiscussionDate || null)
             && (activeOnly ? existing.status === 'vectorized' : true)
+            && !isClosedInfoStale(existing, pos)
         })
 
         if (allUnchanged) {
@@ -195,7 +203,7 @@ export const positionPipelineOrchestrator = {
             const candidatesUnchanged = existing && existing.candidates_presented === (pos.candidatesPresented ?? 0)
             const discussionUnchanged = existing && existing.last_discussion_date === (pos.lastDiscussionDate || null)
 
-            if (lastModUnchanged && candidatesUnchanged && discussionUnchanged) {
+            if (lastModUnchanged && candidatesUnchanged && discussionUnchanged && !isClosedInfoStale(existing, pos)) {
               syncedUpstreamIds.add(pos.id)
 
               const alreadyVectorized = existing.status === 'vectorized'
@@ -277,7 +285,7 @@ export const positionPipelineOrchestrator = {
               in_office: detail?.inOffice ? 1 as const : 0 as const,
               csu: detail?.csu ?? '',
               cs: detail?.cs ?? '',
-              closed_date: detail?.dateClosed ?? null,
+              closed_date: pos.dateClosed ?? detail?.dateClosed ?? null,
               closed_reason: pos.closedReason || null,
               is_ready: detail?.isReady ? 1 as const : 0 as const,
               is_promotion: detail?.isPromotion ? 1 as const : 0 as const,
@@ -397,11 +405,12 @@ export const positionPipelineOrchestrator = {
 
       if (!signal.aborted && activeOnly) {
         const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
-        const closedDate = new Date().toISOString()
         let closedCount = 0
         for (const local of allLocalPositions) {
-          if (!syncedUpstreamIds.has(local.upstream_id) && local.position_status !== 'Closed') {
-            syncRepository.markPositionClosed(local.upstream_id, closedDate)
+          if (!syncedUpstreamIds.has(local.upstream_id) && !local.position_status.startsWith('Closed')) {
+            // Real close date is unknown for absence-detected closures — leave it null
+            // rather than stamping the sync time (which would mis-bucket the quarter).
+            syncRepository.markPositionClosed(local.upstream_id, null)
             closedCount++
           }
         }
@@ -415,7 +424,7 @@ export const positionPipelineOrchestrator = {
       const pauseReason = signal.aborted ? (isTokenExpiringSoon() ? 'token-expiring' as const : 'user' as const) : undefined
       log.info('Position pipeline finished', { totalRecords, processedRecords, succeededCount, failedCount, skippedCount, status: finalStatus })
       if (finalStatus === 'paused') {
-        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly, year })
       } else {
         clearPositionPipelineState()
       }
@@ -423,13 +432,13 @@ export const positionPipelineOrchestrator = {
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         const reason = isTokenExpiringSoon() ? 'token-expiring' as const : 'user' as const
-        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: reason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+        savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: reason, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly, year })
         emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused', undefined, reason) })
         return
       }
       log.error('Position pipeline failed', err instanceof Error ? err : new Error(String(err)))
       const errMsg = err instanceof Error ? err.message : 'Pipeline failed'
-      savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: 'error', errorMessage: errMsg, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly })
+      savePositionPipelineState({ offset: pageOffset, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, pauseReason: 'error', errorMessage: errMsg, succeededRecords: accSucceeded, failedRecords: accFailed, skippedRecords: accSkipped, activeOnly, year })
       emitEvent({ type: 'error', message: errMsg })
       emitEvent({ type: 'complete', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'paused', undefined, 'error', errMsg) })
     } finally {

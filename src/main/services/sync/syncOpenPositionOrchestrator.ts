@@ -4,6 +4,7 @@ import { matchRepository } from '../../db/repositories/matchRepository'
 import { matchEngineService } from '../matchEngineService'
 import { createLogger } from '../logger'
 import type { SyncEvent, SyncOptions, PositionSyncRecord } from './syncTypes'
+import { isClosedInfoStale } from './syncUtils'
 
 const log = createLogger('SyncOpenPositionOrchestrator')
 
@@ -49,6 +50,7 @@ export const syncOpenPositionOrchestrator = {
         return existing.last_modification === (pos.lastModification || null)
           && existing.candidates_presented === (pos.candidatesPresented ?? 0)
           && existing.last_discussion_date === (pos.lastDiscussionDate || null)
+          && !isClosedInfoStale(existing, pos)
       })
 
       if (allUnchanged) {
@@ -84,7 +86,7 @@ export const syncOpenPositionOrchestrator = {
           const discussionUnchanged = existing
             && existing.last_discussion_date === (pos.lastDiscussionDate || null)
 
-          if (lastModUnchanged && candidatesUnchanged && discussionUnchanged) {
+          if (lastModUnchanged && candidatesUnchanged && discussionUnchanged && !isClosedInfoStale(existing, pos)) {
             syncedUpstreamIds.add(pos.id)
             unchangedCount++
 
@@ -145,7 +147,7 @@ export const syncOpenPositionOrchestrator = {
             in_office: detail?.inOffice ? 1 : 0,
             csu: detail?.csu ?? '',
             cs: detail?.cs ?? '',
-            closed_date: detail?.dateClosed ?? null,
+            closed_date: pos.dateClosed ?? detail?.dateClosed ?? null,
             closed_reason: pos.closedReason || null,
             is_ready: detail?.isReady ? 1 : 0,
             is_promotion: detail?.isPromotion ? 1 : 0,
@@ -250,11 +252,12 @@ export const syncOpenPositionOrchestrator = {
 
     if (!signal.aborted && activeOnly) {
       const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
-      const closedDate = new Date().toISOString()
       let closedCount = 0
       for (const local of allLocalPositions) {
-        if (!syncedUpstreamIds.has(local.upstream_id) && local.position_status !== 'Closed') {
-          syncRepository.markPositionClosed(local.upstream_id, closedDate)
+        if (!syncedUpstreamIds.has(local.upstream_id) && !local.position_status.startsWith('Closed')) {
+          // Real close date is unknown for absence-detected closures — leave it null
+          // rather than stamping the sync time (which would mis-bucket the quarter).
+          syncRepository.markPositionClosed(local.upstream_id, null)
           closedCount++
         }
       }

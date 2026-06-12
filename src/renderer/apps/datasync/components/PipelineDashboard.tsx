@@ -1,7 +1,9 @@
 import { memo } from 'react'
 import type { PipelineRecordEvent, PipelineProgressDto } from '../hooks/useUnifiedPipeline'
+import type { SyncRecord } from '../types'
 import FailedRecordsTable from './FailedRecordsTable'
 import SucceededRecordsTable from './SucceededRecordsTable'
+import AllSyncedRecordsTable from './AllSyncedRecordsTable'
 import YearSelector from './YearSelector'
 
 interface PipelineDashboardProps {
@@ -11,8 +13,8 @@ interface PipelineDashboardProps {
   failedRecords: PipelineRecordEvent[]
   skippedRecords: PipelineRecordEvent[]
   retryingId?: number
-  activeTab: 'succeeded' | 'failed' | 'skipped'
-  onTabChange: (tab: 'succeeded' | 'failed' | 'skipped') => void
+  activeTab: 'all-records' | 'succeeded' | 'failed' | 'skipped'
+  onTabChange: (tab: 'all-records' | 'succeeded' | 'failed' | 'skipped') => void
   isRunning: boolean
   isPaused: boolean
   progressPercent: number
@@ -26,6 +28,9 @@ interface PipelineDashboardProps {
   isVoyageKeyConfigured?: boolean
   selectedYear?: number | null
   onYearChange?: (year: number) => void
+  allRecords?: SyncRecord[]
+  isLoadingAllRecords?: boolean
+  dbFailedCount?: number
 }
 
 export default memo(function PipelineDashboard({
@@ -50,6 +55,9 @@ export default memo(function PipelineDashboard({
   isVoyageKeyConfigured,
   selectedYear,
   onYearChange,
+  allRecords,
+  isLoadingAllRecords,
+  dbFailedCount,
 }: PipelineDashboardProps) {
   const sourceLabel = source === 'employees' ? 'Employees' : 'Candidates'
 
@@ -129,19 +137,6 @@ export default memo(function PipelineDashboard({
             </>
           )}
 
-          {failedRecords.length > 0 && !isRunning && (
-            <button
-              onClick={onRetryAllFailed}
-              disabled={isSyncDisabled || !isVoyageKeyConfigured}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
-              Retry Failed ({failedRecords.length})
-            </button>
-          )}
-
           {isSyncDisabled && (
             <p className="text-xs text-amber-600 dark:text-amber-400">Token not configured — sync disabled</p>
           )}
@@ -165,6 +160,16 @@ export default memo(function PipelineDashboard({
             {progress.pauseReason === 'token-expiring' && ' (token expired)'}
             {progress.pauseReason === 'error' && ' (error)'}
           </span>
+        </div>
+      )}
+
+      {/* Previous run failed records banner */}
+      {!isRunning && !isPaused && progress.processedRecords === 0 && (dbFailedCount ?? 0) > 0 && (
+        <div className="glass-panel-subtle rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm text-secondary">
+            <span className="font-semibold text-red-600 dark:text-red-400">{dbFailedCount}</span> failed record{dbFailedCount !== 1 ? 's' : ''} from previous pipeline run
+          </span>
+          <span className="text-xs text-muted">Switch to the Failed tab to retry</span>
         </div>
       )}
 
@@ -226,51 +231,82 @@ export default memo(function PipelineDashboard({
       )}
 
       {/* Tab toggle */}
-      {(succeededRecords.length > 0 || failedRecords.length > 0 || skippedRecords.length > 0) && (
-        <div className="flex gap-1 p-1 glass-panel-subtle rounded-xl w-fit">
-          <button
-            onClick={() => onTabChange('succeeded')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === 'succeeded'
-                ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
-                : 'text-muted hover:text-secondary'
-            }`}
-          >
-            Succeeded ({succeededRecords.length})
-          </button>
-          <button
-            onClick={() => onTabChange('failed')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === 'failed'
-                ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
-                : 'text-muted hover:text-secondary'
-            }`}
-          >
-            Failed ({failedRecords.length})
-          </button>
-          <button
-            onClick={() => onTabChange('skipped')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-              activeTab === 'skipped'
-                ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
-                : 'text-muted hover:text-secondary'
-            }`}
-          >
-            Skipped ({skippedRecords.length})
-          </button>
-        </div>
-      )}
+      <div className="flex gap-1 p-1 glass-panel-subtle rounded-xl w-fit">
+        <button
+          onClick={() => onTabChange('all-records')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+            activeTab === 'all-records'
+              ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
+              : 'text-muted hover:text-secondary'
+          }`}
+        >
+          All Records{allRecords ? ` (${allRecords.length.toLocaleString()})` : ''}
+        </button>
+        {(succeededRecords.length > 0 || failedRecords.length > 0 || skippedRecords.length > 0) && (
+          <>
+            <button
+              onClick={() => onTabChange('succeeded')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                activeTab === 'succeeded'
+                  ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Succeeded ({succeededRecords.length})
+            </button>
+            <button
+              onClick={() => onTabChange('failed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                activeTab === 'failed'
+                  ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Failed ({failedRecords.length})
+            </button>
+            <button
+              onClick={() => onTabChange('skipped')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                activeTab === 'skipped'
+                  ? 'bg-white dark:bg-dark-card text-primary shadow-sm'
+                  : 'text-muted hover:text-secondary'
+              }`}
+            >
+              Skipped ({skippedRecords.length})
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Tab content */}
+      {activeTab === 'all-records' && (
+        <AllSyncedRecordsTable records={allRecords ?? []} isLoading={isLoadingAllRecords ?? false} />
+      )}
       {activeTab === 'succeeded' && (
         <SucceededRecordsTable records={succeededRecords} />
       )}
       {activeTab === 'failed' && (
-        <FailedRecordsTable
-          records={failedRecords}
-          onRetrySingle={onRetrySingle}
-          retryingId={retryingId}
-        />
+        <div className="space-y-3">
+          {failedRecords.length > 0 && !isRunning && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">
+                {failedRecords.length} record{failedRecords.length !== 1 ? 's' : ''} failed
+              </p>
+              <button
+                onClick={onRetryAllFailed}
+                disabled={isSyncDisabled || !isVoyageKeyConfigured}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              >
+                ↻ Retry All Failed ({failedRecords.length})
+              </button>
+            </div>
+          )}
+          <FailedRecordsTable
+            records={failedRecords}
+            onRetrySingle={onRetrySingle}
+            retryingId={retryingId}
+          />
+        </div>
       )}
       {activeTab === 'skipped' && (
         <SucceededRecordsTable records={skippedRecords} variant="skipped" />

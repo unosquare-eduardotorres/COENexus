@@ -3,40 +3,42 @@ import { AIConfig, AISuggestion, SuggestionOption, StructuredResume, RefinementM
 import { TECH_SKILL_SLOTS } from '../constants/resume';
 import { safeJsonParse } from '../../../shared/utils/safeJsonParse';
 
+const safeString = () => z.string().nullable().transform(v => v ?? '').default('');
+
 const extractionResponseSchema = z.object({
-  candidateName: z.string().default(''),
+  candidateName: safeString(),
   email: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   location: z.string().nullable().optional(),
   linkedIn: z.string().nullable().optional(),
-  summary: z.string().default(''),
+  summary: safeString(),
   experience: z.array(z.object({
-    company: z.string().default(''),
-    title: z.string().default(''),
+    company: safeString(),
+    title: safeString(),
     projectName: z.string().nullable().optional(),
-    startDate: z.string().default(''),
-    endDate: z.string().default(''),
+    startDate: safeString(),
+    endDate: safeString(),
     location: z.string().nullable().optional(),
-    description: z.string().default(''),
+    description: safeString(),
     achievements: z.array(z.string()).default([]),
     technologies: z.array(z.string()).default([]),
   })).default([]),
   education: z.array(z.object({
-    institution: z.string().default(''),
-    degree: z.string().default(''),
-    field: z.string().default(''),
-    graduationDate: z.string().default(''),
+    institution: safeString(),
+    degree: safeString(),
+    field: safeString(),
+    graduationDate: safeString(),
     gpa: z.string().nullable().optional(),
     honors: z.string().nullable().optional(),
   })).default([]),
   skills: z.array(z.object({
-    name: z.string().default(''),
+    name: safeString(),
     skills: z.array(z.string()).default([]),
   })).default([]),
   certifications: z.array(z.object({
-    name: z.string().default(''),
-    issuer: z.string().default(''),
-    date: z.string().default(''),
+    name: safeString(),
+    issuer: safeString(),
+    date: safeString(),
   })).default([]),
 });
 
@@ -82,7 +84,7 @@ function buildExtractionPrompt(rawText: string): string {
 
 Schema:
 {
-  "candidateName": "string",
+  "candidateName": "string — full name ONLY, no degrees, credentials, suffixes, or post-nominals (strip BSc, BA, MBA, MBCS, PhD, PMP, etc.)",
   "email": "string or null",
   "phone": "string or null",
   "location": "string or null",
@@ -91,8 +93,8 @@ Schema:
   "experience": [
     {
       "company": "string",
-      "title": "string",
-      "projectName": "string or null",
+      "title": "string — concise job title only (e.g. 'Lead Software Engineer'). Strip parenthetical qualifiers like '(plus acting PM)', verbose descriptions, and technology lists. Max 5 words.",
+      "projectName": "string or null — name of a specific project within this role. When a role lists multiple named projects, create separate experience entries (see MULTI-PROJECT HANDLING).",
       "startDate": "string",
       "endDate": "string",
       "location": "string or null",
@@ -130,6 +132,20 @@ IMPORTANT: For skills and technologies, split compound entries. E.g. 'Entity Fra
 For cloudSkills, classify skills related to AI, cloud platforms, or cloud-native tools. E.g. 'Azure CosmosDB', 'Azure Functions', 'AWS Lambda', 'OpenAI' are cloud/AI skills. Standard frameworks like 'React', '.NET', 'Entity Framework' are NOT cloud skills.
 For each work experience entry, extract a 'technologies' array listing the individual technologies, frameworks, tools, and platforms mentioned. Split compound entries. Also extract 'projectName' if the resume mentions a specific project name for that role.
 
+NAME HANDLING: The candidateName field must contain ONLY the person's given name and surname. Remove all:
+- Academic degrees: BSc, BA, BA(Hons), MSc, MBA, PhD, DPhil, MEng, BEng
+- Professional certifications: MBCS, PMP, CISSP, CPA, MCSE, AWS SAA, TOGAF
+- Honorifics: Mr, Mrs, Dr, Prof, Sir
+- Suffixes: Jr, Sr, III, Esq
+If the resume header is "Graham Parkings BSc BA(Hons) MBCS", extract candidateName as "Graham Parkings".
+If the header is "Dr. Jane Smith PhD, PMP", extract candidateName as "Jane Smith".
+
+TITLE CLEANING: The title field for each experience entry must be a concise job title (2-5 words). Remove:
+- Parenthetical qualifiers: "(plus acting Product Owner and acting Delivery Manager)" → just the core title
+- Technology specifics: "Lead C# .Net Developer and enterprise architect" → "Lead Developer and Architect"
+- Department/team context that belongs in the description, not the title
+If the title is very long or contains multiple roles separated by slashes or parentheses, pick the primary role.
+
 TITLE HANDLING: If an experience entry does not have an explicit job title (e.g., it describes a training period, program participation, bench time, or internal department assignment without a named role), infer a professional title from the candidate's overall career profile and technology stack. Use the pattern "[Specialization] [Level]" based on the candidate's primary domain — for example:
 - Software developers → "Software Engineer"
 - QA/testing roles → "QA Engineer"
@@ -137,6 +153,51 @@ TITLE HANDLING: If an experience entry does not have an explicit job title (e.g.
 - Data roles → "Data Engineer"
 - Design roles → "UX Designer"
 Never default to generic low-seniority titles like "Trainee" or "Intern" unless the original resume text explicitly and unambiguously uses that exact title as the candidate's role. "Training" as an activity does not mean the title is "Trainee".
+
+MULTI-PROJECT HANDLING: When a single company/role entry lists multiple NAMED projects
+(identified by bold project names, bullet points with project headers, numbered sub-entries,
+or distinct labeled sections within one role), create a SEPARATE experience entry for each project.
+Each sub-entry must:
+- Use the SAME company name, title, and date range as the parent entry
+- Set "projectName" to the project's name (include URLs if shown, e.g. "Eroteme (eroteme.ai)")
+- Have its OWN description paragraph covering only that project's work
+- Have its OWN technologies array listing only technologies used in that specific project
+- Have its OWN achievements array (if any achievements are specific to that project)
+
+Example: If the resume shows:
+  "Mayswill Limited — Founder & Lead Developer — 2024-Present"
+  • Eroteme (eroteme.ai): Built an AI prediction market...
+  • Pop the Balloon: Launched a dating app...
+  • Bunnies on the Green: Developed a website...
+
+Extract as 3 separate experience entries:
+  { "company": "Mayswill Limited", "title": "Founder & Lead Developer", "projectName": "Eroteme (eroteme.ai)", "startDate": "2024", "endDate": "Present", "description": "Built an AI prediction market...", "technologies": ["Next.js", "TypeScript", "Solidity"] }
+  { "company": "Mayswill Limited", "title": "Founder & Lead Developer", "projectName": "Pop the Balloon", "startDate": "2024", "endDate": "Present", "description": "Launched a dating app...", "technologies": ["React Native", "Expo", "TypeScript"] }
+  { "company": "Mayswill Limited", "title": "Founder & Lead Developer", "projectName": "Bunnies on the Green", "startDate": "2024", "endDate": "Present", "description": "Developed a website...", "technologies": [...] }
+
+Do NOT split when projects are merely mentioned in passing within a description paragraph.
+Only split when the resume visually structures them as distinct, labeled sub-entries.
+If the parent entry has an introductory paragraph before the project list, incorporate relevant
+context from it into each sub-entry's description.
+
+CERTIFICATION HANDLING: Only include actual professional certifications in the "certifications" array — credentials that involve a formal examination, assessment, or accreditation process from a recognized certifying body. Examples of REAL certifications:
+- "ISTQB Certified Tester, Foundation Level" (ISTQB)
+- "AWS Certified Solutions Architect" (Amazon)
+- "MCTS — Microsoft Certified Technology Specialist" (Microsoft)
+- "PMP — Project Management Professional" (PMI)
+- "Certified ScrumMaster (CSM)" (Scrum Alliance)
+- "GCP Certified in Big Data and ML Fundamentals" (Google)
+
+Do NOT include these as certifications — they are training/courses:
+- Online courses (Udemy, Coursera, Pluralsight, LinkedIn Learning, internal company training)
+- Bootcamps (e.g. "Security Master Bootcamp", "Communication Bootcamp")
+- Workshops or hands-on labs (e.g. "Docker + Kubernetes Administration", "Prompt Engineering Hands-on")
+- Conference talks, webinars, or MOOCs
+- Internal company training programs (unless they explicitly say "certification" with an issuing body)
+
+If the resume has a section titled "Training", "Courses", "Training / Courses", or similar — those items are almost certainly courses, NOT certifications, unless an individual item clearly names a recognized certification credential. When in doubt, exclude it from certifications.
+
+IMPORTANT — certification names: Always include the FULL certification title as it appears on the resume, including the certifying body prefix. For example, "GCP Certified in Big Data and ML Fundamentals" must keep "GCP Certified in" as part of the name — do NOT split it into name="Big Data and ML Fundamentals" issuer="GCP". The issuer field should be the full organization name (e.g. "Google Cloud"), while name retains the complete credential title.
 
 Resume text:
 ${rawText}`;
@@ -162,6 +223,21 @@ async function callClaudeLocal(config: AIConfig, prompt: string): Promise<{ cont
 
 type ExtractionResult = z.infer<typeof extractionResponseSchema>;
 
+function cleanCandidateName(raw: string): string {
+  const credentialPattern = /\b(BSc|BA|BA\(Hons\)|MSc|MBA|PhD|DPhil|MEng|BEng|MBCS|PMP|CISSP|CPA|MCSE|TOGAF|CEng|MIET|MInstMC|CITP|CSM|SAFe|AWS\s+SA[A-Z]*|Jr\.?|Sr\.?|III|II|Esq\.?)\b/gi;
+  const honorificPattern = /^(Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?|Sir|Dame)\s+/i;
+  let cleaned = raw.replace(credentialPattern, '').replace(honorificPattern, '');
+  cleaned = cleaned.replace(/[,\s]+$/, '').replace(/\s{2,}/g, ' ').trim();
+  return cleaned || raw;
+}
+
+function sanitizePlaceholder(value: string | undefined | null): string {
+  if (!value) return '';
+  const lower = value.trim().toLowerCase();
+  const placeholders = ['unknown', 'n/a', 'not specified', 'not available', 'none', 'not provided'];
+  return placeholders.includes(lower) ? '' : value;
+}
+
 function mapToStructuredResume(
   parsed: ExtractionResult,
   fileName: string,
@@ -185,10 +261,10 @@ function mapToStructuredResume(
 
   const education: EducationEntry[] = parsed.education.map((e, idx) => ({
     id: `edu-${now}-${idx}`,
-    institution: e.institution,
+    institution: sanitizePlaceholder(e.institution),
     degree: e.degree,
     field: e.field,
-    graduationDate: e.graduationDate.toLowerCase() === 'unknown' ? '' : e.graduationDate,
+    graduationDate: sanitizePlaceholder(e.graduationDate),
     gpa: e.gpa ?? undefined,
     honors: e.honors ?? undefined,
   }));
@@ -202,8 +278,8 @@ function mapToStructuredResume(
   const certifications: CertificationEntry[] = parsed.certifications.map((c, idx) => ({
     id: `cert-${now}-${idx}`,
     name: c.name,
-    issuer: c.issuer,
-    date: c.date.toLowerCase() === 'unknown' ? '' : c.date,
+    issuer: sanitizePlaceholder(c.issuer),
+    date: sanitizePlaceholder(c.date),
   }));
 
   const processedSkills = splitCompoundSkills(skills);
@@ -216,7 +292,7 @@ function mapToStructuredResume(
     originalFileName: fileName,
     originalFileType: fileType,
     originalContent: rawText,
-    candidateName: parsed.candidateName,
+    candidateName: cleanCandidateName(parsed.candidateName),
     email: parsed.email ?? undefined,
     phone: parsed.phone ?? undefined,
     location: parsed.location ?? undefined,
@@ -335,6 +411,7 @@ ${JSON.stringify({
   experience: resume.experience.map(e => ({
     company: e.company,
     title: e.title,
+    projectName: e.projectName || null,
     startDate: e.startDate,
     endDate: e.endDate,
     description: e.description,
@@ -345,7 +422,8 @@ ${JSON.stringify({
 
 Select the TOP 14 most relevant technical skills from: ${JSON.stringify(allSkills)}
 IMPORTANT for templateSkills: First identify the candidate's primary technology domain from their experience (e.g., iOS/Swift, .NET/C#, React/TypeScript). Ensure at least 8 of the 14 are core technologies from that domain. Fill remaining slots with supporting tools. Do NOT prioritize generic project management tools (Jira, SCRUM) over domain-specific technologies.
-Also select all AI/cloud-related skills for cloudSkills.`;
+Also select all AI/cloud-related skills for cloudSkills (skills matching cloud platforms like Azure, AWS, GCP, or AI tools like OpenAI, Gemini, Anthropic).
+CRITICAL: templateSkills and cloudSkills MUST be mutually exclusive — never include a cloud/AI skill in templateSkills. If a skill belongs in cloudSkills, exclude it from templateSkills entirely.`;
 }
 
 export const aiService = {
@@ -434,11 +512,16 @@ export const aiService = {
     const enhanceConfig = { ...config, maxTokens: Math.max(config.maxTokens, 8192) };
     const { content, usage } = await callClaudeLocal(enhanceConfig, prompt);
     const parsed = parseAiJson(content, enhancementResponseSchema, 'enhanceFullResume');
+    const rawTemplateSkills = parsed.templateSkills || resume.templateSkills;
+    const rawCloudSkills = parsed.cloudSkills || resume.cloudSkills;
+    const cloudSet = new Set(rawCloudSkills || []);
+    const deduplicatedTemplateSkills = (rawTemplateSkills || []).filter(s => !cloudSet.has(s));
+
     const enhanced = {
       ...resume,
       summary: parsed.summary || resume.summary,
-      templateSkills: parsed.templateSkills || resume.templateSkills,
-      cloudSkills: parsed.cloudSkills || resume.cloudSkills,
+      templateSkills: deduplicatedTemplateSkills,
+      cloudSkills: rawCloudSkills,
       experience: resume.experience.map((exp, i) => ({
         ...exp,
         description: parsed.experience?.[i]?.description || exp.description,

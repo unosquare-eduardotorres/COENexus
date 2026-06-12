@@ -38,10 +38,10 @@ describe('pathAiService', () => {
 
     it('should parse valid JSON response from Claude', async () => {
       vi.mocked(claudeService.checkAvailability).mockResolvedValue(true)
-      vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
         prepKit: 'Alice has strong design skills.',
         suggestedQuestions: ['Describe your approach to system design.', 'How do you handle code reviews?'],
-      }))
+      }), usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await pathAiService.generateDefensePrepKit(defaultParams)
       expect(result.prepKit).toBe('Alice has strong design skills.')
@@ -50,7 +50,7 @@ describe('pathAiService', () => {
 
     it('should fallback gracefully when response is not valid JSON', async () => {
       vi.mocked(claudeService.checkAvailability).mockResolvedValue(true)
-      vi.mocked(claudeService.chatAsync).mockResolvedValue('Here is your prep kit: good candidate.')
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: 'Here is your prep kit: good candidate.', usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await pathAiService.generateDefensePrepKit(defaultParams)
       expect(result.prepKit).toBe('Here is your prep kit: good candidate.')
@@ -59,9 +59,9 @@ describe('pathAiService', () => {
 
     it('should extract JSON from mixed text response', async () => {
       vi.mocked(claudeService.checkAvailability).mockResolvedValue(true)
-      vi.mocked(claudeService.chatAsync).mockResolvedValue(
-        'Here is the result:\n{"prepKit": "Great candidate", "suggestedQuestions": ["Q1"]}\nEnd.'
-      )
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text:
+        'Here is the result:\n{"prepKit": "Great candidate", "suggestedQuestions": ["Q1"]}\nEnd.',
+        usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await pathAiService.generateDefensePrepKit(defaultParams)
       expect(result.prepKit).toBe('Great candidate')
@@ -86,11 +86,11 @@ describe('pathAiService', () => {
 
     it('should parse valid JSON response', async () => {
       vi.mocked(claudeService.checkAvailability).mockResolvedValue(true)
-      vi.mocked(claudeService.chatAsync).mockResolvedValue(JSON.stringify({
+      vi.mocked(claudeService.chatAsync).mockResolvedValue({ text: JSON.stringify({
         plan: 'Focus on distributed systems.',
         focusAreas: ['System Design', 'Event-driven patterns'],
         timeline: '8-12 weeks',
-      }))
+      }), usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await pathAiService.generateRemediationPath(defaultParams)
       expect(result.plan).toBe('Focus on distributed systems.')

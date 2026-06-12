@@ -8,6 +8,17 @@ export const haikuTriageSchema = z.object({
 
 export type HaikuTriageResult = z.infer<typeof haikuTriageSchema>
 
+export const haikuBatchTriageSchema = z.array(
+  z.object({
+    candidateIndex: z.number(),
+    relevant: z.boolean().default(false),
+    score: z.number().min(0).max(100).default(0),
+    reason: z.string().default(''),
+  })
+)
+
+export type HaikuBatchTriageResult = z.infer<typeof haikuBatchTriageSchema>
+
 export const opusAnalysisSchema = z.object({
   matchScore: z.number().default(0),
   role: z.string().default(''),

@@ -1,3 +1,41 @@
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  globalThis.DOMMatrix = class DOMMatrix {
+    a: number; b: number; c: number; d: number; e: number; f: number
+    m11: number; m12: number; m13: number; m14: number
+    m21: number; m22: number; m23: number; m24: number
+    m31: number; m32: number; m33: number; m34: number
+    m41: number; m42: number; m43: number; m44: number
+    is2D = true
+    isIdentity = true
+    constructor(init?: string | number[]) {
+      const v = Array.isArray(init) ? init : []
+      if (v.length === 6) {
+        this.a = v[0]; this.b = v[1]; this.c = v[2]; this.d = v[3]; this.e = v[4]; this.f = v[5]
+      } else {
+        this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0
+      }
+      this.m11 = this.a; this.m12 = this.b; this.m13 = 0; this.m14 = 0
+      this.m21 = this.c; this.m22 = this.d; this.m23 = 0; this.m24 = 0
+      this.m31 = 0; this.m32 = 0; this.m33 = 1; this.m34 = 0
+      this.m41 = this.e; this.m42 = this.f; this.m43 = 0; this.m44 = 1
+      this.is2D = true
+      this.isIdentity = this.a === 1 && this.b === 0 && this.c === 0
+        && this.d === 1 && this.e === 0 && this.f === 0
+    }
+    inverse() { return new DOMMatrix() }
+    multiply() { return new DOMMatrix() }
+    translate() { return new DOMMatrix() }
+    scale() { return new DOMMatrix() }
+    rotate() { return new DOMMatrix() }
+    transformPoint(p: { x?: number; y?: number } = {}) {
+      return { x: p.x ?? 0, y: p.y ?? 0, z: 0, w: 1 }
+    }
+    static fromMatrix() { return new DOMMatrix() }
+    static fromFloat32Array() { return new DOMMatrix() }
+    static fromFloat64Array() { return new DOMMatrix() }
+  } as unknown as typeof globalThis.DOMMatrix
+}
+
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { execFile as execFileCb } from 'child_process'

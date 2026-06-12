@@ -12,6 +12,12 @@ const CoePracticesPage = lazy(() => import('./pages/CoePracticesPage'))
 const PracticeSkillsPage = lazy(() => import('./pages/PracticeSkillsPage'))
 const CoePositionsPage = lazy(() => import('./pages/CoePositionsPage'))
 const CoePositionDetailPage = lazy(() => import('./pages/CoePositionDetailPage'))
+const CoeBonusPage = lazy(() => import('./pages/CoeBonusPage'))
+const CoeBonusOverviewTab = lazy(() => import('./pages/coe-bonus/OverviewTab'))
+const CoeBonusPlacementTab = lazy(() => import('./pages/coe-bonus/PlacementMarginTab'))
+const CoeBonusGrossMarginTab = lazy(() => import('./pages/coe-bonus/GrossMarginTab'))
+const CoeBonusFillRateTab = lazy(() => import('./pages/coe-bonus/FillRateTab'))
+const CoeBonusAcceptanceTab = lazy(() => import('./pages/coe-bonus/AcceptanceRateTab'))
 
 function RouteFallback() {
   return (
@@ -44,6 +50,13 @@ export default function CommandCenterApp() {
           <Route path="coe-tracking/:coe/:practice" element={<PracticeSkillsPage />} />
           <Route path="coe-tracking/:coe/:practice/:skill" element={<CoePositionsPage />} />
           <Route path="coe-tracking/:coe/:practice/:skill/:positionId" element={<CoePositionDetailPage />} />
+          <Route path="coe-bonus" element={<CoeBonusPage />}>
+            <Route index element={<CoeBonusOverviewTab />} />
+            <Route path="placement-margin" element={<CoeBonusPlacementTab />} />
+            <Route path="gross-margin" element={<CoeBonusGrossMarginTab />} />
+            <Route path="fill-rate" element={<CoeBonusFillRateTab />} />
+            <Route path="acceptance-rate" element={<CoeBonusAcceptanceTab />} />
+          </Route>
         </Route>
       </Routes>
     </Suspense>

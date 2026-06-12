@@ -31,8 +31,10 @@ export function usePositionPipeline() {
   const [isVectorizingSynced, setIsVectorizingSynced] = useState(false)
 
   const [syncMode, setSyncMode] = useState<'active' | 'full'>('active')
+  const [syncYear, setSyncYear] = useState<number | null>(null)
   const pausedOffsetRef = useRef(0)
   const savedActiveOnlyRef = useRef<boolean>(true)
+  const savedYearRef = useRef<number | null>(null)
   const prevTokenRef = useRef(token)
 
   useEffect(() => {
@@ -103,6 +105,8 @@ export function usePositionPipeline() {
         const restoredActiveOnly = saved.activeOnly ?? true
         savedActiveOnlyRef.current = restoredActiveOnly
         setSyncMode(restoredActiveOnly ? 'active' : 'full')
+        savedYearRef.current = saved.year ?? null
+        setSyncYear(saved.year ?? null)
       }
     }).catch(err => log.error('Failed to load persisted state', err))
   }, [])
@@ -118,7 +122,7 @@ export function usePositionPipeline() {
       ) {
         log.info('Token refreshed — auto-resuming position pipeline', { skip: pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
         setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
-        positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current })
+        positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
       }
     }
   }, [token, progress.status, progress.pauseReason, sharepoint.isValid])
@@ -133,6 +137,7 @@ export function usePositionPipeline() {
   const handleSyncActive = useCallback(async () => {
     log.info('Position pipeline sync active')
     savedActiveOnlyRef.current = true
+    savedYearRef.current = null
     setSyncMode('active')
     await positionPipelineService.clearState()
     resetState()
@@ -143,12 +148,13 @@ export function usePositionPipeline() {
   const handleSyncAll = useCallback(async () => {
     log.info('Position pipeline sync all')
     savedActiveOnlyRef.current = false
+    savedYearRef.current = syncYear
     setSyncMode('full')
     await positionPipelineService.clearState()
     resetState()
     setProgress({ ...initialProgress(), status: 'processing' })
-    await positionPipelineService.startPipeline(false, token, { skip: 0 })
-  }, [token, resetState])
+    await positionPipelineService.startPipeline(false, token, { skip: 0, year: syncYear ?? undefined })
+  }, [token, resetState, syncYear])
 
   const handleVectorizeSynced = useCallback(async () => {
     log.info('Position pipeline vectorize synced')
@@ -168,7 +174,7 @@ export function usePositionPipeline() {
   const handleResume = useCallback(async () => {
     log.info('Position pipeline resume', { skip: pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
     setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
-    await positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current })
+    await positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
   }, [token])
 
   const handleRetryAllFailed = useCallback(async () => {
@@ -201,7 +207,9 @@ export function usePositionPipeline() {
   const handleStartOver = useCallback(async () => {
     log.info('Position pipeline start over')
     savedActiveOnlyRef.current = true
+    savedYearRef.current = null
     setSyncMode('active')
+    setSyncYear(null)
     await positionPipelineService.clearState()
     resetState()
     setProgress(initialProgress())
@@ -228,6 +236,8 @@ export function usePositionPipeline() {
     progressPercent,
     isVectorizingSynced,
     syncMode,
+    syncYear,
+    setSyncYear,
     handleSyncActive,
     handleSyncAll,
     handleVectorizeSynced,

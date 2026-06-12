@@ -33,6 +33,7 @@ import type {
   BenchBurnEvent,
   ReportStalledThresholds,
   ReportStalledPositionResult,
+  ReportAcceptanceRateFilters,
   PrrUpdateCoeStatusParams,
   PrrAddCommentParams,
   PrrReportItem,
@@ -360,6 +361,10 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_PDF),
     exportXlsx: (results: ReportStalledPositionResult[]) =>
       ipcRenderer.invoke(IPC_CHANNELS.REPORT_EXPORT_XLSX, results) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_EXPORT_XLSX]['response']>,
+    getAcceptanceRate: (filters: ReportAcceptanceRateFilters) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_ACCEPTANCE_RATE, filters) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_ACCEPTANCE_RATE]['response']>,
+    getAcceptanceRateCoes: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_ACCEPTANCE_RATE_COES) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_ACCEPTANCE_RATE_COES]['response']>,
   },
 
   coeTracking: {

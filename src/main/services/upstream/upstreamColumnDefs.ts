@@ -100,7 +100,15 @@ export function buildNoteColumns(): ColumnDefinition[] {
   ]
 }
 
-export function buildOpenPositionColumns(): ColumnDefinition[] {
+export function buildOpenPositionColumns(year?: number): ColumnDefinition[] {
+  const createdColumn = col('Created', 'Created', { dataType: 'date', filterOperator: 'None' })
+
+  if (year != null) {
+    createdColumn.filterOperator = 'Between'
+    createdColumn.filterText = `${year}-01-01T00:00:00.000Z`
+    createdColumn.filterArgument = [`${year}-12-31T23:59:59.999Z`]
+  }
+
   return [
     col('RecruitmentRequisitionId', 'Actions', { filterable: false, exportable: false, sortable: false, filterOperator: 'None' }),
     col('Id', 'Id', { dataType: 'numeric', isKey: true, sortDirection: 'Ascending', sortOrder: 2, filterOperator: 'None' }),
@@ -118,7 +126,7 @@ export function buildOpenPositionColumns(): ColumnDefinition[] {
     col('Aging', 'Aging', { dataType: 'numeric', filterable: false, filterOperator: 'None' }),
     col('Seniorities', 'Seniorities', { searchable: true, filterOperator: 'None' }),
     col('RateRange', 'Available Range', { filterOperator: 'None' }),
-    col('Created', 'Created', { dataType: 'date', filterOperator: 'None' }),
+    createdColumn,
     col('StartDate', 'Ready Date', { dataType: 'date', filterOperator: 'None' }),
     col('LastStatus', 'Last Modification', { dataType: 'date', filterOperator: 'None' }),
     col('Sourcing', 'Sourcing', { searchable: true, filterOperator: 'None' }),
@@ -166,6 +174,14 @@ export function buildTeamCompositionColumns(): ColumnDefinition[] {
     col('Role', 'Role', { searchable: true, filterOperator: 'None' }),
     col('StartDate', 'Start Date', { dataType: 'datetimeutc', sortDirection: 'Descending', sortOrder: 1, filterOperator: 'None' }),
     col('EndDate', 'End Date', { dataType: 'datetimeutc', filterOperator: 'None' }),
+  ]
+}
+
+export function buildBenchColumns(): ColumnDefinition[] {
+  return [
+    col('UserId', 'User ID', { dataType: 'numeric', isKey: true, filterable: false, filterOperator: 'None', visible: false }),
+    col('Name', 'Employee', { searchable: true, sortDirection: 'Ascending', sortOrder: 1 }),
+    col('MainSkill', 'Main Skill', { searchable: true }),
   ]
 }
 

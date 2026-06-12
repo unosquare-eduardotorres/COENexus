@@ -14,7 +14,7 @@ export const claudeService = {
     temperature = 0.1,
     systemPrompt?: string,
     signal?: AbortSignal
-  ): Promise<string> {
+  ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
     const abortController = new AbortController()
     if (signal) {
       signal.addEventListener('abort', () => abortController.abort())
@@ -61,7 +61,9 @@ export const claudeService = {
         if (msg.type === 'result') {
           const usage = msg.usage as Record<string, number> | undefined
           if (usage) {
-            inputTokens = usage.input_tokens ?? usage.input ?? 0
+            inputTokens = (usage.input_tokens ?? 0)
+              + (usage.cache_creation_input_tokens ?? 0)
+              + (usage.cache_read_input_tokens ?? 0)
             outputTokens = usage.output_tokens ?? usage.output ?? 0
           }
         }
@@ -83,7 +85,7 @@ export const claudeService = {
     log.info('Chat completed', { model, inputTokens, outputTokens, resultLength: result.length })
 
     if (!result) throw new Error('Empty response from Claude SDK')
-    return result
+    return { text: result, usage: { inputTokens, outputTokens } }
   },
 
   getTokenUsage() {

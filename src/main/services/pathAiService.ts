@@ -99,7 +99,7 @@ export const pathAiService = {
 
     const prompt = buildDefensePrepPrompt(params)
     const signal = AbortSignal.timeout(30_000)
-    const response = await claudeService.chatAsync(
+    const { text: response } = await claudeService.chatAsync(
       'claude-sonnet-4-20250514',
       prompt,
       2000,
@@ -128,7 +128,7 @@ export const pathAiService = {
 
     const prompt = buildRemediationPrompt(params)
     const signal = AbortSignal.timeout(30_000)
-    const response = await claudeService.chatAsync(
+    const { text: response } = await claudeService.chatAsync(
       'claude-sonnet-4-20250514',
       prompt,
       2000,

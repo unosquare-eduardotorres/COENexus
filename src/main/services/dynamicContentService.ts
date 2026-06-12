@@ -46,7 +46,7 @@ Respond with a JSON array:
 [{"title": "...", "url": "...", "source": "...", "relevanceScore": 0.9, "format": "article"}, ...]`
 
     const signal = AbortSignal.timeout(30_000)
-    const response = await claudeService.chatAsync(
+    const { text: response } = await claudeService.chatAsync(
       'claude-sonnet-4-20250514',
       prompt,
       2000,

@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 
 vi.mock('../claudeService', () => ({
   claudeService: {
-    chatAsync: vi.fn().mockResolvedValue('{"match_score":85,"summary":"Good match"}'),
+    chatAsync: vi.fn().mockResolvedValue({ text: '{"match_score":85,"summary":"Good match"}', usage: { inputTokens: 0, outputTokens: 0 } }),
   },
 }))
 

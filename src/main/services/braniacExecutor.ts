@@ -769,7 +769,7 @@ class BraniacExecutor {
       }),
     })
 
-    const response = await claudeService.chatAsync(
+    const { text: response } = await claudeService.chatAsync(
       BRANIAC_MODEL,
       buildAnalysisPrompt(singleBundle),
       MAX_OUTPUT_TOKENS,
@@ -878,7 +878,7 @@ class BraniacExecutor {
       })
 
       const prompt = buildBatchAnalysisPrompt(batch, observations, account)
-      const response = await claudeService.chatAsync(
+      const { text: response } = await claudeService.chatAsync(
         BRANIAC_MODEL,
         prompt,
         MAX_OUTPUT_TOKENS,
@@ -956,7 +956,7 @@ class BraniacExecutor {
     })
 
     const synthesisPrompt = buildSynthesisPrompt(observations, account, stakeholder, totalPositions)
-    const synthesisResponse = await claudeService.chatAsync(
+    const { text: synthesisResponse } = await claudeService.chatAsync(
       BRANIAC_MODEL,
       synthesisPrompt,
       MAX_OUTPUT_TOKENS,

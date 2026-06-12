@@ -25,6 +25,8 @@ export default memo(function SucceededRecordsTable({ records, variant = 'vectori
             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Name</th>
             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Seniority</th>
             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Main Skill</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Job Title</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted">Functional Unit</th>
             <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted w-28">Status</th>
           </tr>
         </thead>
@@ -39,6 +41,12 @@ export default memo(function SucceededRecordsTable({ records, variant = 'vectori
               </td>
               <td className="px-4 py-3 text-secondary">
                 {record.mainSkill || '—'}
+              </td>
+              <td className="px-4 py-3 text-secondary truncate max-w-[160px]" title={record.jobTitle ?? ''}>
+                {record.jobTitle || '—'}
+              </td>
+              <td className="px-4 py-3 text-secondary truncate max-w-[140px]" title={record.functionalUnit ?? ''}>
+                {record.functionalUnit || '—'}
               </td>
               <td className="px-4 py-3">
                 {variant === 'skipped' ? (

@@ -136,7 +136,7 @@ export const presentationService = {
       resumeText,
     })
 
-    const response = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 1200, 0.1)
+    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 1200, 0.1)
     const parsed = parseJsonResponse<ResumeFormatCheckResult>(
       response,
       { isFormatted: false, details: ['Could not parse format check response'] },
@@ -156,7 +156,7 @@ export const presentationService = {
       jobDescription,
     })
 
-    const response = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2600, 0.2)
+    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2600, 0.2)
     const parsed = parseJsonResponse<ResumeTransformResult>(
       response,
       { transformedResume: resumeText },
@@ -181,7 +181,7 @@ export const presentationService = {
       mainSkill,
     })
 
-    const response = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 900, 0.35)
+    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 900, 0.35)
     return response.trim()
   },
 
@@ -200,7 +200,7 @@ export const presentationService = {
       positionTitle,
     })
 
-    const response = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2200, 0.2)
+    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2200, 0.2)
     const parsed = parseJsonResponse<CandidateProfileResult>(
       response,
       {

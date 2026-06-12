@@ -42,6 +42,9 @@ function mapEmployeeRowToDto(row: SyncedEmployeeRow): SyncRecordDto {
     syncedAt: row.synced_at,
     resumeDateCreated: row.resume_date_created,
     jobTitle: row.job_title,
+    functionalUnit: row.functional_unit,
+    officeLocation: row.office_location,
+    businessUnit: row.business_unit,
   }
 }
 

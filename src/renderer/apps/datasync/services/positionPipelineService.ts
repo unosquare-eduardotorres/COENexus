@@ -15,7 +15,7 @@ export const positionPipelineService = {
   async startPipeline(
     activeOnly: boolean,
     token: string,
-    options?: { model?: string; limit?: number; skip?: number },
+    options?: { model?: string; limit?: number; skip?: number; year?: number },
   ): Promise<{ started: boolean }> {
     log.info('Position pipeline start requested', { activeOnly })
     return window.api.positionPipeline.start({
@@ -24,6 +24,7 @@ export const positionPipelineService = {
       model: options?.model,
       limit: options?.limit,
       skip: options?.skip,
+      year: options?.year,
     })
   },
 

@@ -27,7 +27,7 @@ export function registerAiHandlers(): void {
         hasSystemMessage: Boolean(systemMessage),
       })
 
-      const response = await claudeService.chatAsync(
+      const { text, usage } = await claudeService.chatAsync(
         validated.model,
         userMessage.content,
         validated.maxTokens ?? 4096,
@@ -37,8 +37,13 @@ export function registerAiHandlers(): void {
 
       return {
         choices: [{
-          message: { role: 'assistant', content: response },
+          message: { role: 'assistant', content: text },
         }],
+        usage: {
+          prompt_tokens: usage.inputTokens,
+          completion_tokens: usage.outputTokens,
+          total_tokens: usage.inputTokens + usage.outputTokens,
+        },
       }
     })
 

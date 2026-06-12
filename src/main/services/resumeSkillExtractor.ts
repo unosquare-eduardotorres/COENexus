@@ -72,7 +72,7 @@ async function extractOneInternal(row: EmbeddingRow, model: string): Promise<boo
 
   const prompt = `${EXTRACTION_PROMPT}\n\nRESUME TEXT:\n${text}`
 
-  const response = await claudeService.chatAsync(
+  const { text: response } = await claudeService.chatAsync(
     model,
     prompt,
     1024,

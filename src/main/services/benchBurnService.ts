@@ -160,7 +160,7 @@ export const benchBurnService = {
         })
 
         try {
-          const response = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+          const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
           const parsed = parseAiResponse(response, opusAnalysisSchema, 'bench-burn')
 
           const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
@@ -484,7 +484,7 @@ export const benchBurnService = {
         })
 
         try {
-          const response = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+          const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
           const parsed = parseAiResponse(response, opusAnalysisSchema, 'candidate-to-positions')
 
           const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
@@ -655,7 +655,7 @@ export const benchBurnService = {
           })
 
           try {
-            const response = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+            const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
             const parsed = parseAiResponse(response, opusAnalysisSchema, 'external-candidate')
 
             const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>

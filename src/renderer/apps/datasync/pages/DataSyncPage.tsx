@@ -180,6 +180,9 @@ export default function DataSyncPage() {
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
             selectedYear={selectedYear}
             onYearChange={handleYearChange}
+            allRecords={pipeline.allRecords}
+            isLoadingAllRecords={pipeline.isLoadingAllRecords}
+            dbFailedCount={pipeline.dbFailedCount}
           />
         </>
       );
@@ -212,6 +215,8 @@ export default function DataSyncPage() {
             isSyncDisabled={!isTokenValid}
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
             syncMode={positionPipeline.syncMode}
+            syncYear={positionPipeline.syncYear}
+            onSyncYearChange={positionPipeline.setSyncYear}
           />
         </>
       );

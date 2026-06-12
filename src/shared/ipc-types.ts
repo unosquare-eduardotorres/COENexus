@@ -139,6 +139,10 @@ export interface PipelineRecordEvent {
   error?: string
   seniority?: string
   mainSkill?: string
+  jobTitle?: string
+  functionalUnit?: string
+  businessUnit?: string
+  hasResume?: boolean
 }
 
 export interface PipelineProgressDto {
@@ -166,6 +170,7 @@ export interface PositionPipelineStartParams {
   activeOnly: boolean
   limit?: number
   skip?: number
+  year?: number
 }
 
 export interface PositionPipelineVectorizeSyncedParams {
@@ -796,6 +801,79 @@ export interface ReportPositionDetailResult {
 export interface ReportSyncStatus {
   total: number
   lastSyncedAt: string | null
+}
+
+// ---- Acceptance Rate report --------------------------------------------------
+
+export type AcceptanceBucket = 'approved' | 'rejected' | 'declined' | 'unresolved'
+export type AcceptanceOutcome = 'won' | 'lost' | 'no-decision'
+
+export interface ReportAcceptanceRateFilters {
+  year: number
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
+  /** Real COE value, or 'all' for no COE scoping. */
+  coe: string
+}
+
+export interface ReportCandidateOutcome {
+  candidateRequisitionId: number
+  candidateName: string
+  mainSkill: string
+  candidateStatus: string
+  bucket: AcceptanceBucket
+  isEmployee: boolean
+  rate: number
+  startDate: string | null
+}
+
+export interface ReportPositionOutcome {
+  upstreamId: number
+  account: string
+  jobTitle: string
+  mainSkill: string
+  coe: string
+  practice: string
+  /** Granular upstream position Status (e.g. 'ClosedWon', 'ClosedLostCompetitor', 'Closed'). */
+  positionStatus: string
+  closedDate: string | null
+  approved: number
+  rejected: number
+  declined: number
+  unresolved: number
+  outcome: AcceptanceOutcome
+  candidates: ReportCandidateOutcome[]
+}
+
+export interface ReportAcceptanceRateSummary {
+  /** approved / (approved + rejected), as a percentage (0..100); 0 when denominator is 0. */
+  acceptanceRate: number
+  approved: number
+  rejected: number
+  declined: number
+  unresolvedTotal: number
+  /** Count of every candidate_status value seen across the closed positions in scope. */
+  byStatus: Record<string, number>
+  /** Raw count per position_status across the quarter-closed positions in scope. */
+  positionStatusCounts: Record<string, number>
+  wonCount: number
+  lostCount: number
+  noDecisionCount: number
+  totalClosedPositions: number
+  candidatesEvaluated: number
+  /** Closed positions with no upstream close date — excluded from the quarterly totals. */
+  undatedCount: number
+  lastSyncedAt: string | null
+}
+
+export interface ReportAcceptanceRateResult {
+  summary: ReportAcceptanceRateSummary
+  groups: {
+    won: ReportPositionOutcome[]
+    lost: ReportPositionOutcome[]
+    noDecision: ReportPositionOutcome[]
+    /** Closed but date-less positions, surfaced separately from the dated quarter. */
+    undated: ReportPositionOutcome[]
+  }
 }
 
 export interface ReportExportCsvResult {
@@ -2106,6 +2184,8 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
   [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
   [IPC_CHANNELS.REPORT_EXPORT_XLSX]: { request: readonly [ReportStalledPositionResult[]]; response: ExcelExportResult }
+  [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE]: { request: ReportAcceptanceRateFilters; response: ReportAcceptanceRateResult }
+  [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE_COES]: { request: void; response: string[] }
 
   [IPC_CHANNELS.COE_TRACKING_GET_OVERVIEW]: { request: void; response: CoeTrackingSummary[] }
   [IPC_CHANNELS.COE_TRACKING_GET_COE_DETAIL]: { request: string; response: PracticeTrackingSummary[] }

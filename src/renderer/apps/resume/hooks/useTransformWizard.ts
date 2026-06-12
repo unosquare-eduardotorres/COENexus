@@ -233,6 +233,12 @@ export function useTransformWizard(
     else session.setShowSaveSessionModal(true);
   }, [claudeConnected, session]);
 
+  const handleRetryTransform = useCallback(() => {
+    log.info('Transform retry requested');
+    pipeline.setError(null);
+    void executeTransform();
+  }, [executeTransform, pipeline]);
+
   const handleSaveAndEnhance = useCallback((sessionName: string) => {
     log.info('Transform save-and-enhance confirmed', { sessionName });
     session.setPendingSessionName(sessionName);
@@ -474,6 +480,7 @@ export function useTransformWizard(
       error: pipeline.error,
       setError: pipeline.setError,
       handleTransform,
+      handleRetryTransform,
       executeTransform,
       processingMetrics: pipeline.processingMetrics,
     },

@@ -471,7 +471,7 @@ export function registerBraniacHandlers(): void {
         'Rewrite as a structured pattern. Output JSON only.',
       ].join('\n')
 
-      const raw = await claudeService.chatAsync(model, prompt, 512, 0.2, systemPrompt)
+      const { text: raw } = await claudeService.chatAsync(model, prompt, 512, 0.2, systemPrompt)
       const parsed = JSON.parse(raw.replace(/```json\n?/g, '').replace(/```/g, '').trim())
 
       return ok({

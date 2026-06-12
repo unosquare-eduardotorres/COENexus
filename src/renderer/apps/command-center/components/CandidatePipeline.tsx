@@ -9,6 +9,26 @@ interface CandidatePipelineProps {
 
 const ACTIVE_STATUSES = ['PresentedToCGX', 'PresentedToClient', 'CustomerInterview'] as const
 
+const STATUS_SYNONYMS: Record<string, string> = {
+  PresentedToClientSuccess: 'PresentedToCGX',
+}
+
+function normalizeStatus(status: string): string {
+  return STATUS_SYNONYMS[status] ?? status
+}
+
+const SUCCESS_STATUSES = new Set(['Approved', 'Hired', 'AcceptedByClient', 'Started', 'Active'])
+
+function getStatusStyle(status: string, isEnded: boolean): string {
+  if (SUCCESS_STATUSES.has(status)) {
+    return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
+  }
+  if (isEnded) {
+    return 'bg-red-500/10 text-red-400 border-red-500/20'
+  }
+  return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+}
+
 const COLUMNS = [
   { status: 'PresentedToCGX', label: 'Presented to CGX', color: 'border-teal-500', headerBg: 'bg-teal-500/10 text-teal-500' },
   { status: 'PresentedToClient', label: 'Presented to Client', color: 'border-violet-500', headerBg: 'bg-violet-500/10 text-violet-500' },
@@ -32,20 +52,26 @@ function CandidateCard({ candidate, isEnded, feedbackCatalog }: { candidate: Can
     ? resolveFeedbackLabels(candidate.rejectionFeedback, feedbackCatalog)
     : []
 
+  const isSuccess = SUCCESS_STATUSES.has(candidate.candidateStatus)
+
   return (
-    <div className={`glass-panel-subtle p-3 rounded-lg ${isEnded ? 'opacity-75' : ''}`}>
-      <p className="text-xs font-semibold text-primary">{candidate.candidateName}</p>
-      <div className="flex items-center gap-2 mt-1 text-[10px] text-primary/80">
+    <div className={`p-3 rounded-lg ${
+      isSuccess
+        ? 'bg-emerald-500/10 border border-emerald-500/20'
+        : isEnded
+          ? 'glass-panel-subtle opacity-75'
+          : 'glass-panel-subtle'
+    }`}>
+      <p className={`text-xs font-semibold ${isSuccess ? 'text-white' : 'text-primary'}`}>{candidate.candidateName}</p>
+      <div className={`flex items-center gap-2 mt-1 text-[10px] ${isSuccess ? 'text-white/80' : 'text-primary/80'}`}>
         {candidate.mainSkill && <span>{candidate.mainSkill}</span>}
         {candidate.rate > 0 && <span>${candidate.rate}/hr</span>}
       </div>
       {candidate.startDate && (
-        <p className="text-[10px] text-secondary mt-1">{formatDate(candidate.startDate)}</p>
+        <p className={`text-[10px] mt-1 ${isSuccess ? 'text-white/70' : 'text-secondary'}`}>{formatDate(candidate.startDate)}</p>
       )}
       <span className={`inline-flex mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-        isEnded
-          ? 'bg-red-500/10 text-red-400 border-red-500/20'
-          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+        getStatusStyle(candidate.candidateStatus, isEnded)
       }`}>
         {candidate.candidateStatus.replace(/([A-Z])/g, ' $1').trim()}
       </span>
@@ -70,10 +96,10 @@ export default function CandidatePipeline({ candidates, feedbackCatalog = {} }: 
     let filtered: Candidate[]
     if (col.status === 'Ended') {
       filtered = candidates.filter(c =>
-        !(ACTIVE_STATUSES as readonly string[]).includes(c.candidateStatus)
+        !(ACTIVE_STATUSES as readonly string[]).includes(normalizeStatus(c.candidateStatus))
       )
     } else {
-      filtered = candidates.filter(c => c.candidateStatus === col.status)
+      filtered = candidates.filter(c => normalizeStatus(c.candidateStatus) === col.status)
     }
     return { ...col, candidates: filtered }
   })

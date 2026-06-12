@@ -50,7 +50,7 @@ const DEFAULT_CONFIG: AppConfig = {
   claude: {
     haikuModel: 'claude-haiku-4-20250414',
     sonnetModel: 'claude-sonnet-4-20250514',
-    opusModel: 'claude-opus-4-20250514',
+    opusModel: 'claude-sonnet-4-20250514',
     timeoutSeconds: 120,
     maxConcurrency: 8,
     haikuMaxConcurrency: 20,

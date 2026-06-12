@@ -19,6 +19,10 @@ export interface PipelineRecordEvent {
   error?: string
   seniority?: string
   mainSkill?: string
+  jobTitle?: string
+  functionalUnit?: string
+  businessUnit?: string
+  hasResume?: boolean
 }
 
 export interface PipelineProgress {
@@ -127,7 +131,19 @@ export const unifiedPipelineOrchestrator = {
 
     log.info('Unified pipeline started', { source, mode, limit, skip, year, model })
 
+    let benchUpstreamIds: Set<number> | undefined
+    if (source === 'employees') {
+      try {
+        benchUpstreamIds = await upstreamApiService.getBenchEmployeeIds(token, signal)
+        log.info('Loaded bench IDs for pipeline', { count: benchUpstreamIds.size })
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') throw err
+        log.warn('Failed to load bench IDs — using composition-only detection')
+      }
+    }
+
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
+    syncRepository.reconcileStatuses(source)
     let totalRecords = 0
     const resumeFrom = skip ?? pausedOffset
     pausedOffset = 0
@@ -162,12 +178,12 @@ export const unifiedPipelineOrchestrator = {
         let pageTotal: number
 
         if (source === 'employees') {
-          const result = await upstreamApiService.getEmployeesPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun))
+          const result = await upstreamApiService.getEmployeesPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun), signal)
           pageTotal = result.totalRecords
           pageItems = result.items.map(e => ({ upstreamId: e.userId, fullName: e.fullName, email: e.email, raw: e }))
         } else {
           const take = Math.min(pageSize, maxToProcess - processedInRun)
-          const result = await upstreamApiService.getCandidatesPaged(token, pageOffset, take, year)
+          const result = await upstreamApiService.getCandidatesPaged(token, pageOffset, take, year, signal)
           pageTotal = result.totalRecords
           pageItems = result.items.map(c => ({ upstreamId: c.candidateId, fullName: c.fullName, email: c.email ?? '', raw: c }))
         }
@@ -183,7 +199,7 @@ export const unifiedPipelineOrchestrator = {
           if (batch.length === 0) break
 
           const batchResults = await Promise.allSettled(
-            batch.map(item => processOneRecord(source, token, model, table, item, mode))
+            batch.map(item => processOneRecord(source, token, model, table, item, mode, signal, benchUpstreamIds))
           )
 
           for (let i = 0; i < batchResults.length; i++) {
@@ -194,17 +210,23 @@ export const unifiedPipelineOrchestrator = {
             const result = batchResults[i]
 
             if (result.status === 'rejected') {
-              failedCount++
-              const error = result.reason instanceof Error ? result.reason.message : 'Unknown error'
-              log.error('Pipeline record processing failed', result.reason instanceof Error ? result.reason : new Error(error), { source, upstreamId: item.upstreamId })
-              emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'failed', failedStep: 'sync', error } })
+              const reason = result.reason
+              if (reason instanceof Error && reason.name === 'AbortError') {
+                skippedCount++
+                emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'skipped' } })
+              } else {
+                failedCount++
+                const error = reason instanceof Error ? reason.message : 'Unknown error'
+                log.error('Pipeline record processing failed', reason instanceof Error ? reason : new Error(error), { source, upstreamId: item.upstreamId })
+                emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'failed', failedStep: 'sync', error } })
+              }
             } else {
-              const record = result.value
-              if (record.outcome === 'vectorized') succeededCount++
-              else if (record.outcome === 'failed') failedCount++
-              else skippedCount++
-              emitAndAccumulate({ type: 'record', record })
-            }
+                const record = result.value
+                if (record.outcome === 'vectorized') succeededCount++
+                else if (record.outcome === 'failed') failedCount++
+                else skippedCount++
+                emitAndAccumulate({ type: 'record', record })
+              }
           }
 
           emitEvent({ type: 'progress', progress: makeProgress(source, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', batch[batch.length - 1]?.fullName) })
@@ -224,6 +246,7 @@ export const unifiedPipelineOrchestrator = {
       }
 
       matchEngineService.invalidateFilterCache()
+      syncRepository.reconcileStatuses(source)
       const finalStatus = signal.aborted ? 'paused' as const : 'completed' as const
       if (signal.aborted) {
         pausedOffset = pageOffset
@@ -267,8 +290,9 @@ export const unifiedPipelineOrchestrator = {
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
 
     log.info('Retry all failed started', { source })
+    syncRepository.reconcileStatuses(source)
 
-    const failedRecords = syncRepository.getFailedRecords(table)
+    const failedRecords = syncRepository.getRetryableRecords(table)
     const totalRecords = failedRecords.length
     let processedRecords = 0
     let succeededCount = 0
@@ -278,9 +302,15 @@ export const unifiedPipelineOrchestrator = {
     emitEvent({ type: 'progress', progress: makeProgress(source, totalRecords, 0, 0, 0, 0, 'processing') })
 
     try {
-      for (const record of failedRecords) {
+      for (let i = 0; i < failedRecords.length; i++) {
         if (signal.aborted) break
+        const record = failedRecords[i]
         processedRecords++
+
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          if (signal.aborted) break
+        }
 
         try {
           const result = await retrySingleInternal(source, token, model, record)
@@ -312,11 +342,11 @@ export const unifiedPipelineOrchestrator = {
     const model = getModel(params.model)
     const table = source === 'employees' ? 'synced_employees' as const : 'synced_candidates' as const
 
-    const records = syncRepository.getFailedRecords(table)
+    const records = syncRepository.getRetryableRecords(table)
     const record = records.find(r => r.upstream_id === upstreamId)
 
     if (!record) {
-      return { upstreamId, name: 'Unknown', outcome: 'failed', failedStep: 'sync', error: 'Record not found in failed list' }
+      return { upstreamId, name: 'Unknown', outcome: 'failed', failedStep: 'sync', error: 'Record not found in retryable list' }
     }
 
     return retrySingleInternal(source, token, model, record)
@@ -330,8 +360,10 @@ async function processOneRecord(
   table: 'synced_employees' | 'synced_candidates',
   item: { upstreamId: number; fullName: string; email: string },
   mode: PipelineMode = 'full',
+  signal?: AbortSignal,
+  benchUpstreamIds?: Set<number>,
 ): Promise<PipelineRecordEvent> {
-  const syncResult = await syncSingleRecord(source, token, item.upstreamId)
+  const syncResult = await syncSingleRecord(source, token, item.upstreamId, signal, benchUpstreamIds)
 
   if ('error' in syncResult) {
     syncRepository.upsertSyncFailed(table, {
@@ -343,10 +375,11 @@ async function processOneRecord(
     return { upstreamId: item.upstreamId, name: item.fullName, outcome: 'failed', failedStep: 'sync', error: syncResult.error }
   }
 
-  const { dbId, resumeChanged, syncDetail, hasResume, noteId, filename, isBench, name, seniority, mainSkill } = syncResult
+  const { dbId, resumeChanged, syncDetail, hasResume, noteId, filename, isBench, name, seniority, mainSkill, jobTitle, functionalUnit, businessUnit } = syncResult
+  const extraFields = { seniority, mainSkill, jobTitle, functionalUnit, businessUnit, hasResume }
 
   if (mode === 'sync-only') {
-    return { upstreamId: item.upstreamId, name, outcome: 'skipped', seniority, mainSkill }
+    return { upstreamId: item.upstreamId, name, outcome: 'skipped', ...extraFields }
   }
 
   if (syncDetail === 'unchanged' && !resumeChanged) {
@@ -355,7 +388,7 @@ async function processOneRecord(
       : syncRepository.findCandidateByUpstreamId(item.upstreamId)
     const alreadyVectorized = existing?.status === 'vectorized' || existing?.status === 'extracted'
     if (alreadyVectorized) {
-      return { upstreamId: item.upstreamId, name, outcome: 'skipped', seniority, mainSkill }
+      return { upstreamId: item.upstreamId, name, outcome: 'skipped', ...extraFields }
     }
   }
 
@@ -364,32 +397,34 @@ async function processOneRecord(
       ? syncRepository.findEmployeeByUpstreamId(item.upstreamId)
       : syncRepository.findCandidateByUpstreamId(item.upstreamId)
     if (existing?.status === 'vectorized') {
-      return { upstreamId: item.upstreamId, name, outcome: 'skipped', seniority, mainSkill }
+      return { upstreamId: item.upstreamId, name, outcome: 'skipped', ...extraFields }
     }
   }
 
   if (!hasResume) {
     syncRepository.markFailed(table, dbId, 'incomplete', 'No resume available')
-    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'no_resume', error: 'No resume available' }
+    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'no_resume', error: 'No resume available', ...extraFields }
   }
 
-  const extractResult = await extractSingleRecord(source, token, noteId!, filename!, dbId, item.upstreamId, isBench)
+  const extractResult = await extractSingleRecord(source, token, noteId!, filename!, dbId, item.upstreamId, isBench, signal)
   if ('error' in extractResult) {
-    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'extract', error: extractResult.error }
+    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'extract', error: extractResult.error, ...extraFields }
   }
 
-  const vecResult = await vectorizeSingleRecord(source, dbId, item.upstreamId, extractResult.text, isBench, model)
+  const vecResult = await vectorizeSingleRecord(source, dbId, item.upstreamId, extractResult.text, isBench, model, signal)
   if ('error' in vecResult) {
-    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error }
+    return { upstreamId: item.upstreamId, name, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error, ...extraFields }
   }
 
-  return { upstreamId: item.upstreamId, name, outcome: 'vectorized', seniority, mainSkill }
+  return { upstreamId: item.upstreamId, name, outcome: 'vectorized', ...extraFields }
 }
 
 async function syncSingleRecord(
   source: 'employees' | 'candidates',
   token: string,
   upstreamId: number,
+  signal?: AbortSignal,
+  benchUpstreamIds?: Set<number>,
 ): Promise<
   | { error: string }
   | {
@@ -403,11 +438,14 @@ async function syncSingleRecord(
       name: string
       seniority: string
       mainSkill: string
+      jobTitle: string
+      functionalUnit: string
+      businessUnit: string
     }
 > {
   try {
     if (source === 'employees') {
-      const dto = await syncEmployeeOrchestrator.syncSingle(token, upstreamId)
+      const dto = await syncEmployeeOrchestrator.syncSingle(token, upstreamId, signal, benchUpstreamIds)
       const row = syncRepository.findEmployeeByUpstreamId(upstreamId)
       if (!row) return { error: 'Failed to persist employee record' }
       return {
@@ -421,9 +459,12 @@ async function syncSingleRecord(
         name: row.full_name,
         seniority: row.seniority,
         mainSkill: row.main_skill,
+        jobTitle: row.job_title,
+        functionalUnit: row.functional_unit,
+        businessUnit: row.business_unit,
       }
     } else {
-      const dto = await syncCandidateOrchestrator.syncSingle(token, upstreamId)
+      const dto = await syncCandidateOrchestrator.syncSingle(token, upstreamId, signal)
       const row = syncRepository.findCandidateByUpstreamId(upstreamId)
       if (!row) return { error: 'Failed to persist candidate record' }
       return {
@@ -437,9 +478,13 @@ async function syncSingleRecord(
         name: row.full_name,
         seniority: row.seniority ?? '',
         mainSkill: row.main_skill ?? '',
+        jobTitle: '',
+        functionalUnit: '',
+        businessUnit: '',
       }
     }
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw err
     return { error: err instanceof Error ? err.message : 'Sync failed' }
   }
 }
@@ -498,7 +543,7 @@ async function retrySingleInternal(
     return { upstreamId: record.upstream_id, name: record.full_name, outcome: 'vectorized' }
   }
 
-  if (record.status === 'vectorize_failed') {
+  if (record.status === 'extracted' || record.status === 'vectorize_failed') {
     const embedding = embeddingRepository.findBySource(source, record.id)
     if (!embedding?.resume_text) {
       return { upstreamId: record.upstream_id, name: record.full_name, outcome: 'failed', failedStep: 'extract', error: 'No resume text found for re-vectorization' }

@@ -37,7 +37,8 @@ describe('claudeService', () => {
       const { claudeService } = await import('../claudeService')
       const result = await claudeService.chatAsync('claude-3-haiku', 'Test prompt')
 
-      expect(result).toBe('AI response text')
+      expect(result.text).toBe('AI response text')
+      expect(result.usage).toEqual({ inputTokens: 100, outputTokens: 50 })
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           prompt: 'Test prompt',
@@ -82,7 +83,7 @@ describe('claudeService', () => {
       const { claudeService } = await import('../claudeService')
       const result = await claudeService.chatAsync('claude-3-haiku', 'prompt')
 
-      expect(result).toBe('Vigil response text')
+      expect(result.text).toBe('Vigil response text')
     })
 
     it('should re-throw max turns error when no text was accumulated', async () => {
@@ -119,7 +120,7 @@ describe('claudeService', () => {
       const { claudeService } = await import('../claudeService')
       const result = await claudeService.chatAsync('claude-3-haiku', 'prompt')
 
-      expect(result).toBe('Part 1 Part 2')
+      expect(result.text).toBe('Part 1 Part 2')
     })
   })
 

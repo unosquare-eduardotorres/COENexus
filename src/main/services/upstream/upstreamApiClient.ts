@@ -42,7 +42,7 @@ export interface ColumnDefinition {
   filterArgument?: string[]
 }
 
-export async function fetchAuthorized<T>(method: string, url: string, token: string, body?: unknown): Promise<T> {
+export async function fetchAuthorized<T>(method: string, url: string, token: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const start = Date.now()
   const options: RequestInit = {
     method,
@@ -51,6 +51,7 @@ export async function fetchAuthorized<T>(method: string, url: string, token: str
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
+    signal,
   }
 
   const response = await fetch(url, options)
@@ -62,8 +63,8 @@ export async function fetchAuthorized<T>(method: string, url: string, token: str
   return response.json() as Promise<T>
 }
 
-export async function fetchPaged(url: string, token: string, request: PagedRequest): Promise<PagedResponse> {
-  const raw = await fetchAuthorized<Record<string, unknown>>('POST', url, token, request)
+export async function fetchPaged(url: string, token: string, request: PagedRequest, signal?: AbortSignal): Promise<PagedResponse> {
+  const raw = await fetchAuthorized<Record<string, unknown>>('POST', url, token, request, signal)
   const payload = (raw.payload ?? raw.Payload) as unknown[][] | undefined
   if (!payload || !Array.isArray(payload)) {
     log.warn('Invalid paged response — token may be expired', { url, hasPayload: !!raw.payload || !!raw.Payload })

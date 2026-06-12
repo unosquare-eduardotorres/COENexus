@@ -9,6 +9,7 @@ import { benchBurnService } from '../../services/benchBurnService'
 import { matchSearchCoordinator } from '../../services/matchSearchCoordinator'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow } from '../../db/repositories/syncRepository'
+import { embeddingRepository } from '../../db/repositories/embeddingRepository'
 import { matchRepository } from '../../db/repositories/matchRepository'
 import { claudeService } from '../../services/claudeService'
 import type { MatchRankPositionsParams, MatchRankPositionsForTextParams, MatchToPositionsParams } from '../../../shared/ipc-types'
@@ -18,7 +19,7 @@ import { createLogger } from '../../services/logger'
 
 const log = createLogger('MatchIPC')
 
-function mapEmployeeToBenchDto(row: SyncedEmployeeRow) {
+function mapEmployeeToBenchDto(row: SyncedEmployeeRow, vectorizedIds?: Set<number>) {
   return {
     upstreamId: row.upstream_id,
     name: row.full_name,
@@ -29,13 +30,13 @@ function mapEmployeeToBenchDto(row: SyncedEmployeeRow) {
     grossMonthlySalary: row.gross_monthly_salary,
     salaryCurrency: row.salary_currency,
     lastAccount: row.last_account,
-    isVectorized: row.status === 'vectorized',
+    isVectorized: vectorizedIds ? vectorizedIds.has(row.id) : row.status === 'vectorized',
     isBench: row.is_bench === 1,
     hasResume: row.has_resume === 1,
   }
 }
 
-function mapCandidateToListDto(row: SyncedCandidateRow) {
+function mapCandidateToListDto(row: SyncedCandidateRow, vectorizedIds?: Set<number>) {
   return {
     upstreamId: row.upstream_id,
     name: row.full_name,
@@ -48,11 +49,11 @@ function mapCandidateToListDto(row: SyncedCandidateRow) {
     coeCertified: row.coe_certified === 1,
     candidateStatus: row.candidate_status ?? '',
     hasResume: row.has_resume === 1,
-    isVectorized: row.status === 'vectorized',
+    isVectorized: vectorizedIds ? vectorizedIds.has(row.id) : row.status === 'vectorized',
   }
 }
 
-function mapPositionToBenchDto(row: SyncedOpenPositionRow) {
+function mapPositionToBenchDto(row: SyncedOpenPositionRow, vectorizedIds?: Set<number>) {
   return {
     upstreamId: row.upstream_id,
     id: row.id,
@@ -69,8 +70,23 @@ function mapPositionToBenchDto(row: SyncedOpenPositionRow) {
     aging: row.aging,
     availableRange: row.available_range,
     countries: row.countries,
-    isVectorized: row.status === 'vectorized',
+    isVectorized: vectorizedIds ? vectorizedIds.has(row.id) : row.status === 'vectorized',
   }
+}
+
+function mapEmployeeRows(rows: SyncedEmployeeRow[]) {
+  const vectorizedIds = embeddingRepository.getVectorizedSourceIds('employees', rows.map(r => r.id))
+  return rows.map(r => mapEmployeeToBenchDto(r, vectorizedIds))
+}
+
+function mapCandidateRows(rows: SyncedCandidateRow[]) {
+  const vectorizedIds = embeddingRepository.getVectorizedSourceIds('candidates', rows.map(r => r.id))
+  return rows.map(r => mapCandidateToListDto(r, vectorizedIds))
+}
+
+function mapPositionRows(rows: SyncedOpenPositionRow[]) {
+  const vectorizedIds = embeddingRepository.getVectorizedSourceIds('positions', rows.map(r => r.id))
+  return rows.map(r => mapPositionToBenchDto(r, vectorizedIds))
 }
 
 export function registerMatchHandlers(): void {
@@ -141,33 +157,33 @@ export function registerMatchHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.MATCH_BENCH_EMPLOYEES,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return syncRepository.getBenchEmployees().map(mapEmployeeToBenchDto)
+      return mapEmployeeRows(syncRepository.getBenchEmployees())
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_ALL_EMPLOYEES,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return syncRepository.getAllEmployees().map(mapEmployeeToBenchDto)
+      return mapEmployeeRows(syncRepository.getAllEmployees())
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_ALL_CANDIDATES,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return syncRepository.getAllCandidates().map(mapCandidateToListDto)
+      return mapCandidateRows(syncRepository.getAllCandidates())
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_SEARCH_CANDIDATES,
     async (event: IpcMainInvokeEvent, query: string) => {
       validateSender(event)
       if (!query || query.length < 3) return []
-      return syncRepository.searchCandidates(query).map(mapCandidateToListDto)
+      return mapCandidateRows(syncRepository.searchCandidates(query))
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_SEARCH_EMPLOYEES,
     async (event: IpcMainInvokeEvent, query: string) => {
       validateSender(event)
       if (!query || query.length < 3) return []
-      return syncRepository.searchEmployees(query).map(mapEmployeeToBenchDto)
+      return mapEmployeeRows(syncRepository.searchEmployees(query))
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_CANDIDATE_COUNT,
@@ -185,7 +201,7 @@ export function registerMatchHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.MATCH_OPEN_POSITIONS,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
-      return syncRepository.getAvailableOpenPositions().map(mapPositionToBenchDto)
+      return mapPositionRows(syncRepository.getAvailableOpenPositions())
     })
 
   registerIpcHandler(IPC_CHANNELS.MATCH_BENCH_BURN_SESSION,

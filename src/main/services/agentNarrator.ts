@@ -49,7 +49,7 @@ export const agentNarrator = {
 
     try {
       const model = configRepository.getConfig().haiku_model
-      const response = await claudeService.chatAsync(
+      const { text: response } = await claudeService.chatAsync(
         model,
         buildPrompt(input),
         120,

@@ -97,10 +97,4 @@ export const AI_ASSESSMENT_SECTIONS: { key: keyof SonnetAnalysis; title: string;
   { key: 'immediateValue', title: 'Immediate Value to the Team', icon: '⚡', borderColor: 'border-blue-500' },
   { key: 'rampUpEstimate', title: 'Ramp-Up Time Estimate', icon: '⏱️', borderColor: 'border-indigo-500' },
   { key: 'riskFactors', title: 'Risk Factors & Mitigation', icon: '⚠️', borderColor: 'border-amber-500' },
-  { key: 'beyondJd', title: 'Beyond the Job Description', icon: '💎', borderColor: 'border-violet-500' },
-  { key: 'leadershipDynamics', title: 'Leadership & Team Dynamics', icon: '👥', borderColor: 'border-teal-500' },
-  { key: 'industryDepth', title: 'Industry & Domain Depth', icon: '🏥', borderColor: 'border-cyan-500' },
-  { key: 'trackRecord', title: 'Track Record & Proof Points', icon: '📊', borderColor: 'border-violet-500' },
-  { key: 'culturalFit', title: 'Cultural & Work Style Compatibility', icon: '🌍', borderColor: 'border-rose-500' },
-  { key: 'retentionPotential', title: 'Retention & Long-Term Potential', icon: '🔒', borderColor: 'border-sky-500' },
 ];

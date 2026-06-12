@@ -140,12 +140,12 @@ function mapCandidateToDto(entity: Omit<SyncedCandidateRow, 'id'> & { id?: numbe
 
 
 export const syncCandidateOrchestrator = {
-  async syncSingle(token: string, upstreamId: number): Promise<SyncRecordDto> {
-    const { seniorities, mainSkills, countries } = await loadCatalogs(token)
+  async syncSingle(token: string, upstreamId: number, signal?: AbortSignal): Promise<SyncRecordDto> {
+    const { seniorities, mainSkills, countries } = await loadCatalogs(token, signal)
 
     const [detail, notes] = await Promise.all([
-      upstreamApiService.getCandidateDetail(token, upstreamId),
-      loadOrEmpty('Notes', () => upstreamApiService.getCandidateNotes(token, upstreamId)),
+      upstreamApiService.getCandidateDetail(token, upstreamId, signal),
+      loadOrEmpty('Notes', () => upstreamApiService.getCandidateNotes(token, upstreamId, signal)),
     ])
 
     const basicFallback: CandidateDetail = { candidateId: upstreamId, fullName: '' }

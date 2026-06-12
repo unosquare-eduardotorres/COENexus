@@ -107,6 +107,31 @@ export interface SyncedOpenPositionRow {
   synced_at: string
 }
 
+/** Lightweight Closed-position projection used by the Acceptance Rate report. */
+export interface ClosedPositionOutcomeRow {
+  id: number
+  upstream_id: number
+  position_status: string
+  account: string
+  coe: string
+  practice: string
+  job_title: string
+  main_skill: string
+  closed_date: string | null
+}
+
+/** Candidate projection joined to a Closed position. */
+export interface ClosedPositionCandidateRow {
+  open_position_id: number
+  candidate_requisition_id: number
+  candidate_name: string
+  main_skill: string
+  candidate_status: string
+  rate: number
+  start_date: string | null
+  is_employee: number
+}
+
 export interface SyncedProjectReallocationRow {
   id: number
   upstream_id: number
@@ -387,6 +412,94 @@ export const syncRepository = {
     return db.prepare('SELECT * FROM synced_open_positions WHERE upstream_id = ?').get(upstreamId) as SyncedOpenPositionRow | undefined
   },
 
+  /** Distinct, non-empty COE values across Closed positions — used to populate the Acceptance Rate filter. */
+  getDistinctClosedCoes(): string[] {
+    const db = getDatabase()
+    const rows = db.prepare(
+      "SELECT DISTINCT coe FROM synced_open_positions WHERE position_status LIKE 'Closed%' AND coe != '' ORDER BY coe"
+    ).all() as { coe: string }[]
+    return rows.map(r => r.coe)
+  },
+
+  /**
+   * Closed positions in a date window (optionally scoped to a COE) plus their candidate rows.
+   * Two queries total (positions + a single JOIN for candidates) — avoids the N+1 the
+   * stalled-report evaluate() does. `closed_date` is ISO-8601 so lexical range comparison is safe.
+   */
+  getClosedPositionsWithOutcomes(opts: {
+    startDate: string
+    endDateExclusive: string
+    coe: string | null
+  }): { positions: ClosedPositionOutcomeRow[]; candidates: ClosedPositionCandidateRow[] } {
+    const db = getDatabase()
+    const where = ["sop.position_status LIKE 'Closed%'", 'sop.closed_date IS NOT NULL', 'sop.closed_date >= ?', 'sop.closed_date < ?']
+    const params: string[] = [opts.startDate, opts.endDateExclusive]
+    if (opts.coe) {
+      where.push('sop.coe = ?')
+      params.push(opts.coe)
+    }
+    const whereSql = where.join(' AND ')
+
+    const positions = db.prepare(
+      `SELECT sop.id, sop.upstream_id, sop.position_status, sop.account, sop.coe, sop.practice, sop.job_title, sop.main_skill, sop.closed_date
+       FROM synced_open_positions sop WHERE ${whereSql} ORDER BY sop.closed_date DESC`
+    ).all(...params) as ClosedPositionOutcomeRow[]
+
+    if (positions.length === 0) return { positions, candidates: [] }
+
+    const candidates = db.prepare(
+      `SELECT opc.open_position_id, opc.candidate_requisition_id, opc.candidate_name,
+              opc.main_skill, opc.candidate_status, opc.rate, opc.start_date, opc.is_employee
+       FROM open_position_candidates opc
+       INNER JOIN synced_open_positions sop ON sop.upstream_id = opc.open_position_id
+       WHERE ${whereSql}
+       ORDER BY opc.candidate_name`
+    ).all(...params) as ClosedPositionCandidateRow[]
+
+    return { positions, candidates }
+  },
+
+  /**
+   * Closed positions with an unknown close date (`closed_date IS NULL`), optionally
+   * scoped to a COE, plus their candidate rows. Same projection/JOIN as
+   * getClosedPositionsWithOutcomes so the report can reuse its bucketing loop.
+   * These rows can't be placed on the quarter axis and are surfaced separately.
+   */
+  getClosedPositionsWithoutDate(coe: string | null): {
+    positions: ClosedPositionOutcomeRow[]
+    candidates: ClosedPositionCandidateRow[]
+  } {
+    const db = getDatabase()
+    // Truly undated closures only: any Closed* status with no upstream close date.
+    // Columns are qualified with the `sop` alias so the same WHERE can be reused
+    // verbatim in both the positions query and the candidate JOIN.
+    const where = ["sop.position_status LIKE 'Closed%'", 'sop.closed_date IS NULL']
+    const params: string[] = []
+    if (coe) {
+      where.push('sop.coe = ?')
+      params.push(coe)
+    }
+    const whereSql = where.join(' AND ')
+
+    const positions = db.prepare(
+      `SELECT sop.id, sop.upstream_id, sop.position_status, sop.account, sop.coe, sop.practice, sop.job_title, sop.main_skill, sop.closed_date
+       FROM synced_open_positions sop WHERE ${whereSql} ORDER BY sop.account`
+    ).all(...params) as ClosedPositionOutcomeRow[]
+
+    if (positions.length === 0) return { positions, candidates: [] }
+
+    const candidates = db.prepare(
+      `SELECT opc.open_position_id, opc.candidate_requisition_id, opc.candidate_name,
+              opc.main_skill, opc.candidate_status, opc.rate, opc.start_date, opc.is_employee
+       FROM open_position_candidates opc
+       INNER JOIN synced_open_positions sop ON sop.upstream_id = opc.open_position_id
+       WHERE ${whereSql}
+       ORDER BY opc.candidate_name`
+    ).all(...params) as ClosedPositionCandidateRow[]
+
+    return { positions, candidates }
+  },
+
   getOpenPositionSyncStatus(): { total: number; lastSyncedAt: string | null } {
     const db = getDatabase()
     const total = (db.prepare(
@@ -476,7 +589,12 @@ export const syncRepository = {
     return (db.prepare('SELECT COUNT(*) as c FROM prr_presentations WHERE prr_id = ?').get(prrId) as { c: number }).c
   },
 
-  markPositionClosed(upstreamId: number, closedDate: string): void {
+  /**
+   * Mark a position Closed. Pass `closedDate = null` when the real upstream close
+   * date is unknown (e.g. absence-detected closures) — never fake it with the
+   * sync-run timestamp, or the Acceptance Rate report buckets it in the wrong quarter.
+   */
+  markPositionClosed(upstreamId: number, closedDate: string | null): void {
     const db = getDatabase()
     db.prepare(
       "UPDATE synced_open_positions SET position_status = 'Closed', closed_date = ? WHERE upstream_id = ?"
@@ -555,6 +673,40 @@ export const syncRepository = {
     }>
   },
 
+  getRetryableRecords(table: 'synced_employees' | 'synced_candidates'): Array<{
+    id: number
+    upstream_id: number
+    full_name: string
+    status: string
+    status_reason: string | null
+    has_resume: number
+    resume_note_id: number | null
+    resume_filename: string | null
+  }> {
+    const db = getDatabase()
+    const sourceType = table === 'synced_employees' ? 'employees' : 'candidates'
+    return db.prepare(
+      `SELECT se.id, se.upstream_id, se.full_name, se.status, se.status_reason,
+              se.has_resume, se.resume_note_id, se.resume_filename
+       FROM ${table} se
+       WHERE se.status IN ('sync_failed', 'extract_failed', 'vectorize_failed', 'incomplete')
+          OR (se.status = 'extracted' AND EXISTS (
+              SELECT 1 FROM resume_embeddings re
+              WHERE re.source_type = ? AND re.source_id = se.id
+                AND re.resume_text IS NOT NULL AND re.embedding IS NULL
+          ))`
+    ).all(sourceType) as Array<{
+      id: number
+      upstream_id: number
+      full_name: string
+      status: string
+      status_reason: string | null
+      has_resume: number
+      resume_note_id: number | null
+      resume_filename: string | null
+    }>
+  },
+
   updateResumeFields(
     id: number,
     fields: {
@@ -611,5 +763,40 @@ export const syncRepository = {
   clearSyncMetadata(key: string): void {
     const db = getDatabase()
     db.prepare('DELETE FROM sync_metadata WHERE key = ?').run(key)
+  },
+
+  reconcileStatuses(source: 'employees' | 'candidates'): number {
+    const db = getDatabase()
+    const syncTable = source === 'employees' ? 'synced_employees' : 'synced_candidates'
+
+    const vectorizedFix = db.prepare(`
+      UPDATE ${syncTable} SET status = 'vectorized', status_reason = NULL
+      WHERE status NOT IN ('vectorized', 'vectorize_failed', 'inactive') AND has_resume = 1
+        AND id IN (
+          SELECT re.source_id FROM resume_embeddings re
+          WHERE re.source_type = ? AND re.embedding IS NOT NULL
+            AND re.resume_text IS NOT NULL AND re.resume_text != ''
+        )
+    `).run(source)
+
+    const extractedFix = db.prepare(`
+      UPDATE ${syncTable} SET status = 'extracted', status_reason = NULL
+      WHERE status NOT IN ('extracted', 'vectorized', 'extract_failed', 'vectorize_failed', 'inactive') AND has_resume = 1
+        AND id IN (
+          SELECT re.source_id FROM resume_embeddings re
+          WHERE re.source_type = ? AND re.resume_text IS NOT NULL AND re.resume_text != ''
+            AND re.embedding IS NULL
+        )
+    `).run(source)
+
+    const totalFixed = vectorizedFix.changes + extractedFix.changes
+    if (totalFixed > 0) {
+      log.warn('Reconciled mismatched statuses', {
+        source,
+        vectorizedFix: vectorizedFix.changes,
+        extractedFix: extractedFix.changes,
+      })
+    }
+    return totalFixed
   },
 }

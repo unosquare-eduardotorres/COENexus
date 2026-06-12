@@ -74,7 +74,7 @@ describe('ResumeSkillExtractor', () => {
         VALUES ('employees', 1, 100, 'John Doe - Senior C# Developer with 8 years of .NET experience')
       `).run()
 
-      mockChatAsync.mockResolvedValueOnce(VALID_SKILLS_JSON)
+      mockChatAsync.mockResolvedValueOnce({ text: VALID_SKILLS_JSON, usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await resumeSkillExtractor.extractOne(1)
       expect(result).toBe(true)
@@ -100,7 +100,7 @@ describe('ResumeSkillExtractor', () => {
       expect(skipped).toBe(false)
       expect(mockChatAsync).not.toHaveBeenCalled()
 
-      mockChatAsync.mockResolvedValueOnce(VALID_SKILLS_JSON)
+      mockChatAsync.mockResolvedValueOnce({ text: VALID_SKILLS_JSON, usage: { inputTokens: 0, outputTokens: 0 } })
       const forced = await resumeSkillExtractor.extractOne(1, true)
       expect(forced).toBe(true)
       expect(mockChatAsync).toHaveBeenCalledOnce()
@@ -112,7 +112,7 @@ describe('ResumeSkillExtractor', () => {
         VALUES ('candidates', 1, 200, 'Alice - React developer')
       `).run()
 
-      mockChatAsync.mockResolvedValueOnce('This is not valid JSON at all!!!')
+      mockChatAsync.mockResolvedValueOnce({ text: 'This is not valid JSON at all!!!', usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await resumeSkillExtractor.extractOne(1)
       expect(result).toBe(false)
@@ -147,9 +147,9 @@ describe('ResumeSkillExtractor', () => {
       `).run()
 
       mockChatAsync
-        .mockResolvedValueOnce(JSON.stringify({ primary_tech_stack: ['Java'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }))
-        .mockResolvedValueOnce(JSON.stringify({ primary_tech_stack: ['Python'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }))
-        .mockResolvedValueOnce(JSON.stringify({ primary_tech_stack: ['Go'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }))
+        .mockResolvedValueOnce({ text: JSON.stringify({ primary_tech_stack: ['Java'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }), usage: { inputTokens: 0, outputTokens: 0 } })
+        .mockResolvedValueOnce({ text: JSON.stringify({ primary_tech_stack: ['Python'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }), usage: { inputTokens: 0, outputTokens: 0 } })
+        .mockResolvedValueOnce({ text: JSON.stringify({ primary_tech_stack: ['Go'], secondary_tech_stack: [], roles: [], domains: [], years_experience: null, seniority_signals: [], certifications: [], languages: [], summary: '' }), usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await resumeSkillExtractor.extractBatch(undefined, 10)
       expect(result.extracted).toBe(3)
@@ -164,7 +164,7 @@ describe('ResumeSkillExtractor', () => {
                ('candidates', 2, 200, 'Candidate resume')
       `).run()
 
-      mockChatAsync.mockResolvedValue(VALID_SKILLS_JSON)
+      mockChatAsync.mockResolvedValue({ text: VALID_SKILLS_JSON, usage: { inputTokens: 0, outputTokens: 0 } })
 
       const result = await resumeSkillExtractor.extractBatch('employees', 10)
       expect(result.extracted).toBe(1)
@@ -179,7 +179,7 @@ describe('ResumeSkillExtractor', () => {
       `).run()
 
       mockChatAsync
-        .mockResolvedValueOnce(VALID_SKILLS_JSON)
+        .mockResolvedValueOnce({ text: VALID_SKILLS_JSON, usage: { inputTokens: 0, outputTokens: 0 } })
         .mockRejectedValueOnce(new Error('LLM timeout'))
 
       const result = await resumeSkillExtractor.extractBatch()
