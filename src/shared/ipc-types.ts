@@ -2070,6 +2070,56 @@ export interface BraniacResponse<T = unknown> {
   error?: string
 }
 
+// ── Responsiveness Report ────────────────────────────────
+
+export interface ResponsivenessUnansweredMention {
+  positionUpstreamId: number
+  account: string
+  coe: string
+  practice: string
+  mainSkill: string
+  aging: number
+  mentionCommentId: number
+  mentionMessage: string
+  mentionAuthor: string
+  mentionAuthorName: string
+  mentionDate: string
+  taggedLeadName: string
+  taggedLeadEmail: string
+  waitingSince: string
+  waitingDays: number
+}
+
+export interface ResponsivenessLeadSummary {
+  name: string
+  email: string
+  totalMentions: number
+  unanswered: number
+  responseRate: number
+}
+
+export interface ResponsivenessReport {
+  totalMentions: number
+  unansweredMentions: number
+  responseRate: number
+  items: ResponsivenessUnansweredMention[]
+  leadSummary: ResponsivenessLeadSummary[]
+}
+
+export interface ResponsivenessCoePracticeLead {
+  id: number
+  display_name: string
+  email: string
+  coe: string
+  active: number
+}
+
+export interface ResponsivenessAddLeadParams {
+  name: string
+  email: string
+  coe?: string
+}
+
 export interface IpcContracts {
   [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: string; response: { valid: boolean; message: string } }
   [IPC_CHANNELS.SYNC_GET_STATUS]: { request: SyncDataSource; response: SyncCountByStatus }
@@ -2349,6 +2399,11 @@ export interface IpcContracts {
   [IPC_CHANNELS.MAIL_SAVE_CONFIG]: { request: MailSmtpConfig; response: { saved: boolean } }
   [IPC_CHANNELS.MAIL_CLEAR_CONFIG]: { request: void; response: { cleared: boolean } }
   [IPC_CHANNELS.MAIL_TEST_CONNECTION]: { request: MailSmtpConfig; response: MailTestResult }
+
+  [IPC_CHANNELS.RESPONSIVENESS_GET_REPORT]: { request: void; response: ResponsivenessReport }
+  [IPC_CHANNELS.RESPONSIVENESS_GET_LEADS]: { request: void; response: ResponsivenessCoePracticeLead[] }
+  [IPC_CHANNELS.RESPONSIVENESS_ADD_LEAD]: { request: ResponsivenessAddLeadParams; response: ResponsivenessCoePracticeLead }
+  [IPC_CHANNELS.RESPONSIVENESS_REMOVE_LEAD]: { request: number; response: { removed: boolean } }
 }
 
 export interface IpcEventContracts {

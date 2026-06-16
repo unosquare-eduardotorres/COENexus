@@ -13,6 +13,7 @@ import { registerMailHandlers } from './mail.ipc'
 import { registerBraniacHandlers } from './braniac.ipc'
 import { registerOracleHandlers } from './oracle.ipc'
 import { registerCoeTrackingHandlers } from './coeTracking'
+import { registerResponsivenessHandlers } from './responsiveness'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -30,4 +31,5 @@ export function registerAllHandlers(): void {
   registerBraniacHandlers()
   registerOracleHandlers()
   registerCoeTrackingHandlers()
+  registerResponsivenessHandlers()
 }

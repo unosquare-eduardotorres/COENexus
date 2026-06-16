@@ -9,6 +9,7 @@ import { createLogger } from './logger'
 import { getConfig } from '../config'
 import { tokenWatchdog, isTokenExpiringSoon } from './tokenWatchdog'
 import { isClosedInfoStale } from './sync/syncUtils'
+import { buildOpenPositionEntity, buildRetryPositionEntity, upsertCandidates, upsertDiscussions } from './sync/positionEntityMapper'
 
 const log = createLogger('PositionPipeline')
 
@@ -251,75 +252,21 @@ export const positionPipelineOrchestrator = {
               upstreamApiService.getDiscussionComments(token, pos.id),
             ])
 
-            const latestDiscussionDate = discussions.length > 0
-              ? discussions.reduce((max, d) => (d.date > max ? d.date : max), '')
-              : null
-
             const jdUnchanged = !!existing
               && existing.job_description === (detail?.jobDescription ?? '')
               && existing.job_title === (detail?.jobTitle ?? '')
               && existing.account === (pos.account || '')
               && existing.main_skill === (pos.mainSkill || '')
 
-            const entity = {
-              upstream_id: pos.id,
-              account: pos.account || '',
-              coe: pos.coe || '',
-              practice: pos.practice || '',
-              stakeholder: pos.stakeholder || '',
-              main_skill: pos.mainSkill || '',
-              countries: pos.countries || '',
-              seniorities: pos.seniorities || '',
-              available_range: pos.availableRange || '',
-              account_overview: detail?.comments ?? '',
-              job_description: detail?.jobDescription ?? '',
-              job_title: detail?.jobTitle ?? '',
-              position_status: pos.status || 'Active',
-              aging: pos.aging || 0,
-              created: pos.created || null,
-              ready_date: pos.readyDate || null,
-              last_modification: pos.lastModification || null,
-              sourcing: pos.sourcing || '',
-              replacement: pos.replacement ? 1 as const : 0 as const,
-              vertical_industry: pos.verticalIndustry || '',
-              in_office: detail?.inOffice ? 1 as const : 0 as const,
-              csu: detail?.csu ?? '',
-              cs: detail?.cs ?? '',
-              closed_date: pos.dateClosed ?? detail?.dateClosed ?? null,
-              closed_reason: pos.closedReason || null,
-              is_ready: detail?.isReady ? 1 as const : 0 as const,
-              is_promotion: detail?.isPromotion ? 1 as const : 0 as const,
-              maximum_rate: detail?.maximumRate ?? null,
-              minimum_rate: detail?.minimumRate ?? null,
-              additional_skills: JSON.stringify(detail?.additionalSkills ?? []),
-              created_with_assignments_tool: detail?.createdWithAssignmentsTool == null ? null : detail.createdWithAssignmentsTool ? 1 : 0,
-              candidates_presented: candidates.length,
-              last_discussion_date: latestDiscussionDate,
-              status: (jdUnchanged && existing?.status === 'vectorized' ? 'vectorized' : 'synced') as string,
-              status_reason: null,
-              synced_at: new Date().toISOString(),
-            }
+            const entity = buildOpenPositionEntity({
+              pos, detail, candidatesCount: candidates.length, discussions,
+              status: jdUnchanged && existing?.status === 'vectorized' ? 'vectorized' : 'synced',
+            })
 
             syncRepository.upsertOpenPosition(entity)
             syncedUpstreamIds.add(pos.id)
 
-            for (const cand of candidates) {
-              matchRepository.upsertOpenPositionCandidate({
-                open_position_id: pos.id,
-                candidate_requisition_id: cand.candidateRequisitionId,
-                candidate_id: cand.candidateId,
-                candidate_name: cand.candidate || '',
-                main_skill: cand.skills || '',
-                is_employee: cand.isEmployee ? 1 : 0,
-                candidate_status: cand.candidateStatusName || '',
-                rate: cand.rate ?? 0,
-                start_date: cand.startDate || null,
-                rejection_feedback: '',
-                rejection_comments: '',
-                rejection_action_date: null,
-                synced_at: new Date().toISOString(),
-              })
-            }
+            upsertCandidates(matchRepository, pos.id, candidates)
 
             const rejectedCandidates = candidates.filter(c => c.candidateStatusName === 'RejectedByClient')
             for (const rejected of rejectedCandidates) {
@@ -337,18 +284,7 @@ export const positionPipelineOrchestrator = {
               }
             }
 
-            const syncedAt = new Date().toISOString()
-            for (const comment of discussions) {
-              syncRepository.upsertDiscussion({
-                open_position_id: pos.id,
-                comment_id: comment.commentId,
-                author: comment.author || '',
-                date: comment.date || '',
-                message: comment.message || '',
-                parent_comment_id: comment.parentCommentId,
-                synced_at: syncedAt,
-              })
-            }
+            upsertDiscussions(syncRepository, pos.id, discussions)
 
             if (activeOnly) {
               const hasJd = !!(detail?.jobDescription?.trim())
@@ -625,69 +561,13 @@ async function retrySinglePosition(
         return { upstreamId: record.upstream_id, name: record.full_name, outcome: 'failed', failedStep: 'sync', error: 'Position detail not found' }
       }
 
-      const latestDiscussionDate = discussions.length > 0
-        ? discussions.reduce((max, d) => (d.date > max ? d.date : max), '')
-        : null
-
       const existing = syncRepository.findPositionByUpstreamId(record.upstream_id)
-      const entity = {
-        upstream_id: record.upstream_id,
-        account: existing?.account ?? record.full_name,
-        coe: existing?.coe ?? '',
-        practice: existing?.practice ?? '',
-        stakeholder: existing?.stakeholder ?? '',
-        main_skill: existing?.main_skill ?? '',
-        countries: existing?.countries ?? '',
-        seniorities: existing?.seniorities ?? '',
-        available_range: existing?.available_range ?? '',
-        account_overview: detail.comments ?? '',
-        job_description: detail.jobDescription ?? '',
-        job_title: detail.jobTitle ?? '',
-        position_status: existing?.position_status ?? 'Active',
-        aging: existing?.aging ?? 0,
-        created: existing?.created ?? null,
-        ready_date: existing?.ready_date ?? null,
-        last_modification: existing?.last_modification ?? null,
-        sourcing: existing?.sourcing ?? '',
-        replacement: existing?.replacement ?? 0,
-        vertical_industry: existing?.vertical_industry ?? '',
-        in_office: detail.inOffice ? 1 as const : 0 as const,
-        csu: detail.csu ?? '',
-        cs: detail.cs ?? '',
-        closed_date: detail.dateClosed ?? null,
-        closed_reason: existing?.closed_reason ?? null,
-        is_ready: detail.isReady ? 1 as const : 0 as const,
-        is_promotion: detail.isPromotion ? 1 as const : 0 as const,
-        maximum_rate: detail.maximumRate ?? null,
-        minimum_rate: detail.minimumRate ?? null,
-        additional_skills: JSON.stringify(detail.additionalSkills ?? []),
-        created_with_assignments_tool: detail.createdWithAssignmentsTool == null ? null : detail.createdWithAssignmentsTool ? 1 : 0,
-        candidates_presented: candidates.length,
-        last_discussion_date: latestDiscussionDate,
-        status: 'synced' as const,
-        status_reason: null,
-        synced_at: new Date().toISOString(),
-      }
+      const entity = buildRetryPositionEntity(
+        record.upstream_id, detail, candidates.length, discussions, existing, record.full_name,
+      )
 
       syncRepository.upsertOpenPosition(entity)
-
-      for (const cand of candidates) {
-        matchRepository.upsertOpenPositionCandidate({
-          open_position_id: record.upstream_id,
-          candidate_requisition_id: cand.candidateRequisitionId,
-          candidate_id: cand.candidateId,
-          candidate_name: cand.candidate || '',
-          main_skill: cand.skills || '',
-          is_employee: cand.isEmployee ? 1 : 0,
-          candidate_status: cand.candidateStatusName || '',
-          rate: cand.rate ?? 0,
-          start_date: cand.startDate || null,
-          rejection_feedback: '',
-          rejection_comments: '',
-          rejection_action_date: null,
-          synced_at: new Date().toISOString(),
-        })
-      }
+      upsertCandidates(matchRepository, record.upstream_id, candidates)
 
       const hasJd = !!(detail.jobDescription?.trim())
       if (!hasJd) {

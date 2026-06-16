@@ -71,7 +71,7 @@ import type {
   IpcEventContracts,
 } from '../shared/ipc-types'
 import type { CreateOrUpdateTransformSession, BenchBurnRequest, ExternalCandidateMatchRequest } from '../renderer/apps/resume/types'
-import type { ErrorReportRequest, ErrorNewEvent, NomicoreCalculateParams, MailSmtpConfig } from '../shared/ipc-types'
+import type { ErrorReportRequest, ErrorNewEvent, NomicoreCalculateParams, MailSmtpConfig, ResponsivenessAddLeadParams } from '../shared/ipc-types'
 
 const api = {
   sync: {
@@ -773,6 +773,16 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.NOMICORE_CHECK_SESSION),
     calculate: (params: NomicoreCalculateParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.NOMICORE_CALCULATE, params),
+  },
+  responsiveness: {
+    getReport: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.RESPONSIVENESS_GET_REPORT) as Promise<IpcContracts[typeof IPC_CHANNELS.RESPONSIVENESS_GET_REPORT]['response']>,
+    getLeads: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.RESPONSIVENESS_GET_LEADS) as Promise<IpcContracts[typeof IPC_CHANNELS.RESPONSIVENESS_GET_LEADS]['response']>,
+    addLead: (params: ResponsivenessAddLeadParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RESPONSIVENESS_ADD_LEAD, params) as Promise<IpcContracts[typeof IPC_CHANNELS.RESPONSIVENESS_ADD_LEAD]['response']>,
+    removeLead: (id: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RESPONSIVENESS_REMOVE_LEAD, id) as Promise<IpcContracts[typeof IPC_CHANNELS.RESPONSIVENESS_REMOVE_LEAD]['response']>,
   },
 } as const
 

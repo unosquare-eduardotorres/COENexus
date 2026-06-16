@@ -5,6 +5,7 @@ import PrrDetailDrawer from '../components/PrrDetailDrawer'
 import { PRR_COE_STATUSES, type PrrCoeStatus } from '../types'
 import { useToast } from '../../../shared/components/ToastContext'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+import { SearchIcon, XIcon, DatabaseIcon, DownloadIcon } from '../components/Icons'
 
 const log = createRendererLogger('PrrReport')
 
@@ -15,40 +16,6 @@ interface MultiSelectProps {
   options: string[]
   selected: string[]
   onChange: (values: string[]) => void
-}
-
-function SearchIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-    </svg>
-  )
-}
-
-function XIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  )
-}
-
-function DatabaseIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400 mx-auto">
-      <ellipse cx="12" cy="5" rx="9" ry="3" />
-      <path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5" />
-      <path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3" />
-    </svg>
-  )
-}
-
-function DownloadIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  )
 }
 
 function MultiSelect({ label, options, selected, onChange }: MultiSelectProps) {

@@ -304,6 +304,11 @@ export const IPC_CHANNELS = {
   MAIL_SAVE_CONFIG: 'mail:save-config',
   MAIL_CLEAR_CONFIG: 'mail:clear-config',
   MAIL_TEST_CONNECTION: 'mail:test-connection',
+
+  RESPONSIVENESS_GET_REPORT: 'responsiveness:get-report',
+  RESPONSIVENESS_GET_LEADS: 'responsiveness:get-leads',
+  RESPONSIVENESS_ADD_LEAD: 'responsiveness:add-lead',
+  RESPONSIVENESS_REMOVE_LEAD: 'responsiveness:remove-lead',
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

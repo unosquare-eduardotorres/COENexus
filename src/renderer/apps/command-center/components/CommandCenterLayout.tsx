@@ -58,6 +58,14 @@ function TargetIcon() {
   );
 }
 
+function ChatBubbleIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 function TrophyIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -83,6 +91,7 @@ const REPORT_ITEMS: SidebarItem[] = [
   { label: 'Project Reallocation', path: '/command-center/reallocation', active: true, icon: <ArrowsIcon /> },
   { label: 'C.O.E. Tracking', path: '/command-center/coe-tracking', active: true, icon: <TargetIcon /> },
   { label: 'C.O.E. Bonus', path: '/command-center/coe-bonus', active: true, icon: <TrophyIcon /> },
+  { label: 'Responsiveness', path: '/command-center/responsiveness', active: true, icon: <ChatBubbleIcon /> },
 ];
 
 export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayoutProps) {

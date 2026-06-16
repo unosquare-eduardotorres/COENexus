@@ -177,6 +177,14 @@ export interface OpenPositionDiscussionRow {
   synced_at: string
 }
 
+export interface CoePracticeLeadRow {
+  id: number
+  display_name: string
+  email: string
+  coe: string
+  active: number
+}
+
 const EMPLOYEE_COLUMNS = [
   'upstream_id', 'full_name', 'email', 'seniority', 'main_skill', 'country',
   'gross_monthly_salary', 'salary_currency', 'last_account', 'last_account_start_date', 'rate',
@@ -798,5 +806,51 @@ export const syncRepository = {
       })
     }
     return totalFixed
+  },
+
+  // ── COE Practice Leads ───────────────────────────────────
+
+  getCoePracticeLeads(): CoePracticeLeadRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM coe_practice_leads WHERE active = 1 ORDER BY display_name'
+    ).all() as CoePracticeLeadRow[]
+  },
+
+  getAllActivePositionDiscussions(): Map<number, OpenPositionDiscussionRow[]> {
+    const db = getDatabase()
+    const rows = db.prepare(`
+      SELECT d.* FROM open_position_discussions d
+      INNER JOIN synced_open_positions p ON d.open_position_id = p.upstream_id
+      WHERE p.position_status IN ('Active', 'Draft')
+      ORDER BY d.date ASC
+    `).all() as OpenPositionDiscussionRow[]
+
+    const map = new Map<number, OpenPositionDiscussionRow[]>()
+    for (const row of rows) {
+      const existing = map.get(row.open_position_id) ?? []
+      existing.push(row)
+      map.set(row.open_position_id, existing)
+    }
+    return map
+  },
+
+  addCoePracticeLead(data: { display_name: string; email: string; coe: string }): CoePracticeLeadRow {
+    const db = getDatabase()
+    const result = db.prepare(
+      'INSERT INTO coe_practice_leads (display_name, email, coe) VALUES (?, ?, ?)'
+    ).run(data.display_name, data.email, data.coe)
+    return {
+      id: Number(result.lastInsertRowid),
+      display_name: data.display_name,
+      email: data.email,
+      coe: data.coe,
+      active: 1,
+    }
+  },
+
+  deactivateCoePracticeLead(id: number): void {
+    const db = getDatabase()
+    db.prepare('UPDATE coe_practice_leads SET active = 0 WHERE id = ?').run(id)
   },
 }

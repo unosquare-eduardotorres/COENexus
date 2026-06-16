@@ -5,6 +5,7 @@ import { matchEngineService } from '../matchEngineService'
 import { createLogger } from '../logger'
 import type { SyncEvent, SyncOptions, PositionSyncRecord } from './syncTypes'
 import { isClosedInfoStale } from './syncUtils'
+import { buildOpenPositionEntity, upsertCandidates, upsertDiscussions } from './positionEntityMapper'
 
 const log = createLogger('SyncOpenPositionOrchestrator')
 
@@ -119,48 +120,9 @@ export const syncOpenPositionOrchestrator = {
             upstreamApiService.getDiscussionComments(token, pos.id),
           ])
 
-          const latestDiscussionDate = discussions.length > 0
-            ? discussions.reduce((max, d) => (d.date > max ? d.date : max), '')
-            : null
-
-          const entity: Omit<SyncedOpenPositionRow, 'id'> = {
-            upstream_id: pos.id,
-            account: pos.account || '',
-            coe: pos.coe || '',
-            practice: pos.practice || '',
-            stakeholder: pos.stakeholder || '',
-            main_skill: pos.mainSkill || '',
-            countries: pos.countries || '',
-            seniorities: pos.seniorities || '',
-            available_range: pos.availableRange || '',
-            account_overview: detail?.comments ?? '',
-            job_description: detail?.jobDescription ?? '',
-            job_title: detail?.jobTitle ?? '',
-            position_status: pos.status || 'Active',
-            aging: pos.aging || 0,
-            created: pos.created || null,
-            ready_date: pos.readyDate || null,
-            last_modification: pos.lastModification || null,
-            sourcing: pos.sourcing || '',
-            replacement: pos.replacement ? 1 : 0,
-            vertical_industry: pos.verticalIndustry || '',
-            in_office: detail?.inOffice ? 1 : 0,
-            csu: detail?.csu ?? '',
-            cs: detail?.cs ?? '',
-            closed_date: pos.dateClosed ?? detail?.dateClosed ?? null,
-            closed_reason: pos.closedReason || null,
-            is_ready: detail?.isReady ? 1 : 0,
-            is_promotion: detail?.isPromotion ? 1 : 0,
-            maximum_rate: detail?.maximumRate ?? null,
-            minimum_rate: detail?.minimumRate ?? null,
-            additional_skills: JSON.stringify(detail?.additionalSkills ?? []),
-            created_with_assignments_tool: detail?.createdWithAssignmentsTool == null ? null : detail.createdWithAssignmentsTool ? 1 : 0,
-            candidates_presented: candidates.length,
-            last_discussion_date: latestDiscussionDate,
-            status: 'synced',
-            status_reason: null,
-            synced_at: new Date().toISOString(),
-          }
+          const entity = buildOpenPositionEntity({
+            pos, detail, candidatesCount: candidates.length, discussions,
+          })
 
           syncRepository.upsertOpenPosition(entity)
           syncedUpstreamIds.add(pos.id)
@@ -169,20 +131,7 @@ export const syncOpenPositionOrchestrator = {
             updatedCount++
           }
 
-          for (const cand of candidates) {
-            matchRepository.upsertOpenPositionCandidate({
-              open_position_id: pos.id,
-              candidate_requisition_id: cand.candidateRequisitionId,
-              candidate_id: cand.candidateId,
-              candidate_name: cand.candidate || '',
-              main_skill: cand.skills || '',
-              is_employee: cand.isEmployee ? 1 : 0,
-              candidate_status: cand.candidateStatusName || '',
-              rate: cand.rate ?? 0,
-              start_date: cand.startDate || null,
-              synced_at: new Date().toISOString(),
-            })
-          }
+          upsertCandidates(matchRepository, pos.id, candidates)
 
           const rejectedCandidates = candidates.filter(c => c.candidateStatusName === 'RejectedByClient')
           if (rejectedCandidates.length > 0) {
@@ -209,18 +158,7 @@ export const syncOpenPositionOrchestrator = {
             }
           }
 
-          const syncedAt = new Date().toISOString()
-          for (const comment of discussions) {
-            syncRepository.upsertDiscussion({
-              open_position_id: pos.id,
-              comment_id: comment.commentId,
-              author: comment.author || '',
-              date: comment.date || '',
-              message: comment.message || '',
-              parent_comment_id: comment.parentCommentId,
-              synced_at: syncedAt,
-            })
-          }
+          upsertDiscussions(syncRepository, pos.id, discussions)
 
           const hasJd = !!detail?.jobDescription?.trim()
           const record: PositionSyncRecord = {
