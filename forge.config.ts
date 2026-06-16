@@ -41,6 +41,7 @@ const config: ForgeConfig = {
       /^\/\.git/,
       /^\/node_modules\/\.cache/,
       /^\/entitlements\.mac/,
+      /^\/resources\/sqlite-vec/,
     ],
   },
 

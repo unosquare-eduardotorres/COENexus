@@ -4,7 +4,7 @@ import { coeTrackingService } from '../services/coeTrackingService'
 import type { TrackedPosition, HealthBreakdown, HealthTier } from '../types'
 import PositionCard from '../components/PositionCard'
 import CoeTrackingBreadcrumb from '../components/CoeTrackingBreadcrumb'
-import HealthMiniBar from '../components/HealthMiniBar'
+import CoverageProgressBar from '../components/CoverageProgressBar'
 import HealthFilterPills from '../components/HealthFilterPills'
 
 export default function CoePositionsPage() {
@@ -27,9 +27,9 @@ export default function CoePositionsPage() {
   }, [coe, practice, skill])
 
   const breakdown = useMemo<HealthBreakdown>(() => {
-    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0 }
+    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0, won: 0 }
     for (const p of data) {
-      bd[p.healthTier]++
+      if (!p.isVirtual) bd[p.healthTier]++
     }
     return bd
   }, [data])
@@ -39,8 +39,11 @@ export default function CoePositionsPage() {
     return data.filter(p => p.healthTier === filter)
   }, [data, filter])
 
-  const covered = data.filter(p => p.activeCandidateCount > 0).length
-  const effectiveness = data.length > 0 ? Math.round((covered / data.length) * 100) : 0
+  const virtualCount = data.filter(p => p.isVirtual).length
+  const realCount = data.length - virtualCount
+  const realData = data.filter(p => !p.isVirtual)
+  const covered = realData.filter(p => p.activeCandidateCount > 0 || p.healthTier === 'won').length
+  const effectiveness = realData.length > 0 ? Math.round((covered / realData.length) * 100) : 0
 
   if (loading) {
     return (
@@ -68,11 +71,16 @@ export default function CoePositionsPage() {
         <div>
           <h1 className="text-xl font-bold text-primary">{skill}</h1>
           <p className="text-sm text-secondary mt-1">
-            {data.length} position{data.length !== 1 ? 's' : ''} · {effectiveness}% coverage · {coe}
+            {realCount} position{realCount !== 1 ? 's' : ''}{virtualCount > 0 ? ` (+ ${virtualCount} virtual)` : ''} · {effectiveness}% coverage · {coe}
           </p>
         </div>
-        <div className="w-40">
-          <HealthMiniBar breakdown={breakdown} />
+        <div className="w-48">
+          <CoverageProgressBar
+            breakdown={breakdown}
+            covered={covered}
+            total={realData.length}
+            compact
+          />
         </div>
       </div>
 

@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
+import { Info } from 'lucide-react'
 import { coeTrackingService } from '../services/coeTrackingService'
 import { reportService } from '../services/reportService'
 import { useNexusStatus } from '../../../contexts/NexusStatusContext'
-import type { TrackedPositionDetail, HealthTier } from '../types'
+import type { TrackedPositionDetail } from '../types'
+import { TIER_CONFIG } from '../constants/tierConfig'
 import CoeTrackingBreadcrumb from '../components/CoeTrackingBreadcrumb'
 import CandidatePipeline from '../components/CandidatePipeline'
 import AgingTimeline from '../components/AgingTimeline'
@@ -13,33 +15,6 @@ function formatDate(dateStr: string | null): string {
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-const TIER_HERO: Record<HealthTier, { bg: string; text: string; label: string; description: string }> = {
-  critical: {
-    bg: 'bg-red-500/10 border-red-500/25',
-    text: 'text-red-500',
-    label: '🔴 CRITICAL',
-    description: 'This position has no active candidates in the pipeline. Immediate action is needed.',
-  },
-  warning: {
-    bg: 'bg-amber-500/10 border-amber-500/25',
-    text: 'text-amber-500',
-    label: '🟡 WARNING',
-    description: 'This position has only 1 active candidate. It could be rejected at any time with no backup.',
-  },
-  good: {
-    bg: 'bg-emerald-500/10 border-emerald-500/25',
-    text: 'text-emerald-500',
-    label: '🟢 GOOD',
-    description: 'This position has solid coverage with 2 active candidates in the pipeline.',
-  },
-  excellent: {
-    bg: 'bg-blue-500/10 border-blue-500/25',
-    text: 'text-blue-500',
-    label: '🔵 EXCELLENT',
-    description: 'This position has excellent coverage with 3+ active candidates in the pipeline.',
-  },
 }
 
 export default function CoePositionDetailPage() {
@@ -98,20 +73,50 @@ export default function CoePositionDetailPage() {
       : '—'
     : '—'
 
+  // Discussion: sorted newest thread activity first
   const groupedDiscussions = useMemo(() => {
     if (!detail) return []
     const rootCommentIds = new Set(detail.discussions.map(d => d.commentId))
     const roots = detail.discussions.filter(d => !d.parentCommentId || !rootCommentIds.has(d.parentCommentId))
     const replyPool = detail.discussions.filter(d => d.parentCommentId && rootCommentIds.has(d.parentCommentId) && roots.every(r => r.commentId !== d.commentId))
-    return roots
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(root => ({
-        root,
-        replies: replyPool
-          .filter(d => d.parentCommentId === root.commentId)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-      }))
+
+    const threads = roots.map(root => ({
+      root,
+      replies: replyPool
+        .filter(d => d.parentCommentId === root.commentId)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    }))
+
+    // Sort by latest activity in thread (newest first)
+    const getLatestDate = (thread: typeof threads[number]) => {
+      const dates = [new Date(thread.root.date).getTime(), ...thread.replies.map(r => new Date(r.date).getTime())]
+      return Math.max(...dates)
+    }
+
+    return threads.sort((a, b) => getLatestDate(b) - getLatestDate(a))
   }, [detail])
+
+  // Find the single most recent comment across ALL threads
+  const newestCommentId = useMemo(() => {
+    if (!detail || detail.discussions.length === 0) return null
+    let newest = detail.discussions[0]
+    for (const d of detail.discussions) {
+      if (new Date(d.date).getTime() > new Date(newest.date).getTime()) {
+        newest = d
+      }
+    }
+    return newest.commentId
+  }, [detail])
+
+  // Find which thread contains the newest comment
+  const newestThreadRootId = useMemo(() => {
+    if (!newestCommentId || groupedDiscussions.length === 0) return null
+    for (const thread of groupedDiscussions) {
+      if (thread.root.commentId === newestCommentId) return thread.root.commentId
+      if (thread.replies.some(r => r.commentId === newestCommentId)) return thread.root.commentId
+    }
+    return null
+  }, [newestCommentId, groupedDiscussions])
 
   if (loading) {
     return (
@@ -143,7 +148,7 @@ export default function CoePositionDetailPage() {
     )
   }
 
-  const hero = TIER_HERO[detail.healthTier]
+  const tier = TIER_CONFIG[detail.healthTier]
   const p = detail.position
 
   return (
@@ -159,13 +164,16 @@ export default function CoePositionDetailPage() {
       />
 
       {/* Health Hero */}
-      <div className={`glass-panel border ${hero.bg} p-5`}>
+      <div className={`glass-panel border ${tier.bgColor} ${tier.borderColor} p-5`}>
         <div className="flex items-center justify-between">
           <div>
-            <span className={`text-lg font-bold ${hero.text}`}>{hero.label}</span>
+            <div className="flex items-center gap-2">
+              <tier.Icon size={20} className={tier.color} />
+              <span className={`text-lg font-bold ${tier.color}`}>{tier.label}</span>
+            </div>
             <div className="flex items-center gap-6 mt-2">
               <div>
-                <p className={`text-2xl font-bold ${hero.text}`}>{detail.activeCandidateCount}</p>
+                <p className={`text-2xl font-bold ${tier.color}`}>{detail.activeCandidateCount}</p>
                 <p className="text-[10px] text-muted">Active Candidates</p>
               </div>
               <div>
@@ -173,10 +181,17 @@ export default function CoePositionDetailPage() {
                 <p className="text-[10px] text-muted">Total Candidates</p>
               </div>
             </div>
-            <p className="text-sm text-secondary mt-2 max-w-xl">{hero.description}</p>
+            <p className="text-sm text-secondary mt-2 max-w-xl">{tier.description}</p>
           </div>
         </div>
       </div>
+
+      {detail.isVirtual && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-sm">
+          <Info size={16} />
+          <span>This is a virtual/internal position (CE) used for organizational purposes — not a real client position.</span>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="flex items-center gap-3">
@@ -210,23 +225,17 @@ export default function CoePositionDetailPage() {
       {/* Overview Grid */}
       <div className="glass-panel p-5 space-y-5">
         <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Position Details</h2>
-        <div className="grid grid-cols-2 gap-4">
+
+        {/* Primary info — bigger, 3-col */}
+        <div className="grid grid-cols-3 gap-4">
           {[
             { label: 'Job Title', value: p.job_title || '—' },
-            { label: 'COE', value: p.coe },
-            { label: 'Practice', value: p.practice },
-            { label: 'Stakeholder', value: p.stakeholder },
-            { label: 'CSU / CS', value: `${p.csu || '—'} / ${p.cs || '—'}` },
-            { label: 'Countries', value: p.countries || '—' },
-            { label: 'Seniority', value: p.seniorities || '—' },
-            { label: 'Rate Range', value: rateRange },
-            { label: 'Sourcing', value: p.sourcing || '—' },
-            { label: 'Vertical', value: p.vertical_industry || '—' },
+            { label: 'Account / Stakeholder', value: `${p.account || '—'} · ${p.stakeholder || '—'}` },
             { label: 'Main Skill', value: p.main_skill || '—' },
           ].map(row => (
             <div key={row.label}>
-              <p className="text-xs text-muted uppercase tracking-wide mb-0.5">{row.label}</p>
-              <p className="text-sm text-primary">{row.value}</p>
+              <p className="text-[10px] text-muted uppercase tracking-wide mb-1">{row.label}</p>
+              <p className="text-sm font-medium text-primary">{row.value}</p>
             </div>
           ))}
         </div>
@@ -244,6 +253,25 @@ export default function CoePositionDetailPage() {
                 <p className={`text-sm font-mono ${d.highlight ? 'text-emerald-400 font-bold' : 'text-primary'}`}>{d.value}</p>
               </div>
               {i < arr.length - 1 && <div className="w-px h-8 bg-white/10 mx-4" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Secondary info — 4-col, smaller text, subtle */}
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: 'COE', value: p.coe },
+            { label: 'Practice', value: p.practice },
+            { label: 'Countries', value: p.countries || '—' },
+            { label: 'Seniority', value: p.seniorities || '—' },
+            { label: 'Rate Range', value: rateRange },
+            { label: 'Sourcing', value: p.sourcing || '—' },
+            { label: 'Vertical', value: p.vertical_industry || '—' },
+            { label: 'CSU / CS', value: `${p.csu || '—'} / ${p.cs || '—'}` },
+          ].map(row => (
+            <div key={row.label}>
+              <p className="text-[9px] text-muted uppercase tracking-wide mb-0.5">{row.label}</p>
+              <p className="text-xs text-secondary">{row.value}</p>
             </div>
           ))}
         </div>
@@ -299,62 +327,84 @@ export default function CoePositionDetailPage() {
         )}
       </div>
 
-      {/* Discussion */}
+      {/* Discussion — sorted newest thread activity first */}
       <div className="glass-panel p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">
-          Discussion ({detail.discussions.length})
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Discussion</h2>
+          <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 text-[10px] font-semibold">
+            {detail.discussions.length} comment{detail.discussions.length !== 1 ? 's' : ''}
+          </span>
+        </div>
         {detail.discussions.length === 0 ? (
           <p className="text-sm text-muted text-center py-6">No discussion comments yet.</p>
         ) : (
           <div className="space-y-0">
-            {groupedDiscussions.map((thread, idx) => (
-              <div key={thread.root.commentId}>
-                <div className="flex gap-3 py-3">
-                  <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                    <span className="text-xs font-bold text-emerald-400">
-                      {thread.root.author.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-primary">
-                        {thread.root.author.split('@')[0]}
-                      </span>
-                      <span className="text-xs text-muted font-mono">
-                        {formatDate(thread.root.date)}
+            {groupedDiscussions.map((thread, idx) => {
+              const isNewestThread = thread.root.commentId === newestThreadRootId
+
+              return (
+                <div key={thread.root.commentId} className={isNewestThread ? 'relative' : ''}>
+                  {/* Blue left bar for thread with newest comment */}
+                  {isNewestThread && (
+                    <div className="absolute -left-3 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
+                  )}
+
+                  <div className="flex gap-3 py-3">
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                      <span className="text-xs font-bold text-emerald-400">
+                        {thread.root.author.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-sm text-secondary leading-relaxed">{thread.root.message}</p>
-                  </div>
-                </div>
-                {thread.replies.length > 0 && (
-                  <div className="ml-4 border-l-2 border-white/10 pl-4 space-y-0">
-                    {thread.replies.map(reply => (
-                      <div key={reply.commentId} className="flex gap-3 py-2.5">
-                        <div className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center">
-                          <span className="text-xs font-bold text-muted">
-                            {reply.author.charAt(0).toUpperCase()}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-primary">
+                          {thread.root.author.split('@')[0]}
+                        </span>
+                        <span className="text-xs text-muted font-mono">
+                          {formatDate(thread.root.date)}
+                        </span>
+                        {thread.root.commentId === newestCommentId && (
+                          <span className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/15 text-blue-400 font-semibold">
+                            Latest
                           </span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-xs font-medium text-secondary">
-                              {reply.author.split('@')[0]}
-                            </span>
-                            <span className="text-xs text-muted font-mono">
-                              {formatDate(reply.date)}
+                        )}
+                      </div>
+                      <p className="text-sm text-secondary leading-relaxed">{thread.root.message}</p>
+                    </div>
+                  </div>
+                  {thread.replies.length > 0 && (
+                    <div className="ml-4 border-l-2 border-white/10 pl-4 space-y-0">
+                      {thread.replies.map(reply => (
+                        <div key={reply.commentId} className="flex gap-3 py-2.5">
+                          <div className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center">
+                            <span className="text-xs font-bold text-muted">
+                              {reply.author.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          <p className="text-sm text-secondary leading-relaxed">{reply.message}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-medium text-secondary">
+                                {reply.author.split('@')[0]}
+                              </span>
+                              <span className="text-xs text-muted font-mono">
+                                {formatDate(reply.date)}
+                              </span>
+                              {reply.commentId === newestCommentId && (
+                                <span className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/15 text-blue-400 font-semibold">
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-secondary leading-relaxed">{reply.message}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {idx < groupedDiscussions.length - 1 && <div className="minimal-divider my-1" />}
-              </div>
-            ))}
+                      ))}
+                    </div>
+                  )}
+                  {idx < groupedDiscussions.length - 1 && <div className="minimal-divider my-1" />}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

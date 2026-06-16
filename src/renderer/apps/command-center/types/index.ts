@@ -189,13 +189,14 @@ export interface PrrDetailResult {
 
 // ── COE Tracking ─────────────────────────────────────────
 
-export type HealthTier = 'critical' | 'warning' | 'good' | 'excellent'
+export type HealthTier = 'critical' | 'warning' | 'good' | 'excellent' | 'won'
 
 export interface HealthBreakdown {
   critical: number
   warning: number
   good: number
   excellent: number
+  won: number
 }
 
 export interface CoeTrackingSummary {
@@ -205,6 +206,7 @@ export interface CoeTrackingSummary {
   effectivenessPercent: number
   healthBreakdown: HealthBreakdown
   topPractices: string[]
+  virtualPositions: number
 }
 
 export interface PracticeTrackingSummary {
@@ -216,6 +218,7 @@ export interface PracticeTrackingSummary {
   healthBreakdown: HealthBreakdown
   skillCount: number
   singleSkill?: string
+  virtualPositions: number
 }
 
 export interface SkillTrackingSummary {
@@ -225,6 +228,7 @@ export interface SkillTrackingSummary {
   coveredPositions: number
   effectivenessPercent: number
   healthBreakdown: HealthBreakdown
+  virtualPositions: number
 }
 
 export interface TrackedPosition {
@@ -234,6 +238,7 @@ export interface TrackedPosition {
   totalCandidates: number
   matchingCriteria: StalledCriterionKey[]
   actors: CriterionActor[]
+  isVirtual: boolean
 }
 
 export interface CoeTrackingTimelineEvent {
@@ -250,4 +255,5 @@ export interface TrackedPositionDetail {
   candidates: PositionDetailResult['candidates']
   discussions: PositionDetailResult['discussions']
   timelineEvents: CoeTrackingTimelineEvent[]
+  isVirtual: boolean
 }

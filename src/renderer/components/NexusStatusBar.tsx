@@ -94,11 +94,7 @@ export default function NexusStatusBar() {
     if (sync.status === 'completed') {
       dismissSync(sync.source)
     }
-    if (sync.source === 'open-positions') {
-      navigate('/command-center/open-positions')
-    } else {
-      navigate('/datasync')
-    }
+    navigate('/datasync')
   }
 
   return (

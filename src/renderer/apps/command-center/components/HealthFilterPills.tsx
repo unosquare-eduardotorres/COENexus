@@ -1,4 +1,6 @@
+import type { LucideIcon } from 'lucide-react'
 import type { HealthBreakdown, HealthTier } from '../types'
+import { TIER_CONFIG, TIER_ORDER } from '../constants/tierConfig'
 
 type FilterValue = HealthTier | 'all'
 
@@ -11,44 +13,29 @@ interface HealthFilterPillsProps {
 const PILL_CONFIG: Array<{
   value: FilterValue
   label: string
-  icon: string
+  Icon: LucideIcon | null
   activeClasses: string
 }> = [
   {
     value: 'all',
     label: 'All',
-    icon: '',
+    Icon: null,
     activeClasses: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   },
-  {
-    value: 'critical',
-    label: 'Critical',
-    icon: '🔴',
-    activeClasses: 'bg-red-500/20 text-red-400 border-red-500/30',
-  },
-  {
-    value: 'warning',
-    label: 'Warning',
-    icon: '🟡',
-    activeClasses: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  },
-  {
-    value: 'good',
-    label: 'Good',
-    icon: '🟢',
-    activeClasses: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  },
-  {
-    value: 'excellent',
-    label: 'Excellent',
-    icon: '🔵',
-    activeClasses: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  },
+  ...TIER_ORDER.map(key => {
+    const tier = TIER_CONFIG[key]
+    return {
+      value: key as FilterValue,
+      label: key === 'warning' ? 'Needs More' : tier.label,
+      Icon: tier.Icon,
+      activeClasses: `${tier.bgColor} ${tier.color} ${tier.borderColor}`,
+    }
+  }),
 ]
 
 function getCount(breakdown: HealthBreakdown, value: FilterValue): number {
   if (value === 'all') {
-    return breakdown.critical + breakdown.warning + breakdown.good + breakdown.excellent
+    return breakdown.critical + breakdown.warning + breakdown.good + breakdown.excellent + breakdown.won
   }
   return breakdown[value]
 }
@@ -80,7 +67,7 @@ export default function HealthFilterPills({
               }
             `}
           >
-            {pill.icon && <span className="text-[10px]">{pill.icon}</span>}
+            {pill.Icon && <pill.Icon size={12} />}
             <span>{pill.label}</span>
             <span className={`
               ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold

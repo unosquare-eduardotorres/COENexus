@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { Send, Building2, MessageSquare, Archive, CheckCircle2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { TrackedPositionDetail } from '../types'
 
 type Candidate = TrackedPositionDetail['candidates'][number]
@@ -19,22 +22,17 @@ function normalizeStatus(status: string): string {
 
 const SUCCESS_STATUSES = new Set(['Approved', 'Hired', 'AcceptedByClient', 'Started', 'Active'])
 
-function getStatusStyle(status: string, isEnded: boolean): string {
-  if (SUCCESS_STATUSES.has(status)) {
-    return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-  }
-  if (isEnded) {
-    return 'bg-red-500/10 text-red-400 border-red-500/20'
-  }
-  return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-}
-
-const COLUMNS = [
-  { status: 'PresentedToCGX', label: 'Presented to CGX', color: 'border-teal-500', headerBg: 'bg-teal-500/10 text-teal-500' },
-  { status: 'PresentedToClient', label: 'Presented to Client', color: 'border-violet-500', headerBg: 'bg-violet-500/10 text-violet-500' },
-  { status: 'CustomerInterview', label: 'Customer Interview', color: 'border-indigo-500', headerBg: 'bg-indigo-500/10 text-indigo-500' },
-  { status: 'Ended', label: 'Ended', color: 'border-gray-400', headerBg: 'bg-gray-500/10 text-gray-400' },
-] as const
+const COLUMNS: Array<{
+  status: string
+  label: string
+  Icon: LucideIcon
+  iconColor: string
+}> = [
+  { status: 'PresentedToCGX', label: 'Presented to CGX', Icon: Send, iconColor: 'text-teal-400' },
+  { status: 'PresentedToClient', label: 'Presented to Client', Icon: Building2, iconColor: 'text-violet-400' },
+  { status: 'CustomerInterview', label: 'Customer Interview', Icon: MessageSquare, iconColor: 'text-indigo-400' },
+  { status: 'Ended', label: 'Ended', Icon: Archive, iconColor: 'text-gray-400' },
+]
 
 function resolveFeedbackLabels(ids: number[], catalog: Record<number, string>): string[] {
   return ids.map(id => catalog[id] || `Feedback #${id}`)
@@ -47,7 +45,13 @@ function formatDate(dateStr: string | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function CandidateCard({ candidate, isEnded, feedbackCatalog }: { candidate: Candidate; isEnded: boolean; feedbackCatalog: Record<number, string> }) {
+function CandidateCard({ candidate, isEnded, feedbackCatalog, isExpanded, onToggle }: {
+  candidate: Candidate
+  isEnded: boolean
+  feedbackCatalog: Record<number, string>
+  isExpanded: boolean
+  onToggle: () => void
+}) {
   const feedbackLabels = candidate.rejectionFeedback?.length
     ? resolveFeedbackLabels(candidate.rejectionFeedback, feedbackCatalog)
     : []
@@ -63,35 +67,63 @@ function CandidateCard({ candidate, isEnded, feedbackCatalog }: { candidate: Can
           : 'glass-panel-subtle'
     }`}>
       <p className={`text-xs font-semibold ${isSuccess ? 'text-white' : 'text-primary'}`}>{candidate.candidateName}</p>
-      <div className={`flex items-center gap-2 mt-1 text-[10px] ${isSuccess ? 'text-white/80' : 'text-primary/80'}`}>
+      <div className={`flex items-center gap-2 mt-1 text-[10px] ${isSuccess ? 'text-emerald-100' : 'text-slate-400'}`}>
         {candidate.mainSkill && <span>{candidate.mainSkill}</span>}
         {candidate.rate > 0 && <span>${candidate.rate}/hr</span>}
       </div>
       {candidate.startDate && (
-        <p className={`text-[10px] mt-1 ${isSuccess ? 'text-white/70' : 'text-secondary'}`}>{formatDate(candidate.startDate)}</p>
+        <p className={`text-[10px] mt-1 ${isSuccess ? 'text-emerald-200' : 'text-muted'}`}>{formatDate(candidate.startDate)}</p>
       )}
-      <span className={`inline-flex mt-1.5 px-1.5 py-0.5 rounded text-[9px] font-medium border ${
-        getStatusStyle(candidate.candidateStatus, isEnded)
-      }`}>
-        {candidate.candidateStatus.replace(/([A-Z])/g, ' $1').trim()}
-      </span>
+
+      {/* Status: show as subtle text for ended cards, inline badge for success */}
+      {isSuccess && (
+        <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-medium text-emerald-400">
+          <CheckCircle2 size={10} />
+          {candidate.candidateStatus.replace(/([A-Z])/g, ' $1').trim()}
+        </span>
+      )}
+      {isEnded && !isSuccess && (
+        <p className="text-[10px] text-muted mt-1.5">
+          {candidate.candidateStatus.replace(/([A-Z])/g, ' $1').trim()}
+        </p>
+      )}
+
+      {/* Feedback labels as text list instead of pills */}
       {isEnded && feedbackLabels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {feedbackLabels.map((label, i) => (
-            <span key={i} className="px-1 py-0.5 text-[9px] rounded bg-red-500/10 text-red-400 border border-red-500/20">
-              {label}
-            </span>
-          ))}
-        </div>
+        <p className="text-[10px] text-red-400/80 mt-1.5">
+          {feedbackLabels.join(' · ')}
+        </p>
       )}
+
       {isEnded && candidate.rejectionComments && (
-        <p className="text-[9px] text-muted mt-1 line-clamp-4">{candidate.rejectionComments}</p>
+        <div className="mt-2">
+          <p className={`text-xs text-secondary leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}>
+            {candidate.rejectionComments}
+          </p>
+          {candidate.rejectionComments.length > 120 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggle() }}
+              className="text-[10px] text-blue-400 hover:text-blue-300 mt-1 cursor-pointer"
+            >
+              {isExpanded ? 'Show less' : 'Read more'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
 export default function CandidatePipeline({ candidates, feedbackCatalog = {} }: CandidatePipelineProps) {
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set())
+  const toggleExpand = (id: number) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const columns = COLUMNS.map(col => {
     let filtered: Candidate[]
     if (col.status === 'Ended') {
@@ -112,26 +144,50 @@ export default function CandidatePipeline({ candidates, feedbackCatalog = {} }: 
     )
   }
 
+  const approvedCount = candidates.filter(c => SUCCESS_STATUSES.has(c.candidateStatus)).length
+  const rejectedCount = candidates.filter(c => c.candidateStatus === 'RejectedByClient').length
+
   return (
-    <div className="grid grid-cols-4 gap-3">
-      {columns.map(col => (
-        <div key={col.status} className="space-y-2">
-          <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg ${col.headerBg}`}>
-            <span className="text-xs font-medium">{col.label}</span>
-            <span className="text-[10px] font-mono">{col.candidates.length}</span>
-          </div>
-          <div className="space-y-1.5 min-h-[60px]">
-            {col.candidates.map(c => (
-              <CandidateCard
-                key={c.candidateRequisitionId}
-                candidate={c}
-                isEnded={col.status === 'Ended'}
-                feedbackCatalog={feedbackCatalog}
-              />
-            ))}
-          </div>
+    <div className="space-y-2">
+      {(approvedCount > 0 || rejectedCount > 0) && (
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-muted">{candidates.length} total</span>
+          {approvedCount > 0 && (
+            <span className="flex items-center gap-1 text-emerald-400">
+              <CheckCircle2 size={10} />
+              {approvedCount} approved
+            </span>
+          )}
+          {rejectedCount > 0 && <span className="text-red-400">{rejectedCount} rejected</span>}
         </div>
-      ))}
+      )}
+      <div className="grid grid-cols-[1fr_1fr_1fr_1.5fr] gap-3">
+        {columns.map(col => (
+          <div key={col.status} className="rounded-lg bg-white/[0.02] border border-white/[0.04] overflow-hidden">
+            {/* Column header with icon */}
+            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.06]">
+              <col.Icon size={14} className={col.iconColor} />
+              <span className="text-xs font-medium text-secondary">{col.label}</span>
+              <span className="ml-auto text-[10px] text-muted bg-white/[0.05] px-1.5 py-0.5 rounded">
+                {col.candidates.length}
+              </span>
+            </div>
+            {/* Cards */}
+            <div className="p-2 space-y-2 min-h-[60px]">
+              {col.candidates.map(c => (
+                <CandidateCard
+                  key={c.candidateRequisitionId}
+                  candidate={c}
+                  isEnded={col.status === 'Ended'}
+                  feedbackCatalog={feedbackCatalog}
+                  isExpanded={expandedCards.has(c.candidateRequisitionId)}
+                  onToggle={() => toggleExpand(c.candidateRequisitionId)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

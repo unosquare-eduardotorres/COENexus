@@ -217,6 +217,7 @@ export default function DataSyncPage() {
             syncMode={positionPipeline.syncMode}
             syncYear={positionPipeline.syncYear}
             onSyncYearChange={positionPipeline.setSyncYear}
+            dbFailedCount={positionPipeline.dbFailedCount}
           />
         </>
       );

@@ -43,12 +43,13 @@ export default function CoeTrackingPage() {
   }, [])
 
   const totalBreakdown = useMemo<HealthBreakdown>(() => {
-    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0 }
+    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0, won: 0 }
     for (const coe of data) {
       bd.critical += coe.healthBreakdown.critical
       bd.warning += coe.healthBreakdown.warning
       bd.good += coe.healthBreakdown.good
       bd.excellent += coe.healthBreakdown.excellent
+      bd.won += coe.healthBreakdown.won
     }
     return bd
   }, [data])
@@ -115,6 +116,7 @@ export default function CoeTrackingPage() {
             healthBreakdown={coe.healthBreakdown}
             href={`/command-center/coe-tracking/${encodeURIComponent(coe.coe)}`}
             description={buildDescription(coe)}
+            virtualPositions={coe.virtualPositions}
           />
         ))}
       </div>

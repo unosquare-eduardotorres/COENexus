@@ -17,7 +17,12 @@ export function initDatabase(): Database.Database {
 
   const vecExtPath = resolveVecExtension()
   if (vecExtPath) {
-    db.loadExtension(vecExtPath)
+    try {
+      db.loadExtension(vecExtPath)
+      log.info(`Loaded sqlite-vec extension from ${vecExtPath}`)
+    } catch (err) {
+      log.warn(`Failed to load sqlite-vec extension from ${vecExtPath} — vector search will be unavailable`, err)
+    }
   }
 
   db.pragma('journal_mode = WAL')
@@ -49,6 +54,10 @@ function resolveVecExtension(): string | null {
     : '.so'
 
   const candidates = [
+    // Packaged app: extraResource puts files at Contents/Resources/
+    join(process.resourcesPath, `sqlite-vec/${baseName}${ext}`),
+    join(process.resourcesPath, `${baseName}${ext}`),
+    // Dev mode: relative from .vite/build/main
     join(__dirname, `../../resources/sqlite-vec/${baseName}${ext}`),
     join(__dirname, `../../resources/${baseName}${ext}`),
     join(app.getAppPath(), `resources/sqlite-vec/${baseName}${ext}`),
@@ -57,6 +66,8 @@ function resolveVecExtension(): string | null {
   ]
 
   for (const path of candidates) {
+    // Native .dylib/.so/.dll cannot be loaded from inside ASAR archives
+    if (path.includes('.asar')) continue
     if (existsSync(path)) return path.replace(ext, '')
   }
 

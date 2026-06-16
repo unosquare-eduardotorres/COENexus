@@ -2,37 +2,31 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { coeTrackingService } from '../services/coeTrackingService'
 import type { SkillTrackingSummary, TrackedPosition, HealthBreakdown, HealthTier } from '../types'
+import { TIER_CONFIG } from '../constants/tierConfig'
 import TrackingCard from '../components/TrackingCard'
 import CoeTrackingBreadcrumb from '../components/CoeTrackingBreadcrumb'
 import EffectivenessRing from '../components/EffectivenessRing'
 import HealthFilterPills from '../components/HealthFilterPills'
 
-const TIER_ICON: Record<HealthTier, string> = {
-  critical: '🔴',
-  warning: '🟡',
-  good: '🟢',
-  excellent: '🔵',
-}
-
-const TIER_ROW_TINT: Record<HealthTier, string> = {
-  critical: 'bg-red-500/[0.03]',
-  warning: '',
-  good: '',
-  excellent: '',
-}
-
-const TIER_BORDER: Record<HealthTier, string> = {
-  critical: 'border-l-red-500',
-  warning: 'border-l-amber-500',
-  good: 'border-l-emerald-500',
-  excellent: 'border-l-blue-500',
-}
-
 function buildSkillDescription(skill: SkillTrackingSummary): string {
   if (skill.healthBreakdown.critical > 0) {
-    return `${skill.healthBreakdown.critical} critical position${skill.healthBreakdown.critical > 1 ? 's' : ''} need attention`
+    return `${skill.healthBreakdown.critical} position${skill.healthBreakdown.critical > 1 ? 's' : ''} need candidates`
   }
   return `${skill.coveredPositions} of ${skill.totalPositions} covered`
+}
+
+function StatWithTooltip({ value, label, color, tooltip }: { value: number; label: string; color: string; tooltip: string }) {
+  return (
+    <div className="text-center group relative">
+      <p className={`text-lg font-bold ${color}`}>{value}</p>
+      <p className="text-[10px] text-muted">{label}</p>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+        <div className="glass-panel px-3 py-2 rounded-lg shadow-lg text-[10px] text-secondary whitespace-nowrap">
+          {tooltip}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function PracticeSkillsPage() {
@@ -68,26 +62,28 @@ export default function PracticeSkillsPage() {
 
   const totalPositions = data.reduce((sum, s) => sum + s.totalPositions, 0)
   const totalCovered = data.reduce((sum, s) => sum + s.coveredPositions, 0)
+  const totalVirtual = data.reduce((sum, s) => sum + s.virtualPositions, 0)
   const overallEffectiveness = totalPositions > 0
     ? Math.round((totalCovered / totalPositions) * 100)
     : 0
 
   const skillBreakdown = useMemo<HealthBreakdown>(() => {
-    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0 }
+    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0, won: 0 }
     for (const s of data) {
       bd.critical += s.healthBreakdown.critical
       bd.warning += s.healthBreakdown.warning
       bd.good += s.healthBreakdown.good
       bd.excellent += s.healthBreakdown.excellent
+      bd.won += s.healthBreakdown.won
     }
     return bd
   }, [data])
 
   const positionsBreakdown = useMemo<HealthBreakdown>(() => {
     if (!practicePositions) return skillBreakdown
-    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0 }
+    const bd: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0, won: 0 }
     for (const p of practicePositions) {
-      bd[p.healthTier]++
+      if (!p.isVirtual) bd[p.healthTier]++
     }
     return bd
   }, [practicePositions, skillBreakdown])
@@ -139,18 +135,26 @@ export default function PracticeSkillsPage() {
                 <p className="text-lg font-bold text-primary">{totalPositions}</p>
                 <p className="text-[10px] text-muted">Total Positions</p>
               </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-emerald-500">{totalCovered}</p>
-                <p className="text-[10px] text-muted">Covered</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-red-500">{totalPositions - totalCovered}</p>
-                <p className="text-[10px] text-muted">Uncovered</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-secondary">{data.length}</p>
-                <p className="text-[10px] text-muted">Skills</p>
-              </div>
+              <StatWithTooltip
+                value={totalCovered}
+                label="Covered"
+                color="text-emerald-500"
+                tooltip="Positions with at least 1 active candidate or an approved hire"
+              />
+              <StatWithTooltip
+                value={totalPositions - totalCovered}
+                label="Uncovered"
+                color="text-red-500"
+                tooltip="Positions with 0 active candidates — need sourcing attention"
+              />
+              {totalVirtual > 0 && (
+                <StatWithTooltip
+                  value={totalVirtual}
+                  label="Virtual"
+                  color="text-cyan-400"
+                  tooltip="Internal/CE positions — not counted in coverage metrics"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -215,6 +219,7 @@ export default function PracticeSkillsPage() {
                   healthBreakdown={skill.healthBreakdown}
                   href={`/command-center/coe-tracking/${enc(coe)}/${enc(practice)}/${enc(skill.skill)}`}
                   description={buildSkillDescription(skill)}
+                  virtualPositions={skill.virtualPositions}
                 />
               ))}
             </div>
@@ -245,7 +250,7 @@ export default function PracticeSkillsPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      <th className="px-4 py-3 text-[10px] font-semibold text-muted uppercase tracking-wider w-16">Health</th>
+                      <th className="px-4 py-3 text-[10px] font-semibold text-muted uppercase tracking-wider w-16">Status</th>
                       <th className="px-4 py-3 text-[10px] font-semibold text-muted uppercase tracking-wider">Skill</th>
                       <th className="px-4 py-3 text-[10px] font-semibold text-muted uppercase tracking-wider">Job Title</th>
                       <th className="px-4 py-3 text-[10px] font-semibold text-muted uppercase tracking-wider">Account</th>
@@ -259,14 +264,15 @@ export default function PracticeSkillsPage() {
                     {filteredPositions.map(pos => {
                       const p = pos.position
                       const skill = p.main_skill || 'Unspecified'
+                      const tier = TIER_CONFIG[pos.healthTier]
                       return (
                         <tr
                           key={p.upstream_id}
                           onClick={() => navigate(`/command-center/coe-tracking/${enc(coe)}/${enc(practice)}/${enc(skill)}/${p.upstream_id}`)}
-                          className={`border-l-4 ${TIER_BORDER[pos.healthTier]} ${TIER_ROW_TINT[pos.healthTier]} hover:bg-white/[0.03] cursor-pointer transition-colors`}
+                          className={`border-l-4 ${tier.borderLeft} ${tier.rowTint} hover:bg-white/[0.03] cursor-pointer transition-colors${pos.isVirtual ? ' opacity-60' : ''}`}
                         >
                           <td className="px-4 py-3 text-center">
-                            <span className="text-sm" title={pos.healthTier}>{TIER_ICON[pos.healthTier]}</span>
+                            <tier.Icon size={16} className={tier.color} />
                           </td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded-full bg-gray-100 dark:bg-dark-hover text-secondary">
@@ -277,7 +283,12 @@ export default function PracticeSkillsPage() {
                             {p.job_title || `Position #${p.upstream_id}`}
                           </td>
                           <td className="px-4 py-3 text-xs text-secondary truncate max-w-[140px]">{p.account}</td>
-                          <td className="px-4 py-3 text-xs text-secondary truncate max-w-[140px]">{p.stakeholder}</td>
+                          <td className="px-4 py-3 text-xs text-secondary truncate max-w-[140px]">
+                            {p.stakeholder}
+                            {pos.isVirtual && (
+                              <span className="ml-1 px-1 py-0.5 text-[9px] rounded bg-cyan-500/15 text-cyan-400">Virtual</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`text-xs font-semibold ${
                               pos.activeCandidateCount === 0 ? 'text-red-500' :

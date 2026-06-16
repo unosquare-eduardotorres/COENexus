@@ -8,6 +8,13 @@ const log = createRendererLogger('usePositionPipeline')
 
 export type { PipelineRecordEvent, PipelineProgressDto }
 
+function statusToFailedStep(status: string): 'sync' | 'extract' | 'vectorize' | 'no_resume' {
+  if (status === 'sync_failed') return 'sync'
+  if (status === 'extract_failed') return 'extract'
+  if (status === 'vectorize_failed') return 'vectorize'
+  return 'no_resume'
+}
+
 const initialProgress = (): PipelineProgressDto => ({
   source: 'open-positions',
   status: 'completed',
@@ -29,6 +36,7 @@ export function usePositionPipeline() {
   const [retryingId, setRetryingId] = useState<number | undefined>()
   const [activeTab, setActiveTab] = useState<'succeeded' | 'failed' | 'skipped'>('succeeded')
   const [isVectorizingSynced, setIsVectorizingSynced] = useState(false)
+  const [dbFailedCount, setDbFailedCount] = useState(0)
 
   const [syncMode, setSyncMode] = useState<'active' | 'full'>('active')
   const [syncYear, setSyncYear] = useState<number | null>(null)
@@ -36,6 +44,26 @@ export function usePositionPipeline() {
   const savedActiveOnlyRef = useRef<boolean>(true)
   const savedYearRef = useRef<number | null>(null)
   const prevTokenRef = useRef(token)
+
+  // Load DB-failed records on mount (persists across navigation)
+  useEffect(() => {
+    positionPipelineService.getFailedRecords().then(dbFailed => {
+      setDbFailedCount(dbFailed.length)
+      if (dbFailed.length > 0) {
+        setFailedRecords(prev => {
+          if (prev.length > 0) return prev
+          return dbFailed.map(r => ({
+            upstreamId: r.upstream_id,
+            name: r.full_name,
+            outcome: 'failed' as const,
+            failedStep: statusToFailedStep(r.status),
+            error: r.status_reason ?? undefined,
+            hasResume: r.has_resume === 1,
+          }))
+        })
+      }
+    }).catch(err => log.error('Failed to load DB failed records', err))
+  }, [])
 
   useEffect(() => {
     const unsub = positionPipelineService.onProgress((event: PipelineProgressEvent) => {
@@ -68,6 +96,19 @@ export function usePositionPipeline() {
         if (event.progress.source === 'open-positions') {
           setProgress(event.progress)
           setIsVectorizingSynced(false)
+          if (event.progress.status === 'completed') {
+            positionPipelineService.getFailedRecords().then(dbFailed => {
+              setDbFailedCount(dbFailed.length)
+              setFailedRecords(dbFailed.map(r => ({
+                upstreamId: r.upstream_id,
+                name: r.full_name,
+                outcome: 'failed' as const,
+                failedStep: statusToFailedStep(r.status),
+                error: r.status_reason ?? undefined,
+                hasResume: r.has_resume === 1,
+              })))
+            }).catch(err => log.error('Failed to refresh DB failed records', err))
+          }
           if (event.progress.status === 'paused') {
             pausedOffsetRef.current = event.progress.processedRecords
           }
@@ -246,5 +287,6 @@ export function usePositionPipeline() {
     handleStartOver,
     handleRetryAllFailed,
     handleRetrySingle,
+    dbFailedCount,
   }
 }

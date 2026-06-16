@@ -1,26 +1,31 @@
 interface EffectivenessRingProps {
   percent: number
   size?: 'sm' | 'lg'
+  /** When true, shows "—" in gray instead of "0%" — used when there are no real positions */
+  noData?: boolean
 }
 
-export default function EffectivenessRing({ percent, size = 'sm' }: EffectivenessRingProps) {
+export default function EffectivenessRing({ percent, size = 'sm', noData = false }: EffectivenessRingProps) {
   const dimension = size === 'lg' ? 120 : 64
   const strokeWidth = size === 'lg' ? 8 : 5
   const radius = (dimension - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const offset = circumference - (percent / 100) * circumference
+  const displayPercent = noData ? 0 : percent
+  const offset = circumference - (displayPercent / 100) * circumference
 
-  const ringColor =
-    percent < 40 ? 'stroke-red-500' :
-    percent < 70 ? 'stroke-amber-500' :
-    percent < 90 ? 'stroke-emerald-500' :
-    'stroke-blue-500'
+  const ringColor = noData
+    ? 'stroke-gray-500'
+    : percent < 40 ? 'stroke-red-500'
+    : percent < 70 ? 'stroke-amber-500'
+    : percent < 90 ? 'stroke-emerald-500'
+    : 'stroke-blue-500'
 
-  const textColor =
-    percent < 40 ? 'text-red-500' :
-    percent < 70 ? 'text-amber-500' :
-    percent < 90 ? 'text-emerald-500' :
-    'text-blue-500'
+  const textColor = noData
+    ? 'text-gray-500'
+    : percent < 40 ? 'text-red-500'
+    : percent < 70 ? 'text-amber-500'
+    : percent < 90 ? 'text-emerald-500'
+    : 'text-blue-500'
 
   const fontSize = size === 'lg' ? 'text-2xl' : 'text-sm'
 
@@ -36,20 +41,22 @@ export default function EffectivenessRing({ percent, size = 'sm' }: Effectivenes
           strokeWidth={strokeWidth}
           className="text-gray-200 dark:text-dark-border"
         />
-        <circle
-          cx={dimension / 2}
-          cy={dimension / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className={`${ringColor} transition-all duration-700 ease-out`}
-        />
+        {!noData && (
+          <circle
+            cx={dimension / 2}
+            cy={dimension / 2}
+            r={radius}
+            fill="none"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className={`${ringColor} transition-all duration-700 ease-out`}
+          />
+        )}
       </svg>
       <span className={`absolute ${fontSize} font-bold ${textColor}`}>
-        {percent}%
+        {noData ? '—' : `${percent}%`}
       </span>
     </div>
   )

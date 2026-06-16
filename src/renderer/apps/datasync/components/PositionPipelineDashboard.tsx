@@ -28,6 +28,7 @@ interface PositionPipelineDashboardProps {
   syncMode?: 'active' | 'full'
   syncYear?: number | null
   onSyncYearChange: (year: number | null) => void
+  dbFailedCount?: number
 }
 
 export default memo(function PositionPipelineDashboard({
@@ -55,6 +56,7 @@ export default memo(function PositionPipelineDashboard({
   syncMode,
   syncYear,
   onSyncYearChange,
+  dbFailedCount,
 }: PositionPipelineDashboardProps) {
   return (
     <div className="space-y-6">
@@ -157,19 +159,6 @@ export default memo(function PositionPipelineDashboard({
             </>
           )}
 
-          {failedRecords.length > 0 && !isRunning && (
-            <button
-              onClick={onRetryAllFailed}
-              disabled={isSyncDisabled || !isVoyageKeyConfigured}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
-              Retry Failed ({failedRecords.length})
-            </button>
-          )}
-
           {!isRunning && !isPaused && !isVectorizingSynced && progress.status === 'completed' && succeededRecords.length > 0 && (
             <button
               onClick={onVectorizeSynced}
@@ -191,6 +180,16 @@ export default memo(function PositionPipelineDashboard({
           )}
         </div>
       </div>
+
+      {/* Previous run failed records banner */}
+      {!isRunning && !isPaused && progress.processedRecords === 0 && (dbFailedCount ?? 0) > 0 && (
+        <div className="glass-panel-subtle rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm text-secondary">
+            <span className="font-semibold text-red-600 dark:text-red-400">{dbFailedCount}</span> failed record{dbFailedCount !== 1 ? 's' : ''} from previous pipeline run
+          </span>
+          <span className="text-xs text-muted">Switch to the Failed tab to retry</span>
+        </div>
+      )}
 
       {/* Restored session banner */}
       {isPaused && progress.processedRecords > 0 && !isRunning && (
@@ -313,11 +312,27 @@ export default memo(function PositionPipelineDashboard({
         <SucceededRecordsTable records={succeededRecords} />
       )}
       {activeTab === 'failed' && (
-        <FailedRecordsTable
-          records={failedRecords}
-          onRetrySingle={onRetrySingle}
-          retryingId={retryingId}
-        />
+        <div className="space-y-3">
+          {failedRecords.length > 0 && !isRunning && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">
+                {failedRecords.length} record{failedRecords.length !== 1 ? 's' : ''} failed
+              </p>
+              <button
+                onClick={onRetryAllFailed}
+                disabled={isSyncDisabled || !isVoyageKeyConfigured}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20 rounded-xl hover:bg-red-200 dark:hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              >
+                ↻ Retry All Failed ({failedRecords.length})
+              </button>
+            </div>
+          )}
+          <FailedRecordsTable
+            records={failedRecords}
+            onRetrySingle={onRetrySingle}
+            retryingId={retryingId}
+          />
+        </div>
       )}
       {activeTab === 'skipped' && (
         <SucceededRecordsTable records={skippedRecords} variant="skipped" />

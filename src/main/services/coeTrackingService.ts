@@ -23,7 +23,8 @@ import { createLogger } from './logger'
 
 const log = createLogger('CoeTrackingService')
 
-function computeHealthTier(activeCount: number): HealthTier {
+function computeHealthTier(activeCount: number, hasApproved: boolean): HealthTier {
+  if (hasApproved) return 'won'
   if (activeCount === 0) return 'critical'
   if (activeCount === 1) return 'warning'
   if (activeCount === 2) return 'good'
@@ -33,6 +34,7 @@ function computeHealthTier(activeCount: number): HealthTier {
 function countActiveCandidates(positionUpstreamId: number): {
   activeCount: number
   totalCount: number
+  hasApproved: boolean
 } {
   const candidates = matchRepository.getOpenPositionCandidates(positionUpstreamId)
   const activeCount = candidates.filter(c =>
@@ -40,7 +42,8 @@ function countActiveCandidates(positionUpstreamId: number): {
       normalizeStatus(c.candidate_status)
     )
   ).length
-  return { activeCount, totalCount: candidates.length }
+  const hasApproved = candidates.some(c => c.candidate_status === 'Approved')
+  return { activeCount, totalCount: candidates.length, hasApproved }
 }
 
 function buildBreakdownAndCoverage(
@@ -48,16 +51,22 @@ function buildBreakdownAndCoverage(
 ): {
   breakdown: HealthBreakdown
   coveredCount: number
+  virtualCount: number
 } {
-  const breakdown: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0 }
+  const breakdown: HealthBreakdown = { critical: 0, warning: 0, good: 0, excellent: 0, won: 0 }
   let coveredCount = 0
+  let virtualCount = 0
   for (const pos of positions) {
-    const { activeCount } = countActiveCandidates(pos.upstream_id)
-    const tier = computeHealthTier(activeCount)
+    if (pos.stakeholder === 'CE') {
+      virtualCount++
+      continue
+    }
+    const { activeCount, hasApproved } = countActiveCandidates(pos.upstream_id)
+    const tier = computeHealthTier(activeCount, hasApproved)
     breakdown[tier]++
-    if (activeCount >= 1) coveredCount++
+    if (activeCount >= 1 || hasApproved) coveredCount++
   }
-  return { breakdown, coveredCount }
+  return { breakdown, coveredCount, virtualCount }
 }
 
 export const coeTrackingService = {
@@ -73,7 +82,8 @@ export const coeTrackingService = {
 
     const results: CoeTrackingSummary[] = []
     for (const [coe, coePositions] of coeMap) {
-      const { breakdown, coveredCount } = buildBreakdownAndCoverage(coePositions)
+      const { breakdown, coveredCount, virtualCount } = buildBreakdownAndCoverage(coePositions)
+      const realCount = coePositions.length - virtualCount
 
       const practiceCounts = new Map<string, number>()
       for (const pos of coePositions) {
@@ -86,13 +96,14 @@ export const coeTrackingService = {
 
       results.push({
         coe,
-        totalPositions: coePositions.length,
+        totalPositions: realCount,
         coveredPositions: coveredCount,
-        effectivenessPercent: coePositions.length > 0
-          ? Math.round((coveredCount / coePositions.length) * 100)
+        effectivenessPercent: realCount > 0
+          ? Math.round((coveredCount / realCount) * 100)
           : 0,
         healthBreakdown: breakdown,
         topPractices,
+        virtualPositions: virtualCount,
       })
     }
 
@@ -114,7 +125,8 @@ export const coeTrackingService = {
 
     const results: PracticeTrackingSummary[] = []
     for (const [practice, practicePositions] of practiceMap) {
-      const { breakdown, coveredCount } = buildBreakdownAndCoverage(practicePositions)
+      const { breakdown, coveredCount, virtualCount } = buildBreakdownAndCoverage(practicePositions)
+      const realCount = practicePositions.length - virtualCount
 
       const distinctSkills = new Set<string>()
       for (const pos of practicePositions) {
@@ -126,14 +138,15 @@ export const coeTrackingService = {
       results.push({
         practice,
         coe,
-        totalPositions: practicePositions.length,
+        totalPositions: realCount,
         coveredPositions: coveredCount,
-        effectivenessPercent: practicePositions.length > 0
-          ? Math.round((coveredCount / practicePositions.length) * 100)
+        effectivenessPercent: realCount > 0
+          ? Math.round((coveredCount / realCount) * 100)
           : 0,
         healthBreakdown: breakdown,
         skillCount,
         singleSkill,
+        virtualPositions: virtualCount,
       })
     }
 
@@ -158,16 +171,18 @@ export const coeTrackingService = {
 
     const results: SkillTrackingSummary[] = []
     for (const [skill, skillPositions] of skillMap) {
-      const { breakdown, coveredCount } = buildBreakdownAndCoverage(skillPositions)
+      const { breakdown, coveredCount, virtualCount } = buildBreakdownAndCoverage(skillPositions)
+      const realCount = skillPositions.length - virtualCount
       results.push({
         skill,
         coe,
-        totalPositions: skillPositions.length,
+        totalPositions: realCount,
         coveredPositions: coveredCount,
-        effectivenessPercent: skillPositions.length > 0
-          ? Math.round((coveredCount / skillPositions.length) * 100)
+        effectivenessPercent: realCount > 0
+          ? Math.round((coveredCount / realCount) * 100)
           : 0,
         healthBreakdown: breakdown,
+        virtualPositions: virtualCount,
       })
     }
 
@@ -186,18 +201,19 @@ export const coeTrackingService = {
     )
 
     const results: TrackedPosition[] = filtered.map(r => {
-      const { activeCount, totalCount } = countActiveCandidates(r.position.upstream_id)
+      const { activeCount, totalCount, hasApproved } = countActiveCandidates(r.position.upstream_id)
       return {
         position: r.position,
         activeCandidateCount: activeCount,
-        healthTier: computeHealthTier(activeCount),
+        healthTier: computeHealthTier(activeCount, hasApproved),
         totalCandidates: totalCount,
         matchingCriteria: r.matchingCriteria,
         actors: r.actors,
+        isVirtual: r.position.stakeholder === 'CE',
       }
     })
 
-    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3 }
+    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3, won: 4 }
     results.sort((a, b) => {
       const tierDiff = tierOrder[a.healthTier] - tierOrder[b.healthTier]
       if (tierDiff !== 0) return tierDiff
@@ -217,18 +233,19 @@ export const coeTrackingService = {
     )
 
     const results: TrackedPosition[] = filtered.map(r => {
-      const { activeCount, totalCount } = countActiveCandidates(r.position.upstream_id)
+      const { activeCount, totalCount, hasApproved } = countActiveCandidates(r.position.upstream_id)
       return {
         position: r.position,
         activeCandidateCount: activeCount,
-        healthTier: computeHealthTier(activeCount),
+        healthTier: computeHealthTier(activeCount, hasApproved),
         totalCandidates: totalCount,
         matchingCriteria: r.matchingCriteria,
         actors: r.actors,
+        isVirtual: r.position.stakeholder === 'CE',
       }
     })
 
-    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3 }
+    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3, won: 4 }
     results.sort((a, b) => {
       const tierDiff = tierOrder[a.healthTier] - tierOrder[b.healthTier]
       if (tierDiff !== 0) return tierDiff
@@ -247,18 +264,19 @@ export const coeTrackingService = {
     )
 
     const results: TrackedPosition[] = filtered.map(r => {
-      const { activeCount, totalCount } = countActiveCandidates(r.position.upstream_id)
+      const { activeCount, totalCount, hasApproved } = countActiveCandidates(r.position.upstream_id)
       return {
         position: r.position,
         activeCandidateCount: activeCount,
-        healthTier: computeHealthTier(activeCount),
+        healthTier: computeHealthTier(activeCount, hasApproved),
         totalCandidates: totalCount,
         matchingCriteria: r.matchingCriteria,
         actors: r.actors,
+        isVirtual: r.position.stakeholder === 'CE',
       }
     })
 
-    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3 }
+    const tierOrder: Record<HealthTier, number> = { critical: 0, warning: 1, good: 2, excellent: 3, won: 4 }
     results.sort((a, b) => {
       const tierDiff = tierOrder[a.healthTier] - tierOrder[b.healthTier]
       if (tierDiff !== 0) return tierDiff
@@ -280,6 +298,7 @@ export const coeTrackingService = {
         normalizeStatus(c.candidateStatus)
       )
     ).length
+    const hasApproved = detail.candidates.some(c => c.candidateStatus === 'Approved')
 
     const events: CoeTrackingTimelineEvent[] = []
 
@@ -313,24 +332,18 @@ export const coeTrackingService = {
       }
     }
 
-    for (const d of detail.discussions) {
-      events.push({
-        type: 'discussion',
-        date: d.date,
-        label: `Comment by ${d.author.split('@')[0]}`,
-        detail: d.message.length > 80 ? d.message.slice(0, 80) + '...' : d.message,
-      })
-    }
+    // Discussion events removed from timeline — they live in the Discussion section
 
     events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     return {
       position: detail.position,
       activeCandidateCount: activeCount,
-      healthTier: computeHealthTier(activeCount),
+      healthTier: computeHealthTier(activeCount, hasApproved),
       candidates: detail.candidates,
       discussions: detail.discussions,
       timelineEvents: events,
+      isVirtual: detail.position.stakeholder === 'CE',
     }
   },
 
