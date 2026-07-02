@@ -11,10 +11,9 @@ import {
 import {
   isTokenExpired,
   getTokenExpiration,
-  validateJwtStructure,
-  decodeTokenPayload,
 } from '../shared/utils/tokenUtils';
 import { safeJsonParse } from '../shared/utils/safeJsonParse';
+import type { TokenSource } from '../../shared/ipc-types';
 
 interface ClaudeStatus {
   connected: boolean;
@@ -32,7 +31,7 @@ interface TokenUsage {
   outputTokens: number;
 }
 
-interface SharePointStatus {
+export interface TokenSlotStatus {
   token: string;
   isValid: boolean;
   isValidating: boolean;
@@ -41,20 +40,18 @@ interface SharePointStatus {
   showExpirationWarning: boolean;
 }
 
+export interface ApiTokensState {
+  unocore: TokenSlotStatus;
+  exec: TokenSlotStatus;
+}
+
 interface ModalState {
   claude: boolean;
   tokens: boolean;
-  sharepoint: boolean;
+  apiTokens: boolean;
 }
 
-type ModalKey = 'claude' | 'tokens' | 'sharepoint';
-
-export interface AgentActivity {
-  id: string;
-  name: string;
-  status: 'running' | 'queued';
-  runId: string | null;
-}
+type ModalKey = 'claude' | 'tokens' | 'apiTokens';
 
 interface NexusStatusContextValue {
   claude: ClaudeStatus;
@@ -62,16 +59,16 @@ interface NexusStatusContextValue {
   tokens: TokenUsage;
   refreshTokenUsage: () => Promise<void>;
   resetTokenUsage: () => Promise<void>;
-  sharepoint: SharePointStatus;
-  setSharePointToken: (token: string) => void;
-  validateSharePoint: () => Promise<void>;
-  disconnectSharePoint: () => void;
-  requireSharePointToken: () => boolean;
+  apiTokens: ApiTokensState;
+  setApiToken: (source: TokenSource, token: string) => void;
+  validateApiToken: (source: TokenSource) => Promise<void>;
+  disconnectApiToken: (source: TokenSource) => void;
+  requireApiToken: (source: TokenSource) => boolean;
+  pendingTokenSource: TokenSource | null;
+  clearPendingTokenSource: () => void;
   modals: ModalState;
   openModal: (modal: ModalKey) => void;
   closeModal: (modal: ModalKey) => void;
-  agentActivities: AgentActivity[];
-  setAgentActivities: (activities: AgentActivity[]) => void;
 }
 
 const NexusStatusContext = createContext<NexusStatusContextValue | null>(null);
@@ -82,7 +79,122 @@ export function useNexusStatus(): NexusStatusContextValue {
   return ctx;
 }
 
+// ── localStorage migration (old single token → dual slots) ──────────────────
+function runTokenMigration() {
+  const migrated = localStorage.getItem('datasync-token-migrated');
+  if (!migrated) {
+    const oldToken = localStorage.getItem('datasync-token');
+    const oldValid = localStorage.getItem('datasync-is-token-valid');
+    if (oldToken) {
+      localStorage.setItem('datasync-token-unocore', oldToken);
+      if (oldValid) localStorage.setItem('datasync-is-token-valid-unocore', oldValid);
+    }
+    localStorage.removeItem('datasync-token');
+    localStorage.removeItem('datasync-is-token-valid');
+    localStorage.setItem('datasync-token-migrated', '1');
+  }
+}
+
+// ── Per-slot hook ────────────────────────────────────────────────────────────
+interface TokenSlotReturn {
+  token: string;
+  valid: boolean;
+  validating: boolean;
+  error: string | undefined;
+  remainingMs: number;
+  showWarning: boolean;
+  setToken: (t: string) => void;
+  setValid: (v: boolean) => void;
+  setValidating: (v: boolean) => void;
+  setError: (e: string | undefined) => void;
+  setShowWarning: (v: boolean) => void;
+  disconnect: () => void;
+}
+
+function useTokenSlot(storageKeyToken: string, storageKeyValid: string): TokenSlotReturn {
+  const [token, setTokenRaw] = useState(() =>
+    localStorage.getItem(storageKeyToken) ?? ''
+  );
+  const [valid, setValid] = useState(() => {
+    const storedToken = localStorage.getItem(storageKeyToken) ?? '';
+    const wasValid = safeJsonParse(localStorage.getItem(storageKeyValid), false);
+    if (wasValid && storedToken && !isTokenExpired(storedToken)) return true;
+    return false;
+  });
+  const [validating, setValidating] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [remainingMs, setRemainingMs] = useState(0);
+  const [showWarning, setShowWarning] = useState(false);
+
+  // Persist token to localStorage
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem(storageKeyToken, token);
+    } else {
+      localStorage.removeItem(storageKeyToken);
+    }
+  }, [token, storageKeyToken]);
+
+  // Persist valid flag to localStorage
+  useEffect(() => {
+    localStorage.setItem(storageKeyValid, JSON.stringify(valid));
+  }, [valid, storageKeyValid]);
+
+  // Countdown timer — each slot owns its own interval
+  const expiredRef = useRef(false);
+  useEffect(() => {
+    expiredRef.current = false;
+
+    const computeRemaining = () => {
+      const expiresAt = getTokenExpiration(token);
+      if (!expiresAt) return 0;
+      return Math.max(0, expiresAt.getTime() - Date.now());
+    };
+
+    setRemainingMs(computeRemaining());
+
+    const interval = setInterval(() => {
+      const ms = computeRemaining();
+      setRemainingMs(ms);
+
+      if (ms <= 0 && valid && !expiredRef.current) {
+        expiredRef.current = true;
+        setValid(false);
+        setShowWarning(true);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [token, valid]);
+
+  const setToken = useCallback((t: string) => {
+    setTokenRaw(t);
+    setValid(false);
+    setError(undefined);
+    setShowWarning(false);
+  }, []);
+
+  const disconnect = useCallback(() => {
+    setTokenRaw('');
+    setValid(false);
+    setError(undefined);
+    setShowWarning(false);
+    localStorage.removeItem(storageKeyToken);
+    localStorage.removeItem(storageKeyValid);
+  }, [storageKeyToken, storageKeyValid]);
+
+  return {
+    token, valid, validating, error, remainingMs, showWarning,
+    setToken, setValid, setValidating, setError, setShowWarning,
+    disconnect,
+  };
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────────
 export function NexusStatusProvider({ children }: { children: ReactNode }) {
+  // Run migration synchronously before any state initializes
+  useState(() => { runTokenMigration(); });
+
   const [claude, setClaude] = useState<ClaudeStatus>({
     connected: false,
     checking: true,
@@ -96,26 +208,15 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
 
   const [tokens, setTokens] = useState<TokenUsage>({ inputTokens: 0, outputTokens: 0 });
 
-  const [spToken, setSpToken] = useState(() =>
-    localStorage.getItem('datasync-token') ?? ''
-  );
-  const [spValid, setSpValid] = useState(() => {
-    const storedToken = localStorage.getItem('datasync-token') ?? '';
-    const wasValid = safeJsonParse(localStorage.getItem('datasync-is-token-valid'), false);
-    if (wasValid && storedToken && !isTokenExpired(storedToken)) return true;
-    return false;
-  });
-  const [spValidating, setSpValidating] = useState(false);
-  const [spError, setSpError] = useState<string | undefined>();
-  const [spRemainingMs, setSpRemainingMs] = useState(0);
-  const [spShowWarning, setSpShowWarning] = useState(false);
+  const unocore = useTokenSlot('datasync-token-unocore', 'datasync-is-token-valid-unocore');
+  const exec = useTokenSlot('datasync-token-exec', 'datasync-is-token-valid-exec');
 
-  const [agentActivities, setAgentActivities] = useState<AgentActivity[]>([]);
+  const [pendingTokenSource, setPendingTokenSource] = useState<TokenSource | null>(null);
 
   const [modals, setModals] = useState<ModalState>({
     claude: false,
     tokens: false,
-    sharepoint: false,
+    apiTokens: false,
   });
 
   const checkClaude = useCallback(async () => {
@@ -149,8 +250,17 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
 
   const refreshTokenUsage = useCallback(async () => {
     try {
-      const usage = await window.api.ai.getTokenUsage() as { inputTokens: number; outputTokens: number };
-      setTokens(usage);
+      const raw = await window.api.ai.getTokenUsage() as
+        | { inputTokens: number; outputTokens: number }
+        | { claude: { inputTokens: number; outputTokens: number }; local: { inputTokens: number; outputTokens: number } };
+      if ('claude' in raw) {
+        setTokens({
+          inputTokens: raw.claude.inputTokens + raw.local.inputTokens,
+          outputTokens: raw.claude.outputTokens + raw.local.outputTokens,
+        });
+      } else {
+        setTokens(raw);
+      }
     } catch {
       // silently ignore
     }
@@ -165,64 +275,58 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    if (spToken) {
-      localStorage.setItem('datasync-token', spToken);
-    } else {
-      localStorage.removeItem('datasync-token');
-    }
-  }, [spToken]);
-
-  useEffect(() => {
-    localStorage.setItem('datasync-is-token-valid', JSON.stringify(spValid));
-  }, [spValid]);
-
-  const setSharePointToken = useCallback((token: string) => {
-    setSpToken(token);
-    setSpValid(false);
-    setSpError(undefined);
-    setSpShowWarning(false);
-  }, []);
-
-  const validateSharePoint = useCallback(async () => {
-    setSpValidating(true);
-    setSpError(undefined);
-    try {
-      const result = await window.api.sync.validateToken(spToken) as { valid: boolean; error?: string };
-      if (result.valid) {
-        setSpValid(true);
-      } else {
-        setSpError(result.error ?? 'Validation failed');
-      }
-    } catch (err) {
-      setSpError(err instanceof Error ? err.message : 'Validation failed');
-    } finally {
-      setSpValidating(false);
-    }
-  }, [spToken]);
-
-  const disconnectSharePoint = useCallback(() => {
-    setSpToken('');
-    setSpValid(false);
-    setSpError(undefined);
-    setSpShowWarning(false);
-    localStorage.removeItem('datasync-token');
-    localStorage.removeItem('datasync-is-token-valid');
-  }, []);
-
   const openModal = useCallback((modal: ModalKey) => {
     setModals(prev => ({ ...prev, [modal]: true }));
   }, []);
 
   const closeModal = useCallback((modal: ModalKey) => {
     setModals(prev => ({ ...prev, [modal]: false }));
+    if (modal === 'apiTokens') setPendingTokenSource(null);
   }, []);
 
-  const requireSharePointToken = useCallback(() => {
-    if (spValid && spToken && !isTokenExpired(spToken)) return true;
-    openModal('sharepoint');
+  const setApiToken = useCallback((source: TokenSource, token: string) => {
+    const slot = source === 'unocore' ? unocore : exec;
+    slot.setToken(token);
+  }, [unocore, exec]);
+
+  const validateApiToken = useCallback(async (source: TokenSource) => {
+    const slot = source === 'unocore' ? unocore : exec;
+    slot.setValidating(true);
+    slot.setError(undefined);
+    try {
+      const result = await window.api.sync.validateToken(slot.token, source) as {
+        valid: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (result.valid) {
+        slot.setValid(true);
+      } else {
+        slot.setError(result.error || result.message || 'Validation failed');
+      }
+    } catch (err) {
+      slot.setError(err instanceof Error ? err.message : 'Validation failed');
+    } finally {
+      slot.setValidating(false);
+    }
+  }, [unocore, exec]);
+
+  const disconnectApiToken = useCallback((source: TokenSource) => {
+    const slot = source === 'unocore' ? unocore : exec;
+    slot.disconnect();
+  }, [unocore, exec]);
+
+  const requireApiToken = useCallback((source: TokenSource) => {
+    const slot = source === 'unocore' ? unocore : exec;
+    if (slot.valid && slot.token && !isTokenExpired(slot.token)) return true;
+    setPendingTokenSource(source);
+    openModal('apiTokens');
     return false;
-  }, [spValid, spToken, openModal]);
+  }, [unocore, exec, openModal]);
+
+  const clearPendingTokenSource = useCallback(() => {
+    setPendingTokenSource(null);
+  }, []);
 
   useEffect(() => {
     checkClaude();
@@ -238,53 +342,27 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
     };
   }, [checkClaude, refreshTokenUsage]);
 
-  const spExpiredRef = useRef(false);
-
-  useEffect(() => {
-    spExpiredRef.current = false;
-
-    const computeRemaining = () => {
-      const expiresAt = getTokenExpiration(spToken);
-      if (!expiresAt) return 0;
-      return Math.max(0, expiresAt.getTime() - Date.now());
-    };
-
-    setSpRemainingMs(computeRemaining());
-
-    const interval = setInterval(() => {
-      const ms = computeRemaining();
-      setSpRemainingMs(ms);
-
-      if (ms <= 0 && spValid && !spExpiredRef.current) {
-        spExpiredRef.current = true;
-        setSpValid(false);
-        setSpShowWarning(true);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [spToken, spValid]);
-
-  const sharepoint = useMemo<SharePointStatus>(() => ({
-    token: spToken,
-    isValid: spValid,
-    isValidating: spValidating,
-    error: spError,
-    remainingMs: spRemainingMs,
-    showExpirationWarning: spShowWarning,
-  }), [spToken, spValid, spValidating, spError, spRemainingMs, spShowWarning]);
-
-  const localValidation = useMemo(() => {
-    const trimmed = spToken.trim();
-    if (!trimmed) return 'idle';
-    if (!validateJwtStructure(trimmed)) return 'invalid-structure';
-    const payload = decodeTokenPayload(trimmed);
-    if (!payload) return 'invalid-structure';
-    if (payload.exp && isTokenExpired(trimmed)) return 'expired';
-    return 'valid';
-  }, [spToken]);
-
-  void localValidation;
+  const apiTokens = useMemo<ApiTokensState>(() => ({
+    unocore: {
+      token: unocore.token,
+      isValid: unocore.valid,
+      isValidating: unocore.validating,
+      error: unocore.error,
+      remainingMs: unocore.remainingMs,
+      showExpirationWarning: unocore.showWarning,
+    },
+    exec: {
+      token: exec.token,
+      isValid: exec.valid,
+      isValidating: exec.validating,
+      error: exec.error,
+      remainingMs: exec.remainingMs,
+      showExpirationWarning: exec.showWarning,
+    },
+  }), [
+    unocore.token, unocore.valid, unocore.validating, unocore.error, unocore.remainingMs, unocore.showWarning,
+    exec.token, exec.valid, exec.validating, exec.error, exec.remainingMs, exec.showWarning,
+  ]);
 
   const value = useMemo<NexusStatusContextValue>(() => ({
     claude,
@@ -292,21 +370,21 @@ export function NexusStatusProvider({ children }: { children: ReactNode }) {
     tokens,
     refreshTokenUsage,
     resetTokenUsage,
-    sharepoint,
-    setSharePointToken,
-    validateSharePoint,
-    disconnectSharePoint,
-    requireSharePointToken,
+    apiTokens,
+    setApiToken,
+    validateApiToken,
+    disconnectApiToken,
+    requireApiToken,
+    pendingTokenSource,
+    clearPendingTokenSource,
     modals,
     openModal,
     closeModal,
-    agentActivities,
-    setAgentActivities,
   }), [
     claude, checkClaude, tokens, refreshTokenUsage, resetTokenUsage,
-    sharepoint, setSharePointToken, validateSharePoint, disconnectSharePoint,
-    requireSharePointToken, modals, openModal, closeModal,
-    agentActivities,
+    apiTokens, setApiToken, validateApiToken, disconnectApiToken,
+    requireApiToken, pendingTokenSource, clearPendingTokenSource,
+    modals, openModal, closeModal,
   ]);
 
   return (

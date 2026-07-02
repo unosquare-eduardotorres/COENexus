@@ -389,7 +389,7 @@ export const upstreamApiService = {
   async getAllOpenPositionsPaged(token: string, skip: number, take: number, year?: number): Promise<{ items: OpenPositionListItem[]; totalRecords: number }> {
     const { upstream } = getConfig()
     const paged = await fetchPaged(`${upstream.apiUrl}op/paged/false//`, token, {
-      skip, take, columns: buildOpenPositionColumns(year),
+      skip, take, columns: buildOpenPositionColumns({ year, sortByIdDesc: true }),
     })
     const items = paged.payload.map(row => ({
       id: getInt(row, 1),

@@ -3,6 +3,10 @@ import type {
   ResponsivenessReport,
   ResponsivenessCoePracticeLead,
   ResponsivenessAddLeadParams,
+  ResponsivenessDiscussionComment,
+  ResponsivenessAnalyzeRequest,
+  ResponsivenessAiAnalysisResult,
+  PositionAttentionReport,
 } from '../../../shared/ipc-types'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
@@ -39,6 +43,38 @@ export function registerResponsivenessHandlers(): void {
       validateSender(event)
       responsivenessService.removeLead(id)
       return { removed: true }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.RESPONSIVENESS_GET_POSITION_DISCUSSIONS,
+    async (event, positionUpstreamId: number): Promise<ResponsivenessDiscussionComment[]> => {
+      validateSender(event)
+      return responsivenessService.getPositionDiscussions(positionUpstreamId)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.RESPONSIVENESS_ANALYZE_MENTIONS,
+    async (event, request: ResponsivenessAnalyzeRequest): Promise<ResponsivenessAiAnalysisResult[]> => {
+      validateSender(event)
+      return responsivenessService.analyzeUnansweredMentions(request.positionUpstreamIds)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.RESPONSIVENESS_GENERATE_FULL_REPORT,
+    async (event): Promise<PositionAttentionReport> => {
+      validateSender(event)
+      return responsivenessService.generateFullReport(event.sender)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.RESPONSIVENESS_GET_LAST_REPORT,
+    async (event): Promise<PositionAttentionReport | null> => {
+      validateSender(event)
+      return responsivenessService.getLastReport()
     }
   )
 }

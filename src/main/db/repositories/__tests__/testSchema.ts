@@ -231,4 +231,48 @@ export const SCHEMA = `
     name TEXT NOT NULL,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Catalog tables
+  CREATE TABLE IF NOT EXISTS catalog_coes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS catalog_practices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS catalog_skills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS catalog_coe_practices (
+    coe_id INTEGER NOT NULL,
+    practice_id INTEGER NOT NULL,
+    PRIMARY KEY (coe_id, practice_id),
+    FOREIGN KEY (coe_id) REFERENCES catalog_coes(id) ON DELETE CASCADE,
+    FOREIGN KEY (practice_id) REFERENCES catalog_practices(id) ON DELETE RESTRICT
+  );
+
+  CREATE TABLE IF NOT EXISTS catalog_practice_skills (
+    practice_id INTEGER NOT NULL,
+    skill_id INTEGER NOT NULL,
+    PRIMARY KEY (practice_id, skill_id),
+    FOREIGN KEY (practice_id) REFERENCES catalog_practices(id) ON DELETE CASCADE,
+    FOREIGN KEY (skill_id) REFERENCES catalog_skills(id) ON DELETE RESTRICT
+  );
 `

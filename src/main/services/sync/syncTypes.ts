@@ -99,5 +99,6 @@ export interface SyncOptions {
   limit?: number
   skip?: number
   year?: number
+  quarter?: string
   activeOnly?: boolean
 }

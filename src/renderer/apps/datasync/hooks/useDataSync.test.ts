@@ -6,15 +6,25 @@ import { useDataSync } from './useDataSync';
 
 vi.mock('../../../contexts/NexusStatusContext', () => ({
   useNexusStatus: () => ({
-    sharepoint: {
-      token: '',
-      isValid: false,
-      isValidating: false,
-      error: undefined,
-      remainingMs: 0,
-      showExpirationWarning: false,
+    apiTokens: {
+      unocore: {
+        token: '',
+        isValid: false,
+        isValidating: false,
+        error: undefined,
+        remainingMs: 0,
+        showExpirationWarning: false,
+      },
+      exec: {
+        token: '',
+        isValid: false,
+        isValidating: false,
+        error: undefined,
+        remainingMs: 0,
+        showExpirationWarning: false,
+      },
     },
-    requireSharePointToken: vi.fn().mockReturnValue(false),
+    requireApiToken: vi.fn().mockReturnValue(false),
   }),
 }));
 

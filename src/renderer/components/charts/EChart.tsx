@@ -23,6 +23,8 @@ interface EChartProps {
   height?: number | string
   className?: string
   style?: CSSProperties
+  /** Event handlers forwarded to ReactECharts. Keys are event names (e.g. 'click'). */
+  onEvents?: Record<string, (params: any) => void>
 }
 
 /** Tracks the app's dark-mode class so charts re-theme on toggle. */
@@ -39,7 +41,7 @@ function useIsDark(): boolean {
   return dark
 }
 
-export default function EChart({ option, height = 300, className, style }: EChartProps) {
+export default function EChart({ option, height = 300, className, style, onEvents }: EChartProps) {
   const dark = useIsDark()
   const resolvedHeight = typeof height === 'number' ? `${height}px` : height
 
@@ -53,6 +55,7 @@ export default function EChart({ option, height = 300, className, style }: EChar
       opts={{ renderer: 'svg' }}
       style={{ height: resolvedHeight, width: '100%', ...style }}
       className={className}
+      onEvents={onEvents}
     />
   )
 }

@@ -2,6 +2,7 @@ import { syncEmployeeOrchestrator } from './sync/syncEmployeeOrchestrator'
 import { syncCandidateOrchestrator } from './sync/syncCandidateOrchestrator'
 import { syncOpenPositionOrchestrator } from './sync/syncOpenPositionOrchestrator'
 import { syncPrrOrchestrator } from './sync/syncPrrOrchestrator'
+import { syncPlacementMarginOrchestrator } from './sync/syncPlacementMarginOrchestrator'
 import type { SyncRecordDto, SyncEvent, SyncOptions } from './sync/syncTypes'
 import { createLogger } from './logger'
 
@@ -34,6 +35,17 @@ export const syncOrchestrator = {
         await syncOpenPositionOrchestrator.sync(token, options, emitEvent, signal)
       } else if (source === 'project-reallocations') {
         await syncPrrOrchestrator.sync(token, options, emitEvent, signal)
+      } else if (source === 'placement-margin') {
+        if (!options.year) {
+          emitEvent({ type: 'error', message: 'Year is required for placement-margin sync' })
+          return
+        }
+        await syncPlacementMarginOrchestrator.sync(
+          token,
+          { ...options, year: options.year, quarter: options.quarter },
+          emitEvent,
+          signal,
+        )
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {

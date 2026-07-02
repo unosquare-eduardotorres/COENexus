@@ -1,13 +1,14 @@
 import { SyncSourceType, SyncProgress, SyncRecord } from '../types';
+import type { TokenSource } from '../../../../shared/ipc-types';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 
 const log = createRendererLogger('dataSyncService');
 
 export const dataSyncService = {
-  async validateToken(token: string): Promise<{ valid: boolean; error?: string }> {
+  async validateToken(token: string, source: TokenSource = 'unocore'): Promise<{ valid: boolean; error?: string }> {
     try {
-      log.info('Sync token validation requested');
-      const result = await window.api.sync.validateToken(token) as {
+      log.info('Sync token validation requested', { source });
+      const result = await window.api.sync.validateToken(token, source) as {
         valid?: boolean;
         message?: string;
         error?: string;

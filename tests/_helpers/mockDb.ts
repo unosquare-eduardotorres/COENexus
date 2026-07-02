@@ -6,14 +6,6 @@ export function createInMemoryDb(): Database.Database {
   return new Database(':memory:')
 }
 
-export function createAgentsDb(): Database.Database {
-  const db = createInMemoryDb()
-  const schemaPath = join(__dirname, '../../src/main/db/agents/schema.sql')
-  const schemaSql = readFileSync(schemaPath, 'utf-8')
-  db.exec(schemaSql)
-  return db
-}
-
 export function createNexusDb(): Database.Database {
   const db = createInMemoryDb()
   const schemaPath = join(__dirname, '../../src/main/db/schema.sql')
@@ -23,13 +15,6 @@ export function createNexusDb(): Database.Database {
   return db
 }
 
-export function createPathDb(): Database.Database {
-  const db = createInMemoryDb()
-  const schemaPath = join(__dirname, '../../src/main/db/path/schema.sql')
-  const schemaSql = readFileSync(schemaPath, 'utf-8')
-  db.exec(schemaSql)
-  return db
-}
 
 function stripVecExtensions(sql: string): string {
   return sql

@@ -6,6 +6,7 @@ import { registerAiHandlers } from './ai.ipc'
 import { registerPresentationHandlers } from './presentation.ipc'
 import { registerPipelineHandlers } from './pipeline.ipc'
 import { registerPositionPipelineHandlers } from './positionPipeline.ipc'
+import { registerModelConfigHandlers } from './modelConfig.ipc'
 
 export function registerVemHandlers(): void {
   registerProcessingHandlers()
@@ -16,4 +17,5 @@ export function registerVemHandlers(): void {
   registerPresentationHandlers()
   registerPipelineHandlers()
   registerPositionPipelineHandlers()
+  registerModelConfigHandlers()
 }

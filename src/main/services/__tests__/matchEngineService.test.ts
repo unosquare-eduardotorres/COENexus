@@ -7,9 +7,10 @@ vi.mock('../voyageEmbeddingService', () => ({
   },
 }))
 
-vi.mock('../claudeService', () => ({
-  claudeService: {
+vi.mock('../llmRouter', () => ({
+  llmRouter: {
     chatAsync: vi.fn().mockResolvedValue({ text: '{}', usage: { inputTokens: 0, outputTokens: 0 } }),
+    getConcurrencyLimit: vi.fn().mockReturnValue(8),
   },
 }))
 
@@ -55,6 +56,26 @@ vi.mock('../../config', () => ({
   getConfig: vi.fn(() => ({
     claude: { haikuModel: 'haiku-test', opusModel: 'opus-test', haikuConcurrency: 2, opusConcurrency: 1 },
     voyage: { apiUrl: 'https://api.voyage.test', defaultModel: 'voyage-test', apiKeys: ['key1'] },
+    modelConfig: {
+      presetMode: 'claude',
+      localServerUrl: 'http://localhost:8080',
+      localDefaultModel: '',
+      concurrency: { claude: { max: 2, haikuMax: 2 }, local: { max: 1 } },
+      features: {
+        resumeSkillExtraction: { provider: 'claude', model: 'haiku-test' },
+        resumeFormatCheck: { provider: 'claude', model: 'opus-test' },
+        resumeTransform: { provider: 'claude', model: 'opus-test' },
+        candidateProfile: { provider: 'claude', model: 'opus-test' },
+        coverLetter: { provider: 'claude', model: 'opus-test' },
+        matchTriage: { provider: 'claude', model: 'haiku-test' },
+        matchDeepAnalysis: { provider: 'claude', model: 'opus-test' },
+        benchBurnAnalysis: { provider: 'claude', model: 'opus-test' },
+        responsivenessAnalysis: { provider: 'claude', model: 'opus-test' },
+        responsivenessReport: { provider: 'claude', model: 'opus-test' },
+        bugDescription: { provider: 'claude', model: 'haiku-test' },
+        aiChat: { provider: 'claude', model: 'opus-test' },
+      },
+    },
   })),
 }))
 

@@ -198,3 +198,102 @@ Rules:
 - isFormatted must be true only if all required sections are clearly present.
 - details must list findings, including missing or weak sections.
 - Return only valid JSON.`
+
+export const RESPONSIVENESS_CONTEXT_ANALYSIS = `You are a senior technical recruiting analyst reviewing open position discussions.
+
+Your task: For each @-mention of a tracked COE Practice Lead listed below, determine whether the lead STILL needs to respond, or whether the situation has been resolved through subsequent actions or discussion.
+
+## POSITION CONTEXT
+- Account: {{account}}
+- Job Title: {{jobTitle}}
+- Main Skill: {{mainSkill}}
+- Position Status: {{positionStatus}}
+- Days Open: {{aging}}
+- Candidates Presented: {{candidatesPresented}}
+
+## CANDIDATE PIPELINE
+{{candidatePipeline}}
+
+## FULL DISCUSSION THREAD (chronological)
+{{discussionThread}}
+
+## UNANSWERED MENTIONS TO EVALUATE
+{{mentionsToEvaluate}}
+
+## INSTRUCTIONS
+For each mention above, determine if the tagged lead still needs to respond. Consider:
+
+1. **Action already taken**: Was the requested action (e.g., "present candidate X") already completed? Check the candidate pipeline for presentations, interviews, or decisions.
+2. **Superseded by events**: Has the situation changed since the mention? (e.g., candidate rejected, position closed, different person assigned)
+3. **Already answered elsewhere**: Did the lead or someone else address the question in a later comment, even without a direct reply?
+4. **Stale/obsolete**: Is the mention so old and the context so changed that a response would no longer be useful?
+5. **Still actionable**: Is this a genuine open question or request that hasn't been addressed?
+6. **Position summary**: After evaluating all mentions, provide a brief 1-2 sentence summary of the current situation from the leads' perspective. Focus on: who has the ball right now (lead, vendor, client, recruiter), what the main blocker is, and what the tagged lead could do (even if it's just acknowledging the situation). The lead stays tagged — this summary helps them know what to reply.
+
+Return ONLY a valid JSON object with this structure:
+{
+  "positionSummary": "<1-2 sentences: current blocker, who has the ball, what the tagged lead could do>",
+  "verdicts": [
+    {
+      "mentionCommentId": <number>,
+      "taggedLeadEmail": "<email>",
+      "stillNeedsResponse": <true|false>,
+      "confidence": <0-100>,
+      "reasoning": "<one concise sentence explaining why>"
+    }
+  ]
+}`
+
+export const POSITION_ATTENTION_ANALYSIS = `You are a senior technical recruiting operations analyst. Analyze this open position and classify its current attention state.
+
+## POSITION CONTEXT
+- Position ID: #{{positionId}}
+- Account: {{account}}
+- Job Title: {{jobTitle}}
+- Main Skill: {{mainSkill}}
+- COE: {{coe}}
+- Stakeholder: {{stakeholder}}
+- Position Status: {{positionStatus}}
+- Days Open: {{aging}}
+- Candidates Presented: {{candidatesPresented}}
+- Seniorities: {{seniorities}}
+
+## CANDIDATE PIPELINE
+{{candidatePipeline}}
+
+## DISCUSSION THREAD (chronological, last 40 messages)
+{{discussionThread}}
+
+## COE PRACTICE LEAD RESPONSIBLE
+{{ownerName}} ({{ownerEmail}})
+
+## CLASSIFICATION RULES
+
+Classify this position into exactly ONE state:
+
+1. **NEEDS_COE_ACTION** — The COE Practice Lead or their recruiting team needs to take action NOW. Examples:
+   - Open questions directed at the lead with no response
+   - Decisions pending from the COE team (sourcing strategy, candidate selection, etc.)
+   - No candidates presented despite position being open 14+ days
+   - Active requests for the lead to follow up, chase, or coordinate
+   - The lead was asked to do something and hasn't done it yet
+
+2. **WAITING_ON_CLIENT** — The ball is with the client, stakeholder, vendor, or external party. Examples:
+   - Waiting for client feedback on presented candidates
+   - Client interview pending or being scheduled
+   - Client decision pending on offer/sourcing/role changes
+   - External vendor needs to provide information
+
+3. **ON_TRACK** — Active progress, no blockers, momentum is positive. Examples:
+   - Candidates actively being interviewed
+   - Recent positive activity in discussions
+   - Pipeline is healthy with candidates moving forward
+   - Recently filled/about to be filled
+
+Return ONLY valid JSON:
+{
+  "attentionState": "NEEDS_COE_ACTION" | "WAITING_ON_CLIENT" | "ON_TRACK",
+  "ballWith": "<name of specific person, team, or 'Client' / 'COE Team' / 'Stakeholder'>",
+  "summary": "<1-2 concise sentences: current situation, main blocker, what needs to happen next>",
+  "confidence": <0-100>
+}`

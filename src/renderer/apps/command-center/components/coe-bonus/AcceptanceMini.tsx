@@ -1,19 +1,19 @@
-// Compact right-aligned accept/reject indicator for a Closed-position row.
-// Renders a 2-segment micro-bar (green = approved share, red = rejected share)
-// plus inline ✓/✗ counts. Falls back to a muted "No decision" when there are
-// no approve/reject decisions on the position.
+// Compact right-aligned V2 disposition indicator for a Closed-position row.
+// Renders a 3-segment micro-bar (emerald = numerator, blue = denominator-only,
+// slate = excluded + deduped) plus inline count icons. Falls back to a muted
+// "No decision" when the position has no evaluated candidates.
 
 interface Props {
-  approved: number
-  rejected: number
-  declined: number
-  unresolved: number
+  numerator: number
+  denominatorOnly: number
+  excluded: number
+  deduped: number
 }
 
-export default function AcceptanceMini({ approved, rejected, declined, unresolved }: Props) {
-  const inconclusive = declined + unresolved
-  const total = approved + rejected + inconclusive
-  const tooltip = `${approved} approved · ${rejected} rejected · ${declined} declined · ${unresolved} unresolved`
+export default function AcceptanceMini({ numerator, denominatorOnly, excluded, deduped }: Props) {
+  const other = excluded + deduped
+  const total = numerator + denominatorOnly + other
+  const tooltip = `${numerator} in numerator · ${denominatorOnly} denominator-only · ${excluded} excluded · ${deduped} deduped`
 
   if (total === 0) {
     return (
@@ -29,14 +29,14 @@ export default function AcceptanceMini({ approved, rejected, declined, unresolve
   return (
     <div className="flex items-center gap-2 shrink-0" title={tooltip}>
       <div className="flex w-10 h-1.5 rounded-full overflow-hidden bg-slate-500/20">
-        <div className="bg-emerald-500/80" style={{ width: `${pct(approved)}%` }} />
-        <div className="bg-red-500/80" style={{ width: `${pct(rejected)}%` }} />
-        <div className="bg-blue-500/80" style={{ width: `${pct(inconclusive)}%` }} />
+        <div className="bg-emerald-500/80" style={{ width: `${pct(numerator)}%` }} />
+        <div className="bg-blue-500/80" style={{ width: `${pct(denominatorOnly)}%` }} />
+        <div className="bg-slate-500/80" style={{ width: `${pct(other)}%` }} />
       </div>
       <div className="flex items-center gap-1.5 text-[11px] font-medium">
-        {approved > 0 && <span className="text-emerald-500">✓{approved}</span>}
-        {rejected > 0 && <span className="text-red-400">✗{rejected}</span>}
-        {inconclusive > 0 && <span className="text-blue-400">~{inconclusive}</span>}
+        {numerator > 0 && <span className="text-emerald-500">✓{numerator}</span>}
+        {denominatorOnly > 0 && <span className="text-blue-400">○{denominatorOnly}</span>}
+        {other > 0 && <span className="text-slate-400">~{other}</span>}
       </div>
     </div>
   )

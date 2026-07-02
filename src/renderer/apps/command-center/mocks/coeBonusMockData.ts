@@ -34,7 +34,9 @@ export const COE_OPTIONS: CoeOption[] = [
   { id: 'design', label: 'Design' },
 ]
 
-export const YEAR_OPTIONS = [2024, 2025, 2026]
+import { buildYearOptions } from '../../../../shared/utils/quarterUtils'
+
+export const YEAR_OPTIONS = buildYearOptions()
 export const QUARTER_OPTIONS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4']
 
 export const FILTER_OPTIONS: CoeBonusFilterOptions = {

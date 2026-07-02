@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc-channels'
 import type { AiChatParams } from '../../../shared/ipc-types'
 import { validateSender } from '../validate'
 import { claudeService } from '../../services/claudeService'
+import { llmRouter } from '../../services/llmRouter'
 import { subscriptionService } from '../../services/subscriptionService'
 import { validatePayload, aiChatSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
@@ -21,14 +22,14 @@ export function registerAiHandlers(): void {
       if (!userMessage) throw new Error('No user message provided')
 
       log.info('AI chat requested', {
-        model: validated.model,
+        featureKey: 'aiChat',
         maxTokens: validated.maxTokens ?? 4096,
         messageCount: validated.messages.length,
         hasSystemMessage: Boolean(systemMessage),
       })
 
-      const { text, usage } = await claudeService.chatAsync(
-        validated.model,
+      const { text, usage } = await llmRouter.chatAsync(
+        'aiChat',
         userMessage.content,
         validated.maxTokens ?? 4096,
         0.1,
@@ -60,14 +61,14 @@ export function registerAiHandlers(): void {
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
       log.info('AI token usage requested')
-      return claudeService.getTokenUsage()
+      return llmRouter.getTokenUsage()
     })
 
   registerIpcHandler(IPC_CHANNELS.AI_RESET_TOKEN_USAGE,
     async (event: IpcMainInvokeEvent) => {
       validateSender(event)
       log.warn('AI token usage reset requested')
-      claudeService.resetTokenUsage()
+      llmRouter.resetTokenUsage()
       return { ok: true }
     })
 

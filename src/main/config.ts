@@ -2,6 +2,8 @@ import { app } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createLogger } from './services/logger'
+import type { ModelConfig } from '../shared/model-config-types'
+import { buildDefaultFeatures } from '../shared/model-config-types'
 
 const log = createLogger('Config')
 
@@ -28,19 +30,28 @@ interface ClaudeConfig {
   haikuMaxConcurrency: number
 }
 
+interface ExecApiConfig {
+  apiUrl: string
+}
+
 interface AppConfig {
   upstream: UpstreamConfig
   catalog: CatalogConfig
   voyage: VoyageConfig
   claude: ClaudeConfig
+  modelConfig: ModelConfig
+  execApi: ExecApiConfig
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   upstream: {
-    apiUrl: 'https://internal-api.unosquare.com/elp/',
+    apiUrl: 'https://unocoreapi.azurewebsites.net/',
   },
   catalog: {
-    apiUrl: 'https://internal-api.unosquare.com/corecatalogs/api/',
+    apiUrl: 'https://unocoreapi.azurewebsites.net/api/',
+  },
+  execApi: {
+    apiUrl: 'https://execapi.azurewebsites.net/',
   },
   voyage: {
     apiUrl: 'https://api.voyageai.com/v1',
@@ -48,12 +59,22 @@ const DEFAULT_CONFIG: AppConfig = {
     apiKeys: [],
   },
   claude: {
-    haikuModel: 'claude-haiku-4-20250414',
-    sonnetModel: 'claude-sonnet-4-20250514',
-    opusModel: 'claude-sonnet-4-20250514',
+    haikuModel: 'claude-haiku-4-5',
+    sonnetModel: 'sonnet',
+    opusModel: 'sonnet',
     timeoutSeconds: 120,
     maxConcurrency: 8,
     haikuMaxConcurrency: 20,
+  },
+  modelConfig: {
+    presetMode: 'claude',
+    localServerUrl: 'http://localhost:8080',
+    localDefaultModel: '',
+    concurrency: {
+      claude: { max: 8, haikuMax: 20 },
+      local: { max: 1 },
+    },
+    features: buildDefaultFeatures('claude', ''),
   },
 }
 
@@ -72,11 +93,34 @@ export function getConfig(): AppConfig {
     try {
       const raw = readFileSync(configPath, 'utf-8')
       const parsed = JSON.parse(raw) as Partial<AppConfig>
+      const claudeSection = { ...DEFAULT_CONFIG.claude, ...(parsed.claude ?? (parsed as Record<string, unknown>).claudeProxy as Partial<ClaudeConfig>) }
+      const savedModelConfig = (parsed as Record<string, unknown>).modelConfig as Partial<ModelConfig> | undefined
+      const modelConfig: ModelConfig = savedModelConfig
+        ? {
+            ...DEFAULT_CONFIG.modelConfig,
+            ...savedModelConfig,
+            concurrency: {
+              ...DEFAULT_CONFIG.modelConfig.concurrency,
+              ...(savedModelConfig.concurrency ?? {}),
+              claude: { ...DEFAULT_CONFIG.modelConfig.concurrency.claude, ...(savedModelConfig.concurrency?.claude ?? {}) },
+              local: { ...DEFAULT_CONFIG.modelConfig.concurrency.local, ...(savedModelConfig.concurrency?.local ?? {}) },
+            },
+            features: { ...DEFAULT_CONFIG.modelConfig.features, ...(savedModelConfig.features ?? {}) },
+          }
+        : {
+            ...DEFAULT_CONFIG.modelConfig,
+            concurrency: {
+              claude: { max: claudeSection.maxConcurrency, haikuMax: claudeSection.haikuMaxConcurrency },
+              local: { max: 1 },
+            },
+          }
       cachedConfig = {
         upstream: { ...DEFAULT_CONFIG.upstream, ...parsed.upstream },
         catalog: { ...DEFAULT_CONFIG.catalog, ...parsed.catalog },
         voyage: { ...DEFAULT_CONFIG.voyage, ...parsed.voyage },
-        claude: { ...DEFAULT_CONFIG.claude, ...(parsed.claude ?? (parsed as Record<string, unknown>).claudeProxy as Partial<ClaudeConfig>) },
+        claude: claudeSection,
+        modelConfig,
+        execApi: { ...DEFAULT_CONFIG.execApi, ...(parsed as Record<string, unknown>).execApi as Partial<ExecApiConfig> },
       }
       return cachedConfig
     } catch (err) {

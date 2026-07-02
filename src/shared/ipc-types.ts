@@ -815,65 +815,85 @@ export interface ReportAcceptanceRateFilters {
   coe: string
 }
 
-export interface ReportCandidateOutcome {
+// ---- Acceptance Rate V2 (monthly cohort + audit trail) -------------------------
+
+export interface ReportCandidateAudit {
   candidateRequisitionId: number
+  candidateId: number
   candidateName: string
   mainSkill: string
   candidateStatus: string
-  bucket: AcceptanceBucket
+  /** How this candidate was classified in the V2 algorithm. */
+  disposition: 'numerator' | 'denominator' | 'excluded' | 'dedup-skipped'
+  /** Human-readable reason for exclusion or dedup. */
+  exclusionReason: string | null
+  /** If dedup-skipped, the position where this candidate was already counted. */
+  dedupFirstPositionId: number | null
+  dedupFirstPositionLabel: string | null
   isEmployee: boolean
   rate: number
   startDate: string | null
 }
 
-export interface ReportPositionOutcome {
+export interface ReportPositionOutcomeV2 {
   upstreamId: number
   account: string
+  stakeholder: string
   jobTitle: string
   mainSkill: string
   coe: string
   practice: string
-  /** Granular upstream position Status (e.g. 'ClosedWon', 'ClosedLostCompetitor', 'Closed'). */
   positionStatus: string
+  createdDate: string
   closedDate: string | null
-  approved: number
-  rejected: number
-  declined: number
-  unresolved: number
   outcome: AcceptanceOutcome
-  candidates: ReportCandidateOutcome[]
+  /** Per-position counts (after dedup within this position). */
+  countedInNumerator: number
+  countedInDenominator: number
+  excludedCount: number
+  dedupSkippedCount: number
+  candidates: ReportCandidateAudit[]
 }
 
-export interface ReportAcceptanceRateSummary {
-  /** approved / (approved + rejected), as a percentage (0..100); 0 when denominator is 0. */
-  acceptanceRate: number
-  approved: number
-  rejected: number
-  declined: number
-  unresolvedTotal: number
-  /** Count of every candidate_status value seen across the closed positions in scope. */
-  byStatus: Record<string, number>
-  /** Raw count per position_status across the quarter-closed positions in scope. */
-  positionStatusCounts: Record<string, number>
+export interface ReportMonthBreakdown {
+  month: string
+  positionCount: number
   wonCount: number
   lostCount: number
-  noDecisionCount: number
-  totalClosedPositions: number
-  candidatesEvaluated: number
-  /** Closed positions with no upstream close date — excluded from the quarterly totals. */
-  undatedCount: number
-  lastSyncedAt: string | null
+  otherCount: number
+  math: {
+    rawApproved: number
+    rawPresentedToClient: number
+    rawCustomerInterview: number
+    rawRejectedByClient: number
+    rawDenominator: number
+    excludedByStatus: Record<string, number>
+    excludedTotal: number
+    dedupRemovedNumerator: number
+    dedupRemovedDenominator: number
+    netNumerator: number
+    netDenominator: number
+    rate: number
+  }
+  qtd: {
+    cumulativeNumerator: number
+    cumulativeDenominator: number
+    rate: number
+  }
+  positions: ReportPositionOutcomeV2[]
 }
 
-export interface ReportAcceptanceRateResult {
-  summary: ReportAcceptanceRateSummary
-  groups: {
-    won: ReportPositionOutcome[]
-    lost: ReportPositionOutcome[]
-    noDecision: ReportPositionOutcome[]
-    /** Closed but date-less positions, surfaced separately from the dated quarter. */
-    undated: ReportPositionOutcome[]
+export interface ReportAcceptanceRateResultV2 {
+  summary: {
+    acceptanceRate: number
+    totalPositions: number
+    totalNumerator: number
+    totalDenominator: number
+    totalExcluded: number
+    totalDeduped: number
+    lastSyncedAt: string | null
   }
+  months: ReportMonthBreakdown[]
 }
 
 export interface ReportExportCsvResult {
@@ -889,701 +909,6 @@ export interface ReportExportPdfResult {
 export interface ExcelExportResult {
   saved: boolean
   filePath?: string
-}
-
-export interface PathIdParams {
-  id: number
-}
-
-export interface PathPaginationParams {
-  search?: string
-  role?: string
-  page?: number
-  pageSize?: number
-}
-
-export interface PathDeveloperDashboard {
-  developerId: number
-  fullName: string
-  role: string
-  completionPercent: number
-  activeLearningPathId: number | null
-  nextAssessmentDueAt: string | null
-  pendingThreads: number
-}
-
-export interface PathLearningPathSummary {
-  id: number
-  title: string
-  role: string
-  level: string
-  status: string
-  completionPercent: number
-  updatedAt: string
-}
-
-export interface PathLearningPathSkill {
-  id: number
-  skillCode: string
-  skillName: string
-  targetLevel: string
-  currentLevel: string
-  status: string
-}
-
-export interface PathLearningPathDetail extends PathLearningPathSummary {
-  description: string
-  ownerId: number
-  skills: PathLearningPathSkill[]
-}
-
-export interface PathCreateLearningPathParams {
-  title: string
-  role: string
-  level: string
-  description?: string
-  ownerId: number
-}
-
-export interface PathUpdateLearningPathParams {
-  id: number
-  title?: string
-  role?: string
-  level?: string
-  description?: string
-  status?: string
-}
-
-export interface PathAssessmentSummary {
-  id: number
-  learningPathId: number
-  title: string
-  status: string
-  score: number | null
-  submittedAt: string | null
-  updatedAt: string
-}
-
-export interface PathAssessmentQuestion {
-  id: number
-  prompt: string
-  category: string
-  weight: number
-}
-
-export interface PathAssessmentAnswer {
-  questionId: number
-  score: number
-  notes?: string
-}
-
-export interface PathAssessmentDetail extends PathAssessmentSummary {
-  questions: PathAssessmentQuestion[]
-  answers: PathAssessmentAnswer[]
-}
-
-export interface PathSaveAssessmentDraftParams {
-  assessmentId: number
-  answers: PathAssessmentAnswer[]
-}
-
-export interface PathSubmitAssessmentParams {
-  assessmentId: number
-  answers: PathAssessmentAnswer[]
-  reviewerId: number
-}
-
-export interface PathDiscussionThreadSummary {
-  id: number
-  learningPathId: number
-  title: string
-  status: string
-  createdBy: number
-  replyCount: number
-  lastActivityAt: string
-}
-
-export interface PathDiscussionPost {
-  id: number
-  authorId: number
-  message: string
-  createdAt: string
-  parentPostId: number | null
-}
-
-export interface PathDiscussionThreadDetail extends PathDiscussionThreadSummary {
-  posts: PathDiscussionPost[]
-}
-
-export interface PathCreateDiscussionPostParams {
-  threadId: number
-  authorId: number
-  message: string
-}
-
-export interface PathReplyDiscussionPostParams {
-  threadId: number
-  parentPostId: number
-  authorId: number
-  message: string
-}
-
-export interface PathDossierSummary {
-  id: number
-  developerId: number
-  fullName: string
-  role: string
-  status: string
-  updatedAt: string
-}
-
-export interface PathDossierDetail extends PathDossierSummary {
-  strengths: string[]
-  growthAreas: string[]
-  managerNotes: string
-}
-
-export interface PathUpdateDossierStatusParams {
-  dossierId: number
-  status: string
-  reviewerId: number
-}
-
-export interface PathAdminAnalytics {
-  totalDevelopers: number
-  activeLearningPaths: number
-  completedAssessments: number
-  pendingDossiers: number
-  participationRate: number
-}
-
-export interface PathSettings {
-  assessmentReminderDays: number
-  discussionModerationEnabled: boolean
-  dossierAutoArchiveDays: number
-  defaultPageSize: number
-}
-
-export interface PathSaveSettingsParams {
-  assessmentReminderDays?: number
-  discussionModerationEnabled?: boolean
-  dossierAutoArchiveDays?: number
-  defaultPageSize?: number
-}
-
-export interface PathSaveAnalyticsEventParams {
-  eventName: string
-  payload: Record<string, unknown>
-}
-
-export interface PathRecalculateReadinessParams {
-  developerId: number
-}
-
-export interface PathGenerateDefensePrepParams {
-  candidateName: string
-  targetLevel: string
-  rubricScores: Array<{ dimension: string; score: number; maxScore: number }>
-  codeReviewStrengths: string[]
-}
-
-export interface PathGenerateRemediationParams {
-  candidateName: string
-  scorecardGaps: Array<{ dimension: string; score: number; threshold: number }>
-  evaluatorNotes: string
-}
-
-export interface PathSearchDynamicResourcesParams {
-  topicName: string
-  skillDomain: string
-  level: string
-  preferredFormats: string[]
-}
-
-export type Scout9JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
-export type Scout9ScopeType = 'org' | 'project' | 'custom'
-export type Scout9ReportStatus = 'draft' | 'published' | 'archived'
-export type Scout9CandidateType = 'issue' | 'insight' | 'action'
-export type Scout9CandidateStatus = 'pending' | 'approved' | 'rejected' | 'skipped'
-
-export interface Scout9Job {
-  id: string
-  status: Scout9JobStatus
-  scope_type: Scout9ScopeType
-  scope_value: string | null
-  started_at: string | null
-  completed_at: string | null
-  canceled_at: string | null
-  error_message: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9Report {
-  id: string
-  job_id: string
-  report_title: string
-  report_markdown: string
-  confidence_score: number | null
-  status: Scout9ReportStatus
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9ReportCandidate {
-  id: string
-  report_id: string
-  candidate_type: Scout9CandidateType
-  title: string
-  details: string
-  status: Scout9CandidateStatus
-  confidence_score: number | null
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9KnowledgeRule {
-  id: string
-  rule_name: string
-  rule_text: string
-  is_active: 0 | 1
-  priority: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9KnowledgeGlossaryTerm {
-  id: string
-  term: string
-  definition: string
-  synonyms: string
-  is_active: 0 | 1
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9KnowledgeNote {
-  id: string
-  note_title: string
-  note_text: string
-  tags_json: string
-  is_active: 0 | 1
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9LearnedPattern {
-  id: string
-  pattern_name: string
-  pattern_text: string
-  is_active: 0 | 1
-  confidence_score: number
-  usage_count: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9PatternApplication {
-  id: string
-  pattern_id: string
-  job_id: string | null
-  report_id: string | null
-  applied_at: string
-  outcome: string | null
-}
-
-export interface Scout9SkipFeedback {
-  id: string
-  candidate_id: string
-  reason: string
-  notes: string | null
-  created_at: string
-}
-
-export interface Scout9BrainSnapshot {
-  id: string
-  snapshot_markdown: string
-  token_estimate: number
-  created_at: string
-}
-
-export interface Scout9PromptVersion {
-  id: string
-  version_label: string
-  prompt_text: string
-  is_active: 0 | 1
-  created_at: string
-  activated_at: string | null
-}
-
-export interface Scout9AgentConfig {
-  id: 1
-  model_name: string
-  token_budget: number
-  temperature: number
-  max_reports_per_run: number
-  auto_publish_enabled: 0 | 1
-  include_patterns: 0 | 1
-  include_glossary: 0 | 1
-  include_notes: 0 | 1
-  active_prompt_version_id: string | null
-  sonnet_model: string
-  haiku_model: string
-  max_tool_calls_per_run: number
-  max_tool_calls_per_candidate: number
-  token_budget_ceiling: number
-  max_turns: number
-  max_run_duration_ms: number
-  stream_watchdog_ms: number
-  tool_timeout_ms: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9ClientRuleOverride {
-  id: string
-  client_id: string
-  rule_id: string
-  override_text: string
-  is_active: 0 | 1
-  created_at: string
-  updated_at: string
-}
-
-export interface Scout9ScopeOption {
-  id: string
-  label: string
-  scope_type: Scout9ScopeType
-}
-
-export interface Scout9RunParams {
-  scope_type: Scout9ScopeType
-  scope_value: string | null
-}
-
-export interface Scout9ListReportsParams {
-  status?: Scout9ReportStatus
-  limit?: number
-  offset?: number
-}
-
-export interface Scout9UpdateCandidateParams {
-  id: string
-  status: Scout9CandidateStatus
-}
-
-export interface Scout9SubmitSkipParams {
-  candidate_id: string
-  reason: string
-  notes?: string
-}
-
-export interface Scout9CreateRuleParams {
-  rule_name: string
-  rule_text: string
-  is_active?: 0 | 1
-  priority: number
-}
-
-export interface Scout9UpdateRuleParams {
-  id: string
-  rule_name?: string
-  rule_text?: string
-  is_active?: 0 | 1
-  priority?: number
-}
-
-export interface Scout9CreateGlossaryTermParams {
-  term: string
-  definition: string
-  synonyms?: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9UpdateGlossaryTermParams {
-  id: string
-  term?: string
-  definition?: string
-  synonyms?: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9CreateNoteParams {
-  note_title: string
-  note_text: string
-  tags_json?: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9UpdateNoteParams {
-  id: string
-  note_title?: string
-  note_text?: string
-  tags_json?: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9TogglePatternParams {
-  id: string
-  is_active: 0 | 1
-}
-
-export interface Scout9CreateOverrideParams {
-  client_id: string
-  rule_id: string
-  override_text: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9UpdateConfigParams {
-  model_name?: string
-  token_budget?: number
-  temperature?: number
-  max_reports_per_run?: number
-  auto_publish_enabled?: 0 | 1
-  include_patterns?: 0 | 1
-  include_glossary?: 0 | 1
-  include_notes?: 0 | 1
-  sonnet_model?: string
-  haiku_model?: string
-  max_tool_calls_per_run?: number
-  max_tool_calls_per_candidate?: number
-  token_budget_ceiling?: number
-  max_turns?: number
-  max_run_duration_ms?: number
-  stream_watchdog_ms?: number
-  tool_timeout_ms?: number
-}
-
-export interface Scout9CreatePromptVersionParams {
-  version_label: string
-  prompt_text: string
-  is_active?: 0 | 1
-}
-
-export interface Scout9ActivatePromptVersionParams {
-  id: string
-}
-
-export interface Scout9PipelineEvent {
-  job_id: string
-  stage: string
-  message: string
-  progress: number
-  level: 'info' | 'warning' | 'error'
-  timestamp: string
-}
-
-export interface Scout9StatusEvent {
-  status: Scout9JobStatus | 'idle'
-  job_id: string | null
-  timestamp: string
-}
-
-export interface SalaryBand {
-  id: string
-  countryCode: string
-  jobFamilyGroup: string
-  band: string
-  level: number
-  minMonthly: number
-  maxMonthly: number
-  source: string
-  isActive: boolean
-}
-
-export interface Country {
-  code: string
-  name: string
-  defaultCurrency: string
-  upstreamCatalogName: string | null
-  isActive: boolean
-}
-
-export interface JobFamily {
-  id: string
-  name: string
-  jobFamilyGroup: string
-  isActive: boolean
-}
-
-export interface Scout9UpsertSalaryBandParams {
-  country_code: string
-  job_family_group: string
-  band: string
-  level: number
-  min_monthly: number
-  max_monthly: number
-  source?: string
-}
-
-export interface Scout9Response<T> {
-  success: boolean
-  data?: T
-  error?: string
-}
-
-export interface Scout9ReportDetail {
-  report: Scout9Report
-  candidates: Scout9ReportCandidate[]
-}
-
-export type VigilSource = 'employees' | 'candidates' | 'open-positions' | 'project-reallocations'
-export type VigilRunTriggerType = 'manual' | 'scheduled'
-export type VigilRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled'
-export type VigilActivityEventType = 'run_started' | 'run_progress' | 'run_completed' | 'run_failed' | 'chat' | 'system'
-export type VigilActivitySeverity = 'info' | 'warning' | 'error'
-
-
-export interface VigilRun {
-  id: string
-  trigger_type: VigilRunTriggerType
-  status: VigilRunStatus
-  sources_json: string
-  results_json: string | null
-  started_at: string
-  completed_at: string | null
-  token_hash: string | null
-}
-
-export interface VigilActivityLog {
-  id: string
-  run_id: string | null
-  event_type: VigilActivityEventType
-  source: VigilSource | 'system'
-  severity: VigilActivitySeverity
-  message: string
-  details_json: string | null
-  created_at: string
-}
-
-
-
-export interface VigilConfig {
-  id: 1
-  schedule_enabled: 0 | 1
-  schedule_hour: number
-  schedule_minute: number
-  sync_sources_json: string
-  candidate_year_filter: number
-  schedule_days_json: string
-  active_positions_only: 0 | 1
-}
-
-export interface VigilRunParams {
-  token: string
-  sources?: VigilSource[]
-  options?: { limit?: number; skip?: number; year?: number }
-}
-
-export interface VigilSyncSourceParams {
-  token: string
-  source: VigilSource
-  options?: { limit?: number; skip?: number; year?: number }
-}
-
-export interface VigilCancelRunParams {
-  run_id: string
-}
-
-export interface VigilListRunsParams {
-  status?: VigilRunStatus
-  limit?: number
-  offset?: number
-}
-
-export interface VigilGetActivityLogParams {
-  run_id?: string
-  source?: VigilSource
-  severity?: VigilActivitySeverity
-  limit?: number
-  offset?: number
-}
-
-export interface VigilUpdateConfigParams {
-  schedule_enabled?: 0 | 1
-  schedule_hour?: number
-  schedule_minute?: number
-  sync_sources_json?: string
-  candidate_year_filter?: number
-  schedule_days_json?: string
-  active_positions_only?: 0 | 1
-}
-
-
-
-export interface VigilToolsDryRunParams {
-  input: string
-}
-
-export interface VigilResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-}
-
-export interface VigilActivityEvent {
-  run_id: string | null
-  event_type: VigilActivityEventType
-  source: VigilSource | 'system'
-  severity: VigilActivitySeverity
-  message: string
-  details_json?: string | null
-  timestamp: string
-}
-
-export interface VigilStatusEvent {
-  status: VigilRunStatus | 'idle'
-  run_id: string | null
-  timestamp: string
-}
-
-export type AgentId = 'scout-9' | 'vigil' | 'switchboard' | 'sensei' | 'payday' | 'braniac' | 'oracle'
-
-export interface AgentStepEvent {
-  agentId: AgentId
-  step: string
-  status: 'started' | 'running' | 'completed' | 'failed'
-  message: string
-  narration?: string
-  timestamp: string
-}
-
-export type OracleChatRole = 'user' | 'assistant'
-
-export interface OracleChatMessage {
-  id: string
-  role: OracleChatRole
-  content: string
-  metadata_json: string | null
-  created_at: string
-  toolCalls?: number
-}
-
-export interface ChatChunkEvent {
-  text: string
-  timestamp: string
-}
-
-export interface OracleChatStepEvent {
-  step: string
-  timestamp: string
-}
-
-export interface OracleSendChatMessageParams {
-  content: string
-  metadata_json?: string
-}
-
-export interface OracleListChatMessagesParams {
-  limit?: number
-  offset?: number
-}
-
-export interface OracleResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
 }
 
 export type PrrCoeStatus = 'Not Set' | 'Pending Evaluation' | 'Ready to Present' | 'Presented' | 'Needs Attention' | 'Not Applies' | 'Other' | 'Closed'
@@ -1783,296 +1108,9 @@ export interface MailTestResult {
   message: string
 }
 
-// --- Braniac Agent Types ---
-
-export type BraniacScopeType = 'account' | 'stakeholder'
-export type BraniacApprovalStatus = 'auto_applied' | 'pending_review' | 'approved' | 'rejected'
-
-export interface BraniacRunParams {
-  scope: BraniacScopeType
-  account: string
-  stakeholder?: string
-}
-
-export interface BraniacCancelParams {
-  job_id: string
-}
-
-export interface BraniacListJobsParams {
-  limit?: number
-  offset?: number
-}
-
-export interface BraniacListPatternsParams {
-  account?: string
-  approval_status?: BraniacApprovalStatus
-}
-
-export interface BraniacListProfilesParams {
-  account?: string
-}
-
-export interface BraniacGetProfileParams {
-  stakeholder: string
-  account: string
-}
-
-export interface BraniacApprovePatternParams {
-  id: string
-}
-
-export interface BraniacRejectPatternParams {
-  id: string
-  reason?: string
-}
-
-export interface BraniacUpdatePatternParams {
-  id: string
-  pattern_text?: string
-  confidence_score?: number
-}
-
-export interface BraniacGetStakeholdersParams {
-  account: string
-}
-
-export interface BraniacAnalysisStatusItem {
-  scope: 'account' | 'stakeholder'
-  account: string
-  stakeholder: string | null
-  currentDataPoints: number
-  currentPositions: number
-  lastAnalyzedDataPoints: number | null
-  lastAnalyzedPositions: number | null
-  lastAnalyzedAt: string | null
-  lastJobId: string | null
-  hasNewData: boolean
-}
-
-export interface BraniacGetAnalysisStatusParams {
-  account: string
-}
-
-export interface BraniacCreatePatternParams {
-  pattern_name: string
-  pattern_text: string
-  account: string
-  stakeholder?: string | null
-  confidence_score?: number
-}
-
-export interface BraniacBeautifyPatternParams {
-  text: string
-  account: string
-  stakeholder?: string | null
-}
-
-export interface BraniacBeautifyPatternResult {
-  pattern_name: string
-  pattern_text: string
-}
-
-export interface BraniacClearPatternsParams {
-  account: string
-  stakeholder?: string
-}
-
-export interface BraniacDeletePatternParams {
-  id: string
-}
-
-export interface BraniacDeleteProfileParams {
-  stakeholder: string
-  account: string
-}
-
-export interface BraniacClearStakeholderParams {
-  account: string
-  stakeholder: string
-  include_jobs?: boolean
-}
-
-export interface BraniacClearAccountParams {
-  account: string
-  include_jobs?: boolean
-}
-
-export interface BraniacClearResult {
-  patternsDeleted: number
-  profilesDeleted: number
-  jobsDeleted: number
-}
-
-export interface BraniacChatParams {
-  message: string
-  scopeAccount?: string
-}
-
-export interface BraniacChatResult {
-  content: string
-  toolCalls: number
-  inputTokens: number
-  outputTokens: number
-}
-
-export interface BraniacExtractResumeSkillsParams {
-  sourceType?: string
-  limit?: number
-  force?: boolean
-}
-
-export interface BraniacExtractResumeSkillsResult {
-  extracted: number
-  skipped: number
-  failed: number
-}
-
-export interface BraniacExtractionStatusResult {
-  total: number
-  extracted: number
-  pending: number
-}
-
-export interface Scout9ChatParams {
-  message: string
-  scopeClient?: string
-  scopeStakeholder?: string
-}
-
-export interface Scout9ChatResponse {
-  content: string
-  toolCalls: number
-  inputTokens: number
-  outputTokens: number
-}
-
-export interface BraniacJob {
-  id: string
-  status: Scout9JobStatus
-  scope_type: BraniacScopeType
-  scope_value: string | null
-  initiated_by: string
-  run_reason: string
-  pipeline_phase: string
-  started_at: string | null
-  completed_at: string | null
-  error_message: string | null
-  metadata_json: string
-  created_at: string
-}
-
-export interface BraniacPattern {
-  id: string
-  pattern_name: string
-  pattern_text: string
-  confidence_score: number
-  usage_count: number
-  is_active: number
-  approval_status: BraniacApprovalStatus
-  account: string | null
-  stakeholder: string | null
-  source_agent: string
-  data_points_count: number
-  rejection_reason: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface BraniacAccountSummary {
-  account: string
-  stakeholder_count: number
-  total_candidates_presented: number
-  total_candidates_accepted: number
-  success_rate: number | null
-  total_closed_positions: number
-  total_won_positions: number
-  win_rate: number | null
-  avg_days_to_close: number | null
-  observed_rate_floor: number | null
-  observed_rate_ceiling: number | null
-  avg_accepted_rate: number | null
-  avg_published_rate: number | null
-  avg_time_to_decision_days: number | null
-  accepted_countries: string[]
-  rejected_countries: string[]
-  top_rejection_reasons: string[]
-  top_acceptance_signals: string[]
-  avg_confidence_score: number
-  total_data_points: number
-  last_analyzed_at: string | null
-  last_inference_job_id: string | null
-}
-
-export interface BraniacListAccountSummariesResult {
-  summaries: BraniacAccountSummary[]
-}
-
-export interface BraniacGetAccountSummaryParams {
-  account: string
-}
-
-export interface BraniacStakeholderProfile {
-  id: string
-  stakeholder_name: string
-  account: string
-  observed_rate_floor: number | null
-  observed_rate_ceiling: number | null
-  avg_accepted_rate: number | null
-  accepted_countries: string
-  rejected_countries: string
-  untested_countries: string
-  seniority_flexibility: number
-  posted_seniorities: string
-  accepted_seniorities: string
-  avg_time_to_decision_days: number | null
-  top_rejection_reasons: string
-  top_acceptance_signals: string
-  preference_summary: string
-  actual_accepted_tech_stacks_json: string | null
-  actual_rejected_tech_stacks_json: string | null
-  tech_stack_flexibility: string | null
-  tag_vs_resume_divergence_rate: number | null
-  total_candidates_presented: number
-  total_candidates_accepted: number
-  success_rate: number | null
-  avg_published_rate: number | null
-  avg_days_to_close: number | null
-  total_closed_positions: number
-  total_won_positions: number
-  win_rate: number | null
-  data_points_count: number
-  confidence_score: number
-  last_inference_job_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface BraniacProgressInfo {
-  batch: number
-  totalBatches: number
-  positionsProcessed: number
-  totalPositions: number
-  progressPct: number
-  phase: 'aggregating' | 'analyzing' | 'synthesizing' | 'persisting' | 'done'
-}
-
-export interface BraniacStatusEvent {
-  status: 'idle' | 'running' | 'completed' | 'failed'
-  job_id: string | null
-  timestamp: string
-  error_message?: string
-  progress?: BraniacProgressInfo
-}
-
-export interface BraniacResponse<T = unknown> {
-  success: boolean
-  data?: T
-  error?: string
-}
-
 // ── Responsiveness Report ────────────────────────────────
 
-export interface ResponsivenessUnansweredMention {
+export interface ResponsivenessMentionItem {
   positionUpstreamId: number
   account: string
   coe: string
@@ -2088,7 +1126,11 @@ export interface ResponsivenessUnansweredMention {
   taggedLeadEmail: string
   waitingSince: string
   waitingDays: number
+  responded: boolean
 }
+
+/** @deprecated Use ResponsivenessMentionItem */
+export type ResponsivenessUnansweredMention = ResponsivenessMentionItem
 
 export interface ResponsivenessLeadSummary {
   name: string
@@ -2102,7 +1144,7 @@ export interface ResponsivenessReport {
   totalMentions: number
   unansweredMentions: number
   responseRate: number
-  items: ResponsivenessUnansweredMention[]
+  items: ResponsivenessMentionItem[]
   leadSummary: ResponsivenessLeadSummary[]
 }
 
@@ -2120,8 +1162,203 @@ export interface ResponsivenessAddLeadParams {
   coe?: string
 }
 
+export interface ResponsivenessDiscussionComment {
+  commentId: number
+  author: string
+  date: string
+  message: string
+  parentCommentId: number | null
+}
+
+// ── AI Analysis Types ──────────────────────────────────
+
+export interface ResponsivenessAiMentionVerdict {
+  mentionCommentId: number
+  taggedLeadEmail: string
+  stillNeedsResponse: boolean
+  confidence: number        // 0-100
+  reasoning: string         // one-line explanation
+}
+
+export interface ResponsivenessAiAnalysisResult {
+  positionUpstreamId: number
+  verdicts: ResponsivenessAiMentionVerdict[]
+  positionSummary: string
+}
+
+export interface ResponsivenessAnalyzeRequest {
+  positionUpstreamIds: number[]
+}
+
+// ── Position Attention Report Types ──────────────────
+
+export type PositionAttentionState =
+  | 'needs-coe-action'    // COE/Practice Lead must act
+  | 'waiting-on-client'   // Ball is with client/stakeholder
+  | 'on-track'            // Active progress, no blockers
+  | 'no-activity'         // No discussions at all
+  | 'escalated'           // Auto-escalated from waiting-on-client after 7 days of silence
+
+export interface PositionAttentionItem {
+  positionUpstreamId: number
+  account: string
+  coe: string
+  practice: string
+  mainSkill: string
+  jobTitle: string
+  aging: number
+  candidatesPresented: number
+  lastDiscussionDate: string | null
+  stakeholder: string
+  seniorities: string
+  attentionState: PositionAttentionState
+  /** Who currently has the ball (person/team name) */
+  ballWith: string
+  /** AI-generated 1-2 sentence summary of the situation */
+  summary: string
+  /** AI confidence 0-100 (or -1 for rule-based classification) */
+  confidence: number
+  /** Which COE lead owns this position */
+  ownerEmail: string
+  ownerName: string
+  /** Original mention data if any exist */
+  mentionCount: number
+  unansweredMentionCount: number
+  /** Was this auto-escalated from waiting-on-client? */
+  escalated: boolean
+  /** Human-readable explanation of why this position is in its current state */
+  flagReason: string
+}
+
+export interface PositionAttentionLeadGroup {
+  leadName: string
+  leadEmail: string
+  coePractice: string
+  totalPositions: number
+  needsAction: number
+  waitingOnClient: number
+  onTrack: number
+  noActivity: number
+  escalated: number
+  positions: PositionAttentionItem[]
+}
+
+export interface PositionAttentionReport {
+  generatedAt: string
+  totalPositions: number
+  needsAction: number
+  waitingOnClient: number
+  onTrack: number
+  noActivity: number
+  escalated: number
+  leadGroups: PositionAttentionLeadGroup[]
+  /** Flat list of all positions (for filtering/search) */
+  allPositions: PositionAttentionItem[]
+}
+
+export interface PositionAttentionProgress {
+  phase: 'loading' | 'analyzing' | 'classifying' | 'done'
+  completed: number
+  total: number
+  currentPosition?: string  // e.g., "#8618 · Axos Bank"
+}
+
+// ── Catalog types ──
+
+export interface CatalogCoeRow {
+  id: number; name: string; is_active: number;
+  sort_order: number; created_at: string; updated_at: string;
+}
+export interface CatalogPracticeRow {
+  id: number; name: string; is_active: number;
+  sort_order: number; created_at: string; updated_at: string;
+}
+export interface CatalogSkillRow {
+  id: number; name: string; is_active: number;
+  sort_order: number; created_at: string; updated_at: string;
+}
+export interface CatalogCoe extends CatalogCoeRow {
+  practices: { id: number; name: string }[]
+}
+export interface CatalogPractice extends CatalogPracticeRow {
+  skills: { id: number; name: string }[]
+  coes: { id: number; name: string }[]
+}
+export interface CatalogSkill extends CatalogSkillRow {
+  practices: { id: number; name: string }[]
+}
+export interface CatalogCreateParams { name: string }
+export interface CatalogUpdateParams { id: number; name?: string; sort_order?: number }
+export interface CatalogJunctionParams { parentId: number; childId: number }
+
+// ---- Placement Margin --------------------------------------------------------
+
+export interface PlacementMarginSyncParams {
+  token: string
+  year: number
+  quarter?: string  // optional — defaults to current quarter for YtdTotals scope
+}
+
+export interface PlacementMarginMonthPoint {
+  month: number
+  label: string
+  placementMargin: number
+  currentMargin: number
+}
+
+export interface PlacementMarginAccountRow {
+  account: string
+  placements: number
+  totalRevenue: number
+  totalCost: number
+  weightedMarginPct: number
+}
+
+export interface PlacementMarginEntryDto {
+  name: string
+  email: string
+  account: string
+  mainSkill: string
+  country: string
+  openPositionId: number
+  placementDate: string | null
+  leaveDate: string | null
+  placementRate: number
+  placementMargin: number
+  currentMargin: number
+  placementRevenue: number
+  currentRevenue: number
+  monthlySalary: number
+  currentMonthlySalary: number
+  companyTenure: number
+  isPromotion: boolean
+  firstTimeEntryDate: string | null
+  kickoffDelay: number | null
+  tacAtPlacement?: number
+  currentTac?: number
+}
+
+export interface PlacementMarginReportResult {
+  ytdMargin: number
+  ytdAvgRate: number
+  periodMargin: number
+  periodAvgRate: number
+  monthlyTrend: PlacementMarginMonthPoint[]
+  accountBreakdown: PlacementMarginAccountRow[]
+  entries: PlacementMarginEntryDto[]
+  syncedAt: string
+}
+
+export interface PlacementMarginSyncStatus {
+  hasSyncedData: boolean
+  syncedAt: string | null
+  entryCount: number
+}
+
+export type TokenSource = 'unocore' | 'exec'
+
 export interface IpcContracts {
-  [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: string; response: { valid: boolean; message: string } }
+  [IPC_CHANNELS.SYNC_VALIDATE_TOKEN]: { request: { token: string; source: TokenSource }; response: { valid: boolean; message: string } }
   [IPC_CHANNELS.SYNC_GET_STATUS]: { request: SyncDataSource; response: SyncCountByStatus }
   [IPC_CHANNELS.SYNC_APPLY_YEAR_FILTER]: { request: SyncYearFilterParams; response: { success: boolean; year: number } }
   [IPC_CHANNELS.SYNC_START]: { request: SyncStartParams; response: { started: boolean } }
@@ -2240,8 +1477,11 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_DELETE_POSITION]: { request: number; response: { deleted: boolean } }
   [IPC_CHANNELS.REPORT_EXPORT_PDF]: { request: void; response: ReportExportPdfResult }
   [IPC_CHANNELS.REPORT_EXPORT_XLSX]: { request: readonly [ReportStalledPositionResult[]]; response: ExcelExportResult }
-  [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE]: { request: ReportAcceptanceRateFilters; response: ReportAcceptanceRateResult }
+  [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE]: { request: ReportAcceptanceRateFilters; response: ReportAcceptanceRateResultV2 }
   [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE_COES]: { request: void; response: string[] }
+  [IPC_CHANNELS.REPORT_PLACEMENT_MARGIN]: { request: { year: number; quarter: string }; response: PlacementMarginReportResult | null }
+  [IPC_CHANNELS.SYNC_PLACEMENT_MARGIN]: { request: PlacementMarginSyncParams; response: { started: boolean } }
+  [IPC_CHANNELS.SYNC_PLACEMENT_MARGIN_STATUS]: { request: { year: number; quarter: number }; response: PlacementMarginSyncStatus }
 
   [IPC_CHANNELS.COE_TRACKING_GET_OVERVIEW]: { request: void; response: CoeTrackingSummary[] }
   [IPC_CHANNELS.COE_TRACKING_GET_COE_DETAIL]: { request: string; response: PracticeTrackingSummary[] }
@@ -2259,120 +1499,6 @@ export interface IpcContracts {
   [IPC_CHANNELS.PRR_DELETE]: { request: number; response: { success: boolean } }
   [IPC_CHANNELS.PRR_GET_SYNC_STATUS]: { request: void; response: PrrSyncStatus }
   [IPC_CHANNELS.PRR_EXPORT_XLSX]: { request: PrrReportItem[]; response: ExcelExportResult }
-
-  [IPC_CHANNELS.PATH_GET_DEVELOPER_DASHBOARD]: { request: PathIdParams; response: PathDeveloperDashboard | null }
-  [IPC_CHANNELS.PATH_LIST_LEARNING_PATHS]: { request: PathPaginationParams; response: PathLearningPathSummary[] }
-  [IPC_CHANNELS.PATH_GET_LEARNING_PATH]: { request: PathIdParams; response: PathLearningPathDetail | null }
-  [IPC_CHANNELS.PATH_CREATE_LEARNING_PATH]: { request: PathCreateLearningPathParams; response: { id: number } }
-  [IPC_CHANNELS.PATH_UPDATE_LEARNING_PATH]: { request: PathUpdateLearningPathParams; response: { updated: boolean } }
-  [IPC_CHANNELS.PATH_DELETE_LEARNING_PATH]: { request: PathIdParams; response: { deleted: boolean } }
-  [IPC_CHANNELS.PATH_LIST_ASSESSMENTS]: { request: PathPaginationParams; response: PathAssessmentSummary[] }
-  [IPC_CHANNELS.PATH_GET_ASSESSMENT]: { request: PathIdParams; response: PathAssessmentDetail | null }
-  [IPC_CHANNELS.PATH_SAVE_ASSESSMENT_DRAFT]: { request: PathSaveAssessmentDraftParams; response: { saved: boolean } }
-  [IPC_CHANNELS.PATH_SUBMIT_ASSESSMENT]: { request: PathSubmitAssessmentParams; response: { submitted: boolean; score: number | null } }
-  [IPC_CHANNELS.PATH_LIST_DISCUSSION_THREADS]: { request: PathPaginationParams; response: PathDiscussionThreadSummary[] }
-  [IPC_CHANNELS.PATH_GET_DISCUSSION_THREAD]: { request: PathIdParams; response: PathDiscussionThreadDetail | null }
-  [IPC_CHANNELS.PATH_CREATE_DISCUSSION_POST]: { request: PathCreateDiscussionPostParams; response: { id: number } }
-  [IPC_CHANNELS.PATH_REPLY_DISCUSSION_POST]: { request: PathReplyDiscussionPostParams; response: { id: number } }
-  [IPC_CHANNELS.PATH_LIST_DOSSIERS]: { request: PathPaginationParams; response: PathDossierSummary[] }
-  [IPC_CHANNELS.PATH_GET_DOSSIER]: { request: PathIdParams; response: PathDossierDetail | null }
-  [IPC_CHANNELS.PATH_UPDATE_DOSSIER_STATUS]: { request: PathUpdateDossierStatusParams; response: { updated: boolean } }
-  [IPC_CHANNELS.PATH_GET_ADMIN_ANALYTICS]: { request: void; response: PathAdminAnalytics }
-  [IPC_CHANNELS.PATH_GET_SETTINGS]: { request: void; response: PathSettings }
-  [IPC_CHANNELS.PATH_SAVE_SETTINGS]: { request: PathSaveSettingsParams; response: { saved: boolean } }
-  [IPC_CHANNELS.PATH_SAVE_ANALYTICS_EVENT]: { request: PathSaveAnalyticsEventParams; response: boolean }
-  [IPC_CHANNELS.PATH_RECALCULATE_READINESS]: { request: PathRecalculateReadinessParams; response: { score: number; recalculated: boolean } }
-  [IPC_CHANNELS.PATH_GENERATE_DEFENSE_PREP]: { request: PathGenerateDefensePrepParams; response: { prepKit: string; suggestedQuestions: string[] } }
-  [IPC_CHANNELS.PATH_GENERATE_REMEDIATION]: { request: PathGenerateRemediationParams; response: { plan: string; focusAreas: string[]; timeline: string } }
-  [IPC_CHANNELS.PATH_SEARCH_DYNAMIC_RESOURCES]: { request: PathSearchDynamicResourcesParams; response: unknown[] }
-
-  [IPC_CHANNELS.SCOUT9_RUN]: { request: Scout9RunParams; response: Scout9Response<Scout9Job> }
-  [IPC_CHANNELS.SCOUT9_CANCEL]: { request: void; response: Scout9Response<{ canceled: boolean }> }
-  [IPC_CHANNELS.SCOUT9_GET_STATUS]: { request: void; response: Scout9Response<{ active_job: Scout9Job | null }> }
-  [IPC_CHANNELS.SCOUT9_GET_SCOPE_OPTIONS]: { request: void; response: Scout9Response<Scout9ScopeOption[]> }
-  [IPC_CHANNELS.SCOUT9_LIST_REPORTS]: { request: Scout9ListReportsParams | void; response: Scout9Response<Scout9Report[]> }
-  [IPC_CHANNELS.SCOUT9_GET_REPORT]: { request: string; response: Scout9Response<Scout9ReportDetail | null> }
-  [IPC_CHANNELS.SCOUT9_UPDATE_CANDIDATE]: { request: Scout9UpdateCandidateParams; response: Scout9Response<Scout9ReportCandidate> }
-  [IPC_CHANNELS.SCOUT9_SUBMIT_SKIP]: { request: Scout9SubmitSkipParams; response: Scout9Response<Scout9SkipFeedback> }
-  [IPC_CHANNELS.SCOUT9_KB_LIST_RULES]: { request: void; response: Scout9Response<Scout9KnowledgeRule[]> }
-  [IPC_CHANNELS.SCOUT9_KB_CREATE_RULE]: { request: Scout9CreateRuleParams; response: Scout9Response<Scout9KnowledgeRule> }
-  [IPC_CHANNELS.SCOUT9_KB_UPDATE_RULE]: { request: Scout9UpdateRuleParams; response: Scout9Response<Scout9KnowledgeRule> }
-  [IPC_CHANNELS.SCOUT9_KB_DELETE_RULE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_KB_LIST_GLOSSARY]: { request: void; response: Scout9Response<Scout9KnowledgeGlossaryTerm[]> }
-  [IPC_CHANNELS.SCOUT9_KB_CREATE_GLOSSARY_TERM]: { request: Scout9CreateGlossaryTermParams; response: Scout9Response<Scout9KnowledgeGlossaryTerm> }
-  [IPC_CHANNELS.SCOUT9_KB_UPDATE_GLOSSARY_TERM]: { request: Scout9UpdateGlossaryTermParams; response: Scout9Response<Scout9KnowledgeGlossaryTerm> }
-  [IPC_CHANNELS.SCOUT9_KB_DELETE_GLOSSARY_TERM]: { request: string; response: Scout9Response<{ deleted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_KB_LIST_NOTES]: { request: void; response: Scout9Response<Scout9KnowledgeNote[]> }
-  [IPC_CHANNELS.SCOUT9_KB_CREATE_NOTE]: { request: Scout9CreateNoteParams; response: Scout9Response<Scout9KnowledgeNote> }
-  [IPC_CHANNELS.SCOUT9_KB_UPDATE_NOTE]: { request: Scout9UpdateNoteParams; response: Scout9Response<Scout9KnowledgeNote> }
-  [IPC_CHANNELS.SCOUT9_KB_DELETE_NOTE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_KB_COMPILE]: { request: void; response: Scout9Response<{ compiled_markdown: string; token_estimate: number }> }
-  [IPC_CHANNELS.SCOUT9_KB_LIST_PATTERNS]: { request: void; response: Scout9Response<Scout9LearnedPattern[]> }
-  [IPC_CHANNELS.SCOUT9_KB_TOGGLE_PATTERN]: { request: Scout9TogglePatternParams; response: Scout9Response<Scout9LearnedPattern> }
-  [IPC_CHANNELS.SCOUT9_KB_LIST_OVERRIDES]: { request: string | void; response: Scout9Response<Scout9ClientRuleOverride[]> }
-  [IPC_CHANNELS.SCOUT9_KB_CREATE_OVERRIDE]: { request: Scout9CreateOverrideParams; response: Scout9Response<Scout9ClientRuleOverride> }
-  [IPC_CHANNELS.SCOUT9_KB_DELETE_OVERRIDE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_KB_TOKEN_BUDGET]: { request: void; response: Scout9Response<{ token_budget: number; estimated_tokens: number; remaining_tokens: number }> }
-  [IPC_CHANNELS.SCOUT9_SETTINGS_GET_CONFIG]: { request: void; response: Scout9Response<Scout9AgentConfig> }
-  [IPC_CHANNELS.SCOUT9_SETTINGS_UPDATE_CONFIG]: { request: Scout9UpdateConfigParams; response: Scout9Response<Scout9AgentConfig> }
-  [IPC_CHANNELS.SCOUT9_SETTINGS_LIST_PROMPTS]: { request: void; response: Scout9Response<Scout9PromptVersion[]> }
-  [IPC_CHANNELS.SCOUT9_SETTINGS_CREATE_PROMPT]: { request: Scout9CreatePromptVersionParams; response: Scout9Response<Scout9PromptVersion> }
-  [IPC_CHANNELS.SCOUT9_SETTINGS_ACTIVATE_PROMPT]: { request: Scout9ActivatePromptVersionParams; response: Scout9Response<Scout9PromptVersion> }
-  [IPC_CHANNELS.SCOUT9_GET_BRAIN_SNAPSHOT]: { request: void; response: Scout9Response<Scout9BrainSnapshot | null> }
-  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_LIST]: { request: void; response: Scout9Response<SalaryBand[]> }
-  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_BY_COUNTRY]: { request: string; response: Scout9Response<SalaryBand[]> }
-  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_UPSERT]: { request: Scout9UpsertSalaryBandParams; response: Scout9Response<{ upserted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_SALARY_BANDS_DELETE]: { request: string; response: Scout9Response<{ deleted: boolean }> }
-  [IPC_CHANNELS.SCOUT9_JOB_FAMILIES_LIST]: { request: void; response: Scout9Response<JobFamily[]> }
-  [IPC_CHANNELS.SCOUT9_COUNTRIES_LIST]: { request: void; response: Scout9Response<Country[]> }
-
-  [IPC_CHANNELS.VIGIL_RUN]: { request: VigilRunParams; response: VigilResponse<VigilRun> }
-  [IPC_CHANNELS.VIGIL_CANCEL_RUN]: { request: VigilCancelRunParams; response: VigilResponse<{ canceled: boolean }> }
-  [IPC_CHANNELS.VIGIL_GET_STATUS]: { request: void; response: VigilResponse<{ active_run: VigilRun | null }> }
-  [IPC_CHANNELS.VIGIL_LIST_RUNS]: { request: VigilListRunsParams | void; response: VigilResponse<VigilRun[]> }
-  [IPC_CHANNELS.VIGIL_GET_RUN]: { request: string; response: VigilResponse<VigilRun | null> }
-  [IPC_CHANNELS.VIGIL_GET_ACTIVITY_LOG]: { request: VigilGetActivityLogParams | void; response: VigilResponse<VigilActivityLog[]> }
-  [IPC_CHANNELS.VIGIL_CLEAR_ACTIVITY_LOG]: { request: void; response: VigilResponse<{ cleared: boolean }> }
-  [IPC_CHANNELS.VIGIL_GET_CONFIG]: { request: void; response: VigilResponse<VigilConfig> }
-  [IPC_CHANNELS.VIGIL_UPDATE_CONFIG]: { request: VigilUpdateConfigParams; response: VigilResponse<VigilConfig> }
-
-  [IPC_CHANNELS.VIGIL_TOOLS_DRY_RUN]: { request: VigilToolsDryRunParams; response: VigilResponse<Record<string, unknown>> }
-  [IPC_CHANNELS.VIGIL_SYNC_SOURCE]: { request: VigilSyncSourceParams; response: VigilResponse<{ started: boolean }> }
-
-  [IPC_CHANNELS.ORACLE_CHAT_SEND_MESSAGE]: { request: OracleSendChatMessageParams; response: OracleResponse<OracleChatMessage> }
-  [IPC_CHANNELS.ORACLE_CHAT_LIST_MESSAGES]: { request: OracleListChatMessagesParams | void; response: OracleResponse<OracleChatMessage[]> }
-  [IPC_CHANNELS.ORACLE_CHAT_CLEAR_MESSAGES]: { request: void; response: OracleResponse<{ cleared: boolean }> }
-
-  [IPC_CHANNELS.BRANIAC_RUN]: { request: BraniacRunParams; response: BraniacResponse<BraniacJob> }
-  [IPC_CHANNELS.BRANIAC_CANCEL]: { request: BraniacCancelParams; response: BraniacResponse<{ canceled: boolean }> }
-  [IPC_CHANNELS.BRANIAC_GET_STATUS]: { request: void; response: BraniacResponse<{ running: boolean; job_id: string | null }> }
-  [IPC_CHANNELS.BRANIAC_LIST_JOBS]: { request: BraniacListJobsParams | void; response: BraniacResponse<BraniacJob[]> }
-  [IPC_CHANNELS.BRANIAC_GET_JOB]: { request: string; response: BraniacResponse<BraniacJob | null> }
-  [IPC_CHANNELS.BRANIAC_LIST_PATTERNS]: { request: BraniacListPatternsParams | void; response: BraniacResponse<BraniacPattern[]> }
-  [IPC_CHANNELS.BRANIAC_LIST_PROFILES]: { request: BraniacListProfilesParams | void; response: BraniacResponse<BraniacStakeholderProfile[]> }
-  [IPC_CHANNELS.BRANIAC_GET_PROFILE]: { request: BraniacGetProfileParams; response: BraniacResponse<BraniacStakeholderProfile | null> }
-  [IPC_CHANNELS.BRANIAC_GET_ACCOUNTS]: { request: void; response: BraniacResponse<string[]> }
-  [IPC_CHANNELS.BRANIAC_APPROVE_PATTERN]: { request: BraniacApprovePatternParams; response: BraniacResponse<{ updated: boolean }> }
-  [IPC_CHANNELS.BRANIAC_REJECT_PATTERN]: { request: BraniacRejectPatternParams; response: BraniacResponse<{ updated: boolean }> }
-  [IPC_CHANNELS.BRANIAC_UPDATE_PATTERN]: { request: BraniacUpdatePatternParams; response: BraniacResponse<{ updated: boolean }> }
-  [IPC_CHANNELS.BRANIAC_GET_STAKEHOLDERS]: { request: BraniacGetStakeholdersParams; response: BraniacResponse<string[]> }
-  [IPC_CHANNELS.BRANIAC_GET_ANALYSIS_STATUS]: { request: BraniacGetAnalysisStatusParams; response: BraniacResponse<BraniacAnalysisStatusItem[]> }
-  [IPC_CHANNELS.BRANIAC_CREATE_PATTERN]: { request: BraniacCreatePatternParams; response: BraniacResponse<BraniacPattern> }
-  [IPC_CHANNELS.BRANIAC_BEAUTIFY_PATTERN]: { request: BraniacBeautifyPatternParams; response: BraniacResponse<BraniacBeautifyPatternResult> }
-  [IPC_CHANNELS.BRANIAC_CLEAR_PATTERNS]: { request: BraniacClearPatternsParams; response: BraniacResponse<{ deleted: number }> }
-  [IPC_CHANNELS.BRANIAC_LIST_ACCOUNT_SUMMARIES]: { request: void; response: BraniacResponse<BraniacListAccountSummariesResult> }
-  [IPC_CHANNELS.BRANIAC_GET_ACCOUNT_SUMMARY]: { request: BraniacGetAccountSummaryParams; response: BraniacResponse<BraniacAccountSummary | null> }
-  [IPC_CHANNELS.BRANIAC_DELETE_PATTERN]: { request: BraniacDeletePatternParams; response: BraniacResponse<{ deleted: boolean }> }
-  [IPC_CHANNELS.BRANIAC_DELETE_PROFILE]: { request: BraniacDeleteProfileParams; response: BraniacResponse<{ deleted: boolean }> }
-  [IPC_CHANNELS.BRANIAC_CLEAR_STAKEHOLDER]: { request: BraniacClearStakeholderParams; response: BraniacResponse<BraniacClearResult> }
-  [IPC_CHANNELS.BRANIAC_CLEAR_ACCOUNT]: { request: BraniacClearAccountParams; response: BraniacResponse<BraniacClearResult> }
-  [IPC_CHANNELS.BRANIAC_CHAT]: { request: BraniacChatParams; response: BraniacResponse<BraniacChatResult> }
-  [IPC_CHANNELS.BRANIAC_EXTRACT_RESUME_SKILLS]: { request: BraniacExtractResumeSkillsParams; response: BraniacResponse<BraniacExtractResumeSkillsResult> }
-  [IPC_CHANNELS.BRANIAC_GET_EXTRACTION_STATUS]: { request: void; response: BraniacResponse<BraniacExtractionStatusResult> }
-
-  [IPC_CHANNELS.SCOUT9_CHAT]: { request: Scout9ChatParams; response: BraniacResponse<Scout9ChatResponse> }
-
-  [IPC_CHANNELS.AGENT_STUB_RUN]: { request: { agentId: AgentId; prompt?: string }; response: { success: boolean; runId: string } }
 
   [IPC_CHANNELS.APP_GET_VERSION]: { request: void; response: string }
   [IPC_CHANNELS.APP_GET_PLATFORM]: { request: void; response: string }
@@ -2404,6 +1530,39 @@ export interface IpcContracts {
   [IPC_CHANNELS.RESPONSIVENESS_GET_LEADS]: { request: void; response: ResponsivenessCoePracticeLead[] }
   [IPC_CHANNELS.RESPONSIVENESS_ADD_LEAD]: { request: ResponsivenessAddLeadParams; response: ResponsivenessCoePracticeLead }
   [IPC_CHANNELS.RESPONSIVENESS_REMOVE_LEAD]: { request: number; response: { removed: boolean } }
+  [IPC_CHANNELS.RESPONSIVENESS_GET_POSITION_DISCUSSIONS]: { request: number; response: ResponsivenessDiscussionComment[] }
+  [IPC_CHANNELS.RESPONSIVENESS_ANALYZE_MENTIONS]: { request: ResponsivenessAnalyzeRequest; response: ResponsivenessAiAnalysisResult[] }
+
+  [IPC_CHANNELS.RESPONSIVENESS_GENERATE_FULL_REPORT]: { request: void; response: PositionAttentionReport }
+  [IPC_CHANNELS.RESPONSIVENESS_GET_LAST_REPORT]: { request: void; response: PositionAttentionReport | null }
+
+  [IPC_CHANNELS.MODEL_CONFIG_GET]: { request: void; response: import('./model-config-types').ModelConfig }
+  [IPC_CHANNELS.MODEL_CONFIG_SAVE]: { request: import('./model-config-types').ModelConfig; response: { saved: boolean } }
+  [IPC_CHANNELS.MODEL_CONFIG_LOCAL_HEALTH]: { request: { url: string }; response: { available: boolean; models: string[] } }
+  [IPC_CHANNELS.MODEL_CONFIG_LOCAL_MODELS]: { request: { url: string }; response: { models: string[] } }
+
+  // Catalog Management
+  [IPC_CHANNELS.CATALOG_GET_COES]: { request: void; response: CatalogCoe[] }
+  [IPC_CHANNELS.CATALOG_GET_COE]: { request: number; response: CatalogCoe | null }
+  [IPC_CHANNELS.CATALOG_CREATE_COE]: { request: CatalogCreateParams; response: CatalogCoeRow }
+  [IPC_CHANNELS.CATALOG_UPDATE_COE]: { request: CatalogUpdateParams; response: CatalogCoeRow }
+  [IPC_CHANNELS.CATALOG_TOGGLE_COE]: { request: number; response: CatalogCoeRow }
+  [IPC_CHANNELS.CATALOG_ADD_PRACTICE_TO_COE]: { request: CatalogJunctionParams; response: { success: boolean } }
+  [IPC_CHANNELS.CATALOG_REMOVE_PRACTICE_FROM_COE]: { request: CatalogJunctionParams; response: { success: boolean } }
+
+  [IPC_CHANNELS.CATALOG_GET_PRACTICES]: { request: void; response: CatalogPractice[] }
+  [IPC_CHANNELS.CATALOG_GET_PRACTICE]: { request: number; response: CatalogPractice | null }
+  [IPC_CHANNELS.CATALOG_CREATE_PRACTICE]: { request: CatalogCreateParams; response: CatalogPracticeRow }
+  [IPC_CHANNELS.CATALOG_UPDATE_PRACTICE]: { request: CatalogUpdateParams; response: CatalogPracticeRow }
+  [IPC_CHANNELS.CATALOG_TOGGLE_PRACTICE]: { request: number; response: CatalogPracticeRow }
+  [IPC_CHANNELS.CATALOG_ADD_SKILL_TO_PRACTICE]: { request: CatalogJunctionParams; response: { success: boolean } }
+  [IPC_CHANNELS.CATALOG_REMOVE_SKILL_FROM_PRACTICE]: { request: CatalogJunctionParams; response: { success: boolean } }
+
+  [IPC_CHANNELS.CATALOG_GET_SKILLS]: { request: void; response: CatalogSkill[] }
+  [IPC_CHANNELS.CATALOG_GET_SKILL]: { request: number; response: CatalogSkill | null }
+  [IPC_CHANNELS.CATALOG_CREATE_SKILL]: { request: CatalogCreateParams; response: CatalogSkillRow }
+  [IPC_CHANNELS.CATALOG_UPDATE_SKILL]: { request: CatalogUpdateParams; response: CatalogSkillRow }
+  [IPC_CHANNELS.CATALOG_TOGGLE_SKILL]: { request: number; response: CatalogSkillRow }
 }
 
 export interface IpcEventContracts {
@@ -2413,22 +1572,9 @@ export interface IpcEventContracts {
   [IPC_CHANNELS.POSITION_PIPELINE_PROGRESS_EVENT]: PipelineProgressEvent
   [IPC_CHANNELS.MATCH_SEARCH_EVENT]: MatchSearchEvent
   [IPC_CHANNELS.MATCH_BENCH_BURN_EVENT]: BenchBurnEvent
-  [IPC_CHANNELS.SCOUT9_PIPELINE_EVENT]: Scout9PipelineEvent
-  [IPC_CHANNELS.SCOUT9_STATUS_EVENT]: Scout9StatusEvent
-  [IPC_CHANNELS.SCOUT9_CHAT_STEP_EVENT]: string
-  [IPC_CHANNELS.SCOUT9_CHAT_CHUNK_EVENT]: ChatChunkEvent
-  [IPC_CHANNELS.VIGIL_ACTIVITY_EVENT]: VigilActivityEvent
-  [IPC_CHANNELS.VIGIL_STATUS_EVENT]: VigilStatusEvent
-
-  [IPC_CHANNELS.ORACLE_CHAT_STEP_EVENT]: OracleChatStepEvent
-  [IPC_CHANNELS.ORACLE_CHAT_CHUNK_EVENT]: ChatChunkEvent
-  [IPC_CHANNELS.AGENT_STEP_EVENT]: AgentStepEvent
-  [IPC_CHANNELS.BRANIAC_STEP_EVENT]: AgentStepEvent
-  [IPC_CHANNELS.BRANIAC_STATUS_EVENT]: BraniacStatusEvent
-  [IPC_CHANNELS.BRANIAC_CHAT_STEP_EVENT]: string
-  [IPC_CHANNELS.BRANIAC_CHAT_CHUNK_EVENT]: ChatChunkEvent
   [IPC_CHANNELS.APP_UPDATE_AVAILABLE]: AppUpdateAvailableEvent
   [IPC_CHANNELS.APP_UPDATE_DOWNLOADED]: void
   [IPC_CHANNELS.APP_NAVIGATE]: { path: string }
   [IPC_CHANNELS.ERRORS_NEW_EVENT]: ErrorNewEvent
+  [IPC_CHANNELS.RESPONSIVENESS_GENERATE_PROGRESS]: PositionAttentionProgress
 }

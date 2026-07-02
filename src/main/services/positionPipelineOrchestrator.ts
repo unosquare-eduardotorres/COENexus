@@ -25,6 +25,8 @@ interface PipelineRecordEvent {
   functionalUnit?: string
   businessUnit?: string
   hasResume?: boolean
+  account?: string
+  aging?: number
 }
 
 interface PipelineProgress {
@@ -97,6 +99,119 @@ function makeProgress(
 ): PipelineProgress {
   return { source: 'open-positions', status, totalRecords: total, processedRecords: processed, succeededCount: succeeded, failedCount: failed, skippedCount: skipped, currentRecord, pauseReason, errorMessage }
 }
+
+// ─── Extracted helpers for the run loop ──────────────────────────────────────
+
+import type { OpenPositionListItem } from './upstreamApiService'
+import type { SyncedOpenPositionRow } from '../db/repositories/syncRepository'
+
+/** Try vectorizing an unchanged position that was already synced. */
+async function vectorizeExistingPosition(
+  existing: SyncedOpenPositionRow,
+  pos: OpenPositionListItem,
+  model: string,
+  activeOnly: boolean,
+): Promise<PipelineRecordEvent> {
+  const posName = `${pos.account} — ${pos.mainSkill}`
+
+  if (existing.status === 'vectorized' || !activeOnly) {
+    return { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill }
+  }
+
+  const hasJd = !!existing.job_description?.trim()
+  if (!hasJd) {
+    syncRepository.markFailed('synced_open_positions', existing.id, 'incomplete', 'No job description')
+    return { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' }
+  }
+
+  const enrichedText = extractPositionText({
+    account: existing.account, job_title: existing.job_title,
+    main_skill: existing.main_skill, job_description: existing.job_description,
+  })
+  const vecResult = await vectorizePosition(existing.id, pos.id, enrichedText, model)
+  if ('error' in vecResult) {
+    return { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error }
+  }
+  return { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill }
+}
+
+/** Fetch rejection details for rejected candidates and persist them. */
+async function fetchRejectionDetails(
+  token: string,
+  positionId: number,
+  candidates: Array<{ candidateRequisitionId: number; candidateStatusName: string }>,
+): Promise<void> {
+  const rejected = candidates.filter(c => c.candidateStatusName === 'RejectedByClient')
+  for (const r of rejected) {
+    try {
+      const rejDetail = await upstreamApiService.getCandidateRequisitionDetail(token, r.candidateRequisitionId)
+      if (rejDetail) {
+        matchRepository.updateCandidateRejectionDetails(positionId, r.candidateRequisitionId, {
+          rejection_feedback: JSON.stringify(rejDetail.listFeedback ?? []),
+          rejection_comments: rejDetail.comments ?? '',
+          rejection_action_date: rejDetail.actionDate || null,
+        })
+      }
+    } catch {
+      log.warn(`Failed to fetch rejection detail for candidateRequisition ${r.candidateRequisitionId}`, { positionId })
+    }
+  }
+}
+
+/** After a position is synced + stored, optionally vectorize it. */
+async function vectorizeAfterSync(
+  posId: number,
+  posName: string,
+  mainSkill: string,
+  entityStatus: string,
+  jobDescription: string | undefined,
+  model: string,
+  activeOnly: boolean,
+): Promise<PipelineRecordEvent> {
+  if (!activeOnly) {
+    return { upstreamId: posId, name: posName, outcome: 'vectorized', mainSkill }
+  }
+  if (entityStatus === 'vectorized') {
+    return { upstreamId: posId, name: posName, outcome: 'skipped', mainSkill }
+  }
+  const hasJd = !!jobDescription?.trim()
+  if (!hasJd) {
+    syncRepository.markFailed('synced_open_positions', syncRepository.findPositionByUpstreamId(posId)?.id ?? 0, 'incomplete', 'No job description')
+    return { upstreamId: posId, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' }
+  }
+  const row = syncRepository.findPositionByUpstreamId(posId)
+  if (!row) {
+    return { upstreamId: posId, name: posName, outcome: 'failed', failedStep: 'sync', error: 'Position not found after sync' }
+  }
+  const enrichedText = extractPositionText({
+    account: row.account, job_title: row.job_title,
+    main_skill: row.main_skill, job_description: row.job_description,
+  })
+  const vecResult = await vectorizePosition(row.id, posId, enrichedText, model)
+  if ('error' in vecResult) {
+    return { upstreamId: posId, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error }
+  }
+  return { upstreamId: posId, name: posName, outcome: 'vectorized', mainSkill }
+}
+
+/** Detect positions absent from upstream and mark them closed. */
+function markAbsentPositionsClosed(syncedUpstreamIds: Set<number>): void {
+  const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
+  let closedCount = 0
+  for (const local of allLocalPositions) {
+    if (!syncedUpstreamIds.has(local.upstream_id) && !local.position_status.startsWith('Closed')) {
+      // Real close date is unknown for absence-detected closures — leave it null
+      // rather than stamping the sync time (which would mis-bucket the quarter).
+      syncRepository.markPositionClosed(local.upstream_id, null)
+      closedCount++
+    }
+  }
+  if (closedCount > 0) {
+    log.info('Marked positions as Closed (not in upstream)', { closedCount })
+  }
+}
+
+// ─── Orchestrator ────────────────────────────────────────────────────────────
 
 export const positionPipelineOrchestrator = {
   requestPause(): void {
@@ -206,43 +321,11 @@ export const positionPipelineOrchestrator = {
 
             if (lastModUnchanged && candidatesUnchanged && discussionUnchanged && !isClosedInfoStale(existing, pos)) {
               syncedUpstreamIds.add(pos.id)
-
-              const alreadyVectorized = existing.status === 'vectorized'
-              if (alreadyVectorized) {
-                skippedCount++
-                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
-                emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
-                continue
-              }
-
-              if (!activeOnly) {
-                skippedCount++
-                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
-                emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
-                continue
-              }
-
-              const hasJd = !!existing.job_description?.trim()
-              if (hasJd) {
-                const enrichedText = extractPositionText({
-                  account: existing.account,
-                  job_title: existing.job_title,
-                  main_skill: existing.main_skill,
-                  job_description: existing.job_description,
-                })
-                const vecResult = await vectorizePosition(existing.id, pos.id, enrichedText, model)
-                if ('error' in vecResult) {
-                  failedCount++
-                  emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
-                } else {
-                  succeededCount++
-                  emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
-                }
-              } else {
-                failedCount++
-                syncRepository.markFailed('synced_open_positions', existing.id, 'incomplete', 'No job description')
-                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' } })
-              }
+              const result = await vectorizeExistingPosition(existing, pos, model, activeOnly)
+              if (result.outcome === 'skipped') skippedCount++
+              else if (result.outcome === 'failed') failedCount++
+              else succeededCount++
+              emitAndAccumulate({ type: 'record', record: { ...result, account: pos.account, aging: pos.aging } })
               continue
             }
 
@@ -267,58 +350,14 @@ export const positionPipelineOrchestrator = {
             syncedUpstreamIds.add(pos.id)
 
             upsertCandidates(matchRepository, pos.id, candidates)
-
-            const rejectedCandidates = candidates.filter(c => c.candidateStatusName === 'RejectedByClient')
-            for (const rejected of rejectedCandidates) {
-              try {
-                const rejDetail = await upstreamApiService.getCandidateRequisitionDetail(token, rejected.candidateRequisitionId)
-                if (rejDetail) {
-                  matchRepository.updateCandidateRejectionDetails(pos.id, rejected.candidateRequisitionId, {
-                    rejection_feedback: JSON.stringify(rejDetail.listFeedback ?? []),
-                    rejection_comments: rejDetail.comments ?? '',
-                    rejection_action_date: rejDetail.actionDate || null,
-                  })
-                }
-              } catch {
-                log.warn(`Failed to fetch rejection detail for candidateRequisition ${rejected.candidateRequisitionId}`, { positionId: pos.id })
-              }
-            }
-
+            await fetchRejectionDetails(token, pos.id, candidates)
             upsertDiscussions(syncRepository, pos.id, discussions)
 
-            if (activeOnly) {
-              const hasJd = !!(detail?.jobDescription?.trim())
-              if (entity.status === 'vectorized') {
-                skippedCount++
-                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'skipped', mainSkill: pos.mainSkill } })
-              } else if (hasJd) {
-                const row = syncRepository.findPositionByUpstreamId(pos.id)
-                if (row) {
-                  const enrichedText = extractPositionText({
-                    account: row.account,
-                    job_title: row.job_title,
-                    main_skill: row.main_skill,
-                    job_description: row.job_description,
-                  })
-
-                  const vecResult = await vectorizePosition(row.id, pos.id, enrichedText, model)
-                  if ('error' in vecResult) {
-                    failedCount++
-                    emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
-                  } else {
-                    succeededCount++
-                    emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
-                  }
-                }
-              } else {
-                failedCount++
-                syncRepository.markFailed('synced_open_positions', syncRepository.findPositionByUpstreamId(pos.id)?.id ?? 0, 'incomplete', 'No job description')
-                emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'failed', failedStep: 'no_resume', error: 'No job description' } })
-              }
-            } else {
-              succeededCount++
-              emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: posName, outcome: 'vectorized', mainSkill: pos.mainSkill } })
-            }
+            const vecResult = await vectorizeAfterSync(pos.id, posName, pos.mainSkill, entity.status, detail?.jobDescription, model, activeOnly)
+            if (vecResult.outcome === 'skipped') skippedCount++
+            else if (vecResult.outcome === 'failed') failedCount++
+            else succeededCount++
+            emitAndAccumulate({ type: 'record', record: { ...vecResult, account: pos.account, aging: pos.aging } })
           } catch (err) {
             failedCount++
             const error = err instanceof Error ? err.message : 'Unknown error'
@@ -329,7 +368,7 @@ export const positionPipelineOrchestrator = {
               status: 'sync_failed',
               status_reason: error,
             })
-            emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: pos.account || 'Unknown', outcome: 'failed', failedStep: 'sync', error } })
+            emitAndAccumulate({ type: 'record', record: { upstreamId: pos.id, name: pos.account || 'Unknown', outcome: 'failed', failedStep: 'sync', error, account: pos.account } })
           }
 
           emitEvent({ type: 'progress', progress: makeProgress(totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', posName) })
@@ -340,19 +379,7 @@ export const positionPipelineOrchestrator = {
       }
 
       if (!signal.aborted && activeOnly) {
-        const allLocalPositions = syncRepository.getAllOpenPositions(100000, 0)
-        let closedCount = 0
-        for (const local of allLocalPositions) {
-          if (!syncedUpstreamIds.has(local.upstream_id) && !local.position_status.startsWith('Closed')) {
-            // Real close date is unknown for absence-detected closures — leave it null
-            // rather than stamping the sync time (which would mis-bucket the quarter).
-            syncRepository.markPositionClosed(local.upstream_id, null)
-            closedCount++
-          }
-        }
-        if (closedCount > 0) {
-          log.info('Marked positions as Closed (not in upstream)', { closedCount })
-        }
+        markAbsentPositionsClosed(syncedUpstreamIds)
       }
 
       matchEngineService.invalidateFilterCache()
@@ -429,7 +456,7 @@ export const positionPipelineOrchestrator = {
             emitEvent({ type: 'record', record: { upstreamId: pos.upstream_id, name: posName, outcome: 'failed', failedStep: 'vectorize', error: vecResult.error } })
           } else {
             succeededCount++
-            emitEvent({ type: 'record', record: { upstreamId: pos.upstream_id, name: posName, outcome: 'vectorized', mainSkill: pos.main_skill } })
+            emitEvent({ type: 'record', record: { upstreamId: pos.upstream_id, name: posName, outcome: 'vectorized', mainSkill: pos.main_skill, account: pos.account } })
           }
         } catch (err) {
           failedCount++

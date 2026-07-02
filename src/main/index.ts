@@ -4,14 +4,7 @@ import { IPC_CHANNELS } from '../shared/ipc-channels'
 import { registerAllHandlers } from './ipc'
 import { createMenu } from './menu'
 import { initDatabase, closeDatabase } from './db/connection'
-import { initPathDatabase, closePathDatabase } from './db/path/pathConnection'
-import { initAgentsDatabase, closeAgentsDatabase } from './db/agents/agentsConnection'
 import { embeddingWorker } from './services/embeddingWorker'
-import { vigilScheduler } from './services/vigilScheduler'
-import { vigilExecutor } from './services/vigilExecutor'
-import { getVigilToken } from './services/vigilTokenStore'
-import type { VigilStatusEvent } from '../shared/ipc-types'
-import { toVigilActivityEvent } from './services/vigilEventMapper'
 import { initAutoUpdater, stopAutoUpdater } from './updater'
 import { initErrorTransport } from './services/errorTransport'
 import { syncWatcherService } from './services/syncWatcherService'
@@ -44,20 +37,6 @@ const log = createLogger('Main')
 
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
-
-const activeAgents = new Set<string>()
-
-function updateTrayActivity(agentId: string, running: boolean): void {
-  if (running) activeAgents.add(agentId)
-  else activeAgents.delete(agentId)
-  trayService.setActive(activeAgents.size > 0)
-
-  const statuses: Record<string, string> = {}
-  for (const id of activeAgents) {
-    statuses[id] = 'Running'
-  }
-  trayService.rebuildMenu(activeAgents.size > 0 ? statuses : undefined)
-}
 
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -220,18 +199,6 @@ app.whenReady().then(async () => {
   }
 
   try {
-    initPathDatabase()
-  } catch (err) {
-    log.error('PATH database initialization failed', err instanceof Error ? err : new Error(String(err)))
-  }
-
-  try {
-    initAgentsDatabase()
-  } catch (err) {
-    log.error('Agents database initialization failed', err instanceof Error ? err : new Error(String(err)))
-  }
-
-  try {
     initErrorTransport()
   } catch { /* never crash */ }
 
@@ -292,86 +259,6 @@ app.whenReady().then(async () => {
   if (mainWindow) {
     trayService.init(mainWindow)
   }
-  vigilScheduler.start({
-    getToken: () => getVigilToken(),
-    run: async ({ token, sources, options }) => {
-      const runningStatus: VigilStatusEvent = {
-        status: 'running',
-        run_id: null,
-        timestamp: new Date().toISOString(),
-      }
-      emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, runningStatus)
-      updateTrayActivity('Vigil', true)
-
-      try {
-        const run = await vigilExecutor.run({
-          token,
-          triggerType: 'scheduled',
-          sources,
-          options,
-          emitEvent: (syncEvent) => {
-            emitToRenderer(IPC_CHANNELS.VIGIL_ACTIVITY_EVENT, toVigilActivityEvent(syncEvent))
-          },
-        })
-
-        const completedStatus: VigilStatusEvent = {
-          status: run.status,
-          run_id: run.id,
-          timestamp: new Date().toISOString(),
-        }
-        emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, completedStatus)
-        updateTrayActivity('Vigil', false)
-
-        if (Notification.isSupported()) {
-          const completedRunId = run.id
-          const notification = new Notification({
-            title: 'Vigil Sync Complete',
-            body: 'All sources synced successfully',
-            silent: false,
-          })
-          notification.on('click', () => {
-            const win = getMainWindow()
-            if (win) {
-              win.show()
-              win.focus()
-              win.webContents.send(IPC_CHANNELS.APP_NAVIGATE, { path: `/agents/vigil/runs/${completedRunId}` })
-            }
-          })
-          notification.show()
-        }
-
-        return run
-      } catch (error) {
-        const failedStatus: VigilStatusEvent = {
-          status: 'failed',
-          run_id: null,
-          timestamp: new Date().toISOString(),
-        }
-        emitToRenderer(IPC_CHANNELS.VIGIL_STATUS_EVENT, failedStatus)
-        updateTrayActivity('Vigil', false)
-
-        if (Notification.isSupported()) {
-          const notification = new Notification({
-            title: 'Vigil Sync Failed',
-            body: error instanceof Error ? error.message : 'Unknown error',
-            silent: false,
-          })
-          notification.on('click', () => {
-            const win = getMainWindow()
-            if (win) {
-              win.show()
-              win.focus()
-              win.webContents.send(IPC_CHANNELS.APP_NAVIGATE, { path: '/agents/vigil/runs' })
-            }
-          })
-          notification.show()
-        }
-
-        throw error
-      }
-    },
-  })
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -385,12 +272,9 @@ app.on('before-quit', () => {
   isQuitting = true
   trayService.destroy()
   embeddingWorker.stop()
-  vigilScheduler.stop()
   syncWatcherService.stop()
   stopAutoUpdater()
   closeDatabase()
-  closePathDatabase()
-  closeAgentsDatabase()
 })
 
 app.on('web-contents-created', (_event, contents) => {

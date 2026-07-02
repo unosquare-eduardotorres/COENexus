@@ -86,7 +86,7 @@ function SyncPill({ sync, onClick }: { sync: SyncProgress; onClick: () => void }
 }
 
 export default function NexusStatusBar() {
-  const { claude, tokens, sharepoint, openModal, agentActivities } = useNexusStatus();
+  const { claude, tokens, apiTokens, openModal } = useNexusStatus();
   const { activeSyncs, dismissSync } = useSyncActivity();
   const navigate = useNavigate();
 
@@ -118,26 +118,6 @@ export default function NexusStatusBar() {
             {claude.checking ? 'Checking...' : claude.connected ? 'Claude Connected' : 'Claude Offline'}
           </span>
         </button>
-
-        {agentActivities.length > 0 && (
-          <>
-            <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
-            {agentActivities.map((agent) => (
-              <button
-                key={agent.id}
-                type="button"
-                onClick={() => navigate(`/agents/${agent.id}`)}
-                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                title={`${agent.name} is ${agent.status}`}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                <span className="text-blue-400 dark:text-blue-300">
-                  {agent.name} syncing…
-                </span>
-              </button>
-            ))}
-          </>
-        )}
 
         <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
 
@@ -190,20 +170,41 @@ export default function NexusStatusBar() {
 
         <button
           type="button"
-          onClick={() => openModal('sharepoint')}
+          onClick={() => openModal('apiTokens')}
           className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
         >
           <span
             className={`h-1.5 w-1.5 rounded-full ${
-              sharepoint.isValid ? 'bg-emerald-400' : 'bg-gray-400'
+              apiTokens.unocore.isValid ? 'bg-emerald-400' : 'bg-gray-400'
             }`}
           />
-          {sharepoint.isValid ? (
-            <span className={`font-mono ${getCountdownColor(sharepoint.remainingMs)}`}>
-              SP {formatCountdown(sharepoint.remainingMs)}
+          {apiTokens.unocore.isValid ? (
+            <span className={`font-mono ${getCountdownColor(apiTokens.unocore.remainingMs)}`}>
+              UNO {formatCountdown(apiTokens.unocore.remainingMs)}
             </span>
           ) : (
-            <span className="text-muted">SP Not Connected</span>
+            <span className="text-muted">UNO</span>
+          )}
+        </button>
+
+        <div className="h-3 w-px bg-gray-300/40 dark:bg-dark-border/40" />
+
+        <button
+          type="button"
+          onClick={() => openModal('apiTokens')}
+          className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              apiTokens.exec.isValid ? 'bg-emerald-400' : 'bg-gray-400'
+            }`}
+          />
+          {apiTokens.exec.isValid ? (
+            <span className={`font-mono ${getCountdownColor(apiTokens.exec.remainingMs)}`}>
+              EXEC {formatCountdown(apiTokens.exec.remainingMs)}
+            </span>
+          ) : (
+            <span className="text-muted">EXEC</span>
           )}
         </button>
       </div>

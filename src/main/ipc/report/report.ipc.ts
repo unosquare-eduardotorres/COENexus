@@ -1,11 +1,12 @@
 import { BrowserWindow, dialog } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus, ExcelExportResult, ReportAcceptanceRateFilters, ReportAcceptanceRateResult } from '../../../shared/ipc-types'
+import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus, ExcelExportResult, ReportAcceptanceRateFilters, ReportAcceptanceRateResultV2, PlacementMarginReportResult } from '../../../shared/ipc-types'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
 import { acceptanceRateService } from '../../services/acceptanceRateService'
+import { placementMarginService } from '../../services/placementMarginService'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { matchEngineService } from '../../services/matchEngineService'
 import { matchRepository } from '../../db/repositories/matchRepository'
@@ -130,7 +131,7 @@ export function registerReportHandlers(): void {
 
   registerIpcHandler(
     IPC_CHANNELS.REPORT_ACCEPTANCE_RATE,
-    async (event, filters: ReportAcceptanceRateFilters): Promise<ReportAcceptanceRateResult> => {
+    async (event, filters: ReportAcceptanceRateFilters): Promise<ReportAcceptanceRateResultV2> => {
       validateSender(event)
       return acceptanceRateService.evaluate(filters)
     }
@@ -141,6 +142,14 @@ export function registerReportHandlers(): void {
     async (event): Promise<string[]> => {
       validateSender(event)
       return acceptanceRateService.getCoes()
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_PLACEMENT_MARGIN,
+    async (event, { year, quarter }: { year: number; quarter: string }): Promise<PlacementMarginReportResult | null> => {
+      validateSender(event)
+      return placementMarginService.evaluate(year, quarter)
     }
   )
 }

@@ -1,4 +1,4 @@
-import type { ResponsivenessReport, ResponsivenessCoePracticeLead } from '../../../../shared/ipc-types'
+import type { ResponsivenessReport, ResponsivenessCoePracticeLead, ResponsivenessDiscussionComment, ResponsivenessAiAnalysisResult, PositionAttentionReport } from '../../../../shared/ipc-types'
 
 export const responsivenessService = {
   getReport(): Promise<ResponsivenessReport> {
@@ -15,5 +15,21 @@ export const responsivenessService = {
 
   removeLead(id: number): Promise<{ removed: boolean }> {
     return window.api.responsiveness.removeLead(id)
+  },
+
+  getPositionDiscussions(positionUpstreamId: number): Promise<ResponsivenessDiscussionComment[]> {
+    return window.api.responsiveness.getPositionDiscussions(positionUpstreamId)
+  },
+
+  analyzeMentions(positionUpstreamIds: number[]): Promise<ResponsivenessAiAnalysisResult[]> {
+    return window.api.responsiveness.analyzeMentions({ positionUpstreamIds })
+  },
+
+  generateFullReport(): Promise<PositionAttentionReport> {
+    return window.api.responsiveness.generateFullReport()
+  },
+
+  getLastReport(): Promise<PositionAttentionReport | null> {
+    return window.api.responsiveness.getLastReport()
   },
 }

@@ -10,16 +10,6 @@ function CloudDownloadIcon() {
   );
 }
 
-function CompassTrailIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill="currentColor" opacity="0.3" />
-      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-    </svg>
-  );
-}
-
 function CoreIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -29,18 +19,6 @@ function CoreIcon() {
       <circle cx="18" cy="10" r="2" fill="currentColor" opacity="0.3" />
       <circle cx="12" cy="4" r="2" fill="currentColor" opacity="0.3" />
       <circle cx="6" cy="14" r="2" fill="currentColor" opacity="0.3" />
-    </svg>
-  );
-}
-
-function BotIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="10" rx="2" />
-      <circle cx="12" cy="5" r="3" />
-      <line x1="12" y1="8" x2="12" y2="11" />
-      <circle cx="8" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
-      <circle cx="16" cy="16" r="1.5" fill="currentColor" opacity="0.3" />
     </svg>
   );
 }
@@ -74,6 +52,15 @@ function BugIcon() {
   );
 }
 
+function CatalogIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5v-15A2.5 2.5 0 016.5 2H20v20H6.5a2.5 2.5 0 010-5H20" />
+      <path d="M8 7h6" /><path d="M8 11h4" />
+    </svg>
+  );
+}
+
 function AccentLetter({ children, color }: { children: string; color: string }) {
   return <span style={{ color, fontWeight: 700 }}>{children}</span>;
 }
@@ -82,10 +69,9 @@ export default function NexusLanding() {
   const resumeColor = '#3b82f6';
   const dataSyncColor = '#f59e0b';
   const coreColor = '#10b981';
-  const pathColor = '#8b5cf6';
-  const agentColor = '#a855f7';
   const bugColor = '#ef4444';
   const nomicoreColor = '#06b6d4';
+  const catalogColor = '#a855f7';
 
   return (
     <div className="relative flex min-h-screen pb-8 flex-col gradient-subtle transition-colors duration-300">
@@ -161,26 +147,6 @@ export default function NexusLanding() {
             icon={<CoreIcon />}
           />
           <AppCard
-            name="P.A.T.H."
-            codename="Training Hub"
-            status="experimental"
-            href="/path"
-            accentColor={pathColor}
-            tagline=""
-            description={<><AccentLetter color={pathColor}>P</AccentLetter>ersonalized. <AccentLetter color={pathColor}>A</AccentLetter>daptive. <AccentLetter color={pathColor}>T</AccentLetter>raining. <AccentLetter color={pathColor}>H</AccentLetter>ub. Tailored learning paths and skill development for COE team members.</>}
-            icon={<CompassTrailIcon />}
-          />
-          <AppCard
-            name="A.G.E.N.T."
-            codename="Agent Studio"
-            status="experimental"
-            href="/agents"
-            accentColor={agentColor}
-            tagline=""
-            description={<><AccentLetter color={agentColor}>A</AccentLetter>utonomous. <AccentLetter color={agentColor}>G</AccentLetter>enerative. <AccentLetter color={agentColor}>E</AccentLetter>xpert. <AccentLetter color={agentColor}>N</AccentLetter>etwork. <AccentLetter color={agentColor}>T</AccentLetter>eam. Multi-agent AI workforce for code, design, and operations.</>}
-            icon={<BotIcon />}
-          />
-          <AppCard
             name="B.U.G."
             codename="Bug Unified Guardian"
             status="experimental"
@@ -199,6 +165,16 @@ export default function NexusLanding() {
             tagline=""
             description={<><AccentLetter color={nomicoreColor}>N</AccentLetter>omicore. <AccentLetter color={nomicoreColor}>O</AccentLetter>n-demand. <AccentLetter color={nomicoreColor}>M</AccentLetter>exico. <AccentLetter color={nomicoreColor}>I</AccentLetter>ntelligence. Salary calculations powered by Nomicore browser automation.</>}
             icon={<CalculatorIcon />}
+          />
+          <AppCard
+            name="C.A.T."
+            codename="Catalog Administration Tools"
+            status="active"
+            href="/catalogs"
+            accentColor={catalogColor}
+            tagline=""
+            description={<><AccentLetter color={catalogColor}>C</AccentLetter>atalog. <AccentLetter color={catalogColor}>A</AccentLetter>dministration. <AccentLetter color={catalogColor}>T</AccentLetter>ools. Manage COEs, Practices, and Skills — the organizational backbone of the operation.</>}
+            icon={<CatalogIcon />}
           />
         </div>
       </section>

@@ -8,6 +8,8 @@ import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeD
 import { findResumeNote, loadOrEmpty, loadCatalogs } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
 import { salaryNormalizationService } from '../salaryNormalizationService'
+import { resolveCatalogValue, validateRecordFields } from './entityFieldMappers'
+import { emitSyncProgress, emitSyncComplete, createSyncCounters } from './syncProgressHelper'
 import type { SyncRecordDto, SyncEvent, SyncOptions, CandidateSyncRecord } from './syncTypes'
 
 const log = createLogger('SyncCandidateOrchestrator')
@@ -30,23 +32,16 @@ function buildCandidateEntity(
     ? (seniorities.get(detail.seniority) ?? pagedFallback.seniorityText ?? 'Unknown')
     : (pagedFallback.seniorityText ?? 'Unknown')
 
-  const mainSkill = mainSkills.size > 0 && detail.mainSkillId && detail.mainSkillId > 0
-    ? (mainSkills.get(detail.mainSkillId) ?? pagedFallback.mainSkill)
-    : pagedFallback.mainSkill
+  const mainSkill = resolveCatalogValue(mainSkills, detail.mainSkillId, pagedFallback.mainSkill, '')
+  const country = resolveCatalogValue(countries, detail.countryId, pagedFallback.country, '')
 
-  const country = countries.size > 0 && detail.countryId && detail.countryId > 0
-    ? (countries.get(detail.countryId) ?? pagedFallback.country)
-    : pagedFallback.country
-
-  const missingFields: string[] = []
-  if (!fullName) missingFields.push('FullName')
-  if (!detail.email) missingFields.push('Email')
-  if (seniority === 'Unknown') missingFields.push('Seniority')
-  if (!mainSkill) missingFields.push('MainSkill')
-  if (!resumeNote) missingFields.push('Resume')
-
-  const recordStatus = missingFields.length === 0 ? 'synced' : 'incomplete'
-  const statusReason = missingFields.length > 0 ? `Missing: ${missingFields.join(', ')}` : null
+  const { status: recordStatus, statusReason } = validateRecordFields([
+    { field: 'FullName', present: !!fullName },
+    { field: 'Email', present: !!detail.email },
+    { field: 'Seniority', present: seniority !== 'Unknown' },
+    { field: 'MainSkill', present: !!mainSkill },
+    { field: 'Resume', present: !!resumeNote },
+  ])
 
   const salaryCurrency = detail.currentSalaryCurrency ?? detail.salaryCurrency ?? null
   const salaryExpectationsCurrency = detail.desiredSalaryCurrency ?? null
@@ -164,10 +159,7 @@ export const syncCandidateOrchestrator = {
     const pageSize = 100
     const chunkSize = 15
     let pageOffset = options.skip ?? 0
-    let totalRecords = 0
-    let syncedCount = 0, incompleteCount = 0, notProcessedCount = 0
-    let updatedCount = 0, unchangedCount = 0, skippedDetailCount = 0
-    let fetchedRecords = options.skip ?? 0
+    const counters = createSyncCounters(options.skip ?? 0)
     const maxToProcess = options.limit ?? Infinity
     let processedInRun = 0
 
@@ -176,7 +168,7 @@ export const syncCandidateOrchestrator = {
 
       const take = Math.min(pageSize, maxToProcess - processedInRun)
       const { items: batch, totalRecords: total } = await upstreamApiService.getCandidatesPaged(token, pageOffset, take, options.year)
-      totalRecords = total
+      counters.totalRecords = total
       if (batch.length === 0) break
 
       for (let chunkStart = 0; chunkStart < batch.length; chunkStart += chunkSize) {
@@ -207,7 +199,7 @@ export const syncCandidateOrchestrator = {
           for (let i = 0; i < fetchResults.length; i++) {
             const result = fetchResults[i]
             const basicCandRef = chunk[i]
-            fetchedRecords++
+            counters.fetchedRecords++
             processedInRun++
 
             if (result.status === 'rejected') {
@@ -219,8 +211,8 @@ export const syncCandidateOrchestrator = {
                 status: 'sync_failed',
                 status_reason: reason,
               })
-              notProcessedCount++
-              emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, status: 'syncing' } })
+              counters.notProcessedCount++
+              emitSyncProgress(emitEvent, 'candidates', counters)
               continue
             }
 
@@ -245,16 +237,16 @@ export const syncCandidateOrchestrator = {
                   }
                   syncRepository.updateResumeFields(existing.id, resumeFields)
                   embeddingRepository.deleteBySource('candidates', existing.id)
-                  updatedCount++
-                  skippedDetailCount++
+                  counters.updatedCount++
+                  counters.skippedCount++
                   emitEvent({ type: 'record', record: mapCandidateToDto(
                     { ...existing, ...resumeFields }, true, 'updated') })
                 } else {
-                  unchangedCount++
-                  skippedDetailCount++
+                  counters.unchangedCount++
+                  counters.skippedCount++
                 }
 
-                emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, currentRecord: basicCand.fullName, status: 'syncing' } })
+                emitSyncProgress(emitEvent, 'candidates', counters, basicCand.fullName)
 
                 if (processedInRun >= maxToProcess) break
                 continue
@@ -262,22 +254,22 @@ export const syncCandidateOrchestrator = {
 
               const entity = buildCandidateEntity(detail!, notes, seniorities, mainSkills, countries, basicCand)
               const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, candidateChangeConfig)
-              if (entity.status === 'incomplete') incompleteCount++
-              else if (entity.status === 'not-processed') notProcessedCount++
+              if (entity.status === 'incomplete') counters.incompleteCount++
+              else if (entity.status === 'not-processed') counters.notProcessedCount++
               else {
-                if (syncDetail === 'new') syncedCount++
-                else if (syncDetail === 'updated') updatedCount++
-                else unchangedCount++
+                if (syncDetail === 'new') counters.syncedCount++
+                else if (syncDetail === 'updated') counters.updatedCount++
+                else counters.unchangedCount++
               }
 
               emitEvent({ type: 'record', record: mapCandidateToDto(entity, resumeChanged, syncDetail) })
             } catch (err) {
               log.error(`Candidate upsert failed: ${basicCand.fullName} (${basicCand.candidateId})`, err instanceof Error ? err : new Error(String(err)), { upstreamId: basicCand.candidateId })
-              notProcessedCount++
+              counters.notProcessedCount++
               emitEvent({ type: 'record', record: { id: `cand-${basicCand.candidateId}`, source: 'candidates', status: 'sync_failed', name: basicCand.fullName || 'Unknown', email: basicCand.email ?? '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicCand.candidateId, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error' } })
             }
 
-            emitEvent({ type: 'progress', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, currentRecord: basicCand.fullName, status: 'syncing' } })
+            emitSyncProgress(emitEvent, 'candidates', counters, basicCand.fullName)
 
             if (processedInRun >= maxToProcess) break
           }
@@ -288,11 +280,11 @@ export const syncCandidateOrchestrator = {
       }
 
       pageOffset += batch.length
-      if (pageOffset >= totalRecords) break
+      if (pageOffset >= counters.totalRecords) break
     }
 
     matchEngineService.invalidateFilterCache()
-    log.info('Candidate sync finished', { totalRecords, fetchedRecords, syncedCount, updatedCount, unchangedCount, skippedDetailCount, incompleteCount, notProcessedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { source: 'candidates', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: skippedDetailCount, status: signal.aborted ? 'paused' : 'completed' } })
+    log.info('Candidate sync finished', { ...counters, status: signal.aborted ? 'paused' : 'completed' })
+    emitSyncComplete(emitEvent, 'candidates', counters, signal.aborted)
   },
 }

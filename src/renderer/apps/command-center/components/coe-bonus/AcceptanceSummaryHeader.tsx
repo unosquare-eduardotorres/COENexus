@@ -1,19 +1,18 @@
-// Header summary for the Acceptance Rate report, split into two clearly-labelled
-// grain sections so the candidate-grain "goal" never gets confused with the
-// position-grain outcomes:
-//   ① Candidate Acceptance (candidate grain) — the headline goal, the
-//      approved-vs-rejected donut, a 3-way candidate split, and status chips.
-//   ② Position Outcomes (position grain) — closed-position KPI + status
-//      breakdown (Won / Lost + reasons / Other).
+// V2 Header summary for the Acceptance Rate report, showing:
+//   Candidate Acceptance (candidate grain) — the QTD headline goal,
+//      the numerator-vs-denominator donut, a 4-way candidate split bar, and KPIs.
+//   Position Outcomes (position grain) — total closed-position count
+//      with won/lost/other breakdown.
 
 import { useMemo } from 'react'
+import { Users, Briefcase } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { EChartsOption } from 'echarts'
 import EChart from '../../../../components/charts/EChart'
-import type { AcceptanceRateSummary } from '../../types/coeBonus'
+import type { ReportAcceptanceRateResultV2 } from '../../types/coeBonus'
 import { KpiStat, SectionCard } from './BonusUi'
-import { BUCKET_CHIP, bucketForStatus, formatClosedDate, humanizeStatus } from './acceptanceStatus'
+import { formatClosedDate } from './acceptanceStatus'
 import CandidateAcceptanceHero from './CandidateAcceptanceHero'
-import PositionStatusBreakdown from './PositionStatusBreakdown'
 
 /** Small pill labelling which grain a section reports on. */
 function GrainBadge({ grain }: { grain: 'Candidates' | 'Positions' }) {
@@ -28,30 +27,38 @@ function GrainBadge({ grain }: { grain: 'Candidates' | 'Positions' }) {
   )
 }
 
-function SectionHeading({ index, title, grain }: { index: string; title: string; grain: 'Candidates' | 'Positions' }) {
+function SectionHeading({ icon: Icon, title, grain }: { icon: LucideIcon; title: string; grain: 'Candidates' | 'Positions' }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="text-xs font-mono text-muted">{index}</span>
+      <Icon className="w-4 h-4 text-slate-400" />
       <h2 className="text-sm font-semibold text-primary">{title}</h2>
       <GrainBadge grain={grain} />
     </div>
   )
 }
 
-/** Three-segment proportion bar: Approved / Rejected / Inconclusive. */
-function CandidateSplitBar({ approved, rejected, inconclusive }: { approved: number; rejected: number; inconclusive: number }) {
-  const total = approved + rejected + inconclusive
+/** Four-segment proportion bar: Approved / In-Progress / Rejected / Excluded. */
+function CandidateSplitBar({ numerator, denominator, excluded, deduped }: {
+  numerator: number
+  denominator: number
+  excluded: number
+  deduped: number
+}) {
+  // denominator includes numerator, so "presented but not approved" = denominator - numerator
+  const presentedOnly = denominator - numerator
+  const total = denominator + excluded + deduped
   const segs = [
-    { label: 'Approved', value: approved, color: '#10b981' },
-    { label: 'Rejected', value: rejected, color: '#ef4444' },
-    { label: 'Inconclusive', value: inconclusive, color: '#64748b' },
+    { label: 'Approved', value: numerator, color: '#10b981' },
+    { label: 'Presented (not approved)', value: presentedOnly, color: '#3b82f6' },
+    { label: 'Excluded', value: excluded, color: '#64748b' },
+    { label: 'Deduped', value: deduped, color: '#f59e0b' },
   ]
 
   return (
     <div className="space-y-3">
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/5">
         {total > 0 ? (
-          segs.map(s => (
+          segs.filter(s => s.value > 0).map(s => (
             <div
               key={s.label}
               style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }}
@@ -63,7 +70,7 @@ function CandidateSplitBar({ approved, rejected, inconclusive }: { approved: num
         )}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-        {segs.map(s => (
+        {segs.filter(s => s.value > 0).map(s => (
           <div key={s.label} className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
             <span className="text-xs text-muted">{s.label}</span>
@@ -71,13 +78,27 @@ function CandidateSplitBar({ approved, rejected, inconclusive }: { approved: num
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-muted">Inconclusive = declined + unresolved (excluded from the rate)</p>
+      <p className="text-[11px] text-muted">Excluded = statuses not genuinely presented · Deduped = same person across Acct+Stakeholder+Skill</p>
     </div>
   )
 }
 
-export default function AcceptanceSummaryHeader({ summary }: { summary: AcceptanceRateSummary }) {
+export default function AcceptanceSummaryHeader({ data, isAdjusted = false }: { data: ReportAcceptanceRateResultV2; isAdjusted?: boolean }) {
+  const { summary, months } = data
+
+  // Aggregate position status counts across all months for the donut
+  const { wonTotal, lostTotal, otherTotal } = useMemo(() => {
+    let won = 0, lost = 0, other = 0
+    for (const m of months) {
+      won += m.wonCount
+      lost += m.lostCount
+      other += m.otherCount
+    }
+    return { wonTotal: won, lostTotal: lost, otherTotal: other }
+  }, [months])
+
   const donutOption = useMemo<EChartsOption>(() => {
+    const denomOnly = summary.totalDenominator - summary.totalNumerator
     return {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
       series: [
@@ -88,36 +109,32 @@ export default function AcceptanceSummaryHeader({ summary }: { summary: Acceptan
           label: { show: false },
           labelLine: { show: false },
           data: [
-            { name: 'Approved', value: summary.approved, itemStyle: { color: '#10b981' } },
-            { name: 'Rejected', value: summary.rejected, itemStyle: { color: '#ef4444' } },
+            { name: 'Approved', value: summary.totalNumerator, itemStyle: { color: '#10b981' } },
+            { name: 'Presented (not approved)', value: denomOnly, itemStyle: { color: '#3b82f6' } },
           ],
         },
       ],
     }
-  }, [summary.approved, summary.rejected])
-
-  // Chips ordered by bucket (approved → rejected → unresolved → declined), then count desc.
-  const bucketOrder = { approved: 0, rejected: 1, unresolved: 2, declined: 3 } as const
-  const statusChips = Object.entries(summary.byStatus).sort((a, b) => {
-    const ba = bucketForStatus(a[0])
-    const bb = bucketForStatus(b[0])
-    if (bucketOrder[ba] !== bucketOrder[bb]) return bucketOrder[ba] - bucketOrder[bb]
-    return b[1] - a[1]
-  })
-
-  const inconclusive = summary.declined + summary.unresolvedTotal
+  }, [summary.totalNumerator, summary.totalDenominator])
 
   return (
     <div className="space-y-6">
-      {/* ① Candidate Acceptance — the goal (candidate grain) */}
+      {/* Candidate Acceptance — the goal (candidate grain) */}
       <section className="space-y-4">
-        <SectionHeading index="①" title="Candidate Acceptance" grain="Candidates" />
+        <div className="flex items-center gap-2.5">
+          <SectionHeading icon={Users} title="Candidate Acceptance" grain="Candidates" />
+          {isAdjusted && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25">
+              adjusted
+            </span>
+          )}
+        </div>
 
         <CandidateAcceptanceHero summary={summary} />
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <SectionCard title="Approved vs. Rejected" subtitle="Decision split (excludes declined / unresolved)">
-            {summary.approved + summary.rejected > 0 ? (
+          <SectionCard title="Approved vs. Presented" subtitle="Decision split (QTD, after dedup)">
+            {summary.totalDenominator > 0 ? (
               <EChart option={donutOption} height={200} />
             ) : (
               <div className="flex items-center justify-center h-[200px] text-sm text-muted">
@@ -126,55 +143,24 @@ export default function AcceptanceSummaryHeader({ summary }: { summary: Acceptan
             )}
           </SectionCard>
 
-          <SectionCard title="Candidate Split" subtitle="Approved / Rejected / Inconclusive">
-            <CandidateSplitBar approved={summary.approved} rejected={summary.rejected} inconclusive={inconclusive} />
-            <div className="mt-4">
-              <KpiStat
-                label="Candidates Evaluated"
-                value={String(summary.candidatesEvaluated)}
-                hint="across closed positions in scope"
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Candidate Status Breakdown" subtitle="Every status and its count">
-            {statusChips.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {statusChips.map(([status, count]) => (
-                  <span
-                    key={status}
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${BUCKET_CHIP[bucketForStatus(status)]}`}
-                  >
-                    {humanizeStatus(status)}
-                    <span className="font-mono text-[11px] opacity-90">{count}</span>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[120px] text-sm text-muted">
-                No candidates in this scope
-              </div>
-            )}
-          </SectionCard>
-        </div>
-      </section>
-
-      {/* ② Position Outcomes (position grain) */}
-      <section className="space-y-4">
-        <SectionHeading index="②" title="Position Outcomes" grain="Positions" />
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <SectionCard title="Closed Positions" subtitle="Quarter-closed, in scope" className="lg:col-span-1">
-            <KpiStat
-              label="Closed Positions"
-              value={String(summary.totalClosedPositions)}
-              hint={`${summary.wonCount} won · ${summary.lostCount} lost · ${summary.noDecisionCount} other`}
-              accentClass="text-blue-500"
+          <SectionCard title="Candidate Split" subtitle="Approved / Presented / Excluded / Deduped">
+            <CandidateSplitBar
+              numerator={summary.totalNumerator}
+              denominator={summary.totalDenominator}
+              excluded={summary.totalExcluded}
+              deduped={summary.totalDeduped}
             />
           </SectionCard>
 
-          <SectionCard title="Position Status Breakdown" subtitle="Won · Lost (by reason) · Other" className="lg:col-span-2">
-            <PositionStatusBreakdown summary={summary} />
+          <SectionCard title="Quarter Totals" subtitle="Across all months in scope">
+            <div className="space-y-3">
+              <KpiStat
+                label="Closed Positions"
+                value={String(summary.totalPositions)}
+                hint={`${wonTotal} won · ${lostTotal} lost · ${otherTotal} other`}
+                accentClass="text-blue-500"
+              />
+            </div>
           </SectionCard>
         </div>
       </section>
@@ -182,13 +168,6 @@ export default function AcceptanceSummaryHeader({ summary }: { summary: Acceptan
       <div className="space-y-1 text-xs text-muted">
         {summary.lastSyncedAt && (
           <p>Open positions last synced {formatClosedDate(summary.lastSyncedAt)}.</p>
-        )}
-        {summary.undatedCount > 0 && (
-          <p className="text-amber-500/90">
-            {summary.undatedCount} absence-detected closure{summary.undatedCount === 1 ? '' : 's'} with no
-            authoritative upstream close date {summary.undatedCount === 1 ? 'is' : 'are'} excluded from quarterly
-            totals — run a full position sync to backfill.
-          </p>
         )}
       </div>
     </div>

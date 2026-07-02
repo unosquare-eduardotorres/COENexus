@@ -6,6 +6,8 @@ import { upsertWithChangeDetection, type ChangeDetectionConfig } from './changeD
 import { findResumeNote, loadOrEmpty, loadCatalogs, isBenchFromComposition } from './syncUtils'
 import { matchEngineService } from '../matchEngineService'
 import { salaryNormalizationService } from '../salaryNormalizationService'
+import { resolveCatalogValue, validateRecordFields, str } from './entityFieldMappers'
+import { emitSyncProgress, emitSyncComplete, createSyncCounters } from './syncProgressHelper'
 import type { SyncRecordDto, SyncEvent, SyncOptions, EmployeeSyncRecord } from './syncTypes'
 
 const log = createLogger('SyncEmployeeOrchestrator')
@@ -42,12 +44,8 @@ function buildEmployeeEntity(
   const resumeNote = findResumeNote(notes)
 
   const seniority = seniorities.get(detail.seniority) ?? 'Unknown'
-  const mainSkill = mainSkills.size > 0
-    ? (mainSkills.get(detail.mainSkillId) ?? basicEmployee.mainSkillName)
-    : basicEmployee.mainSkillName
-  const country = countries.size > 0
-    ? (countries.get(detail.countryId) ?? basicEmployee.officeName)
-    : basicEmployee.officeName
+  const mainSkill = resolveCatalogValue(mainSkills, detail.mainSkillId, basicEmployee.mainSkillName, '')
+  const country = resolveCatalogValue(countries, detail.countryId, basicEmployee.officeName, '')
 
   const compositionBench = isBenchFromComposition(compositions)
   const isInBenchApi = benchUpstreamIds?.has(detail.userId) ?? false
@@ -55,15 +53,13 @@ function buildEmployeeEntity(
   const benchTeam = compositionBench.benchTeam
     ?? (isInBenchApi ? 'Bench (upstream API)' : null)
 
-  const missingFields: string[] = []
-  if (!detail.fullName) missingFields.push('FullName')
-  if (!detail.email) missingFields.push('Email')
-  if (seniority === 'Unknown') missingFields.push('Seniority')
-  if (!mainSkill) missingFields.push('MainSkill')
-  if (!resumeNote) missingFields.push('Resume')
-
-  const recordStatus = missingFields.length === 0 ? 'synced' : 'incomplete'
-  const statusReason = missingFields.length > 0 ? `Missing: ${missingFields.join(', ')}` : null
+  const { status: recordStatus, statusReason } = validateRecordFields([
+    { field: 'FullName', present: !!detail.fullName },
+    { field: 'Email', present: !!detail.email },
+    { field: 'Seniority', present: seniority !== 'Unknown' },
+    { field: 'MainSkill', present: !!mainSkill },
+    { field: 'Resume', present: !!resumeNote },
+  ])
 
   const grossMonthlySalary = contract?.salary ?? null
   const salaryCurrency = contract?.currencyCode ?? null
@@ -97,11 +93,11 @@ function buildEmployeeEntity(
 
   return {
     upstream_id: detail.userId,
-    full_name: detail.fullName || '',
-    email: detail.email || '',
+    full_name: str(detail.fullName),
+    email: str(detail.email),
     seniority,
-    main_skill: mainSkill || '',
-    country: country || '',
+    main_skill: str(mainSkill),
+    country: str(country),
     gross_monthly_salary: grossMonthlySalary,
     salary_currency: salaryCurrency,
     last_account: isBench ? null : (detail.accountName || null),
@@ -113,10 +109,10 @@ function buildEmployeeEntity(
     resume_filename: resumeNote?.filename ?? null,
     is_bench: isBench ? 1 : 0,
     bench_team: benchTeam,
-    job_title: detail.jobTitle || basicEmployee.jobTitle || '',
-    functional_unit: detail.functionalUnit || basicEmployee.functionalUnit || '',
-    office_location: basicEmployee.officeName || detail.officeName || '',
-    business_unit: detail.businessUnit || basicEmployee.businessUnit || '',
+    job_title: str(detail.jobTitle, str(basicEmployee.jobTitle)),
+    functional_unit: str(detail.functionalUnit, str(basicEmployee.functionalUnit)),
+    office_location: str(basicEmployee.officeName, str(detail.officeName)),
+    business_unit: str(detail.businessUnit, str(basicEmployee.businessUnit)),
     normalized_monthly_usd: normalizedMonthlyUsd,
     inferred_currency: inferredCurrency,
     currency_confidence: currencyConfidence,
@@ -215,12 +211,8 @@ export const syncEmployeeOrchestrator = {
     const { seniorities, mainSkills, countries } = await loadCatalogs(token)
 
     let pageOffset = 0
-    let totalRecords = 0
     const pageSize = options.limit ? Math.min(100, options.limit) : 100
-
-    let syncedCount = 0, incompleteCount = 0, notProcessedCount = 0
-    let updatedCount = 0, unchangedCount = 0
-    let fetchedRecords = options.skip ?? 0
+    const counters = createSyncCounters(options.skip ?? 0)
     let excludedCount = 0
     let processedInRun = 0
     const maxToProcess = options.limit ?? Infinity
@@ -231,7 +223,7 @@ export const syncEmployeeOrchestrator = {
       if (signal.aborted) break
 
       const { items, totalRecords: total } = await upstreamApiService.getEmployeesPaged(token, pageOffset, pageSize)
-      totalRecords = total
+      counters.totalRecords = total
       if (items.length === 0) break
 
       let batch = items
@@ -240,8 +232,8 @@ export const syncEmployeeOrchestrator = {
       excludedCount += excludedInBatch
       batch = batch.filter(e => !EXCLUDED_JOB_TITLES.has(e.jobTitle.toLowerCase()))
 
-      if (options.skip && options.skip > fetchedRecords) {
-        const toSkip = options.skip - fetchedRecords
+      if (options.skip && options.skip > counters.fetchedRecords) {
+        const toSkip = options.skip - counters.fetchedRecords
         batch = batch.slice(toSkip)
       }
 
@@ -264,7 +256,7 @@ export const syncEmployeeOrchestrator = {
         for (let i = 0; i < fetchResults.length; i++) {
           const result = fetchResults[i]
           const basicEmp = chunk[i]
-          fetchedRecords++
+          counters.fetchedRecords++
           processedInRun++
 
           if (result.status === 'rejected') {
@@ -276,7 +268,7 @@ export const syncEmployeeOrchestrator = {
               status: 'sync_failed',
               status_reason: reason,
             })
-            notProcessedCount++
+            counters.notProcessedCount++
             emitEvent({ type: 'record', record: { id: `emp-${basicEmp.userId}`, source: 'employees', status: 'sync_failed', name: basicEmp.fullName || 'Unknown', email: basicEmp.email || '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicEmp.userId, syncDetail: 'fetch_failed', syncedAt: new Date().toISOString(), reason, seniority: '', mainSkill: '', country: '' } })
             continue
           }
@@ -286,33 +278,35 @@ export const syncEmployeeOrchestrator = {
           try {
             const entity = buildEmployeeEntity(detail, contracts, rates, notes, compositions, seniorities, mainSkills, countries, basicEmp, benchUpstreamIds)
             const { dbId, resumeChanged, syncDetail } = upsertWithChangeDetection(entity, employeeChangeConfig)
-            if (entity.status === 'incomplete') incompleteCount++
-            else if (entity.status === 'not-processed') notProcessedCount++
+            if (entity.status === 'incomplete') counters.incompleteCount++
+            else if (entity.status === 'not-processed') counters.notProcessedCount++
             else {
-              if (syncDetail === 'new') syncedCount++
-              else if (syncDetail === 'updated') updatedCount++
-              else unchangedCount++
+              if (syncDetail === 'new') counters.syncedCount++
+              else if (syncDetail === 'updated') counters.updatedCount++
+              else counters.unchangedCount++
             }
 
             emitEvent({ type: 'record', record: mapEmployeeToDto(entity, resumeChanged, syncDetail) })
           } catch (err) {
             log.error(`Employee upsert failed: ${basicEmp.fullName} (${basicEmp.userId})`, err instanceof Error ? err : new Error(String(err)), { upstreamId: basicEmp.userId })
-            notProcessedCount++
+            counters.notProcessedCount++
             emitEvent({ type: 'record', record: { id: `emp-${basicEmp.userId}`, source: 'employees', status: 'sync_failed', name: basicEmp.fullName || 'Unknown', email: basicEmp.email || '', hasResume: false, isBench: false, resumeChanged: false, upstreamId: basicEmp.userId, syncDetail: 'upsert_failed', syncedAt: new Date().toISOString(), reason: err instanceof Error ? err.message : 'Unknown error', seniority: '', mainSkill: '', country: '' } })
           }
 
-          emitEvent({ type: 'progress', progress: { source: 'employees', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, currentRecord: basicEmp.fullName, status: 'syncing' } })
+          counters.skippedCount = excludedCount
+          emitSyncProgress(emitEvent, 'employees', counters, basicEmp.fullName)
 
           if (processedInRun >= maxToProcess) break
         }
       }
 
       pageOffset += items.length
-      if (pageOffset >= totalRecords) break
+      if (pageOffset >= counters.totalRecords) break
     }
 
     matchEngineService.invalidateFilterCache()
-    log.info('Employee sync finished', { totalRecords, fetchedRecords, syncedCount, updatedCount, unchangedCount, incompleteCount, notProcessedCount, excludedCount, status: signal.aborted ? 'paused' : 'completed' })
-    emitEvent({ type: 'complete', progress: { source: 'employees', totalRecords, fetchedRecords, syncedCount, incompleteCount, notProcessedCount, updatedCount, unchangedCount, skippedCount: excludedCount, status: signal.aborted ? 'paused' : 'completed' } })
+    counters.skippedCount = excludedCount
+    log.info('Employee sync finished', { ...counters, excludedCount, status: signal.aborted ? 'paused' : 'completed' })
+    emitSyncComplete(emitEvent, 'employees', counters, signal.aborted)
   },
 }

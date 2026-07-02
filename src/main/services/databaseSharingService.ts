@@ -85,6 +85,8 @@ const TABLES = [
   'candidate_analysis_cache',
   'synced_project_reallocations',
   'prr_presentations',
+  'synced_placement_margins',
+  'synced_placement_margin_summary',
 ] as const
 
 function getConfigFilePath(): string {

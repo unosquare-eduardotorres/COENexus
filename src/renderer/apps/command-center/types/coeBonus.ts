@@ -136,70 +136,28 @@ export interface FillRateDetail {
   ttm: FillRateTtmPoint[]
 }
 
-// ---- Candidate Acceptance Rate (operational report) -------------------------
-// Real IPC-backed report: Approved vs Rejected candidates per Closed position,
-// with a status-count header and an inferred won/lost grouping. Mirrors the
-// shared `ReportAcceptanceRateResult` shape so the IPC result is a drop-in.
+// ---- Candidate Acceptance Rate V2 (monthly cohort + audit trail) ------------
+// Re-exports the IPC types for renderer convenience. The IPC result is a drop-in.
 
-export type AcceptanceBucket = 'approved' | 'rejected' | 'declined' | 'unresolved'
-export type AcceptanceOutcome = 'won' | 'lost' | 'no-decision'
+import type { ReportAcceptanceRateResultV2 } from '../../../../shared/ipc-types'
 
-export interface CandidateOutcome {
-  candidateRequisitionId: number
-  candidateName: string
-  mainSkill: string
-  candidateStatus: string
-  bucket: AcceptanceBucket
-  isEmployee: boolean
-  rate: number
-  startDate: string | null
-}
+export type { AcceptanceBucket, AcceptanceOutcome } from '../../../../shared/ipc-types'
 
-export interface PositionOutcome {
-  upstreamId: number
-  account: string
-  jobTitle: string
-  mainSkill: string
-  coe: string
-  practice: string
-  /** Granular upstream position Status (e.g. 'ClosedWon', 'ClosedLostCompetitor', 'Closed'). */
-  positionStatus: string
-  closedDate: string | null
-  approved: number
-  rejected: number
-  declined: number
-  unresolved: number
-  outcome: AcceptanceOutcome
-  candidates: CandidateOutcome[]
-}
+export type {
+  ReportCandidateAudit,
+  ReportPositionOutcomeV2,
+  ReportMonthBreakdown,
+  ReportAcceptanceRateResultV2,
+} from '../../../../shared/ipc-types'
 
-export interface AcceptanceRateSummary {
-  /** approved / (approved + rejected), as a percentage (0..100). */
-  acceptanceRate: number
-  approved: number
-  rejected: number
-  declined: number
-  unresolvedTotal: number
-  byStatus: Record<string, number>
-  /** Raw count per position_status across the quarter-closed positions in scope. */
-  positionStatusCounts: Record<string, number>
-  wonCount: number
-  lostCount: number
-  noDecisionCount: number
-  totalClosedPositions: number
-  candidatesEvaluated: number
-  /** Closed positions with no upstream close date — excluded from the quarterly totals. */
-  undatedCount: number
-  lastSyncedAt: string | null
-}
+// V2 summary shape (re-exported from the IPC result for convenience)
+export type AcceptanceRateSummaryV2 = ReportAcceptanceRateResultV2['summary']
 
-export interface AcceptanceRateDetail {
-  summary: AcceptanceRateSummary
-  groups: {
-    won: PositionOutcome[]
-    lost: PositionOutcome[]
-    noDecision: PositionOutcome[]
-    /** Closed but date-less positions, surfaced separately from the dated quarter. */
-    undated: PositionOutcome[]
-  }
-}
+// Placement Margin types (wired to real data)
+export type {
+  PlacementMarginReportResult,
+  PlacementMarginEntryDto,
+  PlacementMarginAccountRow,
+  PlacementMarginMonthPoint,
+  PlacementMarginSyncStatus,
+} from '../../../../shared/ipc-types'

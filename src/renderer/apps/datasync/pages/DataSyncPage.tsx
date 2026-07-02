@@ -5,6 +5,7 @@ import DataSyncOverview from '../components/DataSyncOverview';
 import SyncDashboard from '../components/SyncDashboard';
 import PipelineDashboard from '../components/PipelineDashboard';
 import PositionPipelineDashboard from '../components/PositionPipelineDashboard';
+import PlacementMarginSyncPanel from '../components/PlacementMarginSyncPanel';
 import { useDataSync } from '../hooks/useDataSync';
 import { useUnifiedPipeline } from '../hooks/useUnifiedPipeline';
 import { usePositionPipeline } from '../hooks/usePositionPipeline';
@@ -69,8 +70,45 @@ export default function DataSyncPage() {
     }
   };
 
-  const { sharepoint } = useNexusStatus();
-  const isTokenValid = sharepoint.isValid;
+  const { apiTokens, openModal } = useNexusStatus();
+  const isUnocoreTokenValid = apiTokens.unocore.isValid;
+
+  const renderTokenBanner = () => {
+    const needsUnocore = ['employees', 'candidates', 'open-positions', 'project-reallocations'].includes(activePanel);
+    const needsExec = activePanel === 'placement-margin';
+
+    if (needsUnocore && !apiTokens.unocore.isValid) {
+      return (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <p className="text-sm text-amber-400 flex-1">UnoCore API token required for this sync.</p>
+          <button
+            onClick={() => openModal('apiTokens')}
+            className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
+          >Connect →</button>
+        </div>
+      );
+    }
+
+    if (needsExec && !apiTokens.exec.isValid) {
+      return (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <p className="text-sm text-amber-400 flex-1">Exec API token required for Placement Margin sync.</p>
+          <button
+            onClick={() => openModal('apiTokens')}
+            className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
+          >Connect →</button>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   const {
     sync: { isSyncing, handleStartSync, handleStartSyncAll, handlePauseSync, handleResumeSync },
@@ -157,6 +195,7 @@ export default function DataSyncPage() {
       const pipeline = activePanel === 'employees' ? employeePipeline : candidatePipeline;
       return (
         <>
+          {renderTokenBanner()}
           {renderDatabaseEmptyBanner()}
           <PipelineDashboard
             source={activePanel}
@@ -176,7 +215,7 @@ export default function DataSyncPage() {
             onStartOver={pipeline.handleStartOver}
             onRetryAllFailed={pipeline.handleRetryAllFailed}
             onRetrySingle={pipeline.handleRetrySingle}
-            isSyncDisabled={!isTokenValid}
+            isSyncDisabled={!isUnocoreTokenValid}
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
             selectedYear={selectedYear}
             onYearChange={handleYearChange}
@@ -191,6 +230,7 @@ export default function DataSyncPage() {
     if (activePanel === 'open-positions') {
       return (
         <>
+          {renderTokenBanner()}
           {renderDatabaseEmptyBanner()}
           <PositionPipelineDashboard
             progress={positionPipeline.progress}
@@ -212,7 +252,7 @@ export default function DataSyncPage() {
             onStartOver={positionPipeline.handleStartOver}
             onRetryAllFailed={positionPipeline.handleRetryAllFailed}
             onRetrySingle={positionPipeline.handleRetrySingle}
-            isSyncDisabled={!isTokenValid}
+            isSyncDisabled={!isUnocoreTokenValid}
             isVoyageKeyConfigured={settings.voyageKeyConfigured}
             syncMode={positionPipeline.syncMode}
             syncYear={positionPipeline.syncYear}
@@ -223,8 +263,21 @@ export default function DataSyncPage() {
       );
     }
 
+    if (activePanel === 'placement-margin') {
+      return (
+        <>
+          {renderTokenBanner()}
+          <PlacementMarginSyncPanel
+            token={apiTokens.exec.token}
+            isTokenValid={apiTokens.exec.isValid}
+          />
+        </>
+      );
+    }
+
     return (
       <>
+        {renderTokenBanner()}
         {renderDatabaseEmptyBanner()}
         <SyncDashboard
           source={activePanel as 'project-reallocations'}
@@ -255,7 +308,7 @@ export default function DataSyncPage() {
           isClearing={isClearing}
           selectedYear={selectedYear}
           onYearChange={handleYearChange}
-          isSyncDisabled={!isTokenValid}
+          isSyncDisabled={!isUnocoreTokenValid}
           isVoyageKeyConfigured={settings.voyageKeyConfigured}
         />
       </>

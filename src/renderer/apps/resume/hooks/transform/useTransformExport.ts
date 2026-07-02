@@ -33,7 +33,7 @@ export function useTransformExport({
   generatedDocx: externalGeneratedDocx,
   setGeneratedDocx: externalSetGeneratedDocx,
 }: UseTransformExportParams) {
-  const { sharepoint, requireSharePointToken } = useNexusStatus();
+  const { apiTokens, requireApiToken } = useNexusStatus();
   const [internalGeneratedDocx, setInternalGeneratedDocx] = useState<Blob | null>(null);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [downloadTargetResume, setDownloadTargetResume] = useState<StructuredResume | null>(null);
@@ -115,10 +115,10 @@ export function useTransformExport({
   }, [isCandidateAlreadyPresented, selectedPosition, showToast]);
 
   const handleSyncToATS = useCallback(async (resume: StructuredResume) => {
-    if (!requireSharePointToken()) {
+    if (!requireApiToken('unocore')) {
       return;
     }
-    const token = sharepoint.token;
+    const token = apiTokens.unocore.token;
 
     const personId = sourceType === 'ats-candidates'
       ? selectedCandidate?.upstreamId
@@ -145,7 +145,7 @@ export function useTransformExport({
         return next;
       });
     }
-  }, [selectedCandidate, setError, sourceType, sharepoint.token, requireSharePointToken]);
+  }, [selectedCandidate, setError, sourceType, apiTokens.unocore.token, requireApiToken]);
 
   const isCandidatePresented = useCallback((position: ATSPosition) => {
     if (!selectedCandidate) return false;

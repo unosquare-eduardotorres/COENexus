@@ -10,19 +10,17 @@ import ResumeApp from './apps/resume/ResumeApp';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useErrorCapture } from './hooks/useErrorCapture';
 import { useErrorToastListener } from './hooks/useErrorToastListener';
-import { useAgentActivityListener } from './hooks/useAgentActivityListener';
 import NexusStatusBar from './components/NexusStatusBar';
 import ClaudeStatusModal from './components/modals/ClaudeStatusModal';
 import TokenUsageModal from './components/modals/TokenUsageModal';
-import SharePointTokenModal from './components/modals/SharePointTokenModal';
+import ApiTokenModal from './components/modals/ApiTokenModal';
 
 const DataSyncApp = lazy(() => import('./apps/datasync/DataSyncApp'));
 const CommandCenterApp = lazy(() => import('./apps/command-center/CommandCenterApp'));
-const AgentsApp = lazy(() => import('./apps/agents/AgentsApp'));
-const PathApp = lazy(() => import('./apps/path/PathApp'));
 const SettingsApp = lazy(() => import('./apps/settings/SettingsApp'));
 const BugApp = lazy(() => import('./apps/bug/BugApp'));
 const NomicoreApp = lazy(() => import('./apps/nomicore/NomicoreApp'));
+const CatalogsApp = lazy(() => import('./apps/catalogs/CatalogsApp'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,11 +36,6 @@ function ErrorCaptureProvider({ children }: { children: React.ReactNode }) {
   useErrorCapture();
   useErrorToastListener();
   return <>{children}</>;
-}
-
-function AgentActivityBridge() {
-  useAgentActivityListener();
-  return null;
 }
 
 function AppNavigationBridge() {
@@ -66,23 +59,21 @@ function App() {
               <HashRouter>
                 <NexusStatusProvider>
                   <SyncActivityProvider>
-                    <AgentActivityBridge />
                     <AppNavigationBridge />
                     <Routes>
                       <Route path="/" element={<NexusLanding />} />
                       <Route path="/resume/*" element={<ResumeApp />} />
                       <Route path="/datasync/*" element={<Suspense fallback={null}><DataSyncApp /></Suspense>} />
                       <Route path="/command-center/*" element={<Suspense fallback={null}><CommandCenterApp /></Suspense>} />
-                      <Route path="/agents/*" element={<Suspense fallback={null}><AgentsApp /></Suspense>} />
-                      <Route path="/path/*" element={<Suspense fallback={null}><PathApp /></Suspense>} />
                       <Route path="/settings/*" element={<Suspense fallback={null}><SettingsApp /></Suspense>} />
                       <Route path="/bug/*" element={<Suspense fallback={null}><BugApp /></Suspense>} />
                       <Route path="/nomicore/*" element={<Suspense fallback={null}><NomicoreApp /></Suspense>} />
+                      <Route path="/catalogs/*" element={<Suspense fallback={null}><CatalogsApp /></Suspense>} />
                     </Routes>
                     <NexusStatusBar />
                     <ClaudeStatusModal />
                     <TokenUsageModal />
-                    <SharePointTokenModal />
+                    <ApiTokenModal />
                   </SyncActivityProvider>
                 </NexusStatusProvider>
               </HashRouter>

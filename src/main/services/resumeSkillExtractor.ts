@@ -1,11 +1,11 @@
 import { embeddingRepository, type ResumeSkills, type EmbeddingRow } from '../db/repositories/embeddingRepository'
-import { claudeService } from './claudeService'
+import { llmRouter } from './llmRouter'
 import { getConfig } from '../config'
 import { createLogger } from './logger'
 
 const log = createLogger('ResumeSkillExtractor')
 
-const MAX_CONCURRENCY = 5
+const DEFAULT_MAX_CONCURRENCY = 5
 const MAX_RESUME_CHARS = 12_000
 
 const EXTRACTION_PROMPT = `You are a resume parser. Extract a structured technical profile from the text below.
@@ -60,7 +60,7 @@ function parseSkillsResponse(response: string): ResumeSkills | null {
   }
 }
 
-async function extractOneInternal(row: EmbeddingRow, model: string): Promise<boolean> {
+async function extractOneInternal(row: EmbeddingRow): Promise<boolean> {
   if (!row.resume_text) {
     log.warn('Skipping extraction for row with no resume text', { id: row.id })
     return false
@@ -72,8 +72,8 @@ async function extractOneInternal(row: EmbeddingRow, model: string): Promise<boo
 
   const prompt = `${EXTRACTION_PROMPT}\n\nRESUME TEXT:\n${text}`
 
-  const { text: response } = await claudeService.chatAsync(
-    model,
+  const { text: response } = await llmRouter.chatAsync(
+    'resumeSkillExtraction',
     prompt,
     1024,
     0.0,
@@ -89,7 +89,8 @@ async function extractOneInternal(row: EmbeddingRow, model: string): Promise<boo
     return false
   }
 
-  embeddingRepository.updateExtractedSkills(row.id, JSON.stringify(skills), model)
+  const { model: extractorModel } = getConfig().modelConfig.features.resumeSkillExtraction
+  embeddingRepository.updateExtractedSkills(row.id, JSON.stringify(skills), extractorModel)
   return true
 }
 
@@ -118,8 +119,7 @@ export const resumeSkillExtractor = {
       return false
     }
 
-    const model = getConfig().claude.haikuModel
-    return extractOneInternal(row, model)
+    return extractOneInternal(row)
   },
 
   async extractBatch(
@@ -128,7 +128,7 @@ export const resumeSkillExtractor = {
     force = false,
     onProgress?: (progress: { extracted: number; failed: number; total: number }) => void
   ): Promise<ExtractionBatchResult> {
-    const model = getConfig().claude.haikuModel
+    const concurrency = llmRouter.getConcurrencyLimit('resumeSkillExtraction') || DEFAULT_MAX_CONCURRENCY
     let rows: EmbeddingRow[]
 
     if (force) {
@@ -152,7 +152,6 @@ export const resumeSkillExtractor = {
       count: rows.length,
       sourceType: sourceType ?? 'all',
       force,
-      model,
     })
 
     let extracted = 0
@@ -168,7 +167,7 @@ export const resumeSkillExtractor = {
         return
       }
       try {
-        const success = await extractOneInternal(row, model)
+        const success = await extractOneInternal(row)
         if (success) {
           extracted++
         } else {
@@ -185,7 +184,7 @@ export const resumeSkillExtractor = {
     }
 
     while (queue.length > 0 || active.length > 0) {
-      while (active.length < MAX_CONCURRENCY && queue.length > 0) {
+      while (active.length < concurrency && queue.length > 0) {
         const row = queue.shift()!
         const promise = processOne(row).then(() => {
           active.splice(active.indexOf(promise), 1)

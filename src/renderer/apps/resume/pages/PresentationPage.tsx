@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type {
   PresentationStepKey, PresentationMode, SelectedPerson,
-  PresentationEntry, BenchOpenPosition, ResumeFormatStatus,
+  BenchOpenPosition, ResumeFormatStatus,
 } from '../types'
 import { useStepWizard } from '../hooks/useStepWizard'
-import { presentationService } from '../services/presentationService'
 import { benchBurnService } from '../services/benchBurnService'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+import { usePresentationSession } from '../hooks/usePresentationSession'
 
 const log = createRendererLogger('PresentationPage')
 import PeopleSelector from '../components/presentation/PeopleSelector'
@@ -30,13 +30,6 @@ const STEPS: { key: PresentationStepKey; label: string }[] = [
   { key: 'finalize', label: 'Finalize' },
 ]
 
-function getDefaultAvailability(person: SelectedPerson): string {
-  if (person.sourceType === 'employee') {
-    return person.isBench ? 'Immediate' : ''
-  }
-  return '2 Weeks'
-}
-
 export default function PresentationPage() {
   const [searchParams] = useSearchParams()
   const { currentStep, navigateStep, completeStep, completedSteps } = useStepWizard<PresentationStepKey>(
@@ -50,17 +43,8 @@ export default function PresentationPage() {
   const [skipPosition, setSkipPosition] = useState(false)
   const [manualTitle, setManualTitle] = useState('')
   const [manualAccount, setManualAccount] = useState('')
-  const [sessionId, setSessionId] = useState<number | null>(null)
-  const [entries, setEntries] = useState<PresentationEntry[]>([])
-  const [introText, setIntroText] = useState('')
-  const [htmlContent, setHtmlContent] = useState('')
   const [reviewEntries, setReviewEntries] = useState<ResumeReviewEntry[]>([])
   const [transformTarget, setTransformTarget] = useState<{ person: SelectedPerson; resumeText: string } | null>(null)
-  const [generatingProfiles, setGeneratingProfiles] = useState<Set<number>>(new Set())
-  const [regeneratingIntro, setRegeneratingIntro] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const [manualJobDescription, setManualJobDescription] = useState('')
 
@@ -68,6 +52,11 @@ export default function PresentationPage() {
   const accountName = skipPosition ? manualAccount : (selectedPosition?.account ?? '')
   const positionUpstreamId = skipPosition ? null : (selectedPosition?.upstreamId ?? null)
   const jobDescription = skipPosition ? manualJobDescription : (selectedPosition?.jobDescription ?? '')
+
+  const session = usePresentationSession({
+    selectedPeople, reviewEntries, mode,
+    positionTitle, accountName, positionUpstreamId, jobDescription,
+  })
 
   useEffect(() => {
     const candidateIds = searchParams.get('candidates')?.split(',').map(Number).filter(Boolean) ?? []
@@ -114,7 +103,7 @@ export default function PresentationPage() {
         }
       } catch (err) {
         log.error('Failed to load pre-selected people', err)
-        setError('Failed to load pre-selected people')
+        session.setError('Failed to load pre-selected people')
       }
     }
     loadPreselected()
@@ -150,61 +139,10 @@ export default function PresentationPage() {
 
   const handleNextFromPosition = useCallback(async () => {
     completeStep('position-context')
-
-    if (!sessionId) {
-      try {
-        const result = await presentationService.createSession({
-          mode,
-          positionTitle,
-          accountName,
-          positionUpstreamId: positionUpstreamId ?? undefined,
-          jobDescription: jobDescription || undefined,
-        })
-        setSessionId(result.id)
-
-        const newEntries: PresentationEntry[] = []
-        for (let i = 0; i < selectedPeople.length; i++) {
-          const person = selectedPeople[i]
-          const addResult = await presentationService.addEntry({
-            sessionId: result.id,
-            sourceType: person.sourceType,
-            upstreamId: person.upstreamId,
-            fullName: person.fullName,
-            mainSkill: person.mainSkill,
-            seniority: person.seniority,
-            country: person.country,
-            availability: getDefaultAvailability(person),
-            sortOrder: i,
-          })
-          newEntries.push({
-            id: addResult.id,
-            sessionId: result.id,
-            sourceType: person.sourceType,
-            upstreamId: person.upstreamId,
-            fullName: person.fullName,
-            mainSkill: person.mainSkill,
-            seniority: person.seniority,
-            country: person.country,
-            yearsOfExperience: '',
-            availability: getDefaultAvailability(person),
-            recommendedRate: '',
-            techStack: [],
-            professionalSummary: '',
-            domainExperience: '',
-            resumeFormatStatus: 'unknown',
-            sortOrder: i,
-          })
-        }
-        setEntries(newEntries)
-      } catch (err) {
-        log.error('Failed to create presentation session', err)
-        setError('Failed to create presentation session')
-        return
-      }
-    }
-
+    const ok = await session.createSession()
+    if (!ok) return
     navigateStep('review-resumes')
-  }, [sessionId, selectedPeople, mode, positionTitle, accountName, positionUpstreamId, jobDescription, completeStep, navigateStep])
+  }, [session.createSession, completeStep, navigateStep])
 
   const handleNextFromReview = useCallback(() => {
     completeStep('review-resumes')
@@ -225,119 +163,7 @@ export default function PresentationPage() {
     setTransformTarget(null)
   }, [transformTarget, reviewEntries])
 
-  const handleUpdateEntry = useCallback((id: number, field: string, value: unknown) => {
-    setEntries(prev => prev.map(e => {
-      if (e.id !== id) return e
-      if (field === 'techStack') return { ...e, techStack: value as string[] }
-      return { ...e, [field]: value }
-    }))
-    presentationService.updateEntry(id, { [field === 'techStack' ? 'techStack' : field]: value }).catch(() => {})
-  }, [])
 
-  const handleGenerateProfile = useCallback(async (entry: PresentationEntry) => {
-    const review = reviewEntries.find(r =>
-      r.person.upstreamId === entry.upstreamId && r.person.sourceType === entry.sourceType
-    )
-    const resumeText = review?.resumeText
-    if (!resumeText) {
-      try {
-        const text = await benchBurnService.getResumeText(entry.sourceType, entry.upstreamId)
-        if (!text) {
-          setError(`No resume text available for ${entry.fullName}`)
-          return
-        }
-        await doGenerateProfile(entry, text)
-      } catch (err) {
-        log.error('Failed to get resume text', { fullName: entry.fullName, error: err })
-        setError(`Failed to get resume text for ${entry.fullName}`)
-      }
-      return
-    }
-    await doGenerateProfile(entry, resumeText)
-  }, [reviewEntries, jobDescription, positionTitle])
-
-  const doGenerateProfile = async (entry: PresentationEntry, resumeText: string) => {
-    setGeneratingProfiles(prev => new Set([...prev, entry.id]))
-    try {
-      const result = await presentationService.generateCandidateProfile({
-        resumeText,
-        fullName: entry.fullName,
-        mainSkill: entry.mainSkill,
-        jobDescription: jobDescription || undefined,
-        positionTitle: positionTitle || undefined,
-      })
-      setEntries(prev => prev.map(e => {
-        if (e.id !== entry.id) return e
-        return {
-          ...e,
-          professionalSummary: result.professionalSummary,
-          techStack: result.techStack,
-          domainExperience: result.domainExperience,
-          yearsOfExperience: result.yearsOfExperience,
-        }
-      }))
-      await presentationService.updateEntry(entry.id, {
-        professionalSummary: result.professionalSummary,
-        techStack: result.techStack,
-        domainExperience: result.domainExperience,
-        yearsOfExperience: result.yearsOfExperience,
-      })
-    } catch (err) {
-      log.error('Failed to generate profile', { fullName: entry.fullName, error: err })
-      setError(`Failed to generate profile for ${entry.fullName}`)
-    } finally {
-      setGeneratingProfiles(prev => { const s = new Set(prev); s.delete(entry.id); return s })
-    }
-  }
-
-  const handleGenerateIntro = useCallback(async () => {
-    setRegeneratingIntro(true)
-    try {
-      const result = await presentationService.generateIntro({
-        candidateNames: entries.map(e => e.fullName),
-        positionTitle: positionTitle || undefined,
-        accountName: accountName || undefined,
-        jobDescription: jobDescription || undefined,
-        mainSkill: entries[0]?.mainSkill,
-      })
-      setIntroText(result.introText)
-      if (sessionId) {
-        await presentationService.updateSession(sessionId, { introText: result.introText })
-      }
-    } catch (err) {
-      log.error('Failed to generate intro', err)
-      setError('Failed to generate intro')
-    } finally {
-      setRegeneratingIntro(false)
-    }
-  }, [entries, positionTitle, accountName, jobDescription, sessionId])
-
-  const handleGenerateHtml = useCallback(async () => {
-    if (!sessionId) return
-    try {
-      const result = await presentationService.generateHtml({ sessionId, mode })
-      setHtmlContent(result.html)
-    } catch (err) {
-      log.error('Failed to generate HTML', err)
-      setError('Failed to generate HTML')
-    }
-  }, [sessionId, mode])
-
-  const handleSave = useCallback(async () => {
-    if (!sessionId) return
-    setSaving(true)
-    setSaved(false)
-    try {
-      await presentationService.updateSession(sessionId, { status: 'completed', introText })
-      completeStep('finalize')
-      setSaved(true)
-    } catch (err) {
-      log.error('Failed to save session', err)
-      setError('Failed to save session')
-    } finally {
-      setSaving(false)
-    }
-  }, [sessionId, introText, completeStep])
 
   const handleNextFromGenerate = useCallback(() => {
     completeStep('generate')
@@ -345,20 +171,11 @@ export default function PresentationPage() {
   }, [completeStep, navigateStep])
 
   const handleLoadSession = useCallback(async (id: number) => {
-    try {
-      const session = await presentationService.getSession(id)
-      if (!session) return
-      setSessionId(session.id)
-      setMode(session.mode)
-      setIntroText(session.introText)
-      setEntries(session.entries)
+    await session.loadSession(id, () => {
       setShowHistory(false)
       navigateStep('generate')
-    } catch (err) {
-      log.error('Failed to load session', err)
-      setError('Failed to load session')
-    }
-  }, [navigateStep])
+    })
+  }, [session.loadSession, navigateStep])
 
   const currentStepIndex = STEPS.findIndex(s => s.key === currentStep)
 
@@ -377,10 +194,10 @@ export default function PresentationPage() {
         </button>
       </div>
 
-      {error && (
+      {session.error && (
         <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm flex items-center justify-between">
-          {error}
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">×</button>
+          {session.error}
+          <button onClick={() => session.setError('')} className="text-red-500 hover:text-red-700">×</button>
         </div>
       )}
 
@@ -528,13 +345,13 @@ export default function PresentationPage() {
                 <div className="minimal-divider" />
                 <h3 className="text-base font-semibold text-primary">Candidate Information</h3>
                 <div className="space-y-4">
-                  {entries.map(entry => (
+                  {session.entries.map(entry => (
                     <PresentationEntryCard
                       key={entry.id}
                       entry={entry}
-                      onUpdate={handleUpdateEntry}
-                      onGenerateProfile={handleGenerateProfile}
-                      generating={generatingProfiles.has(entry.id)}
+                      onUpdate={session.updateEntry}
+                      onGenerateProfile={session.generateProfile}
+                      generating={session.generatingProfiles.has(entry.id)}
                     />
                   ))}
                 </div>
@@ -557,15 +374,15 @@ export default function PresentationPage() {
               <div className="space-y-6">
                 <h2 className="text-lg font-semibold text-primary">Preview Presentation</h2>
                 <PresentationPreview
-                  entries={entries}
-                  introText={introText}
+                  entries={session.entries}
+                  introText={session.introText}
                   mode={mode}
                   positionTitle={positionTitle}
                   accountName={accountName}
                   positionId={positionUpstreamId}
-                  onIntroChange={setIntroText}
-                  onRegenerateIntro={handleGenerateIntro}
-                  regenerating={regeneratingIntro}
+                  onIntroChange={session.setIntroText}
+                  onRegenerateIntro={session.generateIntro}
+                  regenerating={session.regeneratingIntro}
                 />
                 <div className="flex justify-between pt-4">
                   <button onClick={() => navigateStep('review-resumes')} className="glass-button px-6 py-2.5 text-sm">
@@ -585,23 +402,23 @@ export default function PresentationPage() {
               <div className="space-y-6">
                 <h2 className="text-lg font-semibold text-primary">Finalize & Export</h2>
                 <PresentationPreview
-                  entries={entries}
-                  introText={introText}
+                  entries={session.entries}
+                  introText={session.introText}
                   mode={mode}
                   positionTitle={positionTitle}
                   accountName={accountName}
                   positionId={positionUpstreamId}
-                  onIntroChange={setIntroText}
-                  onRegenerateIntro={handleGenerateIntro}
-                  regenerating={regeneratingIntro}
+                  onIntroChange={session.setIntroText}
+                  onRegenerateIntro={session.generateIntro}
+                  regenerating={session.regeneratingIntro}
                 />
                 <FinalizeActions
-                  htmlContent={htmlContent}
-                  onSave={handleSave}
-                  onGenerateHtml={handleGenerateHtml}
-                  hasHtml={!!htmlContent}
-                  saving={saving}
-                  saved={saved}
+                  htmlContent={session.htmlContent}
+                  onSave={() => session.save(() => completeStep('finalize'))}
+                  onGenerateHtml={session.generateHtml}
+                  hasHtml={!!session.htmlContent}
+                  saving={session.saving}
+                  saved={session.saved}
                 />
                 <div className="flex justify-start pt-4">
                   <button onClick={() => navigateStep('generate')} className="glass-button px-6 py-2.5 text-sm">

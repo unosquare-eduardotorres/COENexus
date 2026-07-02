@@ -1,10 +1,12 @@
-// UI helpers for the Acceptance Rate report: display formatting and
-// bucket-aligned chip/card styling. The status taxonomy itself is single-sourced
+// UI helpers for the Acceptance Rate V2 report: display formatting and
+// disposition-aligned chip/card styling. The status taxonomy itself is single-sourced
 // in src/shared/acceptanceTaxonomy.ts and re-exported here for convenience.
 
-import type { AcceptanceBucket, MeasureStatus } from '../../types/coeBonus'
+import type { MeasureStatus } from '../../types/coeBonus'
+import type { ReportCandidateAudit } from '../../types/coeBonus'
 
-export { bucketForStatus } from '../../../../../shared/acceptanceTaxonomy'
+// Re-export V2 classification for UI consumers
+export { classifyCandidate, exclusionReason } from '../../../../../shared/acceptanceTaxonomy'
 
 // Candidate acceptance goal (single UI source). The 5-point linear scale runs
 // from the floor (0% attainment) to the target (100% attainment).
@@ -47,19 +49,40 @@ export function humanizeStatus(status: string): string {
   return status.replace(/([A-Z])/g, ' $1').trim()
 }
 
-export const BUCKET_LABEL: Record<AcceptanceBucket, string> = {
-  approved: 'Approved',
-  rejected: 'Rejected',
-  declined: 'Declined',
-  unresolved: 'Unresolved',
+// ── V2 Disposition types ─────────────────────────────────────────────────────
+
+export type CandidateDispositionKind = ReportCandidateAudit['disposition']
+
+/** Display label per disposition. */
+export const DISPOSITION_LABEL: Record<CandidateDispositionKind, string> = {
+  numerator: 'Counted in numerator + denominator',
+  denominator: 'Counted in denominator only',
+  excluded: 'Excluded',
+  'dedup-skipped': 'Deduped',
 }
 
-/** Border + text + subtle background chip classes per bucket. */
-export const BUCKET_CHIP: Record<AcceptanceBucket, string> = {
-  approved: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25',
-  rejected: 'bg-red-500/15 text-red-400 border-red-500/25',
-  declined: 'bg-slate-500/15 text-slate-400 border-slate-500/25',
-  unresolved: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
+/** Badge chip classes per disposition. */
+export const DISPOSITION_CHIP: Record<CandidateDispositionKind, string> = {
+  numerator: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/25',
+  denominator: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
+  excluded: 'bg-slate-500/15 text-slate-400/50 border-slate-500/25',
+  'dedup-skipped': 'bg-amber-500/15 text-amber-400 border-amber-500/25',
+}
+
+/** Card background style per disposition. */
+export const DISPOSITION_CARD_STYLE: Record<CandidateDispositionKind, string> = {
+  numerator: 'bg-emerald-500/10 border border-emerald-500/20',
+  denominator: 'bg-blue-500/10 border border-blue-500/20',
+  excluded: 'glass-panel-subtle opacity-50',
+  'dedup-skipped': 'bg-amber-500/10 border border-amber-500/20',
+}
+
+/** Disposition icon prefix. */
+export const DISPOSITION_ICON: Record<CandidateDispositionKind, string> = {
+  numerator: '✓',
+  denominator: '✓',
+  excluded: '✗',
+  'dedup-skipped': '⊘',
 }
 
 export function formatClosedDate(dateStr: string | null): string {
@@ -67,4 +90,20 @@ export function formatClosedDate(dateStr: string | null): string {
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return dateStr
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** Format a month string (YYYY-MM) to a readable label (e.g. "Apr 2025"). */
+export function formatMonth(monthStr: string): string {
+  const [year, month] = monthStr.split('-')
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const idx = parseInt(month, 10) - 1
+  return `${monthNames[idx] ?? month} ${year}`
+}
+
+/** Short month label (e.g. "Apr", "May", "Jun"). */
+export function shortMonth(monthStr: string): string {
+  const month = monthStr.split('-')[1]
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const idx = parseInt(month, 10) - 1
+  return monthNames[idx] ?? month
 }

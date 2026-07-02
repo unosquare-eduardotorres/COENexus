@@ -1,181 +1,122 @@
-import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useOpenPositionReport, COLUMN_VALUE_EXTRACTORS } from '../hooks/useOpenPositionReport'
-import { CRITERIA_CONFIG, type CriterionActor, type StalledPositionResult } from '../types'
+import { useOpenPositionReport } from '../hooks/useOpenPositionReport'
+import { CRITERIA_CONFIG, type StalledPositionResult } from '../types'
+import { useColumnConfig } from '../hooks/useColumnConfig'
 import PositionDetailDrawer from '../components/PositionDetailDrawer'
+import ColumnConfigPanel from '../components/report/ColumnConfigPanel'
+import FiltersPanel from '../components/report/FiltersPanel'
+import PositionsGridView from '../components/report/PositionsGridView'
+import PositionsTableView from '../components/report/PositionsTableView'
+import ReportToolbar from '../components/report/ReportToolbar'
 import { useToast } from '../../../shared/components/ToastContext'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
-import {
-  SearchIcon, XIcon, DownloadIcon, SettingsIcon, InfoIcon, SortIcon,
-  DatabaseIcon, GridIcon, ListIcon, FilterIcon, ColumnsIcon, SmallFilterIcon, CheckIcon,
-} from '../components/Icons'
+import { SettingsIcon, XIcon, InfoIcon, DatabaseIcon } from '../components/Icons'
 
 const log = createRendererLogger('OpenPositionsReport')
 
-interface ColumnDef {
-  key: string
-  label: string
-  defaultVisible: boolean
-  render: (r: StalledPositionResult) => ReactNode
-}
+// ─── Modals ──────────────────────────────────────────────────────────────
 
-interface ExcelFilterDropdownProps {
-  columnKey: string
-  allValues: string[]
-  selectedValues: string[]
-  isFiltered: boolean
-  onChangeFilter: (colKey: string, values: string[]) => void
-  onClearFilter: (colKey: string) => void
-}
-
-function ExcelFilterDropdown({ columnKey, allValues, selectedValues, isFiltered, onChangeFilter, onClearFilter }: ExcelFilterDropdownProps) {
-  const [open, setOpen] = useState(false)
-  const [searchText, setSearchText] = useState('')
-  const triggerRef = useRef<HTMLDivElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
-
-  const effectiveSelected = !isFiltered ? allValues : selectedValues
-  const isAllSelected = effectiveSelected.length === allValues.length
-  const isActive = isFiltered && !isAllSelected
-  const filtered = allValues.filter(v => v.toLowerCase().includes(searchText.toLowerCase()))
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (
-        triggerRef.current && !triggerRef.current.contains(target) &&
-        panelRef.current && !panelRef.current.contains(target)
-      ) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) { setSearchText(''); return }
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, left: rect.left })
-    }
-  }, [open])
-
-  const toggleAll = () => {
-    if (isAllSelected) {
-      onChangeFilter(columnKey, [])
-    } else {
-      onClearFilter(columnKey)
-    }
-  }
-
-  const toggleValue = (value: string) => {
-    const current = new Set(effectiveSelected)
-    if (current.has(value)) {
-      current.delete(value)
-    } else {
-      current.add(value)
-    }
-    const arr = [...current]
-    if (arr.length === allValues.length) {
-      onClearFilter(columnKey)
-    } else {
-      onChangeFilter(columnKey, arr)
-    }
-  }
-
-  if (allValues.length === 0) return null
-
+function ThresholdsModal({ report, onClose }: {
+  report: ReturnType<typeof useOpenPositionReport>
+  onClose: () => void
+}) {
   return (
-    <div className="relative inline-flex" ref={triggerRef}>
-      <button
-        onClick={e => { e.stopPropagation(); setOpen(!open) }}
-        className={`p-0.5 rounded transition-colors ${
-          isActive
-            ? 'text-emerald-400 hover:text-emerald-300'
-            : 'text-muted/50 hover:text-muted'
-        }`}
-        title={`Filter ${columnKey}`}
-      >
-        <SmallFilterIcon active={isActive} />
-      </button>
-      {open && createPortal(
-        <div
-          ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left }}
-          className="z-[9999] w-60 glass-panel border border-white/10 rounded-lg shadow-xl overflow-hidden"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="p-1.5 border-b border-white/5">
-            <input
-              type="text"
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              placeholder="Search..."
-              className="glass-input w-full text-sm py-1.5 px-2"
-              autoFocus
-            />
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { report.resetDraftThresholds(); onClose() }}>
+      <div className="glass-panel border border-white/10 rounded-xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <SettingsIcon />
+            <h2 className="text-sm font-semibold text-primary">Staleness Thresholds</h2>
           </div>
-          <div className="max-h-56 overflow-y-auto p-1">
-            <button
-              onClick={toggleAll}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors hover:bg-white/5"
-            >
-              <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
-                isAllSelected
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                  : 'border-white/15 text-transparent'
-              }`}>
-                {isAllSelected && <CheckIcon />}
-              </span>
-              <span className="text-sm text-primary font-medium">Select All ({allValues.length})</span>
-            </button>
-            <div className="my-0.5 border-b border-white/5" />
-            {filtered.length === 0 && <p className="text-xs text-muted px-2 py-1">No matches</p>}
-            {filtered.map(value => {
-              const checked = effectiveSelected.includes(value)
-              return (
-                <button
-                  key={value}
-                  onClick={() => toggleValue(value)}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded text-sm transition-colors hover:bg-white/5"
-                >
-                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
-                    checked
-                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                      : 'border-white/15 text-transparent'
-                  }`}>
-                    {checked && <CheckIcon />}
+          <button onClick={() => { report.resetDraftThresholds(); onClose() }} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
+            <XIcon />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {CRITERIA_CONFIG.map(config => (
+            <div key={config.key} className="flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.colorClass}`}>
+                    {config.label}
                   </span>
-                  <span className={`truncate text-sm ${checked ? 'text-secondary' : 'text-muted'}`}>{value}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                    config.actor === 'COE'
+                      ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
+                      : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
+                  }`}>{config.actor}</span>
+                </div>
+                <p className="text-xs text-muted leading-snug">{config.description.replace(/\bX\b/, String(report.draftThresholds[config.key]))}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => report.setDraftThreshold(config.key, Math.max(1, report.draftThresholds[config.key] - 1))}
+                  className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="5" y1="12" x2="19" y2="12" /></svg>
                 </button>
-              )
-            })}
-          </div>
-          {isActive && (
-            <div className="border-t border-white/5 p-1.5">
-              <button
-                onClick={() => { onClearFilter(columnKey); setOpen(false) }}
-                className="w-full text-center text-[10px] text-red-400 hover:text-red-300 py-1 transition-colors"
-              >
-                Clear Filter
-              </button>
+                <span className="w-10 text-center text-sm font-mono font-bold text-primary">{report.draftThresholds[config.key]}d</span>
+                <button
+                  onClick={() => report.setDraftThreshold(config.key, report.draftThresholds[config.key] + 1)}
+                  className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
+              </div>
             </div>
-          )}
-        </div>,
-        document.body
-      )}
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/5">
+          <button onClick={() => { report.resetDraftThresholds(); onClose() }} className="px-3 py-1.5 text-xs text-secondary hover:text-primary transition-colors">Cancel</button>
+          <button onClick={() => { report.applyThresholds(); onClose() }} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">Apply</button>
+        </div>
+      </div>
     </div>
   )
 }
 
-function getAgingColor(aging: number): string {
-  if (aging >= 45) return 'border-l-red-500'
-  if (aging >= 21) return 'border-l-amber-500'
-  if (aging >= 7) return 'border-l-yellow-500'
-  return 'border-l-emerald-500'
+function LegendModal({ thresholds, onClose }: {
+  thresholds: Record<string, number>
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass-panel border border-white/10 rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <InfoIcon />
+            <h2 className="text-sm font-semibold text-primary">Criteria Legend</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
+            <XIcon />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {CRITERIA_CONFIG.map(config => (
+            <div key={config.key} className="flex items-start gap-3">
+              <span className={`shrink-0 inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>
+                {config.label}
+              </span>
+              <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                config.actor === 'COE'
+                  ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
+                  : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
+              }`}>
+                {config.actor}
+              </span>
+              <p className="text-xs text-secondary leading-relaxed">
+                {config.description.replace(/\bX\b/, String(thresholds[config.key]))}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
+
+// ─── Column Definitions ──────────────────────────────────────────────────
 
 function getAgingDotColor(aging: number): string {
   if (aging >= 45) return 'bg-red-500'
@@ -190,169 +131,62 @@ function getStatusBadgeStyle(status: string): string {
   return 'bg-gray-500/10 text-gray-400/70 border-gray-500/15'
 }
 
-const COLUMN_DEFINITIONS: ColumnDef[] = [
-  {
-    key: 'id',
-    label: 'ID',
-    defaultVisible: true,
-    render: r => <span className="font-mono text-muted">#{r.position.upstream_id}</span>,
-  },
-  {
-    key: 'account',
-    label: 'Account',
-    defaultVisible: true,
-    render: (r) => (
-      <span className="text-primary font-medium">{r.position.account}</span>
-    ),
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    defaultVisible: true,
-    render: r => (
-      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>
-        {r.position.position_status}
-      </span>
-    ),
-  },
-  {
-    key: 'stakeholder',
-    label: 'Stakeholder',
-    defaultVisible: true,
-    render: r => <span className="text-secondary">{r.position.stakeholder || '—'}</span>,
-  },
-  {
-    key: 'coe',
-    label: 'COE',
-    defaultVisible: true,
-    render: r => <span className="text-secondary">{r.position.coe || '—'}</span>,
-  },
-  {
-    key: 'practice',
-    label: 'Practice',
-    defaultVisible: true,
-    render: r => <span className="text-secondary">{r.position.practice || '—'}</span>,
-  },
-  {
-    key: 'main_skill',
-    label: 'Main Skill',
-    defaultVisible: true,
-    render: r => <span className="text-secondary">{r.position.main_skill || '—'}</span>,
-  },
-  {
-    key: 'vertical',
-    label: 'Vertical',
-    defaultVisible: true,
-    render: r => <span className="text-secondary">{r.position.vertical_industry || '—'}</span>,
-  },
-  {
-    key: 'aging',
-    label: 'Aging',
-    defaultVisible: true,
-    render: r => (
-      <div className="flex items-center gap-1.5">
-        <span className={`w-2 h-2 rounded-full ${getAgingDotColor(r.position.aging)}`} />
-        <span className="font-mono font-bold text-primary">{r.position.aging}d</span>
-      </div>
-    ),
-  },
-  {
-    key: 'action_needed',
-    label: 'Action Needed',
-    defaultVisible: true,
-    render: r => (
-      <div className="flex flex-wrap gap-1">
-        {r.actors.map(actor => (
-          <span key={actor} className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
-            actor === 'COE'
-              ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
-              : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
-          }`}>{actor}</span>
-        ))}
-      </div>
-    ),
-  },
-  {
-    key: 'criteria',
-    label: 'Criteria',
-    defaultVisible: true,
-    render: r => (
-      <div className="flex flex-wrap gap-1">
-        {r.matchingCriteria.length === 0 && (
-          <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/25">Healthy</span>
-        )}
-        {r.matchingCriteria.map(key => {
-          const config = CRITERIA_CONFIG.find(c => c.key === key)
-          if (!config) return null
-          return <span key={key} className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>{config.label}</span>
-        })}
-      </div>
-    ),
-  },
-  {
-    key: 'job_title',
-    label: 'Job Title',
-    defaultVisible: false,
-    render: r => <span className="text-secondary">{r.position.job_title || '—'}</span>,
-  },
-  {
-    key: 'countries',
-    label: 'Countries',
-    defaultVisible: false,
-    render: r => <span className="text-secondary">{r.position.countries || '—'}</span>,
-  },
-  {
-    key: 'seniorities',
-    label: 'Seniorities',
-    defaultVisible: false,
-    render: r => <span className="text-secondary">{r.position.seniorities || '—'}</span>,
-  },
-  {
-    key: 'sourcing',
-    label: 'Sourcing',
-    defaultVisible: false,
-    render: r => <span className="text-secondary">{r.position.sourcing || '—'}</span>,
-  },
-  {
-    key: 'csu_cs',
-    label: 'CSU / CS',
-    defaultVisible: false,
-    render: r => <span className="text-secondary">{`${r.position.csu || '—'} / ${r.position.cs || '—'}`}</span>,
-  },
-  {
-    key: 'candidates_presented',
-    label: 'Candidates',
-    defaultVisible: false,
-    render: r => <span className="font-mono text-secondary">{r.position.candidates_presented}</span>,
-  },
-  {
-    key: 'rate_range',
-    label: 'Rate Range',
-    defaultVisible: false,
-    render: r => {
-      if (r.position.minimum_rate == null && r.position.maximum_rate == null) return <span className="text-muted">—</span>
-      return <span className="font-mono text-secondary">${r.position.minimum_rate ?? 0}–${r.position.maximum_rate ?? 0}</span>
-    },
-  },
-]
-
-const COLUMN_FILTER_LABELS: Record<string, string> = {
-  account: 'Account',
-  status: 'Status',
-  stakeholder: 'Stakeholder',
-  coe: 'COE',
-  practice: 'Practice',
-  main_skill: 'Main Skill',
-  vertical: 'Vertical',
-  action_needed: 'Action Needed',
-  criteria: 'Criteria',
-  job_title: 'Job Title',
-  countries: 'Countries',
-  seniorities: 'Seniorities',
-  sourcing: 'Sourcing',
+interface ColumnDef {
+  key: string
+  label: string
+  defaultVisible: boolean
+  render: (r: StalledPositionResult) => ReactNode
 }
 
+const COLUMN_DEFINITIONS: ColumnDef[] = [
+  { key: 'id', label: 'ID', defaultVisible: true, render: r => <span className="font-mono text-muted">#{r.position.upstream_id}</span> },
+  { key: 'account', label: 'Account', defaultVisible: true, render: r => <span className="text-primary font-medium">{r.position.account}</span> },
+  { key: 'status', label: 'Status', defaultVisible: true, render: r => <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${getStatusBadgeStyle(r.position.position_status)}`}>{r.position.position_status}</span> },
+  { key: 'stakeholder', label: 'Stakeholder', defaultVisible: true, render: r => <span className="text-secondary">{r.position.stakeholder || '—'}</span> },
+  { key: 'coe', label: 'COE', defaultVisible: true, render: r => <span className="text-secondary">{r.position.coe || '—'}</span> },
+  { key: 'practice', label: 'Practice', defaultVisible: true, render: r => <span className="text-secondary">{r.position.practice || '—'}</span> },
+  { key: 'main_skill', label: 'Main Skill', defaultVisible: true, render: r => <span className="text-secondary">{r.position.main_skill || '—'}</span> },
+  { key: 'vertical', label: 'Vertical', defaultVisible: true, render: r => <span className="text-secondary">{r.position.vertical_industry || '—'}</span> },
+  { key: 'aging', label: 'Aging', defaultVisible: true, render: r => (
+    <div className="flex items-center gap-1.5">
+      <span className={`w-2 h-2 rounded-full ${getAgingDotColor(r.position.aging)}`} />
+      <span className="font-mono font-bold text-primary">{r.position.aging}d</span>
+    </div>
+  )},
+  { key: 'action_needed', label: 'Action Needed', defaultVisible: true, render: r => (
+    <div className="flex flex-wrap gap-1">
+      {r.actors.map(actor => (
+        <span key={actor} className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
+          actor === 'COE' ? 'bg-blue-500/15 text-blue-400 border-blue-500/25' : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
+        }`}>{actor}</span>
+      ))}
+    </div>
+  )},
+  { key: 'criteria', label: 'Criteria', defaultVisible: true, render: r => (
+    <div className="flex flex-wrap gap-1">
+      {r.matchingCriteria.length === 0 && <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-medium border bg-emerald-500/15 text-emerald-400 border-emerald-500/25">Healthy</span>}
+      {r.matchingCriteria.map(key => {
+        const config = CRITERIA_CONFIG.find(c => c.key === key)
+        if (!config) return null
+        return <span key={key} className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>{config.label}</span>
+      })}
+    </div>
+  )},
+  { key: 'job_title', label: 'Job Title', defaultVisible: false, render: r => <span className="text-secondary">{r.position.job_title || '—'}</span> },
+  { key: 'countries', label: 'Countries', defaultVisible: false, render: r => <span className="text-secondary">{r.position.countries || '—'}</span> },
+  { key: 'seniorities', label: 'Seniorities', defaultVisible: false, render: r => <span className="text-secondary">{r.position.seniorities || '—'}</span> },
+  { key: 'sourcing', label: 'Sourcing', defaultVisible: false, render: r => <span className="text-secondary">{r.position.sourcing || '—'}</span> },
+  { key: 'csu_cs', label: 'CSU / CS', defaultVisible: false, render: r => <span className="text-secondary">{`${r.position.csu || '—'} / ${r.position.cs || '—'}`}</span> },
+  { key: 'candidates_presented', label: 'Candidates', defaultVisible: false, render: r => <span className="font-mono text-secondary">{r.position.candidates_presented}</span> },
+  { key: 'rate_range', label: 'Rate Range', defaultVisible: false, render: r => {
+    if (r.position.minimum_rate == null && r.position.maximum_rate == null) return <span className="text-muted">—</span>
+    return <span className="font-mono text-secondary">${r.position.minimum_rate ?? 0}–${r.position.maximum_rate ?? 0}</span>
+  }},
+]
+
 const COLUMNS_STORAGE_KEY = 'core-op-list-columns'
+
+// ─── Main Component ──────────────────────────────────────────────────────
 
 export default function OpenPositionsReport() {
   const navigate = useNavigate()
@@ -363,72 +197,46 @@ export default function OpenPositionsReport() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [summaryCollapsed, setSummaryCollapsed] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
-  const [showColumnConfig, setShowColumnConfig] = useState(false)
-  const columnConfigRef = useRef<HTMLDivElement>(null)
 
-  const [columnConfig, setColumnConfig] = useState<{ visible: string[]; order: string[] }>(() => {
-    try {
-      const stored = localStorage.getItem(COLUMNS_STORAGE_KEY)
-      if (stored) return JSON.parse(stored)
-    } catch { /* use defaults */ }
-    const defaultVisible = COLUMN_DEFINITIONS.filter(c => c.defaultVisible).map(c => c.key)
-    return { visible: defaultVisible, order: COLUMN_DEFINITIONS.map(c => c.key) }
-  })
-
-  useEffect(() => {
-    localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(columnConfig))
-  }, [columnConfig])
-
-  useEffect(() => {
-    if (!showColumnConfig) return
-    const handler = (e: MouseEvent) => {
-      if (columnConfigRef.current && !columnConfigRef.current.contains(e.target as Node)) setShowColumnConfig(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showColumnConfig])
-
-  const visibleColumns = useMemo(() => {
-    return columnConfig.order
-      .filter(key => columnConfig.visible.includes(key))
-      .map(key => COLUMN_DEFINITIONS.find(c => c.key === key)!)
-      .filter(Boolean)
-  }, [columnConfig])
-
-  const toggleColumn = useCallback((key: string) => {
-    setColumnConfig(prev => ({
-      ...prev,
-      visible: prev.visible.includes(key)
-        ? prev.visible.filter(k => k !== key)
-        : [...prev.visible, key],
-    }))
-  }, [])
-
-  const moveColumn = useCallback((key: string, direction: 'up' | 'down') => {
-    setColumnConfig(prev => {
-      const order = [...prev.order]
-      const idx = order.indexOf(key)
-      if (idx < 0) return prev
-      const target = direction === 'up' ? idx - 1 : idx + 1
-      if (target < 0 || target >= order.length) return prev
-      ;[order[idx], order[target]] = [order[target], order[idx]]
-      return { ...prev, order }
-    })
-  }, [])
-
-  const resetColumns = useCallback(() => {
-    const defaultVisible = COLUMN_DEFINITIONS.filter(c => c.defaultVisible).map(c => c.key)
-    setColumnConfig({ visible: defaultVisible, order: COLUMN_DEFINITIONS.map(c => c.key) })
-  }, [])
+  const {
+    columnConfig, visibleColumns, toggleColumn, moveColumn, resetColumns,
+    showColumnConfig, setShowColumnConfig, columnConfigRef,
+  } = useColumnConfig(COLUMN_DEFINITIONS, COLUMNS_STORAGE_KEY)
 
   const { showToast } = useToast()
 
-  useEffect(() => {
-    log.info('Open positions report viewed')
-  }, [])
+  useEffect(() => { log.info('Open positions report viewed') }, [])
 
   const flaggedResults = report.filteredResults.filter(r => r.matchingCriteria.length > 0)
   const healthyResults = report.filteredResults.filter(r => r.matchingCriteria.length === 0)
+
+  const handleExportExcel = useCallback(async () => {
+    const result = await report.exportCsv()
+    if (result?.saved) {
+      showToast(
+        `Excel exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
+        'success', 8000,
+        result.filePath ? [
+          { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+          { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+        ] : undefined,
+      )
+    }
+  }, [report, showToast])
+
+  const handleExportPdf = useCallback(async () => {
+    const result = await window.api.report.exportPdf()
+    if (result.saved) {
+      showToast(
+        `PDF exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
+        'success', 8000,
+        result.filePath ? [
+          { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
+          { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
+        ] : undefined,
+      )
+    }
+  }, [showToast])
 
   if (report.hasData === false) {
     return (
@@ -440,10 +248,7 @@ export default function OpenPositionsReport() {
             Open position data needs to be synced before this report can be generated. Go to D.A.T.A. to sync open positions.
           </p>
           <button
-            onClick={() => {
-              log.info('Open positions report redirected to Data Sync')
-              navigate('/datasync')
-            }}
+            onClick={() => { log.info('Open positions report redirected to Data Sync'); navigate('/datasync') }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             Go to D.A.T.A.
@@ -471,11 +276,7 @@ export default function OpenPositionsReport() {
             onClick={() => setSummaryCollapsed(!summaryCollapsed)}
             className="flex items-center gap-1.5 text-xs text-muted hover:text-secondary transition-colors mb-1.5"
           >
-            <svg
-              width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
-              className={`transition-transform ${summaryCollapsed ? '-rotate-90' : ''}`}
-            >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${summaryCollapsed ? '-rotate-90' : ''}`}>
               <polyline points="6 9 12 15 18 9" />
             </svg>
             Summary
@@ -505,292 +306,44 @@ export default function OpenPositionsReport() {
         </div>
       )}
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"><SearchIcon /></span>
-            <input
-              type="text"
-              value={report.searchText}
-              onChange={e => report.setSearchText(e.target.value)}
-              placeholder="Search positions..."
-              className="glass-input pl-8 pr-8 py-2 w-full text-sm"
-            />
-            {report.searchText && (
-              <button onClick={() => report.setSearchText('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-primary">
-                <XIcon />
-              </button>
-            )}
-          </div>
+      <ReportToolbar
+        searchText={report.searchText}
+        onSearchChange={report.setSearchText}
+        filterHealthStatus={report.filterHealthStatus}
+        onFilterHealthStatusChange={report.setFilterHealthStatus}
+        resultsCounts={{ total: report.results.length, flagged: report.healthCounts.flagged, healthy: report.healthCounts.healthy, external: report.healthCounts.external }}
+        showFilters={showFilters}
+        onToggleFilters={() => setShowFilters(!showFilters)}
+        hasActiveFilters={report.hasActiveFilters}
+        activeFilterCount={report.activeFilterCount}
+        sortOrder={report.sortOrder}
+        onToggleSortOrder={() => report.setSortOrder(report.sortOrder === 'aging-desc' ? 'aging-asc' : 'aging-desc')}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showColumnConfig={showColumnConfig}
+        onToggleColumnConfig={() => setShowColumnConfig(!showColumnConfig)}
+        columnConfigRef={columnConfigRef}
+        columnConfigPanel={<ColumnConfigPanel columnConfig={columnConfig} columnDefs={COLUMN_DEFINITIONS} onToggle={toggleColumn} onMove={moveColumn} onReset={resetColumns} />}
+        onShowLegend={() => setShowLegend(true)}
+        onShowThresholds={() => setShowThresholds(true)}
+        onExportExcel={handleExportExcel}
+        onExportPdf={handleExportPdf}
+        exportDisabled={report.filteredResults.length === 0}
+      />
 
-          <div className="flex items-center gap-0.5 rounded-lg border border-white/5 p-0.5">
-            {(['all', 'flagged', 'healthy', 'external'] as const).map(status => (
-              <button
-                key={status}
-                onClick={() => report.setFilterHealthStatus(status)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium uppercase tracking-wider transition-all ${
-                  report.filterHealthStatus === status
-                    ? status === 'healthy' ? 'bg-emerald-500/15 text-emerald-400'
-                      : status === 'flagged' ? 'bg-red-500/15 text-red-400'
-                      : status === 'external' ? 'bg-amber-500/15 text-amber-400'
-                      : 'bg-white/10 text-primary'
-                    : 'text-muted hover:text-secondary'
-                }`}
-                title={status === 'external' ? 'Exclude proactive-hire positions (no vertical / country-based accounts)' : undefined}
-              >
-                {status === 'all' ? `All (${report.results.length})`
-                 : status === 'flagged' ? `Flagged (${report.healthCounts.flagged})`
-                 : status === 'healthy' ? `Healthy (${report.healthCounts.healthy})`
-                 : `External (${report.healthCounts.external})`}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-              report.hasActiveFilters
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
-            }`}
-          >
-            <FilterIcon />
-            Filters
-            {report.activeFilterCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-emerald-500/25 text-emerald-400">
-                {report.activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => report.setSortOrder(report.sortOrder === 'aging-desc' ? 'aging-asc' : 'aging-desc')}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-secondary hover:text-primary hover:bg-white/5 border border-white/5 transition-all"
-          >
-            <span className={`transition-transform ${report.sortOrder === 'aging-asc' ? 'rotate-180' : ''}`}><SortIcon /></span>
-            Aging
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-white/5 overflow-hidden">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-emerald-500/15 text-emerald-400' : 'text-muted hover:text-primary hover:bg-white/5'}`}
-            >
-              <GridIcon />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 transition-colors ${viewMode === 'list' ? 'bg-emerald-500/15 text-emerald-400' : 'text-muted hover:text-primary hover:bg-white/5'}`}
-            >
-              <ListIcon />
-            </button>
-          </div>
-
-          {viewMode === 'list' && (
-            <div className="relative" ref={columnConfigRef}>
-              <button
-                onClick={() => setShowColumnConfig(!showColumnConfig)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                  showColumnConfig
-                    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25'
-                    : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
-                }`}
-              >
-                <ColumnsIcon />
-                Columns
-              </button>
-
-              {showColumnConfig && (
-                <div className="absolute top-full right-0 mt-1 z-40 w-72 glass-panel border border-white/10 rounded-xl shadow-xl overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-white/5">
-                    <p className="text-xs font-medium text-primary uppercase tracking-wider">Configure Columns</p>
-                    <button onClick={resetColumns} className="text-[10px] text-red-400 hover:text-red-300">
-                      Reset
-                    </button>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto p-1.5 space-y-0.5">
-                    {columnConfig.order.map((key, idx) => {
-                      const def = COLUMN_DEFINITIONS.find(c => c.key === key)
-                      if (!def) return null
-                      const isVisible = columnConfig.visible.includes(key)
-                      return (
-                        <div key={key} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${isVisible ? 'bg-white/[0.03]' : ''}`}>
-                          <button
-                            onClick={() => toggleColumn(key)}
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
-                              isVisible
-                                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                                : 'border-white/10 text-transparent hover:border-white/20'
-                            }`}
-                          >
-                            {isVisible && <CheckIcon />}
-                          </button>
-                          <span className={`flex-1 text-xs ${isVisible ? 'text-primary' : 'text-muted'}`}>
-                            {def.label}
-                          </span>
-                          <div className="flex items-center gap-0.5">
-                            <button
-                              onClick={() => moveColumn(key, 'up')}
-                              disabled={idx === 0}
-                              className="p-0.5 rounded text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                <polyline points="18 15 12 9 6 15" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => moveColumn(key, 'down')}
-                              disabled={idx === columnConfig.order.length - 1}
-                              className="p-0.5 rounded text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                <polyline points="6 9 12 15 18 9" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="ml-auto flex items-center gap-1.5">
-            <button
-              onClick={() => setShowLegend(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-secondary hover:text-primary hover:bg-white/5 border border-white/10 transition-all"
-            >
-              <InfoIcon /> Legend
-            </button>
-            <button
-              onClick={() => setShowThresholds(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-secondary hover:text-primary hover:bg-white/5 border border-white/10 transition-all"
-            >
-              <SettingsIcon /> Thresholds
-            </button>
-            <button
-              onClick={async () => {
-                const result = await report.exportCsv()
-                if (result?.saved) {
-                  showToast(
-                    `Excel exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
-                    'success',
-                    8000,
-                    result.filePath ? [
-                      { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
-                      { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
-                    ] : undefined,
-                  )
-                }
-              }}
-              disabled={report.filteredResults.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-emerald-600/80 hover:bg-emerald-500 text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed no-print"
-            >
-              <DownloadIcon /> Export Excel
-            </button>
-            <button
-              onClick={async () => {
-                const result = await window.api.report.exportPdf()
-                if (result.saved) {
-                  showToast(
-                    `PDF exported to ${result.filePath?.split('/').pop() ?? 'file'}`,
-                    'success',
-                    8000,
-                    result.filePath ? [
-                      { label: 'Open File', icon: 'file' as const, onClick: () => window.api.app.openPath(result.filePath!) },
-                      { label: 'Show in Folder', icon: 'folder' as const, onClick: () => window.api.app.showItemInFolder(result.filePath!) },
-                    ] : undefined,
-                  )
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-blue-600/80 hover:bg-blue-500 text-white transition-all no-print"
-            >
-              <DownloadIcon /> Export PDF
-            </button>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="glass-panel-subtle rounded-xl p-3 space-y-3 relative z-10">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-primary uppercase tracking-wider">Criteria</p>
-              {report.hasActiveFilters && (
-                <button onClick={report.clearAllFilters} className="text-xs text-red-400 hover:text-red-300 transition-colors">
-                  Clear all
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {CRITERIA_CONFIG.map(config => {
-                const isActive = report.criteriaFilter.includes(config.key)
-                const count = report.criteriaFilterCounts[config.key] ?? 0
-                return (
-                  <button
-                    key={config.key}
-                    onClick={() => report.setCriteriaFilter(
-                      isActive
-                        ? report.criteriaFilter.filter(k => k !== config.key)
-                        : [...report.criteriaFilter, config.key]
-                    )}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                      isActive ? config.colorClass : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
-                    }`}
-                  >
-                    {config.label} ({count})
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="minimal-divider" />
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Actors</p>
-              <div className="flex items-center gap-1.5">
-                {(['COE', 'CGX'] as CriterionActor[]).map(actor => {
-                  const isActive = report.filterActors.includes(actor)
-                  return (
-                    <button
-                      key={actor}
-                      onClick={() => report.setFilterActors(
-                        isActive
-                          ? report.filterActors.filter(a => a !== actor)
-                          : [...report.filterActors, actor]
-                      )}
-                      className={`px-2.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all ${
-                        isActive
-                          ? actor === 'COE' ? 'bg-blue-500/15 text-blue-400 border-blue-500/25' : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
-                          : 'bg-white/5 text-muted border-white/5 hover:text-secondary'
-                      }`}
-                    >
-                      {actor}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {Object.keys(report.columnFilters).length > 0 && (
-              <>
-                <div className="minimal-divider" />
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-xs font-medium text-primary uppercase tracking-wider shrink-0">Active Column Filters</p>
-                  {Object.entries(report.columnFilters).map(([key, values]) => (
-                    <span key={key} className="px-2 py-1 rounded-lg text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
-                      {COLUMN_FILTER_LABELS[key] ?? key}: {values.length} selected
-                      <button onClick={() => report.clearColumnFilter(key)} className="hover:text-emerald-200 transition-colors">×</button>
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+      {showFilters && (
+        <FiltersPanel
+          criteriaFilter={report.criteriaFilter}
+          criteriaFilterCounts={report.criteriaFilterCounts}
+          filterActors={report.filterActors}
+          columnFilters={report.columnFilters}
+          hasActiveFilters={report.hasActiveFilters}
+          onCriteriaFilterChange={report.setCriteriaFilter}
+          onActorsChange={report.setFilterActors}
+          onClearAllFilters={report.clearAllFilters}
+          onClearColumnFilter={report.clearColumnFilter}
+        />
+      )}
 
       {report.isLoading && (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -799,11 +352,7 @@ export default function OpenPositionsReport() {
         </div>
       )}
 
-      {report.error && (
-        <div className="glass-panel p-6 text-center">
-          <p className="text-sm text-red-400">{report.error}</p>
-        </div>
-      )}
+      {report.error && <div className="glass-panel p-6 text-center"><p className="text-sm text-red-400">{report.error}</p></div>}
 
       {!report.isLoading && !report.error && report.results.length === 0 && (
         <div className="glass-panel p-8 text-center">
@@ -816,266 +365,32 @@ export default function OpenPositionsReport() {
       )}
 
       {!report.isLoading && !report.error && report.results.length > 0 && viewMode === 'grid' && (
-        <div className="space-y-4">
-          {Object.keys(report.columnFilters).length > 0 && (
-            <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-[11px] text-muted uppercase tracking-wider font-medium">Column Filters:</span>
-              {Object.entries(report.columnFilters).map(([key, values]) => (
-                <span key={key} className="px-2 py-1 rounded-lg text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1">
-                  {COLUMN_FILTER_LABELS[key] ?? key}: {values.length} selected
-                  <button onClick={() => report.clearColumnFilter(key)} className="hover:text-emerald-200 transition-colors ml-0.5">×</button>
-                </span>
-              ))}
-              <button
-                onClick={() => {
-                  for (const key of Object.keys(report.columnFilters)) {
-                    report.clearColumnFilter(key)
-                  }
-                }}
-                className="text-[10px] text-red-400 hover:text-red-300 ml-1 transition-colors"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-
-          {flaggedResults.length > 0 && (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                Flagged Positions ({flaggedResults.length})
-              </p>
-              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                {flaggedResults.map(r => (
-                  <button
-                    key={r.position.upstream_id}
-                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                    className={`glass-card-hover p-3 text-left transition-all border-l-[3px] ${getAgingColor(r.position.aging)}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-primary truncate">{r.position.account}</p>
-                        <p className="text-xs text-muted truncate">{r.position.main_skill} · {r.position.stakeholder}</p>
-                      </div>
-                      <span className="shrink-0 text-sm font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-white/5">
-                        {r.position.aging}d
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mb-2">
-                      <span className="text-xs text-muted font-mono">#{r.position.upstream_id}</span>
-                      <span className="text-xs text-muted">·</span>
-                      <span className="text-xs text-muted">{r.position.coe}</span>
-                      <span className="text-xs text-muted">·</span>
-                      <span className="text-xs text-muted">{r.position.practice}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {r.matchingCriteria.map(key => {
-                        const config = CRITERIA_CONFIG.find(c => c.key === key)
-                        if (!config) return null
-                        return (
-                          <span key={key} className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>
-                            {config.label}
-                          </span>
-                        )
-                      })}
-                      {r.actors.map(actor => (
-                        <span key={actor} className={`px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                          actor === 'COE'
-                            ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
-                            : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
-                        }`}>
-                          {actor}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {healthyResults.length > 0 && report.filterHealthStatus !== 'flagged' && (
-            <>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mt-4">
-                Healthy Positions ({healthyResults.length})
-              </p>
-              <div className="grid gap-1.5 md:grid-cols-2 lg:grid-cols-3">
-                {healthyResults.map(r => (
-                  <button
-                    key={r.position.upstream_id}
-                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                    className="glass-card-hover p-2.5 text-left transition-all border-l-[3px] border-l-emerald-500 opacity-75 hover:opacity-100"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                          Healthy
-                        </span>
-                        <p className="text-sm font-medium text-primary truncate">{r.position.account}</p>
-                        <span className="text-xs text-muted">·</span>
-                        <span className="text-xs text-muted truncate">{r.position.main_skill}</span>
-                      </div>
-                      <span className="shrink-0 text-xs font-mono text-muted">{r.position.aging}d</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          {report.filteredResults.length === 0 && (
-            <div className="glass-panel p-8 text-center text-sm text-muted">
-              No positions match the selected filters.
-            </div>
-          )}
-
-        </div>
+        <PositionsGridView
+          flaggedResults={flaggedResults}
+          healthyResults={healthyResults}
+          filteredResults={report.filteredResults}
+          filterHealthStatus={report.filterHealthStatus}
+          columnFilters={report.columnFilters}
+          onSelectPosition={setSelectedPositionId}
+          onClearColumnFilter={report.clearColumnFilter}
+        />
       )}
 
       {!report.isLoading && !report.error && report.results.length > 0 && viewMode === 'list' && (
-        <div className="glass-panel overflow-hidden rounded-xl">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-dark-bg/95 backdrop-blur">
-              <tr className="border-b border-white/10">
-                {visibleColumns.map(col => (
-                  <th key={col.key} className="text-left text-sm font-bold uppercase tracking-wider text-muted px-3 py-3 first:pl-4 last:pr-4">
-                    <div className="flex items-center gap-1">
-                      {col.label}
-                      {COLUMN_VALUE_EXTRACTORS[col.key] && (
-                        <ExcelFilterDropdown
-                          columnKey={col.key}
-                          allValues={report.availableColumnValues[col.key] ?? []}
-                          selectedValues={report.columnFilters[col.key] ?? []}
-                          isFiltered={report.columnFilters[col.key] !== undefined}
-                          onChangeFilter={report.setColumnFilter}
-                          onClearFilter={report.clearColumnFilter}
-                        />
-                      )}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.filteredResults.length > 0 ? (
-                report.filteredResults.map((r, i) => (
-                  <tr
-                    key={r.position.upstream_id}
-                    className={`border-b border-white/5 hover:bg-white/[0.04] cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
-                    onClick={() => setSelectedPositionId(r.position.upstream_id)}
-                  >
-                    {visibleColumns.map(col => (
-                      <td key={col.key} className="px-3 py-2.5 first:pl-4 last:pr-4">
-                        {col.render(r)}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={visibleColumns.length} className="px-4 py-8 text-center text-sm text-muted">
-                    No positions match the selected filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <PositionsTableView
+          visibleColumns={visibleColumns as ColumnDef[]}
+          filteredResults={report.filteredResults}
+          availableColumnValues={report.availableColumnValues}
+          columnFilters={report.columnFilters}
+          onSetColumnFilter={report.setColumnFilter}
+          onClearColumnFilter={report.clearColumnFilter}
+          onSelectPosition={setSelectedPositionId}
+        />
       )}
 
-      {showThresholds && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }}>
-          <div className="glass-panel border border-white/10 rounded-xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-              <div className="flex items-center gap-2">
-                <SettingsIcon />
-                <h2 className="text-sm font-semibold text-primary">Staleness Thresholds</h2>
-              </div>
-              <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
-                <XIcon />
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-              {CRITERIA_CONFIG.map(config => (
-                <div key={config.key} className="flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${config.colorClass}`}>
-                        {config.label}
-                      </span>
-                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                        config.actor === 'COE'
-                          ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
-                          : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
-                      }`}>{config.actor}</span>
-                    </div>
-                    <p className="text-xs text-muted leading-snug">{config.description.replace(/\bX\b/, String(report.draftThresholds[config.key]))}</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => report.setDraftThreshold(config.key, Math.max(1, report.draftThresholds[config.key] - 1))}
-                      className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    </button>
-                    <span className="w-10 text-center text-sm font-mono font-bold text-primary">{report.draftThresholds[config.key]}d</span>
-                    <button
-                      onClick={() => report.setDraftThreshold(config.key, report.draftThresholds[config.key] + 1)}
-                      className="w-7 h-7 rounded-md bg-white/5 hover:bg-white/10 text-secondary hover:text-primary flex items-center justify-center transition-colors border border-white/5"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/5">
-              <button onClick={() => { report.resetDraftThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs text-secondary hover:text-primary transition-colors">Cancel</button>
-              <button onClick={() => { report.applyThresholds(); setShowThresholds(false) }} className="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">Apply</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showLegend && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowLegend(false)}>
-          <div className="glass-panel border border-white/10 rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <InfoIcon />
-                <h2 className="text-sm font-semibold text-primary">Criteria Legend</h2>
-              </div>
-              <button onClick={() => setShowLegend(false)} className="p-1.5 rounded-lg hover:bg-white/5 text-secondary">
-                <XIcon />
-              </button>
-            </div>
-            <div className="space-y-3">
-              {CRITERIA_CONFIG.map(config => (
-                <div key={config.key} className="flex items-start gap-3">
-                  <span className={`shrink-0 inline-flex px-1.5 py-0.5 rounded text-xs font-medium border ${config.colorClass}`}>
-                    {config.label}
-                  </span>
-                  <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                    config.actor === 'COE'
-                      ? 'bg-blue-500/15 text-blue-400 border-blue-500/25'
-                      : 'bg-purple-500/15 text-purple-400 border-purple-500/25'
-                  }`}>
-                    {config.actor}
-                  </span>
-                  <p className="text-xs text-secondary leading-relaxed">
-                    {config.description.replace(/\bX\b/, String(report.thresholds[config.key]))}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <PositionDetailDrawer
-        upstreamId={selectedPositionId}
-        onClose={() => setSelectedPositionId(null)}
-      />
-
+      {showThresholds && <ThresholdsModal report={report} onClose={() => setShowThresholds(false)} />}
+      {showLegend && <LegendModal thresholds={report.thresholds} onClose={() => setShowLegend(false)} />}
+      <PositionDetailDrawer upstreamId={selectedPositionId} onClose={() => setSelectedPositionId(null)} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 // Small shared presentational primitives for the C.O.E. Bonus tabs.
 
 interface SectionCardProps {
-  title?: string
+  title?: React.ReactNode
   subtitle?: string
   action?: React.ReactNode
   className?: string

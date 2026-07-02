@@ -1,9 +1,10 @@
 import { SyncSourceType, SyncProgress, SyncRecord } from '../types';
+import type { TokenSource } from '../../../../shared/ipc-types';
 
 export const dataSyncService = {
-  async validateToken(token: string): Promise<{ valid: boolean; error?: string }> {
+  async validateToken(token: string, source: TokenSource = 'unocore'): Promise<{ valid: boolean; error?: string }> {
     try {
-      const result = await window.api.sync.validateToken(token) as {
+      const result = await window.api.sync.validateToken(token, source) as {
         valid?: boolean;
         message?: string;
         error?: string;

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AIConfig, AISuggestion, SuggestionOption, StructuredResume, RefinementMode, ExperienceEntry, EducationEntry, SkillCategory, CertificationEntry, TokenUsage, ResumeProcessingMetrics } from '../types';
 import { TECH_SKILL_SLOTS } from '../constants/resume';
 import { safeJsonParse } from '../../../shared/utils/safeJsonParse';
+import { isIpcError } from '../../../shared/types';
 
 const safeString = () => z.string().nullable().transform(v => v ?? '').default('');
 
@@ -73,7 +74,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   provider: 'local',
   localEndpoint: '/api/claude/v1',
   cloudEndpoint: 'https://api.anthropic.com/v1',
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-6',
   temperature: 0.1,
   maxTokens: 4096,
 };
@@ -205,12 +206,19 @@ ${rawText}`;
 
 async function callClaudeLocal(config: AIConfig, prompt: string): Promise<{ content: string; usage: TokenUsage | null }> {
   const messages = [{ role: 'user', content: prompt }];
-  const data = await window.api.ai.chat(config.model, messages, config.maxTokens) as {
+  const data = await window.api.ai.chat(config.model, messages, config.maxTokens);
+
+  // IPC errors return { __ipcError: true, message } instead of throwing
+  if (isIpcError(data)) {
+    throw new Error(data.message || 'AI service call failed');
+  }
+
+  const typed = data as {
     choices: { message: { content: string } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
-  const content = data.choices[0].message.content;
-  const rawUsage = data.usage;
+  const content = typed.choices[0].message.content;
+  const rawUsage = typed.usage;
   const usage: TokenUsage | null = rawUsage
     ? {
         promptTokens: rawUsage.prompt_tokens ?? 0,

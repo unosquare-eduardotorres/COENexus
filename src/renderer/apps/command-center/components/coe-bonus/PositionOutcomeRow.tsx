@@ -1,9 +1,9 @@
-// Compact, expandable row for one Closed position. Collapsed leads with
+// Compact, expandable row for one Closed position (V2). Collapsed leads with
 // #ID · main skill · client · role, a color-coded outcome badge, and a compact
-// accept/reject mini-bar. Expanded: inline candidate breakdown.
+// numerator/denominator mini-bar. Expanded: inline candidate audit breakdown.
 
 import { useState } from 'react'
-import type { PositionOutcome } from '../../types/coeBonus'
+import type { ReportPositionOutcomeV2 } from '../../types/coeBonus'
 import {
   formatClosedDate,
   humanizeStatus,
@@ -27,7 +27,7 @@ function Chevron({ open }: { open: boolean }) {
   )
 }
 
-export default function PositionOutcomeRow({ position }: { position: PositionOutcome }) {
+export default function PositionOutcomeRow({ position }: { position: ReportPositionOutcomeV2 }) {
   const [open, setOpen] = useState(false)
   const outcome = positionOutcomeFor(position.positionStatus)
 
@@ -52,22 +52,24 @@ export default function PositionOutcomeRow({ position }: { position: PositionOut
               <span className="shrink-0 text-[11px] text-secondary truncate max-w-[40%]">{position.account}</span>
               <span className="text-[11px] text-muted truncate">{position.jobTitle || 'Untitled position'}</span>
             </div>
-            {/* Meta: COE · practice (only if differs) · closed date */}
+            {/* Meta: COE · practice · stakeholder · created date */}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted">
               {position.coe && <span>{position.coe}</span>}
               {position.practice && position.practice !== position.coe && <span>· {position.practice}</span>}
-              <span>· {formatClosedDate(position.closedDate)}</span>
+              {position.stakeholder && <span>· {position.stakeholder}</span>}
+              <span>· Created {formatClosedDate(position.createdDate)}</span>
+              {position.closedDate && <span>· Closed {formatClosedDate(position.closedDate)}</span>}
             </div>
           </div>
-          {/* Fixed-width right rail: mini-bar │ status — column-aligned across rows */}
+          {/* Fixed-width right rail: mini counts │ status — column-aligned across rows */}
           <div className="flex items-center shrink-0">
             <div className="w-px self-stretch bg-slate-500/15" aria-hidden="true" />
             <div className="w-[132px] flex justify-start px-3">
               <AcceptanceMini
-                approved={position.approved}
-                rejected={position.rejected}
-                declined={position.declined}
-                unresolved={position.unresolved}
+                numerator={position.countedInNumerator}
+                denominatorOnly={position.countedInDenominator - position.countedInNumerator}
+                excluded={position.excludedCount}
+                deduped={position.dedupSkippedCount}
               />
             </div>
             <div className="w-px self-stretch bg-slate-500/15" aria-hidden="true" />

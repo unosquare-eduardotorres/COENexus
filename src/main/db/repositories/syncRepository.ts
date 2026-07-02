@@ -132,6 +132,36 @@ export interface ClosedPositionCandidateRow {
   is_employee: number
 }
 
+// ── Acceptance Rate V2 row types ──────────────────────────────────────────────
+
+/** Position projection for the V2 Acceptance Rate report — includes stakeholder + created for cohort/dedup. */
+export interface AcceptancePositionRow {
+  id: number
+  upstream_id: number
+  position_status: string
+  account: string
+  stakeholder: string
+  coe: string
+  practice: string
+  job_title: string
+  main_skill: string
+  created: string
+  closed_date: string | null
+}
+
+/** Candidate projection for the V2 Acceptance Rate report — includes candidate_id for person dedup. */
+export interface AcceptanceCandidateRow {
+  open_position_id: number
+  candidate_requisition_id: number
+  candidate_id: number
+  candidate_name: string
+  main_skill: string
+  candidate_status: string
+  rate: number
+  start_date: string | null
+  is_employee: number
+}
+
 export interface SyncedProjectReallocationRow {
   id: number
   upstream_id: number
@@ -183,6 +213,49 @@ export interface CoePracticeLeadRow {
   email: string
   coe: string
   active: number
+}
+
+// ── Placement Margin row types ──────────────────────────────────────────────
+
+export interface SyncedPlacementMarginRow {
+  id: number
+  year: number
+  quarter: number
+  email: string
+  name: string | null
+  account: string | null
+  main_skill: string | null
+  country: string | null
+  open_position_id: number | null
+  placement_date: string | null
+  leave_date: string | null
+  placement_rate: number | null
+  placement_margin: number | null
+  current_margin: number | null
+  placement_revenue: number | null
+  current_revenue: number | null
+  placement_monthly_salary: number | null
+  current_monthly_salary: number | null
+  company_tenure: number | null
+  allocation: number | null
+  is_promotion: number
+  first_time_entry_date: string | null
+  kickoff_delay: number | null
+  tac_at_placement: number | null
+  current_tac: number | null
+  synced_at: string
+}
+
+export interface SyncedPlacementMarginSummaryRow {
+  id: number
+  year: number
+  quarter: number
+  ytd_margin: number | null
+  ytd_avg_rate: number | null
+  period_margin: number | null
+  period_avg_rate: number | null
+  monthly_trend_json: string | null
+  synced_at: string
 }
 
 const EMPLOYEE_COLUMNS = [
@@ -241,6 +314,32 @@ const PRR_PRESENTATION_UPSERT = buildUpsertSql({ table: 'prr_presentations', col
 const EMPLOYEE_UPSERT = buildUpsertSql({ table: 'synced_employees', columns: EMPLOYEE_COLUMNS, conflictColumns: ['upstream_id'] })
 const CANDIDATE_UPSERT = buildUpsertSql({ table: 'synced_candidates', columns: CANDIDATE_COLUMNS, conflictColumns: ['upstream_id'] })
 const POSITION_UPSERT = buildUpsertSql({ table: 'synced_open_positions', columns: POSITION_COLUMNS, conflictColumns: ['upstream_id'] })
+
+const PLACEMENT_MARGIN_COLUMNS = [
+  'year', 'quarter', 'email', 'name', 'account', 'main_skill', 'country',
+  'open_position_id', 'placement_date', 'leave_date', 'placement_rate',
+  'placement_margin', 'current_margin', 'placement_revenue', 'current_revenue',
+  'placement_monthly_salary', 'current_monthly_salary', 'company_tenure',
+  'allocation', 'is_promotion', 'first_time_entry_date', 'kickoff_delay',
+  'tac_at_placement', 'current_tac', 'synced_at',
+]
+
+const PLACEMENT_MARGIN_SUMMARY_COLUMNS = [
+  'year', 'quarter', 'ytd_margin', 'ytd_avg_rate', 'period_margin',
+  'period_avg_rate', 'monthly_trend_json', 'synced_at',
+]
+
+const PLACEMENT_MARGIN_UPSERT = buildUpsertSql({
+  table: 'synced_placement_margins',
+  columns: PLACEMENT_MARGIN_COLUMNS,
+  conflictColumns: ['year', 'name', 'placement_date', 'account'],
+})
+
+const PLACEMENT_MARGIN_SUMMARY_UPSERT = buildUpsertSql({
+  table: 'synced_placement_margin_summary',
+  columns: PLACEMENT_MARGIN_SUMMARY_COLUMNS,
+  conflictColumns: ['year', 'quarter'],
+})
 
 export const syncRepository = {
   upsertEmployee(data: Omit<SyncedEmployeeRow, 'id'>): number {
@@ -504,6 +603,70 @@ export const syncRepository = {
        WHERE ${whereSql}
        ORDER BY opc.candidate_name`
     ).all(...params) as ClosedPositionCandidateRow[]
+
+    return { positions, candidates }
+  },
+
+  /**
+   * V2 Acceptance Rate: Closed positions whose `created` date falls within the
+   * given quarter, optionally scoped to a COE. Returns the expanded projection
+   * needed for month-cohort grouping, stakeholder dedup, and candidate-level audit.
+   *
+   * Key differences from getClosedPositionsWithOutcomes:
+   * - Filters on `created` (not `closed_date`) — positions are bucketed by the
+   *   month they were created, regardless of when they closed.
+   * - SELECT includes `stakeholder` and `created` for dedup + cohort axis.
+   * - Candidate SELECT includes `candidate_id` for person-level dedup.
+   */
+  getClosedPositionsByCreatedMonth(opts: {
+    year: number
+    quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4'
+    coe: string | null
+  }): { positions: AcceptancePositionRow[]; candidates: AcceptanceCandidateRow[] } {
+    const db = getDatabase()
+
+    // Compute quarter date range from created
+    const quarterStartMonth: Record<string, number> = { Q1: 1, Q2: 4, Q3: 7, Q4: 10 }
+    const startMonth = quarterStartMonth[opts.quarter]
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startDate = `${opts.year}-${pad(startMonth)}-01`
+    const endDateExclusive = opts.quarter === 'Q4'
+      ? `${opts.year + 1}-01-01`
+      : `${opts.year}-${pad(startMonth + 3)}-01`
+
+    const where = [
+      "sop.position_status LIKE 'Closed%'",
+      'sop.created IS NOT NULL',
+      'sop.created >= ?',
+      'sop.created < ?',
+    ]
+    const params: (string | number)[] = [startDate, endDateExclusive]
+    if (opts.coe) {
+      where.push('sop.coe = ?')
+      params.push(opts.coe)
+    }
+    const whereSql = where.join(' AND ')
+
+    const positions = db.prepare(
+      `SELECT sop.id, sop.upstream_id, sop.position_status, sop.account,
+              sop.stakeholder, sop.coe, sop.practice, sop.job_title,
+              sop.main_skill, sop.created, sop.closed_date
+       FROM synced_open_positions sop
+       WHERE ${whereSql}
+       ORDER BY sop.created DESC`
+    ).all(...params) as AcceptancePositionRow[]
+
+    if (positions.length === 0) return { positions, candidates: [] }
+
+    const candidates = db.prepare(
+      `SELECT opc.open_position_id, opc.candidate_requisition_id, opc.candidate_id,
+              opc.candidate_name, opc.main_skill, opc.candidate_status,
+              opc.rate, opc.start_date, opc.is_employee
+       FROM open_position_candidates opc
+       INNER JOIN synced_open_positions sop ON sop.upstream_id = opc.open_position_id
+       WHERE ${whereSql}
+       ORDER BY opc.candidate_name`
+    ).all(...params) as AcceptanceCandidateRow[]
 
     return { positions, candidates }
   },
@@ -852,5 +1015,69 @@ export const syncRepository = {
   deactivateCoePracticeLead(id: number): void {
     const db = getDatabase()
     db.prepare('UPDATE coe_practice_leads SET active = 0 WHERE id = ?').run(id)
+  },
+
+  // ── Placement Margin ──────────────────────────────────────
+
+  upsertPlacementMargin(data: Omit<SyncedPlacementMarginRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(PLACEMENT_MARGIN_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertPlacementMargin failed for email=${data.email}`, err instanceof Error ? err : new Error(String(err)))
+      throw err
+    }
+  },
+
+  upsertPlacementMarginSummary(data: Omit<SyncedPlacementMarginSummaryRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(PLACEMENT_MARGIN_SUMMARY_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertPlacementMarginSummary failed for year=${data.year} q=${data.quarter}`, err instanceof Error ? err : new Error(String(err)))
+      throw err
+    }
+  },
+
+  getPlacementMargins(year: number, quarter: number): SyncedPlacementMarginRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM synced_placement_margins WHERE year = ? AND quarter = ?'
+    ).all(year, quarter) as SyncedPlacementMarginRow[]
+  },
+
+  getPlacementMarginsForYear(year: number): SyncedPlacementMarginRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM synced_placement_margins WHERE year = ?'
+    ).all(year) as SyncedPlacementMarginRow[]
+  },
+
+  getPlacementMarginSummary(year: number, quarter: number): SyncedPlacementMarginSummaryRow | undefined {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM synced_placement_margin_summary WHERE year = ? AND quarter = ?'
+    ).get(year, quarter) as SyncedPlacementMarginSummaryRow | undefined
+  },
+
+  clearPlacementMargins(year: number, quarter: number): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM synced_placement_margins WHERE year = ? AND quarter = ?').run(year, quarter)
+    db.prepare('DELETE FROM synced_placement_margin_summary WHERE year = ? AND quarter = ?').run(year, quarter)
+  },
+
+  clearPlacementMarginsForYear(year: number): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM synced_placement_margins WHERE year = ?').run(year)
+  },
+
+  getPlacementMarginSyncStatus(): { year: number; quarter: number; count: number; synced_at: string }[] {
+    const db = getDatabase()
+    return db.prepare(`
+      SELECT year, quarter, COUNT(*) as count, MAX(synced_at) as synced_at
+      FROM synced_placement_margins GROUP BY year, quarter ORDER BY year DESC, quarter DESC
+    `).all() as { year: number; quarter: number; count: number; synced_at: string }[]
   },
 }

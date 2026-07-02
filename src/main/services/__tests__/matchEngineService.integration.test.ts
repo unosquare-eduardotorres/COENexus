@@ -47,15 +47,36 @@ vi.mock('../voyageEmbeddingService', () => ({
   },
 }))
 
-vi.mock('../claudeService', () => ({
-  claudeService: {
-    scoreCandidate: vi.fn(),
-    analyzeCandidate: vi.fn(),
+vi.mock('../llmRouter', () => ({
+  llmRouter: {
+    chatAsync: vi.fn().mockResolvedValue({ text: '{}', usage: { inputTokens: 0, outputTokens: 0 } }),
+    getConcurrencyLimit: vi.fn().mockReturnValue(8),
   },
 }))
 
 vi.mock('../../config', () => ({
-  getConfig: vi.fn().mockReturnValue({}),
+  getConfig: vi.fn().mockReturnValue({
+    modelConfig: {
+      presetMode: 'claude',
+      localServerUrl: 'http://localhost:8080',
+      localDefaultModel: '',
+      concurrency: { claude: { max: 2, haikuMax: 2 }, local: { max: 1 } },
+      features: {
+        resumeSkillExtraction: { provider: 'claude', model: 'claude-haiku-4-5' },
+        resumeFormatCheck: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        resumeTransform: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        candidateProfile: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        coverLetter: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        matchTriage: { provider: 'claude', model: 'claude-haiku-4-5' },
+        matchDeepAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        benchBurnAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        responsivenessAnalysis: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        responsivenessReport: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        bugDescription: { provider: 'claude', model: 'claude-haiku-4-5' },
+        aiChat: { provider: 'claude', model: 'claude-sonnet-4-6' },
+      },
+    },
+  }),
 }))
 
 import { matchEngineService } from '../matchEngineService'

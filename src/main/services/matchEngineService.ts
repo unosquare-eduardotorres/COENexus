@@ -1,5 +1,5 @@
 import { voyageEmbeddingService } from './voyageEmbeddingService'
-import { claudeService } from './claudeService'
+import { llmRouter } from './llmRouter'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { syncRepository } from '../db/repositories/syncRepository'
 import { matchRepository } from '../db/repositories/matchRepository'
@@ -280,9 +280,8 @@ async function runHaikuTriage(
   candidates: EnrichedCandidate[],
   jobDescription: string,
   topN: number,
-  haikuModel: string,
-  concurrency: number
 ): Promise<HaikuResult[]> {
+  const concurrency = llmRouter.getConcurrencyLimit('matchTriage')
   const haikuCandidates = candidates.slice(0, Math.max(topN * 3, 20))
 
   // Step 4: Auto-pass high-similarity candidates (skip Haiku call)
@@ -332,7 +331,7 @@ ${candidateList}
 
 Return ONLY the JSON array, no explanation.`
 
-      const { text: response } = await claudeService.chatAsync(haikuModel, prompt, 512, 0.1)
+      const { text: response } = await llmRouter.chatAsync('matchTriage', prompt, 512, 0.1)
       const parsed = parseAiResponse(response, haikuBatchTriageSchema, 'haiku-triage-batch')
 
       return batch.map((candidate, idx) => {
@@ -363,9 +362,8 @@ interface DeepAnalysisStats {
 async function runDeepAnalysis(
   haikuResults: HaikuResult[],
   request: MatchRequest,
-  opusModel: string,
-  concurrency: number
 ): Promise<{ results: Record<string, unknown>[]; cacheStats: DeepAnalysisStats }> {
+  const concurrency = llmRouter.getConcurrencyLimit('matchDeepAnalysis')
   const jdHash = hashJobDescription(request.jobDescription)
   const cacheStats: DeepAnalysisStats = { cacheHits: 0, cacheMisses: 0 }
 
@@ -403,7 +401,7 @@ async function runDeepAnalysis(
         availabilityDisplay: candidate.isBench ? 'Immediately available (bench)' : 'Currently assigned',
       })
 
-      const { text: response } = await claudeService.chatAsync(opusModel, prompt, 4096, 0.1)
+      const { text: response } = await llmRouter.chatAsync('matchDeepAnalysis', prompt, 4096, 0.1)
       const parsed = parseAiResponse(response, opusAnalysisSchema, 'opus-analysis')
 
       const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
@@ -433,7 +431,8 @@ async function runDeepAnalysis(
         salaryExpectationsCurrency: candidate.salaryExpectationsCurrency ?? '',
       }
 
-      matchRepository.cacheAnalysis(candidate.upstreamId, candidate.sourceType, jdHash, analysisResult, opusModel)
+      const analysisModel = getConfig().modelConfig.features.matchDeepAnalysis.model
+      matchRepository.cacheAnalysis(candidate.upstreamId, candidate.sourceType, jdHash, analysisResult, analysisModel)
       log.info('Analysis cached', { candidateId: candidate.upstreamId, sourceType: candidate.sourceType })
 
       return analysisResult
@@ -522,7 +521,6 @@ export const matchEngineService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claude } = getConfig()
     log.info('Search pipeline started', { dataSource: request.dataSource, topN: request.topN, searchMode: request.searchMode, matchFlowType: request.matchFlowType })
 
     try {
@@ -542,7 +540,7 @@ export const matchEngineService = {
       emitEvent({ type: 'progress', percent: 35, stage: `${filtered.length} candidates after constraints.` })
       emitEvent({ type: 'progress', percent: 40, stage: `Running Haiku triage on ${Math.min(Math.max(request.topN * 3, 20), filtered.length)} candidates...` })
 
-      const haikuResults = await runHaikuTriage(filtered, request.jobDescription, request.topN, claude.haikuModel, claude.haikuMaxConcurrency)
+      const haikuResults = await runHaikuTriage(filtered, request.jobDescription, request.topN)
       const passed = haikuResults.filter(r => r.relevant || r.score >= 40).sort((a, b) => b.score - a.score)
       let topCandidates = passed.slice(0, request.topN)
       log.info('Haiku triage complete', { triaged: haikuResults.length, passed: passed.length, topN: topCandidates.length })
@@ -604,7 +602,7 @@ export const matchEngineService = {
         return null
       }
 
-      const { results: opusResults, cacheStats } = await runDeepAnalysis(topCandidates, request, claude.opusModel, claude.maxConcurrency)
+      const { results: opusResults, cacheStats } = await runDeepAnalysis(topCandidates, request)
       const sortedResults = opusResults.sort((a, b) => (b.matchScore as number) - (a.matchScore as number))
       log.info('Deep analysis cache stats', { cacheHits: cacheStats.cacheHits, cacheMisses: cacheStats.cacheMisses })
 

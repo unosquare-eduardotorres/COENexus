@@ -76,6 +76,37 @@ describe('isTokenExpired', () => {
   })
 })
 
+describe('decodeTokenPayload (Base64URL)', () => {
+  it('should decode Base64URL-encoded payload with - and _ characters', () => {
+    const payload = { sub: 'user-1', exp: 1781808660, nested: { key: 'abc-_/+=' } }
+    const jsonStr = JSON.stringify(payload)
+    // Encode as Base64URL: replace + → -, / → _, strip trailing =
+    const base64url = btoa(jsonStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const token = `${btoa('{"alg":"RS256"}')}.${base64url}.signature`
+    const decoded = decodeTokenPayload(token)
+    expect(decoded?.sub).toBe('user-1')
+    expect(decoded?.exp).toBe(1781808660)
+  })
+
+  it('should handle missing Base64 padding', () => {
+    const payload = { exp: 1781808660 }
+    // Strip padding to simulate JWT encoding
+    const base64url = btoa(JSON.stringify(payload)).replace(/=+$/, '')
+    const token = `${btoa('{}')}.${base64url}.sig`
+    const decoded = decodeTokenPayload(token)
+    expect(decoded?.exp).toBe(1781808660)
+  })
+
+  it('should still decode standard Base64 payloads', () => {
+    // Ensure backward compat — standard Base64 still works
+    const payload = { sub: 'user-1', exp: 9999999999 }
+    const standard = btoa(JSON.stringify(payload)) // includes = padding, uses +/
+    const token = `${btoa('{}')}.${standard}.sig`
+    const decoded = decodeTokenPayload(token)
+    expect(decoded?.sub).toBe('user-1')
+  })
+})
+
 describe('formatCountdown', () => {
   it('should format zero as 00:00:00', () => {
     expect(formatCountdown(0)).toBe('00:00:00')

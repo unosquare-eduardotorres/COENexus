@@ -354,6 +354,11 @@ export const matchToPositionsSchema = z.object({
   })).optional(),
 })
 
+export const syncValidateTokenSchema = z.object({
+  token: z.string().min(1),
+  source: z.enum(['unocore', 'exec']),
+})
+
 export function validatePayload<T>(schema: z.ZodType<T>, data: unknown, channel: string): T {
   const result = schema.safeParse(data)
   if (!result.success) {

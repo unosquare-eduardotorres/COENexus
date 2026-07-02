@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createHash } from 'crypto'
 
-vi.mock('../claudeService', () => ({
-  claudeService: {
+vi.mock('../llmRouter', () => ({
+  llmRouter: {
     chatAsync: vi.fn().mockResolvedValue({ text: '{"match_score":85,"summary":"Good match"}', usage: { inputTokens: 0, outputTokens: 0 } }),
+    getConcurrencyLimit: vi.fn().mockReturnValue(8),
   },
 }))
 
@@ -37,8 +38,27 @@ vi.mock('../../db/repositories/matchRepository', () => ({
 
 vi.mock('../../config', () => ({
   getConfig: vi.fn(() => ({
-    claude: { haikuModel: 'haiku-test', opusModel: 'opus-test', haikuConcurrency: 2, opusConcurrency: 1 },
     voyage: { apiUrl: 'https://api.test', defaultModel: 'voyage-test', apiKeys: ['key1'] },
+    modelConfig: {
+      presetMode: 'claude',
+      localServerUrl: 'http://localhost:8080',
+      localDefaultModel: '',
+      concurrency: { claude: { max: 2, haikuMax: 2 }, local: { max: 1 } },
+      features: {
+        resumeSkillExtraction: { provider: 'claude', model: 'claude-haiku-4-5' },
+        resumeFormatCheck: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        resumeTransform: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        candidateProfile: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        coverLetter: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        matchTriage: { provider: 'claude', model: 'claude-haiku-4-5' },
+        matchDeepAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        benchBurnAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        responsivenessAnalysis: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        responsivenessReport: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        bugDescription: { provider: 'claude', model: 'claude-haiku-4-5' },
+        aiChat: { provider: 'claude', model: 'claude-sonnet-4-6' },
+      },
+    },
   })),
 }))
 

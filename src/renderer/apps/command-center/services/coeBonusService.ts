@@ -9,16 +9,16 @@ import {
   getFillRateMock,
   getGrossMarginMock,
   getOverviewMock,
-  getPlacementMarginMock,
 } from '../mocks/coeBonusMockData'
 import type {
-  AcceptanceRateDetail,
   CoeBonusFilterOptions,
   CoeBonusFilters,
   FillRateDetail,
   GrossMarginDetail,
   OverviewSummary,
-  PlacementMarginDetail,
+  PlacementMarginReportResult,
+  PlacementMarginSyncStatus,
+  ReportAcceptanceRateResultV2,
 } from '../types/coeBonus'
 
 /** Simulates IPC latency so loading states are exercised in the skeleton. */
@@ -45,8 +45,16 @@ export const coeBonusService = {
     return settle(getOverviewMock(filters))
   },
 
-  getPlacementMargin(filters: CoeBonusFilters): Promise<PlacementMarginDetail> {
-    return settle(getPlacementMarginMock(filters))
+  async getPlacementMargin(filters: CoeBonusFilters): Promise<PlacementMarginReportResult | null> {
+    return window.api.report.getPlacementMargin(filters.year, filters.quarter)
+  },
+
+  async getPlacementMarginSyncStatus(year: number, quarter: number): Promise<PlacementMarginSyncStatus> {
+    return window.api.report.getPlacementMarginSyncStatus(year, quarter)
+  },
+
+  async syncPlacementMargin(token: string, year: number, quarter?: string): Promise<{ started: boolean }> {
+    return window.api.report.syncPlacementMargin({ token, year, quarter })
   },
 
   getGrossMargin(filters: CoeBonusFilters): Promise<GrossMarginDetail> {
@@ -57,7 +65,7 @@ export const coeBonusService = {
     return settle(getFillRateMock(filters))
   },
 
-  getAcceptanceRate(filters: CoeBonusFilters): Promise<AcceptanceRateDetail> {
-    return window.api.report.getAcceptanceRate(filters) as Promise<AcceptanceRateDetail>
+  getAcceptanceRate(filters: CoeBonusFilters): Promise<ReportAcceptanceRateResultV2> {
+    return window.api.report.getAcceptanceRate(filters) as Promise<ReportAcceptanceRateResultV2>
   },
 }

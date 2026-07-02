@@ -40,3 +40,27 @@ export const opusAnalysisSchema = z.object({
 })
 
 export type OpusAnalysisResult = z.infer<typeof opusAnalysisSchema>
+
+export const responsivenessAnalysisSchema = z.object({
+  positionSummary: z.string().default(''),
+  verdicts: z.array(
+    z.object({
+      mentionCommentId: z.number(),
+      taggedLeadEmail: z.string(),
+      stillNeedsResponse: z.boolean().default(true),
+      confidence: z.number().min(0).max(100).default(50),
+      reasoning: z.string().default('Unable to determine'),
+    })
+  ),
+})
+
+export type ResponsivenessAnalysisResult = z.infer<typeof responsivenessAnalysisSchema>
+
+export const positionAttentionSchema = z.object({
+  attentionState: z.enum(['NEEDS_COE_ACTION', 'WAITING_ON_CLIENT', 'ON_TRACK']),
+  ballWith: z.string().default('Unknown'),
+  summary: z.string().default('Unable to determine current status.'),
+  confidence: z.number().min(0).max(100).default(50),
+})
+
+export type PositionAttentionResult = z.infer<typeof positionAttentionSchema>

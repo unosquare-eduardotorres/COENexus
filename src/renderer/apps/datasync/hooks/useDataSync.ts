@@ -12,7 +12,7 @@ import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 const log = createRendererLogger('useDataSync');
 
 export function useDataSync(activePanel: DataSyncPanel) {
-  const { sharepoint } = useNexusStatus();
+  const { apiTokens } = useNexusStatus();
 
   const [selectedYear, setSelectedYear] = useState<number | null>(() =>
     safeParseJSON(localStorage.getItem('datasync-candidate-year'), null)
@@ -26,23 +26,23 @@ export function useDataSync(activePanel: DataSyncPanel) {
 
   const employees = useSyncPipeline({
     source: 'employees',
-    token: sharepoint.token,
+    token: apiTokens.unocore.token,
     enabled: true,
   });
   const candidates = useSyncPipeline({
     source: 'candidates',
-    token: sharepoint.token,
+    token: apiTokens.unocore.token,
     enabled: true,
     selectedYear,
   });
   const openPositions = useSyncPipeline({
     source: 'open-positions',
-    token: sharepoint.token,
+    token: apiTokens.unocore.token,
     enabled: true,
   });
   const projectReallocations = useSyncPipeline({
     source: 'project-reallocations',
-    token: sharepoint.token,
+    token: apiTokens.unocore.token,
     enabled: true,
   });
 

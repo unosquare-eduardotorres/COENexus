@@ -1,4 +1,0 @@
-ALTER TABLE stakeholder_profiles ADD COLUMN actual_accepted_tech_stacks_json TEXT;
-ALTER TABLE stakeholder_profiles ADD COLUMN actual_rejected_tech_stacks_json TEXT;
-ALTER TABLE stakeholder_profiles ADD COLUMN tech_stack_flexibility TEXT;
-ALTER TABLE stakeholder_profiles ADD COLUMN tag_vs_resume_divergence_rate REAL;

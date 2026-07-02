@@ -4,7 +4,6 @@ import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { syncRepository } from '../db/repositories/syncRepository'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { getDatabase } from '../db/connection'
-import { getConfig } from '../config'
 import { createLogger } from './logger'
 
 const log = createLogger('ProcessingOrchestrator')

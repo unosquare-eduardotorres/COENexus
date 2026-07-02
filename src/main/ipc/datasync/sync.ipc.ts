@@ -1,6 +1,6 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { SyncStartParams, SyncSingleParams, SyncRetryParams, SyncYearFilterParams, SyncUploadNoteParams, SyncRecordDto } from '../../../shared/ipc-types'
+import type { SyncStartParams, SyncSingleParams, SyncRetryParams, SyncYearFilterParams, SyncUploadNoteParams, SyncRecordDto, PlacementMarginSyncParams } from '../../../shared/ipc-types'
 import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow, SyncedProjectReallocationRow } from '../../db/repositories/syncRepository'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
@@ -9,10 +9,11 @@ import { syncRepository } from '../../db/repositories/syncRepository'
 import { matchRepository } from '../../db/repositories/matchRepository'
 import { catalogService } from '../../services/catalogService'
 import { upstreamApiService } from '../../services/upstreamApiService'
-import { validatePayload, syncStartSchema, syncSingleSchema, syncRetrySchema, syncUploadNoteSchema } from '../schemas'
+import { validatePayload, syncStartSchema, syncSingleSchema, syncRetrySchema, syncUploadNoteSchema, syncValidateTokenSchema } from '../schemas'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { createLogger } from '../../services/logger'
 import { salaryNormalizationService } from '../../services/salaryNormalizationService'
+import { fetchExecApi } from '../../services/upstream/execApiClient'
 
 const log = createLogger('SyncIPC')
 
@@ -144,16 +145,43 @@ function mapPrrRowToDto(row: SyncedProjectReallocationRow): SyncRecordDto {
 
 export function registerSyncHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.SYNC_VALIDATE_TOKEN,
-    async (event: IpcMainInvokeEvent, token: string) => {
+    async (event: IpcMainInvokeEvent, payload: unknown) => {
       validateSender(event)
-      log.info('Token validation requested')
-      if (!token || typeof token !== 'string') throw new Error('Token is required')
+      const { token, source } = validatePayload(syncValidateTokenSchema, payload, IPC_CHANNELS.SYNC_VALIDATE_TOKEN)
+      log.info('Token validation requested', { source })
+
+      // Pre-check: decode JWT and verify expiration before hitting the API
       try {
-        await upstreamApiService.getEmployeesPaged(token, 0, 1)
-        log.info('Token validation result', { valid: true })
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+          const pad = base64.length % 4
+          if (pad) base64 += '='.repeat(4 - pad)
+          const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'))
+          if (payload.exp && typeof payload.exp === 'number') {
+            if (Date.now() > payload.exp * 1000) {
+              log.info('Token validation result', { valid: false, source, reason: 'expired' })
+              return {
+                valid: false,
+                message: `This token has expired. Please extract a new token from ${source === 'exec' ? 'reports.unosquare.com' : 'operations.unosquare.com'}.`,
+              }
+            }
+          }
+        }
+      } catch {
+        // If we can't decode, fall through to the API validation
+      }
+
+      try {
+        if (source === 'exec') {
+          await fetchExecApi('api/Profile/', token, AbortSignal.timeout(10000))
+        } else {
+          await upstreamApiService.getEmployeesPaged(token, 0, 1)
+        }
+        log.info('Token validation result', { valid: true, source })
         return { valid: true, message: 'Token is valid' }
       } catch (err) {
-        log.info('Token validation result', { valid: false, error: err instanceof Error ? err.message : String(err) })
+        log.info('Token validation result', { valid: false, source, error: err instanceof Error ? err.message : String(err) })
         return { valid: false, message: err instanceof Error ? err.message : 'Token validation failed' }
       }
     })
@@ -271,4 +299,42 @@ export function registerSyncHandlers(): void {
       log.info('Salary normalization backfill requested')
       return salaryNormalizationService.backfillAll()
     })
+
+  registerIpcHandler(
+    IPC_CHANNELS.SYNC_PLACEMENT_MARGIN,
+    async (event: IpcMainInvokeEvent, params: PlacementMarginSyncParams) => {
+      validateSender(event)
+      // Default quarter to current quarter when not provided (used for YtdTotals scope)
+      const quarter = params.quarter ?? `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`
+      log.info('Placement margin sync requested', { year: params.year, quarter })
+      const win = getMainWindow()
+      syncOrchestrator.syncAsync('placement-margin', params.token, {
+        year: params.year,
+        quarter,
+      }, (evt) => {
+        win?.webContents.send(IPC_CHANNELS.SYNC_PROGRESS_EVENT, evt)
+      })
+      return { started: true }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.SYNC_PLACEMENT_MARGIN_STATUS,
+    async (event: IpcMainInvokeEvent, { year, quarter }: { year: number; quarter: number }) => {
+      validateSender(event)
+      // Try the exact quarter first, then fall back to year-level count
+      const summary = syncRepository.getPlacementMarginSummary(year, quarter)
+      const entries = quarter === 0
+        ? syncRepository.getPlacementMarginsForYear(year)
+        : syncRepository.getPlacementMargins(year, quarter)
+      // If no entries for the specific quarter, try year-level
+      const yearEntries = entries.length === 0 ? syncRepository.getPlacementMarginsForYear(year) : entries
+      const hasSynced = !!summary || yearEntries.length > 0
+      return {
+        hasSyncedData: hasSynced,
+        syncedAt: summary?.synced_at ?? null,
+        entryCount: yearEntries.length,
+      }
+    }
+  )
 }

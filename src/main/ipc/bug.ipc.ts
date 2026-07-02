@@ -4,7 +4,7 @@ import type { ErrorGenerateDescriptionRequest, ErrorReportRequest } from '../../
 import { validateSender } from './validate'
 import { registerIpcHandler } from './registerIpcHandler'
 import { readAllErrors, clearErrors, markReported, captureError, getErrorsFilePath, deleteError, updateAiDescription } from '../services/errorTransport'
-import { claudeService } from '../services/claudeService'
+import { llmRouter } from '../services/llmRouter'
 
 export function registerBugHandlers(): void {
   registerIpcHandler(IPC_CHANNELS.ERRORS_LIST,
@@ -44,8 +44,8 @@ Error Details:
 - Occurrences: ${error.occurrences}
 - Module: ${error.source ?? 'Unknown'}`
 
-      const { text: description } = await claudeService.chatAsync(
-        'haiku',
+      const { text: description } = await llmRouter.chatAsync(
+        'bugDescription',
         prompt,
         1024,
         0.2,

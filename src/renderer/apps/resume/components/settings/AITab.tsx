@@ -107,8 +107,8 @@ const AITab = memo(function AITab({ aiConfig, setAiConfig, handleSaveAIConfig }:
           <div className="grid grid-cols-3 gap-3">
             {[
               {
-                id: 'claude-sonnet-4-20250514',
-                name: 'Sonnet 4',
+                id: 'claude-sonnet-4-6',
+                name: 'Sonnet 4.6',
                 badge: 'Balanced',
                 description: 'Best balance of quality and speed. Excellent at structured extraction and JSON output.',
                 strengths: ['Fast responses', 'Great at extraction', 'Reliable JSON'],
@@ -119,8 +119,8 @@ const AITab = memo(function AITab({ aiConfig, setAiConfig, handleSaveAIConfig }:
                 checkColor: 'text-accent-500',
               },
               {
-                id: 'claude-opus-4-20250514',
-                name: 'Opus 4',
+                id: 'claude-opus-4-8',
+                name: 'Opus 4.8',
                 badge: 'Premium',
                 description: 'Highest quality and deepest reasoning. Best for complex analysis tasks.',
                 strengths: ['Deepest reasoning', 'Highest accuracy', 'Complex tasks'],
@@ -131,8 +131,8 @@ const AITab = memo(function AITab({ aiConfig, setAiConfig, handleSaveAIConfig }:
                 checkColor: 'text-violet-500',
               },
               {
-                id: 'claude-haiku-4-20250414',
-                name: 'Haiku 4',
+                id: 'claude-haiku-4-5',
+                name: 'Haiku 4.5',
                 badge: 'Fastest',
                 description: 'Lightweight and ultra-fast. Good for quick validation and simple checks.',
                 strengths: ['Ultra-fast', 'Lightweight', 'Cost-efficient'],

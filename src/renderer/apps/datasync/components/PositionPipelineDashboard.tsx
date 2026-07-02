@@ -309,7 +309,7 @@ export default memo(function PositionPipelineDashboard({
 
       {/* Tab content */}
       {activeTab === 'succeeded' && (
-        <SucceededRecordsTable records={succeededRecords} />
+        <SucceededRecordsTable records={succeededRecords} source="positions" />
       )}
       {activeTab === 'failed' && (
         <div className="space-y-3">
@@ -335,7 +335,7 @@ export default memo(function PositionPipelineDashboard({
         </div>
       )}
       {activeTab === 'skipped' && (
-        <SucceededRecordsTable records={skippedRecords} variant="skipped" />
+        <SucceededRecordsTable records={skippedRecords} variant="skipped" source="positions" />
       )}
     </div>
   )

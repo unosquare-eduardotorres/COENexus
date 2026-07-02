@@ -6,6 +6,7 @@ import EmailSettingsPage from './pages/EmailSettingsPage'
 
 const VectorizationSettingsPage = lazy(() => import('./pages/VectorizationSettingsPage'))
 const DataMaintenanceSettingsPage = lazy(() => import('./pages/DataMaintenanceSettingsPage'))
+const AIModelsSettingsPage = lazy(() => import('./pages/AIModelsSettingsPage'))
 
 export default function SettingsApp() {
   return (
@@ -15,6 +16,7 @@ export default function SettingsApp() {
         <Route path="email" element={<EmailSettingsPage />} />
         <Route path="vectorization" element={<Suspense fallback={null}><VectorizationSettingsPage /></Suspense>} />
         <Route path="data-maintenance" element={<Suspense fallback={null}><DataMaintenanceSettingsPage /></Suspense>} />
+        <Route path="ai-models" element={<Suspense fallback={null}><AIModelsSettingsPage /></Suspense>} />
       </Route>
     </Routes>
   )

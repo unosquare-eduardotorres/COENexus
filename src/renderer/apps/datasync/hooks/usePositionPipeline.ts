@@ -1,148 +1,64 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { positionPipelineService } from '../services/positionPipelineService'
-import type { PipelineRecordEvent, PipelineProgressDto, PipelineProgressEvent } from '../services/positionPipelineService'
+import type { PipelineProgressEvent } from '../services/positionPipelineService'
 import { useNexusStatus } from '../../../contexts/NexusStatusContext'
 import { createRendererLogger } from '../../../shared/utils/rendererLogger'
+import { usePipelineRecords, makeInitialProgress } from './usePipelineRecords'
+
+export type { PipelineRecordEvent, PipelineProgressDto } from './usePipelineRecords'
 
 const log = createRendererLogger('usePositionPipeline')
 
-export type { PipelineRecordEvent, PipelineProgressDto }
-
-function statusToFailedStep(status: string): 'sync' | 'extract' | 'vectorize' | 'no_resume' {
-  if (status === 'sync_failed') return 'sync'
-  if (status === 'extract_failed') return 'extract'
-  if (status === 'vectorize_failed') return 'vectorize'
-  return 'no_resume'
-}
-
-const initialProgress = (): PipelineProgressDto => ({
-  source: 'open-positions',
-  status: 'completed',
-  totalRecords: 0,
-  processedRecords: 0,
-  succeededCount: 0,
-  failedCount: 0,
-  skippedCount: 0,
-})
+const SOURCE = 'open-positions'
 
 export function usePositionPipeline() {
-  const { sharepoint } = useNexusStatus()
-  const token = sharepoint.token
+  const { apiTokens } = useNexusStatus()
+  const token = apiTokens.unocore.token
 
-  const [progress, setProgress] = useState<PipelineProgressDto>(initialProgress)
-  const [succeededRecords, setSucceededRecords] = useState<PipelineRecordEvent[]>([])
-  const [failedRecords, setFailedRecords] = useState<PipelineRecordEvent[]>([])
-  const [skippedRecords, setSkippedRecords] = useState<PipelineRecordEvent[]>([])
-  const [retryingId, setRetryingId] = useState<number | undefined>()
+  const records = usePipelineRecords({ source: SOURCE })
   const [activeTab, setActiveTab] = useState<'succeeded' | 'failed' | 'skipped'>('succeeded')
   const [isVectorizingSynced, setIsVectorizingSynced] = useState(false)
-  const [dbFailedCount, setDbFailedCount] = useState(0)
 
   const [syncMode, setSyncMode] = useState<'active' | 'full'>('active')
   const [syncYear, setSyncYear] = useState<number | null>(null)
-  const pausedOffsetRef = useRef(0)
   const savedActiveOnlyRef = useRef<boolean>(true)
   const savedYearRef = useRef<number | null>(null)
   const prevTokenRef = useRef(token)
 
-  // Load DB-failed records on mount (persists across navigation)
+  // Load DB failed records on mount
   useEffect(() => {
-    positionPipelineService.getFailedRecords().then(dbFailed => {
-      setDbFailedCount(dbFailed.length)
-      if (dbFailed.length > 0) {
-        setFailedRecords(prev => {
-          if (prev.length > 0) return prev
-          return dbFailed.map(r => ({
-            upstreamId: r.upstream_id,
-            name: r.full_name,
-            outcome: 'failed' as const,
-            failedStep: statusToFailedStep(r.status),
-            error: r.status_reason ?? undefined,
-            hasResume: r.has_resume === 1,
-          }))
-        })
-      }
-    }).catch(err => log.error('Failed to load DB failed records', err))
+    positionPipelineService.getFailedRecords()
+      .then(dbFailed => records.loadDbFailed(dbFailed))
+      .catch(err => log.error('Failed to load DB failed records', err))
   }, [])
 
+  // Subscribe to pipeline events
   useEffect(() => {
     const unsub = positionPipelineService.onProgress((event: PipelineProgressEvent) => {
-      if (event.type === 'record' && event.record) {
-        const record = event.record
-        if (record.outcome === 'vectorized') {
-          setSucceededRecords(prev => {
-            const exists = prev.some(r => r.upstreamId === record.upstreamId)
-            return exists ? prev.map(r => r.upstreamId === record.upstreamId ? record : r) : [...prev, record]
-          })
-          setFailedRecords(prev => prev.filter(r => r.upstreamId !== record.upstreamId))
-        } else if (record.outcome === 'failed') {
-          setFailedRecords(prev => {
-            const exists = prev.some(r => r.upstreamId === record.upstreamId)
-            return exists ? prev.map(r => r.upstreamId === record.upstreamId ? record : r) : [...prev, record]
-          })
-        } else if (record.outcome === 'skipped') {
-          setSkippedRecords(prev => {
-            const exists = prev.some(r => r.upstreamId === record.upstreamId)
-            return exists ? prev : [...prev, record]
-          })
-        }
-      }
-      if (event.type === 'progress' && event.progress) {
-        if (event.progress.source === 'open-positions') {
-          setProgress(event.progress)
-        }
-      }
-      if (event.type === 'complete' && event.progress) {
-        if (event.progress.source === 'open-positions') {
-          setProgress(event.progress)
-          setIsVectorizingSynced(false)
-          if (event.progress.status === 'completed') {
-            positionPipelineService.getFailedRecords().then(dbFailed => {
-              setDbFailedCount(dbFailed.length)
-              setFailedRecords(dbFailed.map(r => ({
-                upstreamId: r.upstream_id,
-                name: r.full_name,
-                outcome: 'failed' as const,
-                failedStep: statusToFailedStep(r.status),
-                error: r.status_reason ?? undefined,
-                hasResume: r.has_resume === 1,
-              })))
-            }).catch(err => log.error('Failed to refresh DB failed records', err))
-          }
-          if (event.progress.status === 'paused') {
-            pausedOffsetRef.current = event.progress.processedRecords
-          }
+      records.handleEvent(event, SOURCE)
+
+      // Position-specific: clear vectorizing flag on complete/error
+      if (event.type === 'complete' && event.progress?.source === SOURCE) {
+        setIsVectorizingSynced(false)
+        if (event.progress.status === 'completed') {
+          positionPipelineService.getFailedRecords()
+            .then(dbFailed => records.refreshDbFailed(dbFailed))
+            .catch(err => log.error('Failed to refresh DB failed records', err))
         }
       }
       if (event.type === 'error') {
-        log.error('Position pipeline error', new Error(event.message))
         setIsVectorizingSynced(false)
-        setProgress(prev => prev.status === 'processing' ? { ...prev, status: 'paused' } : prev)
       }
     })
-
     return unsub
   }, [])
 
+  // Restore persisted state
   useEffect(() => {
     positionPipelineService.getState().then(saved => {
       if (saved && saved.status === 'paused') {
         log.info('Restoring persisted position pipeline state', { offset: saved.offset })
-        setProgress({
-          source: 'open-positions',
-          status: 'paused',
-          totalRecords: saved.totalRecords,
-          processedRecords: saved.processedRecords,
-          succeededCount: saved.succeededCount,
-          failedCount: saved.failedCount,
-          skippedCount: saved.skippedCount,
-          pauseReason: saved.pauseReason as PipelineProgressDto['pauseReason'],
-          errorMessage: saved.errorMessage,
-        })
-        setSucceededRecords(saved.succeededRecords ?? [])
-        setFailedRecords(saved.failedRecords ?? [])
-        setSkippedRecords(saved.skippedRecords ?? [])
-        pausedOffsetRef.current = saved.offset
+        records.restoreState(saved)
         const restoredActiveOnly = saved.activeOnly ?? true
         savedActiveOnlyRef.current = restoredActiveOnly
         setSyncMode(restoredActiveOnly ? 'active' : 'full')
@@ -152,28 +68,22 @@ export function usePositionPipeline() {
     }).catch(err => log.error('Failed to load persisted state', err))
   }, [])
 
+  // Auto-resume on token refresh
   useEffect(() => {
     if (prevTokenRef.current !== token) {
       prevTokenRef.current = token
       if (
-        progress.status === 'paused'
-        && (progress.pauseReason === 'token-expiring' || progress.pauseReason === 'error')
-        && pausedOffsetRef.current > 0
-        && sharepoint.isValid
+        records.isPaused
+        && (records.progress.pauseReason === 'token-expiring' || records.progress.pauseReason === 'error')
+        && records.pausedOffsetRef.current > 0
+        && apiTokens.unocore.isValid
       ) {
-        log.info('Token refreshed — auto-resuming position pipeline', { skip: pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
-        setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
-        positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
+        log.info('Token refreshed — auto-resuming position pipeline', { skip: records.pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
+        records.markProcessing()
+        positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: records.pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
       }
     }
-  }, [token, progress.status, progress.pauseReason, sharepoint.isValid])
-
-  const resetState = useCallback(() => {
-    setSucceededRecords([])
-    setFailedRecords([])
-    setSkippedRecords([])
-    pausedOffsetRef.current = 0
-  }, [])
+  }, [token, records.progress.status, records.progress.pauseReason, apiTokens.unocore.isValid])
 
   const handleSyncActive = useCallback(async () => {
     log.info('Position pipeline sync active')
@@ -181,10 +91,10 @@ export function usePositionPipeline() {
     savedYearRef.current = null
     setSyncMode('active')
     await positionPipelineService.clearState()
-    resetState()
-    setProgress({ ...initialProgress(), status: 'processing' })
+    records.resetAll()
+    records.setProgress({ ...makeInitialProgress(SOURCE), status: 'processing' })
     await positionPipelineService.startPipeline(true, token, { skip: 0 })
-  }, [token, resetState])
+  }, [token])
 
   const handleSyncAll = useCallback(async () => {
     log.info('Position pipeline sync all')
@@ -192,18 +102,16 @@ export function usePositionPipeline() {
     savedYearRef.current = syncYear
     setSyncMode('full')
     await positionPipelineService.clearState()
-    resetState()
-    setProgress({ ...initialProgress(), status: 'processing' })
+    records.resetAll()
+    records.setProgress({ ...makeInitialProgress(SOURCE), status: 'processing' })
     await positionPipelineService.startPipeline(false, token, { skip: 0, year: syncYear ?? undefined })
-  }, [token, resetState, syncYear])
+  }, [token, syncYear])
 
   const handleVectorizeSynced = useCallback(async () => {
     log.info('Position pipeline vectorize synced')
     setIsVectorizingSynced(true)
-    setSucceededRecords([])
-    setFailedRecords([])
-    setSkippedRecords([])
-    setProgress({ ...initialProgress(), status: 'processing' })
+    records.resetAll()
+    records.setProgress({ ...makeInitialProgress(SOURCE), status: 'processing' })
     await positionPipelineService.vectorizeSynced(token)
   }, [token])
 
@@ -213,35 +121,25 @@ export function usePositionPipeline() {
   }, [])
 
   const handleResume = useCallback(async () => {
-    log.info('Position pipeline resume', { skip: pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
-    setProgress(prev => ({ ...prev, status: 'processing', pauseReason: undefined, errorMessage: undefined }))
-    await positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
+    log.info('Position pipeline resume', { skip: records.pausedOffsetRef.current, activeOnly: savedActiveOnlyRef.current })
+    records.markProcessing()
+    await positionPipelineService.startPipeline(savedActiveOnlyRef.current, token, { skip: records.pausedOffsetRef.current, year: savedYearRef.current ?? undefined })
   }, [token])
 
   const handleRetryAllFailed = useCallback(async () => {
     log.info('Position pipeline retry all failed')
-    setProgress(prev => ({ ...prev, status: 'processing' }))
+    records.setProgress(prev => ({ ...prev, status: 'processing' }))
     await positionPipelineService.retryAllFailed(token)
   }, [token])
 
   const handleRetrySingle = useCallback(async (upstreamId: number) => {
     log.info('Position pipeline retry single', { upstreamId })
-    setRetryingId(upstreamId)
+    records.setRetryingId(upstreamId)
     try {
       const result = await positionPipelineService.retrySingle(token, upstreamId)
-      if (result.outcome === 'vectorized') {
-        setSucceededRecords(prev => [...prev, result])
-        setFailedRecords(prev => prev.filter(r => r.upstreamId !== upstreamId))
-        setProgress(prev => ({
-          ...prev,
-          succeededCount: prev.succeededCount + 1,
-          failedCount: Math.max(0, prev.failedCount - 1),
-        }))
-      } else {
-        setFailedRecords(prev => prev.map(r => r.upstreamId === upstreamId ? result : r))
-      }
+      records.applyRetryResult(upstreamId, result)
     } finally {
-      setRetryingId(undefined)
+      records.setRetryingId(undefined)
     }
   }, [token])
 
@@ -252,29 +150,21 @@ export function usePositionPipeline() {
     setSyncMode('active')
     setSyncYear(null)
     await positionPipelineService.clearState()
-    resetState()
-    setProgress(initialProgress())
-  }, [resetState])
-
-  const isRunning = progress.status === 'processing'
-  const isPaused = progress.status === 'paused'
-  const isCompleted = progress.status === 'completed'
-  const progressPercent = progress.totalRecords > 0
-    ? Math.min(100, Math.round((progress.processedRecords / progress.totalRecords) * 100))
-    : 0
+    records.resetAll()
+  }, [])
 
   return {
-    progress,
-    succeededRecords,
-    failedRecords,
-    skippedRecords,
-    retryingId,
+    progress: records.progress,
+    succeededRecords: records.succeededRecords,
+    failedRecords: records.failedRecords,
+    skippedRecords: records.skippedRecords,
+    retryingId: records.retryingId,
     activeTab,
     setActiveTab,
-    isRunning,
-    isPaused,
-    isCompleted,
-    progressPercent,
+    isRunning: records.isRunning,
+    isPaused: records.isPaused,
+    isCompleted: records.isCompleted,
+    progressPercent: records.progressPercent,
     isVectorizingSynced,
     syncMode,
     syncYear,
@@ -287,6 +177,6 @@ export function usePositionPipeline() {
     handleStartOver,
     handleRetryAllFailed,
     handleRetrySingle,
-    dbFailedCount,
+    dbFailedCount: records.dbFailedCount,
   }
 }

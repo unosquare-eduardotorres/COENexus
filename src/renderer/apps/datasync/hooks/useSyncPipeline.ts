@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { SyncSourceType, SyncProgress, SyncRecord, ProcessingProgress, ProcessingRecord } from '../types';
+import { SyncSourceType, SyncProgress, SyncRecord } from '../types';
 import { dataSyncService } from '../services/dataSyncService';
 import { resumeProcessingService } from '../services/processingService';
 import { createRendererLogger } from '../../../shared/utils/rendererLogger';
 import { useIpcMutation, useIpcQuery, useInvalidateQueries } from '../../../shared/hooks/useIpcQuery';
-import { SYNC_STATUS, PROCESSING_STATUS, PIPELINE_STATUS } from '../constants/syncStatus';
+import { SYNC_STATUS, PIPELINE_STATUS } from '../constants/syncStatus';
 import { safeJsonParse as safeParseJSON } from '../../../shared/utils/safeJsonParse';
+import { useProcessingPipeline } from './useProcessingPipeline';
 
 const log = createRendererLogger('useSyncPipeline');
 
@@ -13,11 +14,6 @@ const initialProgress = (source: SyncSourceType): SyncProgress => ({
   source, status: SYNC_STATUS.IDLE, totalRecords: 0, fetchedRecords: 0,
   syncedCount: 0, incompleteCount: 0, notProcessedCount: 0,
   extractedCount: 0, vectorizedCount: 0, skippedCount: 0,
-});
-
-const initialProcessingProgress = (source: SyncSourceType): ProcessingProgress => ({
-  source, status: PROCESSING_STATUS.IDLE, totalRecords: 0, processedRecords: 0,
-  successCount: 0, failedCount: 0, skippedCount: 0,
 });
 
 function restoreProgress(raw: SyncProgress | null, source: SyncSourceType): SyncProgress {
@@ -85,24 +81,19 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     )
   );
   const [records, setRecords] = useState<SyncRecord[]>([]);
-  const [extractionProgress, setExtractionProgress] = useState<ProcessingProgress>(() =>
-    initialProcessingProgress(source)
-  );
-  const [vectorizationProgress, setVectorizationProgress] = useState<ProcessingProgress>(() =>
-    initialProcessingProgress(source)
-  );
-
-  const [extractingUpstreamId, setExtractingUpstreamId] = useState<number | undefined>();
-  const [vectorizingUpstreamId, setVectorizingUpstreamId] = useState<number | undefined>();
   const [refreshingId, setRefreshingId] = useState<number | undefined>();
   const [vectorizingId, setVectorizingId] = useState<number | undefined>();
   const [isClearing, setIsClearing] = useState(false);
-  const [isProcessingAll, setIsProcessingAll] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const extractionAbortRef = useRef<AbortController | null>(null);
-  const vectorizationAbortRef = useRef<AbortController | null>(null);
   const invalidateQueries = useInvalidateQueries();
+
+  const invalidateRecordQueries = useCallback(() => {
+    invalidateQueries(recordsQueryKey(source, selectedYear));
+    invalidateQueries(['datasync-sync-status', source]);
+  }, [invalidateQueries, source, selectedYear]);
+
+  const processing = useProcessingPipeline(source, token, setRecords, invalidateRecordQueries);
 
   const recordsQuery = useIpcQuery(
     recordsQueryKey(source, selectedYear),
@@ -145,51 +136,6 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     localStorage.setItem(`datasync-${storageKey(source)}-progress`, JSON.stringify(progress));
   }, [progress, source]);
 
-  const invalidateRecordQueries = useCallback(() => {
-    invalidateQueries(recordsQueryKey(source, selectedYear));
-    invalidateQueries(['datasync-sync-status', source]);
-  }, [invalidateQueries, source, selectedYear]);
-
-  const handleRecordExtracted = useCallback((processed: ProcessingRecord) => {
-    if (processed.status === PROCESSING_STATUS.COMPLETED) {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'extracted' as const, reason: undefined } : r
-        )
-      );
-      setExtractingUpstreamId(undefined);
-    } else if (processed.status === 'failed') {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'extract_failed' as const, reason: processed.error } : r
-        )
-      );
-      setExtractingUpstreamId(undefined);
-    } else {
-      setExtractingUpstreamId(processed.upstreamId);
-    }
-  }, []);
-
-  const handleRecordVectorized = useCallback((processed: ProcessingRecord) => {
-    if (processed.status === PROCESSING_STATUS.COMPLETED) {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'vectorized' as const, reason: undefined } : r
-        )
-      );
-      setVectorizingUpstreamId(undefined);
-    } else if (processed.status === 'failed') {
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.upstreamId === processed.upstreamId ? { ...r, pipelineStatus: 'vectorize_failed' as const, reason: processed.error } : r
-        )
-      );
-      setVectorizingUpstreamId(undefined);
-    } else {
-      setVectorizingUpstreamId(processed.upstreamId);
-    }
-  }, []);
-
   const doStartSync = useCallback(async (isResume = false, skipCount?: number, activeOnly?: boolean) => {
     log.info('Sync started', { source, isResume, skipCount: skipCount ?? 0, selectedYear: selectedYear ?? null, activeOnly: activeOnly ?? null });
     const controller = new AbortController();
@@ -227,12 +173,9 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
 
       setProgress({ ...finalProgress, lastSyncedAt: new Date().toISOString() });
       log.info('Sync completed', {
-        source,
-        activeOnly: activeOnly ?? null,
+        source, activeOnly: activeOnly ?? null,
         fetchedRecords: finalProgress.fetchedRecords,
         syncedCount: finalProgress.syncedCount,
-        incompleteCount: finalProgress.incompleteCount,
-        notProcessedCount: finalProgress.notProcessedCount,
       });
       await invalidateRecordQueries();
     } catch (err) {
@@ -245,165 +188,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
   const handlePauseSync = useCallback(() => {
     log.warn('Sync pause requested', { source });
     abortControllerRef.current?.abort();
-  }, []);
-
-  const handleStartExtraction = useCallback(async () => {
-    log.info('Extraction started', { source });
-    extractionAbortRef.current?.abort();
-    const controller = new AbortController();
-    extractionAbortRef.current = controller;
-
-    setExtractionProgress({
-      source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
-      processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
-    });
-    setVectorizationProgress(initialProcessingProgress(source));
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.pipelineStatus === 'extract_failed'
-          ? { ...r, pipelineStatus: 'synced' as const, reason: undefined }
-          : r
-      )
-    );
-
-    try {
-      const finalProgress = await resumeProcessingService.startExtraction(
-        source, token, (p) => setExtractionProgress(p),
-        handleRecordExtracted, controller.signal,
-      );
-
-      setExtractionProgress(finalProgress);
-      setExtractingUpstreamId(undefined);
-      log.info('Extraction completed', {
-        source,
-        successCount: finalProgress.successCount,
-        failedCount: finalProgress.failedCount,
-        skippedCount: finalProgress.skippedCount,
-      });
-
-      if (finalProgress.successCount > 0) {
-        await invalidateRecordQueries();
-      }
-    } catch (err) {
-      log.error('Extraction failed', err instanceof Error ? err : new Error(String(err)));
-      setExtractionProgress((prev) => ({ ...prev, status: 'error' }));
-      setExtractingUpstreamId(undefined);
-    }
-  }, [source, token, handleRecordExtracted, invalidateRecordQueries]);
-
-  const handlePauseExtraction = useCallback(() => {
-    log.warn('Extraction pause requested', { source });
-    extractionAbortRef.current?.abort();
-  }, []);
-
-  const handleStartVectorization = useCallback(async () => {
-    log.info('Vectorization started', { source });
-    vectorizationAbortRef.current?.abort();
-    const controller = new AbortController();
-    vectorizationAbortRef.current = controller;
-
-    setVectorizationProgress({
-      source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
-      processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
-    });
-    setExtractionProgress(initialProcessingProgress(source));
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.pipelineStatus === 'vectorize_failed'
-          ? { ...r, pipelineStatus: 'extracted' as const, reason: undefined }
-          : r
-      )
-    );
-
-    try {
-      const finalProgress = await resumeProcessingService.startVectorization(
-        source, (p) => setVectorizationProgress(p),
-        handleRecordVectorized, controller.signal,
-      );
-
-      setVectorizationProgress(finalProgress);
-      setVectorizingUpstreamId(undefined);
-      log.info('Vectorization completed', {
-        source,
-        successCount: finalProgress.successCount,
-        failedCount: finalProgress.failedCount,
-        skippedCount: finalProgress.skippedCount,
-      });
-
-      if (finalProgress.successCount > 0) {
-        await invalidateRecordQueries();
-      }
-    } catch (err) {
-      log.error('Vectorization failed', err instanceof Error ? err : new Error(String(err)));
-      setVectorizationProgress((prev) => ({ ...prev, status: 'error' }));
-      setVectorizingUpstreamId(undefined);
-    }
-  }, [source, handleRecordVectorized, invalidateRecordQueries]);
-
-  const handlePauseVectorization = useCallback(() => {
-    log.warn('Vectorization pause requested', { source });
-    vectorizationAbortRef.current?.abort();
-  }, []);
-
-  const handleProcessAll = useCallback(async () => {
-    log.info('Process-all started', { source });
-    extractionAbortRef.current?.abort();
-    vectorizationAbortRef.current?.abort();
-    const controller = new AbortController();
-    extractionAbortRef.current = controller;
-
-    setIsProcessingAll(true);
-    setExtractionProgress({
-      source, status: PROCESSING_STATUS.PROCESSING, totalRecords: 0,
-      processedRecords: 0, successCount: 0, failedCount: 0, skippedCount: 0,
-    });
-    setVectorizationProgress(initialProcessingProgress(source));
-    setRecords((prev) =>
-      prev.map((r) => {
-        if (r.pipelineStatus === 'extract_failed') return { ...r, pipelineStatus: 'synced' as const, reason: undefined };
-        if (r.pipelineStatus === 'vectorize_failed') return { ...r, pipelineStatus: 'extracted' as const, reason: undefined };
-        return r;
-      })
-    );
-
-    const handleRecord = (processed: ProcessingRecord) => {
-      if (processed.status === 'extracted') {
-        handleRecordExtracted(processed);
-      } else if (processed.status === 'vectorized') {
-        handleRecordVectorized(processed);
-      } else if (processed.status === 'failed') {
-        handleRecordExtracted(processed);
-      }
-    };
-
-    try {
-      const finalProgress = await resumeProcessingService.processAll(
-        source, token, (p) => setExtractionProgress(p),
-        handleRecord, controller.signal,
-      );
-
-      setExtractionProgress(finalProgress);
-      setExtractingUpstreamId(undefined);
-      setVectorizingUpstreamId(undefined);
-      setIsProcessingAll(false);
-      log.info('Process-all completed', {
-        source,
-        successCount: finalProgress.successCount,
-        failedCount: finalProgress.failedCount,
-        skippedCount: finalProgress.skippedCount,
-      });
-
-      if (finalProgress.successCount > 0) {
-        await invalidateRecordQueries();
-      }
-    } catch (err) {
-      log.error('Process-all failed', err instanceof Error ? err : new Error(String(err)));
-      setExtractionProgress((prev) => ({ ...prev, status: 'error' }));
-      setExtractingUpstreamId(undefined);
-      setVectorizingUpstreamId(undefined);
-      setIsProcessingAll(false);
-    }
-  }, [source, token, handleRecordExtracted, handleRecordVectorized, invalidateRecordQueries]);
+  }, [source]);
 
   const doClearData = useCallback(async () => {
     log.warn('Data clear started', { source });
@@ -411,10 +196,7 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     try {
       await dataSyncService.clearRecords(source);
       setRecords([]);
-      const freshProgress = initialProgress(source);
-      setProgress(freshProgress);
-      setExtractionProgress(initialProcessingProgress(source));
-      setVectorizationProgress(initialProcessingProgress(source));
+      setProgress(initialProgress(source));
       log.info('Data clear completed', { source });
     } finally {
       setIsClearing(false);
@@ -462,14 +244,14 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
   return {
     progress,
     records,
-    extractionProgress,
-    vectorizationProgress,
-    extractingUpstreamId,
-    vectorizingUpstreamId,
+    extractionProgress: processing.extractionProgress,
+    vectorizationProgress: processing.vectorizationProgress,
+    extractingUpstreamId: processing.extractingUpstreamId,
+    vectorizingUpstreamId: processing.vectorizingUpstreamId,
     refreshingId,
     vectorizingId,
     isClearing,
-    isProcessingAll,
+    isProcessingAll: processing.isProcessingAll,
     isLoadingRecords: recordsQuery.isLoading || recordsQuery.isFetching,
     handleStartSync: useCallback(() => { startSyncMutation.mutate({}); }, [startSyncMutation]),
     handleStartSyncAll: useCallback(() => { startSyncAllMutation.mutate({}); }, [startSyncAllMutation]),
@@ -477,11 +259,11 @@ export function useSyncPipeline({ source, token, enabled, selectedYear }: UseSyn
     handleResumeSync: useCallback(() => {
       startSyncMutation.mutate({ isResume: true, skipCount: progress.fetchedRecords });
     }, [startSyncMutation, progress.fetchedRecords]),
-    handleStartExtraction,
-    handlePauseExtraction,
-    handleStartVectorization,
-    handlePauseVectorization,
-    handleProcessAll,
+    handleStartExtraction: processing.handleStartExtraction,
+    handlePauseExtraction: processing.handlePauseExtraction,
+    handleStartVectorization: processing.handleStartVectorization,
+    handlePauseVectorization: processing.handlePauseVectorization,
+    handleProcessAll: processing.handleProcessAll,
     handleClearData: useCallback(() => { clearDataMutation.mutate(); }, [clearDataMutation]),
     handleRefreshRecord: useCallback((upstreamId: number) => { refreshRecordMutation.mutate(upstreamId); }, [refreshRecordMutation]),
     handleVectorizeRecord: useCallback((upstreamId: number) => { vectorizeRecordMutation.mutate(upstreamId); }, [vectorizeRecordMutation]),

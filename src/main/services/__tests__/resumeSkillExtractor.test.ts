@@ -11,19 +11,38 @@ vi.mock('../../db/connection', () => ({
   getDatabase: () => nexusDb,
 }))
 
-vi.mock('../../config', () => ({
-  getConfig: () => ({
-    claude: {
-      haikuModel: 'claude-haiku-4-20250414',
-    },
-  }),
+const mockChatAsync = vi.fn()
+const mockGetConcurrencyLimit = vi.fn().mockReturnValue(5)
+vi.mock('../llmRouter', () => ({
+  llmRouter: {
+    chatAsync: (...args: unknown[]) => mockChatAsync(...args),
+    getConcurrencyLimit: (...args: unknown[]) => mockGetConcurrencyLimit(...args),
+  },
 }))
 
-const mockChatAsync = vi.fn()
-vi.mock('../claudeService', () => ({
-  claudeService: {
-    chatAsync: (...args: unknown[]) => mockChatAsync(...args),
-  },
+vi.mock('../config', () => ({
+  getConfig: () => ({
+    modelConfig: {
+      presetMode: 'claude',
+      localServerUrl: 'http://localhost:8080',
+      localDefaultModel: '',
+      concurrency: { claude: { max: 8, haikuMax: 20 }, local: { max: 2 } },
+      features: {
+        resumeSkillExtraction: { provider: 'claude', model: 'claude-haiku-4-5' },
+        resumeFormatCheck: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        resumeTransform: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        candidateProfile: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        coverLetter: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        matchTriage: { provider: 'claude', model: 'claude-haiku-4-5' },
+        matchDeepAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        benchBurnAnalysis: { provider: 'claude', model: 'claude-opus-4-8' },
+        responsivenessAnalysis: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        responsivenessReport: { provider: 'claude', model: 'claude-sonnet-4-6' },
+        bugDescription: { provider: 'claude', model: 'claude-haiku-4-5' },
+        aiChat: { provider: 'claude', model: 'claude-sonnet-4-6' },
+      },
+    },
+  }),
 }))
 
 import { resumeSkillExtractor } from '../resumeSkillExtractor'
@@ -83,7 +102,7 @@ describe('ResumeSkillExtractor', () => {
         extracted_skills_json: string; skills_extractor_model: string
       }
       expect(row.extracted_skills_json).toBeTruthy()
-      expect(row.skills_extractor_model).toBe('claude-haiku-4-20250414')
+      expect(row.skills_extractor_model).toBe('claude-haiku-4-5')
 
       const parsed = JSON.parse(row.extracted_skills_json)
       expect(parsed.primary_tech_stack).toContain('C#')

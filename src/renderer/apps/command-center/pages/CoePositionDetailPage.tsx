@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Info } from 'lucide-react'
 import { coeTrackingService } from '../services/coeTrackingService'
@@ -9,13 +9,8 @@ import { TIER_CONFIG } from '../constants/tierConfig'
 import CoeTrackingBreadcrumb from '../components/CoeTrackingBreadcrumb'
 import CandidatePipeline from '../components/CandidatePipeline'
 import AgingTimeline from '../components/AgingTimeline'
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
+import PositionDetailsPanel from '../components/coe/PositionDetailsPanel'
+import PositionDiscussionSection from '../components/coe/PositionDiscussionSection'
 
 export default function CoePositionDetailPage() {
   const { coe: rawCoe, practice: rawPractice, skill: rawSkill, positionId } = useParams<{ coe: string; practice: string; skill: string; positionId: string }>()
@@ -28,7 +23,7 @@ export default function CoePositionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [feedbackCatalog, setFeedbackCatalog] = useState<Record<number, string>>({})
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
-  const { sharepoint } = useNexusStatus()
+  const { apiTokens } = useNexusStatus()
 
   useEffect(() => {
     if (!upstreamId) return
@@ -44,8 +39,8 @@ export default function CoePositionDetailPage() {
     const hasRejected = detail.candidates.some(c => c.candidateStatus === 'RejectedByClient')
     if (!hasRejected) return
 
-    if (sharepoint.token) {
-      reportService.getFeedbackCatalog(sharepoint.token)
+    if (apiTokens.unocore.token) {
+      reportService.getFeedbackCatalog(apiTokens.unocore.token)
         .then(setFeedbackCatalog)
         .catch(() => {
           reportService.getFeedbackCatalogLocal()
@@ -57,66 +52,7 @@ export default function CoePositionDetailPage() {
         .then(setFeedbackCatalog)
         .catch(() => setFeedbackCatalog({}))
     }
-  }, [detail, sharepoint.token])
-
-  const additionalSkills = useMemo(() => {
-    if (!detail?.position.additional_skills) return []
-    try {
-      const parsed = JSON.parse(detail.position.additional_skills) as Array<Record<string, unknown>>
-      return parsed.map(s => ((s.label ?? s.tagName ?? s.name ?? '') as string)).filter(Boolean)
-    } catch { return [] }
-  }, [detail])
-
-  const rateRange = detail
-    ? (detail.position.minimum_rate != null || detail.position.maximum_rate != null)
-      ? `$${detail.position.minimum_rate ?? 0} – $${detail.position.maximum_rate ?? 0}`
-      : '—'
-    : '—'
-
-  // Discussion: sorted newest thread activity first
-  const groupedDiscussions = useMemo(() => {
-    if (!detail) return []
-    const rootCommentIds = new Set(detail.discussions.map(d => d.commentId))
-    const roots = detail.discussions.filter(d => !d.parentCommentId || !rootCommentIds.has(d.parentCommentId))
-    const replyPool = detail.discussions.filter(d => d.parentCommentId && rootCommentIds.has(d.parentCommentId) && roots.every(r => r.commentId !== d.commentId))
-
-    const threads = roots.map(root => ({
-      root,
-      replies: replyPool
-        .filter(d => d.parentCommentId === root.commentId)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    }))
-
-    // Sort by latest activity in thread (newest first)
-    const getLatestDate = (thread: typeof threads[number]) => {
-      const dates = [new Date(thread.root.date).getTime(), ...thread.replies.map(r => new Date(r.date).getTime())]
-      return Math.max(...dates)
-    }
-
-    return threads.sort((a, b) => getLatestDate(b) - getLatestDate(a))
-  }, [detail])
-
-  // Find the single most recent comment across ALL threads
-  const newestCommentId = useMemo(() => {
-    if (!detail || detail.discussions.length === 0) return null
-    let newest = detail.discussions[0]
-    for (const d of detail.discussions) {
-      if (new Date(d.date).getTime() > new Date(newest.date).getTime()) {
-        newest = d
-      }
-    }
-    return newest.commentId
-  }, [detail])
-
-  // Find which thread contains the newest comment
-  const newestThreadRootId = useMemo(() => {
-    if (!newestCommentId || groupedDiscussions.length === 0) return null
-    for (const thread of groupedDiscussions) {
-      if (thread.root.commentId === newestCommentId) return thread.root.commentId
-      if (thread.replies.some(r => r.commentId === newestCommentId)) return thread.root.commentId
-    }
-    return null
-  }, [newestCommentId, groupedDiscussions])
+  }, [detail, apiTokens.unocore.token])
 
   if (loading) {
     return (
@@ -208,11 +144,7 @@ export default function CoePositionDetailPage() {
           </svg>
           Open in SharePoint
         </button>
-        <button
-          disabled
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 bg-gray-500/10 border border-gray-500/20 opacity-50 cursor-not-allowed"
-          title="Coming soon"
-        >
+        <button disabled className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-gray-400 bg-gray-500/10 border border-gray-500/20 opacity-50 cursor-not-allowed" title="Coming soon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -222,79 +154,13 @@ export default function CoePositionDetailPage() {
         </button>
       </div>
 
-      {/* Overview Grid */}
-      <div className="glass-panel p-5 space-y-5">
-        <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Position Details</h2>
+      <PositionDetailsPanel position={p} />
 
-        {/* Primary info — bigger, 3-col */}
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Job Title', value: p.job_title || '—' },
-            { label: 'Account / Stakeholder', value: `${p.account || '—'} · ${p.stakeholder || '—'}` },
-            { label: 'Main Skill', value: p.main_skill || '—' },
-          ].map(row => (
-            <div key={row.label}>
-              <p className="text-[10px] text-muted uppercase tracking-wide mb-1">{row.label}</p>
-              <p className="text-sm font-medium text-primary">{row.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="glass-panel-subtle p-4 flex items-center justify-between">
-          {[
-            { label: 'Created', value: formatDate(p.created), highlight: false },
-            { label: 'Ready Date', value: formatDate(p.ready_date), highlight: false },
-            { label: 'Last Modified', value: formatDate(p.last_modification), highlight: false },
-            { label: 'Aging', value: `${p.aging} days`, highlight: true },
-          ].map((d, i, arr) => (
-            <div key={d.label} className="flex items-center gap-0">
-              <div className="text-center">
-                <p className="text-xs text-muted uppercase tracking-wide mb-0.5">{d.label}</p>
-                <p className={`text-sm font-mono ${d.highlight ? 'text-emerald-400 font-bold' : 'text-primary'}`}>{d.value}</p>
-              </div>
-              {i < arr.length - 1 && <div className="w-px h-8 bg-white/10 mx-4" />}
-            </div>
-          ))}
-        </div>
-
-        {/* Secondary info — 4-col, smaller text, subtle */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'COE', value: p.coe },
-            { label: 'Practice', value: p.practice },
-            { label: 'Countries', value: p.countries || '—' },
-            { label: 'Seniority', value: p.seniorities || '—' },
-            { label: 'Rate Range', value: rateRange },
-            { label: 'Sourcing', value: p.sourcing || '—' },
-            { label: 'Vertical', value: p.vertical_industry || '—' },
-            { label: 'CSU / CS', value: `${p.csu || '—'} / ${p.cs || '—'}` },
-          ].map(row => (
-            <div key={row.label}>
-              <p className="text-[9px] text-muted uppercase tracking-wide mb-0.5">{row.label}</p>
-              <p className="text-xs text-secondary">{row.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {additionalSkills.length > 0 && (
-          <div>
-            <p className="text-xs text-muted uppercase tracking-wide mb-2">Additional Skills</p>
-            <div className="flex flex-wrap gap-1.5">
-              {additionalSkills.map((name, i) => (
-                <span key={i} className="px-2 py-1 rounded-md bg-white/5 text-xs text-secondary border border-white/5">{name}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Candidate Pipeline */}
       <div className="space-y-3">
         <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Candidate Pipeline</h2>
         <CandidatePipeline candidates={detail.candidates} feedbackCatalog={feedbackCatalog} />
       </div>
 
-      {/* Aging Timeline */}
       {detail.timelineEvents.length > 0 && detail.position.created && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Timeline</h2>
@@ -304,110 +170,22 @@ export default function CoePositionDetailPage() {
 
       {/* Job Description */}
       <div className="glass-panel p-5 space-y-3">
-        <button
-          onClick={() => setDescriptionExpanded(!descriptionExpanded)}
-          className="flex items-center justify-between w-full text-left"
-        >
+        <button onClick={() => setDescriptionExpanded(!descriptionExpanded)} className="flex items-center justify-between w-full text-left">
           <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Job Description</h2>
-          <svg
-            className={`w-4 h-4 text-muted transition-transform ${descriptionExpanded ? 'rotate-180' : ''}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
+          <svg className={`w-4 h-4 text-muted transition-transform ${descriptionExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
         {descriptionExpanded && (
           p.job_description ? (
-            <div className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">
-              {p.job_description}
-            </div>
+            <div className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">{p.job_description}</div>
           ) : (
             <p className="text-sm text-muted">No job description available.</p>
           )
         )}
       </div>
 
-      {/* Discussion — sorted newest thread activity first */}
-      <div className="glass-panel p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-primary uppercase tracking-wide">Discussion</h2>
-          <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 text-[10px] font-semibold">
-            {detail.discussions.length} comment{detail.discussions.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        {detail.discussions.length === 0 ? (
-          <p className="text-sm text-muted text-center py-6">No discussion comments yet.</p>
-        ) : (
-          <div className="space-y-0">
-            {groupedDiscussions.map((thread, idx) => {
-              const isNewestThread = thread.root.commentId === newestThreadRootId
-
-              return (
-                <div key={thread.root.commentId} className={isNewestThread ? 'relative' : ''}>
-                  {/* Blue left bar for thread with newest comment */}
-                  {isNewestThread && (
-                    <div className="absolute -left-3 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
-                  )}
-
-                  <div className="flex gap-3 py-3">
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                      <span className="text-xs font-bold text-emerald-400">
-                        {thread.root.author.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-primary">
-                          {thread.root.author.split('@')[0]}
-                        </span>
-                        <span className="text-xs text-muted font-mono">
-                          {formatDate(thread.root.date)}
-                        </span>
-                        {thread.root.commentId === newestCommentId && (
-                          <span className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/15 text-blue-400 font-semibold">
-                            Latest
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-secondary leading-relaxed">{thread.root.message}</p>
-                    </div>
-                  </div>
-                  {thread.replies.length > 0 && (
-                    <div className="ml-4 border-l-2 border-white/10 pl-4 space-y-0">
-                      {thread.replies.map(reply => (
-                        <div key={reply.commentId} className="flex gap-3 py-2.5">
-                          <div className="shrink-0 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center">
-                            <span className="text-xs font-bold text-muted">
-                              {reply.author.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-medium text-secondary">
-                                {reply.author.split('@')[0]}
-                              </span>
-                              <span className="text-xs text-muted font-mono">
-                                {formatDate(reply.date)}
-                              </span>
-                              {reply.commentId === newestCommentId && (
-                                <span className="px-1.5 py-0.5 text-[9px] rounded bg-blue-500/15 text-blue-400 font-semibold">
-                                  Latest
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-secondary leading-relaxed">{reply.message}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {idx < groupedDiscussions.length - 1 && <div className="minimal-divider my-1" />}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      <PositionDiscussionSection discussions={detail.discussions} />
     </div>
   )
 }

@@ -108,6 +108,53 @@ function makeProgress(
   return { source, status, totalRecords: total, processedRecords: processed, succeededCount: succeeded, failedCount: failed, skippedCount: skipped, currentRecord, pauseReason, errorMessage }
 }
 
+type PageItem = { upstreamId: number; fullName: string; email: string; [k: string]: unknown }
+
+async function fetchPage(
+  source: 'employees' | 'candidates', token: string, offset: number, take: number,
+  year: number | undefined, signal: AbortSignal,
+): Promise<{ items: PageItem[]; totalRecords: number }> {
+  if (source === 'employees') {
+    const result = await upstreamApiService.getEmployeesPaged(token, offset, take, signal)
+    return { totalRecords: result.totalRecords, items: result.items.map(e => ({ upstreamId: e.userId, fullName: e.fullName, email: e.email, raw: e })) }
+  }
+  const result = await upstreamApiService.getCandidatesPaged(token, offset, take, year, signal)
+  return { totalRecords: result.totalRecords, items: result.items.map(c => ({ upstreamId: c.candidateId, fullName: c.fullName, email: c.email ?? '', raw: c })) }
+}
+
+interface BatchCounters {
+  succeededCount: number
+  failedCount: number
+  skippedCount: number
+}
+
+function accountBatchResult(
+  result: PromiseSettledResult<PipelineRecordEvent>,
+  item: PageItem,
+  source: string,
+  counters: BatchCounters,
+  emitAndAccumulate: (event: PipelineEvent) => void,
+): void {
+  if (result.status === 'rejected') {
+    const reason = result.reason
+    if (reason instanceof Error && reason.name === 'AbortError') {
+      counters.skippedCount++
+      emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'skipped' } })
+    } else {
+      counters.failedCount++
+      const error = reason instanceof Error ? reason.message : 'Unknown error'
+      log.error('Pipeline record processing failed', reason instanceof Error ? reason : new Error(error), { source, upstreamId: item.upstreamId })
+      emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'failed', failedStep: 'sync', error } })
+    }
+  } else {
+    const record = result.value
+    if (record.outcome === 'vectorized') counters.succeededCount++
+    else if (record.outcome === 'failed') counters.failedCount++
+    else counters.skippedCount++
+    emitAndAccumulate({ type: 'record', record })
+  }
+}
+
 export const unifiedPipelineOrchestrator = {
   requestPause(): void {
     if (activeController) {
@@ -174,21 +221,9 @@ export const unifiedPipelineOrchestrator = {
       while (processedInRun < maxToProcess) {
         if (signal.aborted) break
 
-        let pageItems: Array<{ upstreamId: number; fullName: string; email: string; [k: string]: unknown }>
-        let pageTotal: number
-
-        if (source === 'employees') {
-          const result = await upstreamApiService.getEmployeesPaged(token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun), signal)
-          pageTotal = result.totalRecords
-          pageItems = result.items.map(e => ({ upstreamId: e.userId, fullName: e.fullName, email: e.email, raw: e }))
-        } else {
-          const take = Math.min(pageSize, maxToProcess - processedInRun)
-          const result = await upstreamApiService.getCandidatesPaged(token, pageOffset, take, year, signal)
-          pageTotal = result.totalRecords
-          pageItems = result.items.map(c => ({ upstreamId: c.candidateId, fullName: c.fullName, email: c.email ?? '', raw: c }))
-        }
-
-        totalRecords = pageTotal
+        const page = await fetchPage(source, token, pageOffset, Math.min(pageSize, maxToProcess - processedInRun), year, signal)
+        const pageItems = page.items
+        totalRecords = page.totalRecords
         if (pageItems.length === 0) break
 
         const batchSize = mode === 'sync-only' ? 12 : 8
@@ -202,32 +237,16 @@ export const unifiedPipelineOrchestrator = {
             batch.map(item => processOneRecord(source, token, model, table, item, mode, signal, benchUpstreamIds))
           )
 
+          const counters: BatchCounters = { succeededCount, failedCount, skippedCount }
           for (let i = 0; i < batchResults.length; i++) {
             processedRecords++
             processedInRun++
-            const item = batch[i]
-            seenUpstreamIds.add(item.upstreamId)
-            const result = batchResults[i]
-
-            if (result.status === 'rejected') {
-              const reason = result.reason
-              if (reason instanceof Error && reason.name === 'AbortError') {
-                skippedCount++
-                emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'skipped' } })
-              } else {
-                failedCount++
-                const error = reason instanceof Error ? reason.message : 'Unknown error'
-                log.error('Pipeline record processing failed', reason instanceof Error ? reason : new Error(error), { source, upstreamId: item.upstreamId })
-                emitAndAccumulate({ type: 'record', record: { upstreamId: item.upstreamId, name: item.fullName, outcome: 'failed', failedStep: 'sync', error } })
-              }
-            } else {
-                const record = result.value
-                if (record.outcome === 'vectorized') succeededCount++
-                else if (record.outcome === 'failed') failedCount++
-                else skippedCount++
-                emitAndAccumulate({ type: 'record', record })
-              }
+            seenUpstreamIds.add(batch[i].upstreamId)
+            accountBatchResult(batchResults[i], batch[i], source, counters, emitAndAccumulate)
           }
+          succeededCount = counters.succeededCount
+          failedCount = counters.failedCount
+          skippedCount = counters.skippedCount
 
           emitEvent({ type: 'progress', progress: makeProgress(source, totalRecords, processedRecords, succeededCount, failedCount, skippedCount, 'processing', batch[batch.length - 1]?.fullName) })
 

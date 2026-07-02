@@ -91,7 +91,7 @@ const REPORT_ITEMS: SidebarItem[] = [
   { label: 'Project Reallocation', path: '/command-center/reallocation', active: true, icon: <ArrowsIcon /> },
   { label: 'C.O.E. Tracking', path: '/command-center/coe-tracking', active: true, icon: <TargetIcon /> },
   { label: 'C.O.E. Bonus', path: '/command-center/coe-bonus', active: true, icon: <TrophyIcon /> },
-  { label: 'Responsiveness', path: '/command-center/responsiveness', active: true, icon: <ChatBubbleIcon /> },
+  { label: 'Position Attention', path: '/command-center/responsiveness', active: true, icon: <ChatBubbleIcon /> },
 ];
 
 export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayoutProps) {

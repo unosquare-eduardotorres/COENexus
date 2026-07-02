@@ -1,5 +1,5 @@
 import { presentationRepository } from '../db/repositories/presentationRepository'
-import { claudeService } from './claudeService'
+import { llmRouter } from './llmRouter'
 import { createLogger } from './logger'
 import {
   fillTemplate,
@@ -9,7 +9,6 @@ import {
 } from './promptTemplates'
 
 const log = createLogger('PresentationService')
-const PRESENTATION_MODEL = 'claude-sonnet-4-20250514'
 
 interface ResumeFormatCheckResult {
   isFormatted: boolean
@@ -136,7 +135,7 @@ export const presentationService = {
       resumeText,
     })
 
-    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 1200, 0.1)
+    const { text: response } = await llmRouter.chatAsync('resumeFormatCheck', prompt, 1200, 0.1)
     const parsed = parseJsonResponse<ResumeFormatCheckResult>(
       response,
       { isFormatted: false, details: ['Could not parse format check response'] },
@@ -156,7 +155,7 @@ export const presentationService = {
       jobDescription,
     })
 
-    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2600, 0.2)
+    const { text: response } = await llmRouter.chatAsync('resumeTransform', prompt, 2600, 0.2)
     const parsed = parseJsonResponse<ResumeTransformResult>(
       response,
       { transformedResume: resumeText },
@@ -181,7 +180,7 @@ export const presentationService = {
       mainSkill,
     })
 
-    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 900, 0.35)
+    const { text: response } = await llmRouter.chatAsync('coverLetter', prompt, 900, 0.35)
     return response.trim()
   },
 
@@ -200,7 +199,7 @@ export const presentationService = {
       positionTitle,
     })
 
-    const { text: response } = await claudeService.chatAsync(PRESENTATION_MODEL, prompt, 2200, 0.2)
+    const { text: response } = await llmRouter.chatAsync('candidateProfile', prompt, 2200, 0.2)
     const parsed = parseJsonResponse<CandidateProfileResult>(
       response,
       {

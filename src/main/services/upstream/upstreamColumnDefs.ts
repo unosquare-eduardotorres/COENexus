@@ -100,7 +100,8 @@ export function buildNoteColumns(): ColumnDefinition[] {
   ]
 }
 
-export function buildOpenPositionColumns(year?: number): ColumnDefinition[] {
+export function buildOpenPositionColumns(opts?: { year?: number; sortByIdDesc?: boolean }): ColumnDefinition[] {
+  const year = opts?.year
   const createdColumn = col('Created', 'Created', { dataType: 'date', filterOperator: 'None' })
 
   if (year != null) {
@@ -111,8 +112,18 @@ export function buildOpenPositionColumns(year?: number): ColumnDefinition[] {
 
   return [
     col('RecruitmentRequisitionId', 'Actions', { filterable: false, exportable: false, sortable: false, filterOperator: 'None' }),
-    col('Id', 'Id', { dataType: 'numeric', isKey: true, sortDirection: 'Ascending', sortOrder: 2, filterOperator: 'None' }),
-    col('Account', 'Account', { searchable: true, sortDirection: 'Ascending', sortOrder: 1, filterOperator: 'None' }),
+    col('Id', 'Id', {
+      dataType: 'numeric', isKey: true,
+      sortDirection: opts?.sortByIdDesc ? 'Descending' : 'Ascending',
+      sortOrder: opts?.sortByIdDesc ? 1 : 2,
+      filterOperator: 'None',
+    }),
+    col('Account', 'Account', {
+      searchable: true,
+      sortDirection: opts?.sortByIdDesc ? 'None' : 'Ascending',
+      sortOrder: opts?.sortByIdDesc ? -1 : 1,
+      filterOperator: 'None',
+    }),
     col('VerticalIndustry', 'Vertical Industry', { searchable: true, filterOperator: 'None' }),
     col('CoE', 'CoE', { searchable: true, filterOperator: 'None' }),
     col('Practice', 'Practice', { searchable: true, filterOperator: 'None' }),

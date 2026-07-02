@@ -189,8 +189,7 @@ export function useBenchBurn(parentReset?: () => void, propSessionId?: number | 
 
     try {
       const retryResult = await benchBurnService.retryFallbacks(
-        results.sessionId,
-        uniquePairs,
+        { sessionId: results.sessionId, pairs: uniquePairs },
         (p) => setProgress(p),
       );
       setResults(retryResult);

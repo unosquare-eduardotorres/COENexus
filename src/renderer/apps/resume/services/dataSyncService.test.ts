@@ -7,28 +7,35 @@ describe('dataSyncService', () => {
   describe('validateToken', () => {
     it('should return valid true when token is valid', async () => {
       vi.mocked(window.api.sync.validateToken).mockResolvedValue({ valid: true })
-      const result = await dataSyncService.validateToken('good-token')
-      expect(window.api.sync.validateToken).toHaveBeenCalledWith('good-token')
+      const result = await dataSyncService.validateToken('good-token', 'unocore')
+      expect(window.api.sync.validateToken).toHaveBeenCalledWith('good-token', 'unocore')
+      expect(result.valid).toBe(true)
+    })
+
+    it('should pass exec source to validateToken', async () => {
+      vi.mocked(window.api.sync.validateToken).mockResolvedValue({ valid: true })
+      const result = await dataSyncService.validateToken('exec-token', 'exec')
+      expect(window.api.sync.validateToken).toHaveBeenCalledWith('exec-token', 'exec')
       expect(result.valid).toBe(true)
     })
 
     it('should return valid false with error message on invalid token', async () => {
       vi.mocked(window.api.sync.validateToken).mockResolvedValue({ valid: false, error: 'Expired' })
-      const result = await dataSyncService.validateToken('bad-token')
+      const result = await dataSyncService.validateToken('bad-token', 'unocore')
       expect(result.valid).toBe(false)
       expect(result.error).toBeDefined()
     })
 
     it('should handle IPC errors gracefully', async () => {
       vi.mocked(window.api.sync.validateToken).mockResolvedValue({ __ipcError: true, message: 'Connection failed' })
-      const result = await dataSyncService.validateToken('token')
+      const result = await dataSyncService.validateToken('token', 'unocore')
       expect(result.valid).toBe(false)
       expect(result.error).toBe('Connection failed')
     })
 
     it('should catch thrown errors', async () => {
       vi.mocked(window.api.sync.validateToken).mockRejectedValue(new Error('Network error'))
-      const result = await dataSyncService.validateToken('token')
+      const result = await dataSyncService.validateToken('token', 'unocore')
       expect(result.valid).toBe(false)
       expect(result.error).toBe('Network error')
     })

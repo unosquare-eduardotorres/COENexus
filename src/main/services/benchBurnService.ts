@@ -1,13 +1,13 @@
-import { claudeService } from './claudeService'
+import { llmRouter } from './llmRouter'
 import { voyageEmbeddingService } from './voyageEmbeddingService'
 import { embeddingRepository } from '../db/repositories/embeddingRepository'
 import { syncRepository } from '../db/repositories/syncRepository'
 import { matchRepository } from '../db/repositories/matchRepository'
 import { OPUS_ANALYSIS, BENCH_BURN_CONTEXT_BLOCK, EXTERNAL_CANDIDATE_CONTEXT_BLOCK, CANDIDATE_TO_POSITIONS_CONTEXT_BLOCK, fillTemplate } from './promptTemplates'
-import { getConfig } from '../config'
 import type { MatchEvent } from './matchEngineService'
 import { parseAiResponse } from './utils/aiResponseParser'
 import { opusAnalysisSchema } from './utils/aiResponseSchemas'
+import { getConfig } from '../config'
 import { createLogger } from './logger'
 import { createHash } from 'crypto'
 
@@ -58,9 +58,9 @@ export const benchBurnService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claude } = getConfig()
+    const concurrencyLimit = llmRouter.getConcurrencyLimit('benchBurnAnalysis')
 
-    log.info('Bench burn started', { employees: request.employeeUpstreamIds.length, positions: request.positionUpstreamIds.length, topNPerEmployee: request.topNPerEmployee, topNPerPosition: request.topNPerPosition })
+    log.info('Bench burn started', { employees: request.employeeUpstreamIds.length, positions: request.positionUpstreamIds.length, customPositions: request.customPositions?.length ?? 0, topNPerEmployee: request.topNPerEmployee, topNPerPosition: request.topNPerPosition })
 
     try {
       emitEvent({ type: 'progress', percent: 5, stage: 'Loading employee and position data...' })
@@ -72,6 +72,26 @@ export const benchBurnService = {
       const positions = request.positionUpstreamIds
         .map(id => syncRepository.findPositionByUpstreamId(id))
         .filter(Boolean) as NonNullable<ReturnType<typeof syncRepository.findPositionByUpstreamId>>[]
+
+      if (request.customPositions) {
+        for (const cp of request.customPositions) {
+          positions.push({
+            id: 0,
+            upstream_id: -1 - positions.length,
+            account: 'Custom',
+            coe: '', practice: '', stakeholder: '',
+            main_skill: '', countries: '', seniorities: '',
+            available_range: '', account_overview: '',
+            job_description: cp.jobDescription,
+            job_title: cp.name,
+            position_status: 'Active',
+            aging: 0, created: null, ready_date: null, last_modification: null,
+            sourcing: '', replacement: 0,
+            status: 'synced', status_reason: null, failed: 0,
+            synced_at: new Date().toISOString(),
+          })
+        }
+      }
 
       emitEvent({ type: 'progress', percent: 15, stage: 'Computing cross-similarities...' })
 
@@ -111,7 +131,7 @@ export const benchBurnService = {
       let cacheHits = 0
       let cacheMisses = 0
 
-      const results = await runConcurrent(uniquePairs, claude.maxConcurrency, async (pair) => {
+      const results = await runConcurrent(uniquePairs, concurrencyLimit, async (pair) => {
         const jdHash = hashJobDescription(pair.pos.job_description)
         const cached = matchRepository.getCachedAnalysis(pair.emp.upstream_id, 'employee', jdHash)
 
@@ -160,7 +180,7 @@ export const benchBurnService = {
         })
 
         try {
-          const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+          const { text: response } = await llmRouter.chatAsync('benchBurnAnalysis', prompt, 4096, 0.1)
           const parsed = parseAiResponse(response, opusAnalysisSchema, 'bench-burn')
 
           const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
@@ -180,7 +200,8 @@ export const benchBurnService = {
             analysis: mergedAnalysis,
             summary: parsed.summary,
           }
-          matchRepository.cacheAnalysis(pair.emp.upstream_id, 'employee', jdHash, analysisResult, claude.opusModel)
+          const cacheModelTag = getConfig().modelConfig.features.benchBurnAnalysis.model
+          matchRepository.cacheAnalysis(pair.emp.upstream_id, 'employee', jdHash, analysisResult, cacheModelTag)
 
           return {
             employeeUpstreamId: pair.emp.upstream_id,
@@ -378,7 +399,7 @@ export const benchBurnService = {
     }
 
     const startTime = Date.now()
-    const { claude } = getConfig()
+    const concurrencyLimit = llmRouter.getConcurrencyLimit('benchBurnAnalysis')
 
     log.info('Candidate-to-positions match started', { candidateId: request.upstreamId, positions: request.positionUpstreamIds.length })
 
@@ -436,7 +457,7 @@ export const benchBurnService = {
       let cacheHits = 0
       let cacheMisses = 0
 
-      const results = await runConcurrent(pairs, claude.maxConcurrency, async (pair) => {
+      const results = await runConcurrent(pairs, concurrencyLimit, async (pair) => {
         const jdHash = hashJobDescription(pair.pos.job_description)
         const cached = matchRepository.getCachedAnalysis(pair.candidate.upstream_id, 'candidate', jdHash)
 
@@ -484,7 +505,7 @@ export const benchBurnService = {
         })
 
         try {
-          const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+          const { text: response } = await llmRouter.chatAsync('benchBurnAnalysis', prompt, 4096, 0.1)
           const parsed = parseAiResponse(response, opusAnalysisSchema, 'candidate-to-positions')
 
           const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>
@@ -504,7 +525,8 @@ export const benchBurnService = {
             analysis: mergedAnalysis,
             summary: parsed.summary,
           }
-          matchRepository.cacheAnalysis(pair.candidate.upstream_id, 'candidate', jdHash, analysisResult, claude.opusModel)
+          const candidateCacheModelTag = getConfig().modelConfig.features.benchBurnAnalysis.model
+          matchRepository.cacheAnalysis(pair.candidate.upstream_id, 'candidate', jdHash, analysisResult, candidateCacheModelTag)
 
           return {
             employeeUpstreamId: pair.candidate.upstream_id,
@@ -591,7 +613,6 @@ export const benchBurnService = {
     emitEvent: (event: MatchEvent) => void
   ): Promise<number | null> {
     const startTime = Date.now()
-    const { claude } = getConfig()
 
     log.info('External candidate match started', { candidates: request.candidates.length, positions: request.positionUpstreamIds.length, hasCustomPosition: !!request.customPosition })
 
@@ -655,7 +676,7 @@ export const benchBurnService = {
           })
 
           try {
-            const { text: response } = await claudeService.chatAsync(claude.opusModel, prompt, 4096, 0.1)
+            const { text: response } = await llmRouter.chatAsync('benchBurnAnalysis', prompt, 4096, 0.1)
             const parsed = parseAiResponse(response, opusAnalysisSchema, 'external-candidate')
 
             const analysisObj = (parsed.analysis ?? {}) as Record<string, unknown>

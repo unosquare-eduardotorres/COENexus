@@ -1,10 +1,10 @@
-// Candidate-grain "GOAL" hero for the Acceptance Rate report.
+// Candidate-grain "GOAL" hero for the Acceptance Rate V2 report.
 //
 // The headline of the report: the candidate acceptance rate measured against the
 // 33% goal, on the same 5-point linear scale used by the other bonus measures.
-// Phase 1 only VISUALISES the scale; it does not compute authoritative bonus.
+// V2 shows Approved ÷ Total Presented (QTD) instead of the old Approved ÷ (Approved + Rejected).
 
-import type { AcceptanceRateSummary } from '../../types/coeBonus'
+import type { AcceptanceRateSummaryV2 } from '../../types/coeBonus'
 import MeasureGauge from './MeasureGauge'
 import LinearScaleStrip from './LinearScaleStrip'
 import StatusPill from './StatusPill'
@@ -20,10 +20,10 @@ function TargetIcon({ className = '' }: { className?: string }) {
   )
 }
 
-export default function CandidateAcceptanceHero({ summary }: { summary: AcceptanceRateSummary }) {
+export default function CandidateAcceptanceHero({ summary }: { summary: AcceptanceRateSummaryV2 }) {
   const rate = summary.acceptanceRate
   const status = acceptanceStatusFor(rate)
-  const hasDecisions = summary.approved + summary.rejected > 0
+  const hasDecisions = summary.totalDenominator > 0
   // Gauge axis tops out a little above the target so the marker has headroom.
   const gaugeMax = Math.max(ACCEPTANCE_TARGET + 12, Math.ceil(rate / 10) * 10 + 5)
 
@@ -35,7 +35,7 @@ export default function CandidateAcceptanceHero({ summary }: { summary: Acceptan
           <div className="flex items-center gap-2 text-emerald-500">
             <TargetIcon className="w-5 h-5" />
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-              Candidate Acceptance — Goal
+              Candidate Acceptance — QTD Goal
             </span>
           </div>
 
@@ -53,13 +53,20 @@ export default function CandidateAcceptanceHero({ summary }: { summary: Acceptan
 
           <div className="pt-1">
             <p className="text-base font-semibold text-primary">
-              <span className="text-emerald-500">{summary.approved} approved</span>
-              <span className="text-muted"> vs </span>
-              <span className="text-red-400">{summary.rejected} rejected</span>
+              <span className="text-emerald-500">{summary.totalNumerator} approved</span>
+              <span className="text-muted"> of </span>
+              <span className="text-blue-400">{summary.totalDenominator} presented</span>
             </p>
             <p className="text-xs text-muted mt-0.5">
-              Acceptance = Approved ÷ (Approved + Rejected)
+              Acceptance = Approved ÷ Total Presented (QTD)
             </p>
+            {(summary.totalExcluded > 0 || summary.totalDeduped > 0) && (
+              <p className="text-[10px] text-muted mt-0.5">
+                {summary.totalExcluded > 0 && <span>{summary.totalExcluded} excluded by status</span>}
+                {summary.totalExcluded > 0 && summary.totalDeduped > 0 && <span> · </span>}
+                {summary.totalDeduped > 0 && <span>{summary.totalDeduped} deduped</span>}
+              </p>
+            )}
           </div>
         </div>
 
