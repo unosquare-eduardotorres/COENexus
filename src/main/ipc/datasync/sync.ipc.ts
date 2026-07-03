@@ -1,6 +1,6 @@
 import type { IpcMainInvokeEvent } from 'electron'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { SyncStartParams, SyncSingleParams, SyncRetryParams, SyncYearFilterParams, SyncUploadNoteParams, SyncRecordDto, PlacementMarginSyncParams } from '../../../shared/ipc-types'
+import type { SyncStartParams, SyncSingleParams, SyncRetryParams, SyncYearFilterParams, SyncUploadNoteParams, SyncRecordDto, PlacementMarginSyncParams, OffboardingSyncParams } from '../../../shared/ipc-types'
 import type { SyncedEmployeeRow, SyncedCandidateRow, SyncedOpenPositionRow, SyncedProjectReallocationRow } from '../../db/repositories/syncRepository'
 import { validateSender } from '../validate'
 import { getMainWindow } from '../../index'
@@ -334,6 +334,36 @@ export function registerSyncHandlers(): void {
         hasSyncedData: hasSynced,
         syncedAt: summary?.synced_at ?? null,
         entryCount: yearEntries.length,
+      }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.SYNC_OFFBOARDING,
+    async (event: IpcMainInvokeEvent, params: OffboardingSyncParams) => {
+      validateSender(event)
+      const quarter = params.quarter ?? `Q${Math.ceil((new Date().getMonth() + 1) / 3)}`
+      log.info('Offboarding sync requested', { year: params.year, quarter })
+      const win = getMainWindow()
+      syncOrchestrator.syncAsync('offboarding', params.token, {
+        year: params.year,
+        quarter,
+      }, (evt) => {
+        win?.webContents.send(IPC_CHANNELS.SYNC_PROGRESS_EVENT, evt)
+      })
+      return { started: true }
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.SYNC_OFFBOARDING_STATUS,
+    async (event: IpcMainInvokeEvent, { year }: { year: number }) => {
+      validateSender(event)
+      const { count, synced_at } = syncRepository.getOffboardingSyncStatusForYear(year)
+      return {
+        hasSyncedData: count > 0,
+        syncedAt: synced_at,
+        entryCount: count,
       }
     }
   )

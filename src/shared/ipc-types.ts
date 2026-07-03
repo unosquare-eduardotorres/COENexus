@@ -1355,6 +1355,175 @@ export interface PlacementMarginSyncStatus {
   entryCount: number
 }
 
+// ---- Offboarding --------------------------------------------------------
+
+export interface OffboardingSyncParams {
+  token: string
+  year: number
+  quarter?: string
+}
+
+export interface OffboardingSyncStatus {
+  hasSyncedData: boolean
+  syncedAt: string | null
+  entryCount: number
+}
+
+export interface OffboardingEntryDto {
+  employee: string
+  account: string
+  location: string
+  seniority: string
+  mainSkill: string
+  unosquareTenure: number
+  monthlyGrossSalary: number
+  monthlyTac: number
+  rate: number
+  gm: number
+  offboardingDate: string | null
+  offboardingStatus: string
+  leaveReasonType: string
+  leaveReasonDetails: string
+  leaveReason: string
+}
+
+export interface OffboardingReportResult {
+  totalOffboardings: number
+  avgTenure: number
+  byReasonType: Record<string, number>
+  byAccount: Record<string, number>
+  entries: OffboardingEntryDto[]
+  syncedAt: string
+}
+
+// ── Fill Rate Report ──────────────────────────────────────────────────────────
+
+export interface ReportFillRateFilters {
+  /** Start date inclusive (ISO date string, e.g. '2025-07-01') */
+  startDate: string
+  /** End date inclusive (ISO date string, e.g. '2026-06-30') */
+  endDate: string
+  /** COE scope — specific COE name, or 'all' for no scoping */
+  coe: string
+  /** Include Active/Draft positions in the denominator */
+  includeActive: boolean
+}
+
+export interface ReportFillRateCoeRow {
+  coe: string
+  closedWon: number
+  closedOther: number
+  activeCount: number
+  totalDenominator: number
+  fillRate: number
+  goal: number
+}
+
+export interface ReportFillRateMonthPoint {
+  /** ISO month string, e.g. '2025-07' */
+  month: string
+  /** Display label, e.g. 'Jul 2025' */
+  label: string
+  closedWon: number
+  totalDenominator: number
+  fillRate: number
+}
+
+export interface ReportFillRateResult {
+  /** Per-COE breakdown */
+  coes: ReportFillRateCoeRow[]
+  /** Monthly trend within the window */
+  trend: ReportFillRateMonthPoint[]
+  /** Aggregate fill rate across all COEs in scope */
+  overallFillRate: number
+  overallClosedWon: number
+  overallDenominator: number
+  /** The filters that produced this result (echo back for UI confirmation) */
+  filters: ReportFillRateFilters
+  /** Last sync timestamp */
+  lastSyncedAt: string | null
+}
+
+// ── Practice Lead Bonus ─────────────────────────────────────────────────────
+
+export interface BonusTier {
+  min: number
+  max: number
+  label: string
+  amount: number
+}
+
+export interface PLBPlacementEntry {
+  name: string
+  email: string
+  account: string
+  mainSkill: string
+  country: string
+  placementDate: string | null
+  placementMargin: number
+  placementRate: number
+  currentMargin: number
+  kickoffDelay: number | null
+  isPromotion: boolean
+  companyTenure: number
+  practiceName: string
+  coeName: string
+  bonusTierLabel: string
+  bonusAmount: number
+}
+
+export interface PLBOffboardingEntry {
+  employee: string
+  account: string
+  mainSkill: string
+  offboardingDate: string | null
+  gm: number
+  gmOriginal: number
+  seniority: string
+  location: string
+  leaveReasonType: string
+  unosquareTenure: number
+  practiceName: string
+  coeName: string
+  penaltyTierLabel: string
+  penaltyAmount: number
+}
+
+export interface PLBOverviewRow {
+  practiceLeadName: string
+  practiceLeadEmail: string
+  practiceName: string
+  coeName: string
+  placementCount: number
+  offboardingCount: number
+  grossBonus: number
+  penalties: number
+  netBonus: number
+  tierBreakdown: { tier: string; placements: number; offboardings: number }[]
+}
+
+export interface PLBOverview {
+  rows: PLBOverviewRow[]
+  totals: {
+    placements: number
+    offboardings: number
+    grossBonus: number
+    penalties: number
+    netBonus: number
+  }
+}
+
+export interface PLBPracticeLeadRow {
+  id: number
+  display_name: string
+  email: string
+  coe: string
+  active: number
+  practice_id: number | null
+  practice_name: string | null
+  coe_name: string | null
+}
+
 export type TokenSource = 'unocore' | 'exec'
 
 export interface IpcContracts {
@@ -1480,8 +1649,13 @@ export interface IpcContracts {
   [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE]: { request: ReportAcceptanceRateFilters; response: ReportAcceptanceRateResultV2 }
   [IPC_CHANNELS.REPORT_ACCEPTANCE_RATE_COES]: { request: void; response: string[] }
   [IPC_CHANNELS.REPORT_PLACEMENT_MARGIN]: { request: { year: number; quarter: string }; response: PlacementMarginReportResult | null }
+  [IPC_CHANNELS.REPORT_FILL_RATE]: { request: ReportFillRateFilters; response: ReportFillRateResult }
   [IPC_CHANNELS.SYNC_PLACEMENT_MARGIN]: { request: PlacementMarginSyncParams; response: { started: boolean } }
   [IPC_CHANNELS.SYNC_PLACEMENT_MARGIN_STATUS]: { request: { year: number; quarter: number }; response: PlacementMarginSyncStatus }
+
+  [IPC_CHANNELS.SYNC_OFFBOARDING]: { request: OffboardingSyncParams; response: { started: boolean } }
+  [IPC_CHANNELS.SYNC_OFFBOARDING_STATUS]: { request: { year: number }; response: OffboardingSyncStatus }
+  [IPC_CHANNELS.REPORT_OFFBOARDING]: { request: { year: number; quarter: string }; response: OffboardingReportResult | null }
 
   [IPC_CHANNELS.COE_TRACKING_GET_OVERVIEW]: { request: void; response: CoeTrackingSummary[] }
   [IPC_CHANNELS.COE_TRACKING_GET_COE_DETAIL]: { request: string; response: PracticeTrackingSummary[] }
@@ -1563,6 +1737,13 @@ export interface IpcContracts {
   [IPC_CHANNELS.CATALOG_CREATE_SKILL]: { request: CatalogCreateParams; response: CatalogSkillRow }
   [IPC_CHANNELS.CATALOG_UPDATE_SKILL]: { request: CatalogUpdateParams; response: CatalogSkillRow }
   [IPC_CHANNELS.CATALOG_TOGGLE_SKILL]: { request: number; response: CatalogSkillRow }
+
+  // Practice Lead Bonus
+  [IPC_CHANNELS.PRACTICE_LEAD_BONUS_PLACEMENTS]: { request: { year: number; quarter: string; tiers?: BonusTier[] }; response: PLBPlacementEntry[] }
+  [IPC_CHANNELS.PRACTICE_LEAD_BONUS_OFFBOARDINGS]: { request: { year: number; quarter: string; tiers?: BonusTier[] }; response: PLBOffboardingEntry[] }
+  [IPC_CHANNELS.PRACTICE_LEAD_BONUS_OVERVIEW]: { request: { year: number; quarter: string; tiers?: BonusTier[] }; response: PLBOverview }
+  [IPC_CHANNELS.PRACTICE_LEAD_BONUS_GET_PRACTICE_LEADS]: { request: void; response: PLBPracticeLeadRow[] }
+  [IPC_CHANNELS.PRACTICE_LEAD_BONUS_SAVE_GM_OVERRIDE]: { request: { year: number; employee: string; offboardingDate: string | null; account: string; gmOverride: number }; response: { success: boolean } }
 }
 
 export interface IpcEventContracts {

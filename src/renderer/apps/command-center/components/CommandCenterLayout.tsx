@@ -85,13 +85,17 @@ const OVERVIEW_ITEM: SidebarItem = {
   label: 'Overview', path: '/command-center', active: true, icon: <CoreIcon />,
 };
 
-const REPORT_ITEMS: SidebarItem[] = [
+const OPERATIONAL_ITEMS: SidebarItem[] = [
   { label: 'Open Positions', path: '/command-center/open-positions', active: true, icon: <BarChartIcon /> },
   { label: 'Placements', path: '/command-center/placements', active: false, icon: <UsersIcon /> },
   { label: 'Project Reallocation', path: '/command-center/reallocation', active: true, icon: <ArrowsIcon /> },
   { label: 'C.O.E. Tracking', path: '/command-center/coe-tracking', active: true, icon: <TargetIcon /> },
-  { label: 'C.O.E. Bonus', path: '/command-center/coe-bonus', active: true, icon: <TrophyIcon /> },
   { label: 'Position Attention', path: '/command-center/responsiveness', active: true, icon: <ChatBubbleIcon /> },
+];
+
+const BONUS_ITEMS: SidebarItem[] = [
+  { label: 'C.O.E. Bonus', path: '/command-center/coe-bonus', active: true, icon: <TrophyIcon /> },
+  { label: 'Practice Lead Bonus', path: '/command-center/practice-lead-bonus', active: true, icon: <TrophyIcon /> },
 ];
 
 export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayoutProps) {
@@ -196,8 +200,8 @@ export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayou
 
           <div className="minimal-divider mx-3 my-2" />
 
-          {!collapsed && <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Reports</p>}
-          {REPORT_ITEMS.map(item => {
+          {!collapsed && <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Operational Reports</p>}
+          {OPERATIONAL_ITEMS.map(item => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
               <button
@@ -220,6 +224,33 @@ export default function CommandCenterLayout({ lastSyncedAt }: CommandCenterLayou
                 {!collapsed && !item.active && (
                   <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted flex-shrink-0">Soon</span>
                 )}
+              </button>
+            );
+          })}
+
+          <div className="minimal-divider mx-3 my-2" />
+
+          {!collapsed && <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">Bonus Reports</p>}
+          {BONUS_ITEMS.map(item => {
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            return (
+              <button
+                key={item.path}
+                type="button"
+                onClick={() => item.active && navigate(item.path)}
+                disabled={!item.active}
+                title={collapsed ? item.label : undefined}
+                className={`w-full flex items-center ${collapsed ? 'justify-center gap-0 mx-0 px-0 py-2.5' : 'gap-3 mx-2 px-3 py-2.5'} my-0.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : item.active
+                      ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-dark-hover/50'
+                      : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                }`}
+                style={collapsed ? undefined : { maxWidth: 'calc(100% - 16px)' }}
+              >
+                <span className="flex-shrink-0">{item.icon}</span>
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </button>
             );
           })}

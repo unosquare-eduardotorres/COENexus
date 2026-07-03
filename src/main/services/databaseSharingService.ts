@@ -87,6 +87,7 @@ const TABLES = [
   'prr_presentations',
   'synced_placement_margins',
   'synced_placement_margin_summary',
+  'synced_offboardings',
 ] as const
 
 function getConfigFilePath(): string {

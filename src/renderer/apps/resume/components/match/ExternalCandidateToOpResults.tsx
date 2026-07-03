@@ -23,8 +23,10 @@ export default function ExternalCandidateToOpResults({
   onSelectMatch,
   onRetryFallbacks,
 }: ExternalCandidateToOpResultsProps) {
-  const matches = results.positionResults[position.upstreamId] ?? [];
+  const matches = results.positionResults[position.upstreamId]
+    ?? Object.values(results.positionResults).flat();
   const sortedMatches = [...matches].sort((a, b) => b.matchScore - a.matchScore);
+  const resumeCount = resumes.length || new Set(sortedMatches.map(m => m.employeeName)).size;
 
   return (
     <div className="space-y-4">
@@ -60,7 +62,7 @@ export default function ExternalCandidateToOpResults({
           </div>
         </div>
         <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium flex-shrink-0">
-          {resumes.length} Resume{resumes.length !== 1 ? 's' : ''}
+          {resumeCount} Resume{resumeCount !== 1 ? 's' : ''}
         </span>
       </div>
 

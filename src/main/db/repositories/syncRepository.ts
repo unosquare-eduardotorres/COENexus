@@ -213,6 +213,7 @@ export interface CoePracticeLeadRow {
   email: string
   coe: string
   active: number
+  practice_id: number | null
 }
 
 // ── Placement Margin row types ──────────────────────────────────────────────
@@ -243,6 +244,27 @@ export interface SyncedPlacementMarginRow {
   kickoff_delay: number | null
   tac_at_placement: number | null
   current_tac: number | null
+  synced_at: string
+}
+
+export interface SyncedOffboardingRow {
+  id: number
+  year: number
+  employee: string
+  account: string | null
+  location: string | null
+  seniority: string | null
+  main_skill: string | null
+  unosquare_tenure: number | null
+  monthly_gross_salary: number | null
+  monthly_tac: number | null
+  rate: number | null
+  gm: number | null
+  offboarding_date: string | null
+  offboarding_status: string | null
+  leave_reason_type: string | null
+  leave_reason_details: string | null
+  leave_reason: string | null
   synced_at: string
 }
 
@@ -339,6 +361,19 @@ const PLACEMENT_MARGIN_SUMMARY_UPSERT = buildUpsertSql({
   table: 'synced_placement_margin_summary',
   columns: PLACEMENT_MARGIN_SUMMARY_COLUMNS,
   conflictColumns: ['year', 'quarter'],
+})
+
+const OFFBOARDING_COLUMNS = [
+  'year', 'employee', 'account', 'location', 'seniority', 'main_skill',
+  'unosquare_tenure', 'monthly_gross_salary', 'monthly_tac', 'rate', 'gm',
+  'offboarding_date', 'offboarding_status', 'leave_reason_type',
+  'leave_reason_details', 'leave_reason', 'synced_at',
+]
+
+const OFFBOARDING_UPSERT = buildUpsertSql({
+  table: 'synced_offboardings',
+  columns: OFFBOARDING_COLUMNS,
+  conflictColumns: ['year', 'employee', 'offboarding_date', 'account'],
 })
 
 export const syncRepository = {
@@ -682,6 +717,44 @@ export const syncRepository = {
     return { total, lastSyncedAt: latest?.latest ?? null }
   },
 
+  getFillRateData(opts: {
+    startDate: string
+    endDate: string
+    coe: string | null
+    includeActive: boolean
+  }): { coe: string; position_status: string; closed_date: string | null; created: string | null }[] {
+    const db = getDatabase()
+    const conditions: string[] = []
+    const params: unknown[] = []
+
+    if (opts.includeActive) {
+      conditions.push(`(
+        (position_status LIKE 'Closed%' AND closed_date >= ? AND closed_date <= ?)
+        OR
+        (position_status IN ('Active', 'Draft') AND created >= ? AND created <= ?)
+      )`)
+      params.push(opts.startDate, opts.endDate, opts.startDate, opts.endDate)
+    } else {
+      conditions.push(`position_status LIKE 'Closed%'`)
+      conditions.push(`closed_date >= ?`)
+      conditions.push(`closed_date <= ?`)
+      params.push(opts.startDate, opts.endDate)
+    }
+
+    if (opts.coe) {
+      conditions.push(`coe = ?`)
+      params.push(opts.coe)
+    }
+
+    const sql = `
+      SELECT coe, position_status, closed_date, created
+      FROM synced_open_positions
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY coe
+    `
+    return db.prepare(sql).all(...params) as { coe: string; position_status: string; closed_date: string | null; created: string | null }[]
+  },
+
   upsertDiscussion(data: Omit<OpenPositionDiscussionRow, 'id'>): number {
     const db = getDatabase()
     try {
@@ -998,23 +1071,38 @@ export const syncRepository = {
     return map
   },
 
-  addCoePracticeLead(data: { display_name: string; email: string; coe: string }): CoePracticeLeadRow {
+  addCoePracticeLead(data: { display_name: string; email: string; coe: string; practice_id?: number }): CoePracticeLeadRow {
     const db = getDatabase()
     const result = db.prepare(
-      'INSERT INTO coe_practice_leads (display_name, email, coe) VALUES (?, ?, ?)'
-    ).run(data.display_name, data.email, data.coe)
+      'INSERT INTO coe_practice_leads (display_name, email, coe, practice_id) VALUES (?, ?, ?, ?)'
+    ).run(data.display_name, data.email, data.coe, data.practice_id ?? null)
     return {
       id: Number(result.lastInsertRowid),
       display_name: data.display_name,
       email: data.email,
       coe: data.coe,
       active: 1,
+      practice_id: data.practice_id ?? null,
     }
   },
 
   deactivateCoePracticeLead(id: number): void {
     const db = getDatabase()
     db.prepare('UPDATE coe_practice_leads SET active = 0 WHERE id = ?').run(id)
+  },
+
+  /** Get leads grouped by practice (for bonus report) */
+  getLeadsWithPractices(): (CoePracticeLeadRow & { practice_name: string | null; coe_name: string | null })[] {
+    const db = getDatabase()
+    return db.prepare(`
+      SELECT cpl.*, cp.name AS practice_name, cc.name AS coe_name
+      FROM coe_practice_leads cpl
+      LEFT JOIN catalog_practices cp ON cpl.practice_id = cp.id
+      LEFT JOIN catalog_coe_practices ccp ON cp.id = ccp.practice_id
+      LEFT JOIN catalog_coes cc ON ccp.coe_id = cc.id
+      WHERE cpl.active = 1 AND cpl.practice_id IS NOT NULL
+      ORDER BY cc.name, cp.name, cpl.display_name
+    `).all() as (CoePracticeLeadRow & { practice_name: string | null; coe_name: string | null })[]
   },
 
   // ── Placement Margin ──────────────────────────────────────
@@ -1079,5 +1167,64 @@ export const syncRepository = {
       SELECT year, quarter, COUNT(*) as count, MAX(synced_at) as synced_at
       FROM synced_placement_margins GROUP BY year, quarter ORDER BY year DESC, quarter DESC
     `).all() as { year: number; quarter: number; count: number; synced_at: string }[]
+  },
+
+  // ── Offboarding ─────────────────────────────────────────────
+
+  upsertOffboarding(data: Omit<SyncedOffboardingRow, 'id'>): number {
+    const db = getDatabase()
+    try {
+      const result = db.prepare(OFFBOARDING_UPSERT).run(data)
+      return Number(result.lastInsertRowid)
+    } catch (err) {
+      log.error(`upsertOffboarding failed for employee=${data.employee}`, err instanceof Error ? err : new Error(String(err)))
+      throw err
+    }
+  },
+
+  getOffboardingsForYear(year: number): SyncedOffboardingRow[] {
+    const db = getDatabase()
+    return db.prepare(
+      'SELECT * FROM synced_offboardings WHERE year = ?'
+    ).all(year) as SyncedOffboardingRow[]
+  },
+
+  clearOffboardingsForYear(year: number): void {
+    const db = getDatabase()
+    db.prepare('DELETE FROM synced_offboardings WHERE year = ?').run(year)
+  },
+
+  getOffboardingSyncStatusForYear(year: number): { count: number; synced_at: string | null } {
+    const db = getDatabase()
+    const row = db.prepare(
+      'SELECT COUNT(*) as count, MAX(synced_at) as synced_at FROM synced_offboardings WHERE year = ?'
+    ).get(year) as { count: number; synced_at: string | null }
+    return row ?? { count: 0, synced_at: null }
+  },
+
+  // ── GM Overrides (Practice Lead Bonus) ──────────────────────────────
+
+  /** Read all GM overrides for a year as a Map keyed by "employee|date|account". */
+  getGmOverrides(year: number): Map<string, number> {
+    const db = getDatabase()
+    const rows = db.prepare(
+      'SELECT employee, offboarding_date, account, gm_override FROM plb_gm_overrides WHERE year = ?'
+    ).all(year) as { employee: string; offboarding_date: string | null; account: string | null; gm_override: number }[]
+    const map = new Map<string, number>()
+    for (const r of rows) {
+      map.set(`${r.employee}|${r.offboarding_date ?? ''}|${r.account ?? ''}`, r.gm_override)
+    }
+    return map
+  },
+
+  /** Upsert a single GM override (survives re-syncs). */
+  upsertGmOverride(year: number, employee: string, offboardingDate: string | null, account: string, gmOverride: number): void {
+    const db = getDatabase()
+    db.prepare(
+      `INSERT INTO plb_gm_overrides (year, employee, offboarding_date, account, gm_override, updated_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(year, employee, offboarding_date, account)
+       DO UPDATE SET gm_override = excluded.gm_override, updated_at = excluded.updated_at`
+    ).run(year, employee, offboardingDate, account, gmOverride)
   },
 }

@@ -190,13 +190,14 @@ export default function AcceptanceMathCard({
                 <div key={status} className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {onToggleInclusion && (
-                      <button
-                        type="button"
+                      <span
                         role="switch"
+                        tabIndex={0}
                         aria-checked={!!included}
                         onClick={() => onToggleInclusion(status)}
+                        onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggleInclusion(status) } }}
                         className={`
-                          w-9 h-5 rounded-full transition-colors shrink-0 relative cursor-pointer
+                          inline-block w-9 h-5 rounded-full transition-colors flex-none relative overflow-hidden cursor-pointer
                           focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900
                           ${included
                             ? 'bg-blue-500'
@@ -205,10 +206,10 @@ export default function AcceptanceMathCard({
                         `}
                       >
                         <span className={`
-                          absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform
-                          ${included ? 'translate-x-4' : 'translate-x-0.5'}
+                          absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200
+                          ${included ? 'left-[18px]' : 'left-0.5'}
                         `} />
-                      </button>
+                      </span>
                     )}
                     <span className={`text-xs truncate ${included ? 'text-blue-400' : 'text-secondary opacity-50'}`}>
                       {humanizeStatus(status)}

@@ -6,6 +6,7 @@ import SyncDashboard from '../components/SyncDashboard';
 import PipelineDashboard from '../components/PipelineDashboard';
 import PositionPipelineDashboard from '../components/PositionPipelineDashboard';
 import PlacementMarginSyncPanel from '../components/PlacementMarginSyncPanel';
+import OffboardingSyncPanel from '../components/OffboardingSyncPanel';
 import { useDataSync } from '../hooks/useDataSync';
 import { useUnifiedPipeline } from '../hooks/useUnifiedPipeline';
 import { usePositionPipeline } from '../hooks/usePositionPipeline';
@@ -75,7 +76,7 @@ export default function DataSyncPage() {
 
   const renderTokenBanner = () => {
     const needsUnocore = ['employees', 'candidates', 'open-positions', 'project-reallocations'].includes(activePanel);
-    const needsExec = activePanel === 'placement-margin';
+    const needsExec = activePanel === 'placement-margin' || activePanel === 'offboarding';
 
     if (needsUnocore && !apiTokens.unocore.isValid) {
       return (
@@ -98,7 +99,7 @@ export default function DataSyncPage() {
           <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
           </svg>
-          <p className="text-sm text-amber-400 flex-1">Exec API token required for Placement Margin sync.</p>
+          <p className="text-sm text-amber-400 flex-1">Exec API token required for {activePanel === 'offboarding' ? 'Offboarding' : 'Placement Margin'} sync.</p>
           <button
             onClick={() => openModal('apiTokens')}
             className="text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
@@ -268,6 +269,18 @@ export default function DataSyncPage() {
         <>
           {renderTokenBanner()}
           <PlacementMarginSyncPanel
+            token={apiTokens.exec.token}
+            isTokenValid={apiTokens.exec.isValid}
+          />
+        </>
+      );
+    }
+
+    if (activePanel === 'offboarding') {
+      return (
+        <>
+          {renderTokenBanner()}
+          <OffboardingSyncPanel
             token={apiTokens.exec.token}
             isTokenValid={apiTokens.exec.isValid}
           />

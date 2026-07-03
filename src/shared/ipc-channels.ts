@@ -120,9 +120,14 @@ export const IPC_CHANNELS = {
   REPORT_ACCEPTANCE_RATE: 'report:acceptance-rate',
   REPORT_ACCEPTANCE_RATE_COES: 'report:acceptance-rate-coes',
   REPORT_PLACEMENT_MARGIN: 'report:placement-margin',
+  REPORT_FILL_RATE: 'report:fill-rate',
 
   SYNC_PLACEMENT_MARGIN: 'sync:placement-margin',
   SYNC_PLACEMENT_MARGIN_STATUS: 'sync:placement-margin-status',
+
+  SYNC_OFFBOARDING: 'sync:offboarding',
+  SYNC_OFFBOARDING_STATUS: 'sync:offboarding-status',
+  REPORT_OFFBOARDING: 'report:offboarding',
 
   COE_TRACKING_GET_OVERVIEW: 'coe-tracking:get-overview',
   COE_TRACKING_GET_COE_DETAIL: 'coe-tracking:get-coe-detail',
@@ -221,6 +226,13 @@ export const IPC_CHANNELS = {
   CATALOG_CREATE_SKILL: 'catalog:create-skill',
   CATALOG_UPDATE_SKILL: 'catalog:update-skill',
   CATALOG_TOGGLE_SKILL: 'catalog:toggle-skill',
+
+  // Practice Lead Bonus
+  PRACTICE_LEAD_BONUS_PLACEMENTS: 'practice-lead-bonus:placements',
+  PRACTICE_LEAD_BONUS_OFFBOARDINGS: 'practice-lead-bonus:offboardings',
+  PRACTICE_LEAD_BONUS_OVERVIEW: 'practice-lead-bonus:overview',
+  PRACTICE_LEAD_BONUS_GET_PRACTICE_LEADS: 'practice-lead-bonus:get-practice-leads',
+  PRACTICE_LEAD_BONUS_SAVE_GM_OVERRIDE: 'practice-lead-bonus:save-gm-override',
 } as const
 
 export type IpcChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS]

@@ -11,6 +11,19 @@ import {
   MatchToPositionsRequest,
 } from '../types';
 
+function groupFlatResults(list: CrossMatchResult[]): {
+  employeeResults: Record<number, CrossMatchResult[]>;
+  positionResults: Record<number, CrossMatchResult[]>;
+} {
+  const employeeResults: Record<number, CrossMatchResult[]> = {};
+  const positionResults: Record<number, CrossMatchResult[]> = {};
+  for (const r of list) {
+    (employeeResults[r.employeeUpstreamId] ??= []).push(r);
+    (positionResults[r.positionUpstreamId] ??= []).push(r);
+  }
+  return { employeeResults, positionResults };
+}
+
 export interface BenchBurnSearchResult {
   sessionId: number;
   employeeResults: Record<number, CrossMatchResult[]>;
@@ -46,17 +59,9 @@ function createStreamingPromise(
             stats: data.stats ?? { totalPairs: 0, analyzed: 0, time: '0s', searchCost: '$0' },
           };
           if (!result.employeeResults || typeof result.employeeResults !== 'object' || Object.keys(result.employeeResults).length === 0) {
-            result.employeeResults = {};
-            result.positionResults = {};
-            const allResults = Array.isArray(data.candidates) ? data.candidates : [];
-            for (const r of allResults) {
-              const empKey = r.employeeUpstreamId;
-              if (!result.employeeResults[empKey]) result.employeeResults[empKey] = [];
-              result.employeeResults[empKey].push(r);
-              const posKey = r.positionUpstreamId;
-              if (!result.positionResults[posKey]) result.positionResults[posKey] = [];
-              result.positionResults[posKey].push(r);
-            }
+            const grouped = groupFlatResults(Array.isArray(data.candidates) ? data.candidates : []);
+            result.employeeResults = grouped.employeeResults;
+            result.positionResults = grouped.positionResults;
           }
           break;
         case 'session':
@@ -177,11 +182,17 @@ export const benchBurnService = {
   async getSession(id: number): Promise<BenchBurnSearchResult> {
     const raw = await window.api.match.getBenchBurnSession(id) as Record<string, unknown>;
     if (!raw) throw new Error(`Session ${id} not found`);
-    const results = raw.results as Record<string, unknown> | undefined;
+    const rawResults = raw.results;
+    const grouped = Array.isArray(rawResults)
+      ? groupFlatResults(rawResults as CrossMatchResult[])
+      : {
+          employeeResults: ((rawResults as Record<string, unknown>)?.employeeResults as Record<number, CrossMatchResult[]>) ?? {},
+          positionResults: ((rawResults as Record<string, unknown>)?.positionResults as Record<number, CrossMatchResult[]>) ?? {},
+        };
     return {
       sessionId: raw.id as number,
-      employeeResults: (results?.employeeResults as Record<number, CrossMatchResult[]>) ?? {},
-      positionResults: (results?.positionResults as Record<number, CrossMatchResult[]>) ?? {},
+      employeeResults: grouped.employeeResults,
+      positionResults: grouped.positionResults,
       stats: {
         totalPairs: (raw.pipelineStats as Record<string, unknown>)?.totalPairs as number ?? 0,
         analyzed: (raw.pipelineStats as Record<string, unknown>)?.analyzed as number ?? 0,

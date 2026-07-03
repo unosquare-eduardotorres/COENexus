@@ -94,6 +94,7 @@ export function formatClosedDate(dateStr: string | null): string {
 
 /** Format a month string (YYYY-MM) to a readable label (e.g. "Apr 2025"). */
 export function formatMonth(monthStr: string): string {
+  if (!monthStr.includes('-')) return monthStr          // "ALL" or other non-date passthrough
   const [year, month] = monthStr.split('-')
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const idx = parseInt(month, 10) - 1
@@ -102,6 +103,7 @@ export function formatMonth(monthStr: string): string {
 
 /** Short month label (e.g. "Apr", "May", "Jun"). */
 export function shortMonth(monthStr: string): string {
+  if (!monthStr.includes('-')) return monthStr          // "ALL" or other non-date passthrough
   const month = monthStr.split('-')[1]
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const idx = parseInt(month, 10) - 1

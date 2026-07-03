@@ -68,6 +68,20 @@ const sources: Array<{
       </svg>
     ),
   },
+  {
+    id: 'offboarding',
+    title: 'Offboarding',
+    description: 'Sync year-to-date professional offboarding data from the Exec API.',
+    table: 'synced_offboardings',
+    iconBg: 'from-rose-500/15 to-rose-600/10 dark:from-rose-500/20 dark:to-rose-600/15',
+    iconText: 'text-rose-600 dark:text-rose-400',
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+      </svg>
+    ),
+  },
 ]
 
 export default function DataSyncOverview({ onNavigate }: DataSyncOverviewProps) {

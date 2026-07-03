@@ -164,7 +164,7 @@ export function useExternalCandidateToOp(parentReset: () => void, propSessionId?
   const effectivePosition: BenchOpenPosition | null = useMemo(() => {
     if (selectedPosition) return selectedPosition;
     if (customPosition) return {
-      upstreamId: -100,
+      upstreamId: -1,
       id: 0,
       account: 'Custom',
       coe: '',
@@ -175,8 +175,27 @@ export function useExternalCandidateToOp(parentReset: () => void, propSessionId?
       jobDescription: customPosition.jd,
       isVectorized: false,
     };
+    // Session restore: no wizard state — derive from stored results
+    if (results) {
+      const first = Object.values(results.positionResults).flat()[0];
+      if (first) {
+        const [account, ...titleParts] = (first.positionLabel ?? '').split(' - ');
+        return {
+          upstreamId: first.positionUpstreamId,
+          id: 0,
+          account: account || 'Custom',
+          coe: '',
+          practice: '',
+          stakeholder: '',
+          mainSkill: '',
+          jobTitle: titleParts.join(' - ') || first.positionLabel || 'Position',
+          jobDescription: '',
+          isVectorized: false,
+        };
+      }
+    }
     return null;
-  }, [selectedPosition, customPosition]);
+  }, [selectedPosition, customPosition, results]);
 
   const handleSelectMatch = useCallback((match: CrossMatchResult) => {
     setDetailMatch(match);

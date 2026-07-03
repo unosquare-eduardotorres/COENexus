@@ -36,7 +36,6 @@ const POLL_INTERVAL_MS = 2000
  */
 export function usePlacementMarginSync(
   year: number,
-  quarter: string,
   token: string | null,
   isTokenValid: boolean = false,
 ): PlacementMarginSyncState {

@@ -3,6 +3,7 @@ import { syncCandidateOrchestrator } from './sync/syncCandidateOrchestrator'
 import { syncOpenPositionOrchestrator } from './sync/syncOpenPositionOrchestrator'
 import { syncPrrOrchestrator } from './sync/syncPrrOrchestrator'
 import { syncPlacementMarginOrchestrator } from './sync/syncPlacementMarginOrchestrator'
+import { syncOffboardingOrchestrator } from './sync/syncOffboardingOrchestrator'
 import type { SyncRecordDto, SyncEvent, SyncOptions } from './sync/syncTypes'
 import { createLogger } from './logger'
 
@@ -41,6 +42,17 @@ export const syncOrchestrator = {
           return
         }
         await syncPlacementMarginOrchestrator.sync(
+          token,
+          { ...options, year: options.year, quarter: options.quarter },
+          emitEvent,
+          signal,
+        )
+      } else if (source === 'offboarding') {
+        if (!options.year) {
+          emitEvent({ type: 'error', message: 'Year is required for offboarding sync' })
+          return
+        }
+        await syncOffboardingOrchestrator.sync(
           token,
           { ...options, year: options.year, quarter: options.quarter },
           emitEvent,

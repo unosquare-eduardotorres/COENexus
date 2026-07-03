@@ -1,21 +1,20 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { EChartsOption } from 'echarts'
 import EChart from '../../../../components/charts/EChart'
 import { STATUS_COLORS } from '../../../../components/charts/coeBonusEchartsTheme'
-import { useCoeBonusContext } from '../CoeBonusPage'
+import { useBonusConfig } from '../../contexts/BonusConfigContext'
 import { useNexusStatus } from '../../../../contexts/NexusStatusContext'
 import { usePlacementMarginSync } from '../../hooks/usePlacementMarginSync'
+import { useCoeSkillMapping } from '../../hooks/useCoeSkillMapping'
 import { KpiStat, SectionCard, TabError, TabLoading } from '../../components/coe-bonus/BonusUi'
 import StatusPill from '../../components/coe-bonus/StatusPill'
+import LockToOverviewButton from '../../components/coe-bonus/LockToOverviewButton'
 import PlacementMarginFilters from '../../components/coe-bonus/PlacementMarginFilters'
 import PlacementMarginTable from '../../components/coe-bonus/PlacementMarginTable'
 import type { PlacementMarginEntryDto } from '../../types/coeBonus'
 import type { MeasureStatus } from '../../types/coeBonus'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const FLOOR = 50
-const TARGET = 55
 
 /** Number of days before showing a "stale data" warning. */
 const STALE_THRESHOLD_DAYS = 7
@@ -61,8 +60,13 @@ function quarterForMonth(month: number): QuarterKey {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PlacementMarginTab() {
-  const { filters } = useCoeBonusContext()
+  const { activePeriod, config, catalogCoes } = useBonusConfig()
   const { apiTokens } = useNexusStatus()
+  const { mapSkillToCoe } = useCoeSkillMapping(catalogCoes)
+
+  const pmConfig = config.measures.placementMargin
+  const FLOOR = pmConfig.floor
+  const TARGET = pmConfig.goal
 
   const {
     data,
@@ -73,22 +77,35 @@ export default function PlacementMarginTab() {
     handleSync,
     hasUsableToken,
   } = usePlacementMarginSync(
-    filters.year,
-    filters.quarter,
+    activePeriod.year,
     apiTokens.exec.token,
     apiTokens.exec.isValid,
   )
 
+  // ── COE-filtered entries ───────────────────────────────────────────────
+  const coeFilteredEntries = useMemo(() => {
+    const allEntries = data?.entries ?? []
+    if (!activePeriod.coeName || activePeriod.coeName === 'All COEs') return allEntries
+    return allEntries.filter(e => {
+      const mapped = mapSkillToCoe(e.mainSkill ?? '')
+      return mapped.coeName === activePeriod.coeName
+    })
+  }, [data, activePeriod.coeName, mapSkillToCoe])
+
   // ── Filter state ────────────────────────────────────────────────────────
-  const [selectedQuarter, setSelectedQuarter] = useState<QuarterKey>('ALL')
+  const [selectedQuarter, setSelectedQuarter] = useState<QuarterKey>(activePeriod.quarter)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null)
 
-  // ── Derived: filter entries ─────────────────────────────────────────────
-  const allEntries = data?.entries ?? []
+  // Sync quarter when active period changes
+  useEffect(() => {
+    setSelectedQuarter(activePeriod.quarter)
+    setSelectedMonth(null)
+  }, [activePeriod.quarter])
 
+  // ── Derived: filter entries ─────────────────────────────────────────────
   const filteredEntries = useMemo(() => {
-    let result = allEntries
+    let result = coeFilteredEntries
     if (selectedQuarter !== 'ALL') {
       const [qStart, qEnd] = QUARTER_MONTH_RANGES[selectedQuarter]
       result = result.filter(e => {
@@ -103,19 +120,21 @@ export default function PlacementMarginTab() {
       result = result.filter(e => e.account === selectedAccount)
     }
     return result
-  }, [allEntries, selectedQuarter, selectedMonth, selectedAccount])
+  }, [coeFilteredEntries, selectedQuarter, selectedMonth, selectedAccount])
 
   // ── Derived: KPIs ──────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     const isYtd = selectedQuarter === 'ALL' && selectedMonth === null && selectedAccount === null
+    // When COE-filtered, we can't use the pre-aggregated ytdMargin since it spans all COEs
+    const usePreaggregated = isYtd && data && activePeriod.coeName === 'All COEs'
     return {
-      avgMargin: isYtd && data ? data.ytdMargin : avg(filteredEntries, 'placementMargin'),
-      avgRate: isYtd && data ? data.ytdAvgRate : avg(filteredEntries, 'placementRate'),
+      avgMargin: usePreaggregated ? data.ytdMargin : avg(filteredEntries, 'placementMargin'),
+      avgRate: usePreaggregated ? data.ytdAvgRate : avg(filteredEntries, 'placementRate'),
       placements: filteredEntries.length,
       uniquePeople: new Set(filteredEntries.map(e => e.name)).size,
       avgKickoff: avg(filteredEntries, 'kickoffDelay'),
     }
-  }, [filteredEntries, selectedQuarter, selectedMonth, selectedAccount, data])
+  }, [filteredEntries, selectedQuarter, selectedMonth, selectedAccount, data, activePeriod.coeName])
 
   // ── Derived: bonus status ──────────────────────────────────────────────
   const bonusStatus: MeasureStatus = kpis.avgMargin >= TARGET ? 'on-track' : kpis.avgMargin >= FLOOR ? 'at-risk' : 'missed'
@@ -123,14 +142,12 @@ export default function PlacementMarginTab() {
   // ── Derived: KPI label ─────────────────────────────────────────────────
   const kpiLabel = useMemo(() => {
     if (selectedMonth !== null) return `${MONTH_LABELS[selectedMonth]} Margin`
-    if (selectedQuarter !== 'ALL') return `${selectedQuarter} Margin`
-    return 'YTD Margin'
-  }, [selectedQuarter, selectedMonth])
+    return `${activePeriod.quarter} Margin`
+  }, [selectedMonth, activePeriod.quarter])
 
   // ── Derived: account list for dropdown ─────────────────────────────────
   const accounts = useMemo(() => {
-    // Base entries (pre-account-filter) for the account dropdown
-    let base = allEntries
+    let base = coeFilteredEntries
     if (selectedQuarter !== 'ALL') {
       const [qStart, qEnd] = QUARTER_MONTH_RANGES[selectedQuarter]
       base = base.filter(e => {
@@ -148,7 +165,7 @@ export default function PlacementMarginTab() {
     return [...map.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-  }, [allEntries, selectedQuarter, selectedMonth])
+  }, [coeFilteredEntries, selectedQuarter, selectedMonth])
 
   // ── Chart: trend ───────────────────────────────────────────────────────
   const trendOption = useMemo<EChartsOption>(() => {
@@ -199,7 +216,7 @@ export default function PlacementMarginTab() {
         },
       ],
     }
-  }, [data])
+  }, [data, TARGET])
 
   // Chart click handler: select month
   const handleChartClick = useCallback((params: { dataIndex?: number }) => {
@@ -216,6 +233,9 @@ export default function PlacementMarginTab() {
     setSelectedAccount(prev => prev === account ? null : account)
   }, [])
 
+  // ── Lock period label ─────────────────────────────────────────────────
+  const lockPeriodLabel = `${activePeriod.quarter} ${activePeriod.year}`
+
   // ── Loading / error states ─────────────────────────────────────────────
   if (loading && !data) return <TabLoading label="Loading placement margin…" />
   if (error && !data) return <TabError message={error} />
@@ -226,7 +246,7 @@ export default function PlacementMarginTab() {
       <SectionCard title="Placement Margin" subtitle="No data synced for this period">
         <div className="text-center py-8">
           <p className="text-slate-300 mb-4">
-            Sync placement margin data for {filters.year} from the Exec API.
+            Sync placement margin data for {activePeriod.year} from the Exec API.
           </p>
           <button
             onClick={handleSync}
@@ -265,6 +285,16 @@ export default function PlacementMarginTab() {
 
   return (
     <div className="space-y-3">
+      {/* COE scope chip */}
+      {activePeriod.coeName && activePeriod.coeName !== 'All COEs' && (
+        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel-subtle rounded-lg w-fit text-xs">
+          <span className="text-muted">COE:</span>
+          <span className="text-emerald-400 font-medium">{activePeriod.coeName}</span>
+          <span className="text-slate-600">·</span>
+          <span className="text-muted">{coeFilteredEntries.length} of {data.entries.length} entries</span>
+        </div>
+      )}
+
       {/* Stale data warning */}
       {staleDays !== null && staleDays > STALE_THRESHOLD_DAYS && (
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
@@ -277,33 +307,45 @@ export default function PlacementMarginTab() {
         </div>
       )}
 
-      {/* Sync controls */}
+      {/* Sync controls + Lock button */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          Last synced: {new Date(data.syncedAt).toLocaleString()} · {allEntries.length} entries
+          Last synced: {new Date(data.syncedAt).toLocaleString()} · {coeFilteredEntries.length} entries
         </p>
-        <button
-          onClick={handleSync}
-          disabled={syncing || !hasUsableToken}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {syncing ? (
-            <>
-              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Syncing…
-            </>
-          ) : (
-            <>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
-              </svg>
-              Re-sync
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <LockToOverviewButton
+            measureKey="placementMargin"
+            currentAchievement={kpis.avgMargin}
+            periodLabel={lockPeriodLabel}
+            filters={{
+              quarter: selectedQuarter,
+              month: selectedMonth,
+              account: selectedAccount,
+            }}
+          />
+          <button
+            onClick={handleSync}
+            disabled={syncing || !hasUsableToken}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? (
+              <>
+                <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Syncing…
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                </svg>
+                Re-sync
+              </>
+            )}
+          </button>
+        </div>
       </div>
       {syncError && <p className="text-red-400 text-xs">{syncError}</p>}
 
@@ -343,6 +385,7 @@ export default function PlacementMarginTab() {
 
       {/* Filter bar */}
       <PlacementMarginFilters
+        hideQuarterTabs
         selectedQuarter={selectedQuarter}
         selectedMonth={selectedMonth}
         selectedAccount={selectedAccount}

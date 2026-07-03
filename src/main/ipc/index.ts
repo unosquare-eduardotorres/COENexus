@@ -9,6 +9,7 @@ import { registerMailHandlers } from './mail.ipc'
 import { registerCoeTrackingHandlers } from './coeTracking'
 import { registerResponsivenessHandlers } from './responsiveness'
 import { registerCatalogHandlers } from './catalog'
+import { registerPracticeLeadBonusHandlers } from './practiceLeadBonus'
 
 export function registerAllHandlers(): void {
   registerAppHandlers()
@@ -22,4 +23,5 @@ export function registerAllHandlers(): void {
   registerCoeTrackingHandlers()
   registerResponsivenessHandlers()
   registerCatalogHandlers()
+  registerPracticeLeadBonusHandlers()
 }

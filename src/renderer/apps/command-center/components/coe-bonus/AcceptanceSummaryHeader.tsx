@@ -83,7 +83,7 @@ function CandidateSplitBar({ numerator, denominator, excluded, deduped }: {
   )
 }
 
-export default function AcceptanceSummaryHeader({ data, isAdjusted = false }: { data: ReportAcceptanceRateResultV2; isAdjusted?: boolean }) {
+export default function AcceptanceSummaryHeader({ data, isAdjusted = false, scopeLabel }: { data: ReportAcceptanceRateResultV2; isAdjusted?: boolean; scopeLabel?: string }) {
   const { summary, months } = data
 
   // Aggregate position status counts across all months for the donut
@@ -152,7 +152,7 @@ export default function AcceptanceSummaryHeader({ data, isAdjusted = false }: { 
             />
           </SectionCard>
 
-          <SectionCard title="Quarter Totals" subtitle="Across all months in scope">
+          <SectionCard title={`${scopeLabel ?? 'Quarter'} Totals`} subtitle={`Across ${scopeLabel ? 'selected month' : 'all months in scope'}`}>
             <div className="space-y-3">
               <KpiStat
                 label="Closed Positions"

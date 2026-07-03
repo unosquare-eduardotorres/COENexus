@@ -34,7 +34,9 @@ import type {
   ReportStalledThresholds,
   ReportStalledPositionResult,
   ReportAcceptanceRateFilters,
+  ReportFillRateFilters,
   PlacementMarginSyncParams,
+  OffboardingSyncParams,
   PrrUpdateCoeStatusParams,
   PrrAddCommentParams,
   PrrReportItem,
@@ -51,7 +53,7 @@ import type {
   IpcEventContracts,
 } from '../shared/ipc-types'
 import type { CreateOrUpdateTransformSession, BenchBurnRequest, ExternalCandidateMatchRequest } from '../renderer/apps/resume/types'
-import type { ErrorReportRequest, ErrorNewEvent, NomicoreCalculateParams, MailSmtpConfig, ResponsivenessAddLeadParams, ResponsivenessAnalyzeRequest, PositionAttentionProgress, CatalogCreateParams, CatalogUpdateParams, CatalogJunctionParams } from '../shared/ipc-types'
+import type { ErrorReportRequest, ErrorNewEvent, NomicoreCalculateParams, MailSmtpConfig, ResponsivenessAddLeadParams, ResponsivenessAnalyzeRequest, PositionAttentionProgress, CatalogCreateParams, CatalogUpdateParams, CatalogJunctionParams, BonusTier } from '../shared/ipc-types'
 import type { ModelConfig } from '../shared/model-config-types'
 
 const api = {
@@ -352,6 +354,14 @@ const api = {
       ipcRenderer.invoke(IPC_CHANNELS.SYNC_PLACEMENT_MARGIN_STATUS, { year, quarter }) as Promise<IpcContracts[typeof IPC_CHANNELS.SYNC_PLACEMENT_MARGIN_STATUS]['response']>,
     syncPlacementMargin: (params: PlacementMarginSyncParams) =>
       ipcRenderer.invoke(IPC_CHANNELS.SYNC_PLACEMENT_MARGIN, params) as Promise<IpcContracts[typeof IPC_CHANNELS.SYNC_PLACEMENT_MARGIN]['response']>,
+    getFillRate: (filters: ReportFillRateFilters) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_FILL_RATE, filters) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_FILL_RATE]['response']>,
+    syncOffboarding: (params: OffboardingSyncParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SYNC_OFFBOARDING, params) as Promise<IpcContracts[typeof IPC_CHANNELS.SYNC_OFFBOARDING]['response']>,
+    getOffboardingSyncStatus: (year: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SYNC_OFFBOARDING_STATUS, { year }) as Promise<IpcContracts[typeof IPC_CHANNELS.SYNC_OFFBOARDING_STATUS]['response']>,
+    getOffboarding: (year: number, quarter: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.REPORT_OFFBOARDING, { year, quarter }) as Promise<IpcContracts[typeof IPC_CHANNELS.REPORT_OFFBOARDING]['response']>,
   },
 
   coeTracking: {
@@ -537,6 +547,19 @@ const api = {
       ipcRenderer.on(IPC_CHANNELS.RESPONSIVENESS_GENERATE_PROGRESS, handler)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.RESPONSIVENESS_GENERATE_PROGRESS, handler)
     },
+  },
+
+  practiceLeadBonus: {
+    getPlacements: (year: number, quarter: string, tiers?: BonusTier[]): Promise<IpcContracts[typeof IPC_CHANNELS.PRACTICE_LEAD_BONUS_PLACEMENTS]['response']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRACTICE_LEAD_BONUS_PLACEMENTS, { year, quarter, tiers }),
+    getOffboardings: (year: number, quarter: string, tiers?: BonusTier[]): Promise<IpcContracts[typeof IPC_CHANNELS.PRACTICE_LEAD_BONUS_OFFBOARDINGS]['response']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRACTICE_LEAD_BONUS_OFFBOARDINGS, { year, quarter, tiers }),
+    getOverview: (year: number, quarter: string, tiers?: BonusTier[]): Promise<IpcContracts[typeof IPC_CHANNELS.PRACTICE_LEAD_BONUS_OVERVIEW]['response']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRACTICE_LEAD_BONUS_OVERVIEW, { year, quarter, tiers }),
+    getPracticeLeads: (): Promise<IpcContracts[typeof IPC_CHANNELS.PRACTICE_LEAD_BONUS_GET_PRACTICE_LEADS]['response']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRACTICE_LEAD_BONUS_GET_PRACTICE_LEADS),
+    saveGmOverride: (year: number, employee: string, offboardingDate: string | null, account: string, gmOverride: number): Promise<IpcContracts[typeof IPC_CHANNELS.PRACTICE_LEAD_BONUS_SAVE_GM_OVERRIDE]['response']> =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRACTICE_LEAD_BONUS_SAVE_GM_OVERRIDE, { year, employee, offboardingDate, account, gmOverride }),
   },
 } as const
 

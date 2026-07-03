@@ -1,12 +1,14 @@
 import { BrowserWindow, dialog } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { IPC_CHANNELS } from '../../../shared/ipc-channels'
-import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus, ExcelExportResult, ReportAcceptanceRateFilters, ReportAcceptanceRateResultV2, PlacementMarginReportResult } from '../../../shared/ipc-types'
+import type { ReportStalledThresholds, ReportStalledPositionResult, ReportExportCsvResult, ReportExportPdfResult, ReportEvaluateResult, ReportPositionDetailResult, ReportSyncStatus, ExcelExportResult, ReportAcceptanceRateFilters, ReportAcceptanceRateResultV2, PlacementMarginReportResult, ReportFillRateFilters, ReportFillRateResult, OffboardingReportResult } from '../../../shared/ipc-types'
 import { registerIpcHandler } from '../registerIpcHandler'
 import { validateSender } from '../validate'
 import { openPositionReportService } from '../../services/openPositionReportService'
 import { acceptanceRateService } from '../../services/acceptanceRateService'
 import { placementMarginService } from '../../services/placementMarginService'
+import { fillRateService } from '../../services/fillRateService'
+import { offboardingService } from '../../services/offboardingService'
 import { syncRepository } from '../../db/repositories/syncRepository'
 import { matchEngineService } from '../../services/matchEngineService'
 import { matchRepository } from '../../db/repositories/matchRepository'
@@ -150,6 +152,22 @@ export function registerReportHandlers(): void {
     async (event, { year, quarter }: { year: number; quarter: string }): Promise<PlacementMarginReportResult | null> => {
       validateSender(event)
       return placementMarginService.evaluate(year, quarter)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_FILL_RATE,
+    async (event, filters: ReportFillRateFilters): Promise<ReportFillRateResult> => {
+      validateSender(event)
+      return fillRateService.evaluate(filters)
+    }
+  )
+
+  registerIpcHandler(
+    IPC_CHANNELS.REPORT_OFFBOARDING,
+    async (event, { year, quarter }: { year: number; quarter: string }): Promise<OffboardingReportResult | null> => {
+      validateSender(event)
+      return offboardingService.evaluate(year, quarter)
     }
   )
 }

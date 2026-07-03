@@ -12,6 +12,7 @@ interface PlacementMarginFiltersProps {
   onQuarterChange: (q: QuarterKey) => void
   onMonthChange: (month: number | null) => void
   onAccountChange: (account: string | null) => void
+  hideQuarterTabs?: boolean
 }
 
 const QUARTER_MONTHS: Record<QuarterKey, number[]> = {
@@ -33,6 +34,7 @@ export default function PlacementMarginFilters({
   onQuarterChange,
   onMonthChange,
   onAccountChange,
+  hideQuarterTabs,
 }: PlacementMarginFiltersProps) {
   const [accountOpen, setAccountOpen] = useState(false)
   const [accountSearch, setAccountSearch] = useState('')
@@ -61,24 +63,26 @@ export default function PlacementMarginFilters({
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Quarter tabs */}
-      <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5">
-        {QUARTERS.map(q => (
-          <button
-            key={q}
-            onClick={() => {
-              onQuarterChange(q)
-              onMonthChange(null)
-            }}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              selectedQuarter === q
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            {q === 'ALL' ? 'All' : q}
-          </button>
-        ))}
-      </div>
+      {!hideQuarterTabs && (
+        <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5">
+          {QUARTERS.map(q => (
+            <button
+              key={q}
+              onClick={() => {
+                onQuarterChange(q)
+                onMonthChange(null)
+              }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                selectedQuarter === q
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              {q === 'ALL' ? 'All' : q}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Month buttons */}
       <div className="inline-flex items-center gap-1">
