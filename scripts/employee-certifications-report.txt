@@ -1,0 +1,721 @@
+==============================================================================================================
+EMPLOYEE CERTIFICATIONS REPORT (AI-verified via Claude Haiku)
+==============================================================================================================
+Total employees with certifications: 263
+Total employee resumes analyzed: 807
+
+Name                                         Certifications
+--------------------------------------------------------------------------------------------------------------
+Adam Daly                                    Microsoft Programming in HTML5 with JavaScript and CSS3
+Adam Kane                                    Google Associate Android Developer
+Adhemar Duran Gahuincha                      Certified Software Automation Testing Professional
+Adrian  Aguilar Corrales                     Java EE 5 Web Component Developer Certification, Java SE 6 Programmer Certification, Six Sigma Green Belt Certification
+Adrian Ponce de Leon Patiño                  ISTQB Certified Tester, Certified Scrum Master
+Adrian Victor Espinoza Huanca                Salesforce Certified Platform Developer I, Salesforce Certified Platform Developer II
+Adriana  Diaz Gonzalez                       TOEFL ITP
+Adriana Carolina Legorreta Macias            CAPM Certification, Scrum Master I
+Alan Amilcar Lima Galvez                     ISTQB Certified Tester, Foundation Level, Selenium Certification, Scrum Master Certification
+Alan Buengueroff                             Salesforce Certified Development Professional
+Alan Jesus Segundo Nava                      AWS Certified DevOps Engineer – Professional, AWS Certified Developer – Associate, AWS Certified Solutions Architect – Associate, AWS Certified Solutions Architect – Professional, AWS Certified SysOps Administrator – Associate, Microsoft Azure AZ-900, Microsoft Azure AZ-204, Microsoft Azure AZ-400
+Alberto Carlos Barboza Mercado               Scrum Fundamentals Certified, Scrum Developer Certified, Scrum Master Certified
+Aldo Alfredo Gutierrez Gutierrez             Java 7 Professional Certification
+Alejandra Elizabeth Torres Gomez             Scrum Fundamentals Certified, Microsoft Office Specialist
+Alejandro  Vazquez Gongora                   Microsoft Certified Professional
+Alejandro Medina Mendoza                     Palo Alto Networks Certified Cybersecurity Entry-level Technician, Cisco Certified CCNA, Python Institute PCAP: Programming Essentials in Python, Cisco Certified CCNA Security, Certified Scrum Product Owner
+Aleksandra Jovanovska                        Salesforce Certified JavaScript Developer I, Salesforce Certified B2C Commerce Developer
+Alexey  Turlapov                             MCSD .Net 2.0
+Alfredo Daniel Rueda Rueda                   CCNA Cisco Certified Network Associate, Certified Meraki Networking Associate, Scrum Fundamentals Certified
+Alvaro Andres Acha Bejarano                  Software Quality Assurance Jalasoft Certification
+Alvaro Augusto Ortiz Duarte                  Scrum Foundations Professional Certificate
+Alvaro Emanuel Padilla Nunez                 MCSA: Web Applications, MCPS: Certified Professional, Microsoft Certified: HTML5 with JavaScript and CSS3
+Alvaro Mauricio Galarza Almanza              Cybersecurity Essentials
+Ana Julieta Jimenez Ocampo                   UX/UI Designer Certification - EBAC – British School of Creative Arts
+Ana Luisa Alvarez Zavala                     Certified Scrum Product Owner (CSPO), Scrum Master
+Andiria Rojas Agudo                          Scrum Master
+Andres  Juarez Troncoso                      Project Management Professional (PMP), Certified Scrum Master (CSM), Project Management Officer (PMO), ITIL Foundation v3.0
+Andres  Robles Romero                        Sun Certified Java 6 Programmer
+Angel Abraham Sanchez Jaramillo              Cisco IT Essentials: PC Hardware and Software, CCNA Switching & Routing: Introduction to Networks, TOEFL (ITP)
+Angel Adrian Huerta Perez                    Scrum Fundamentals Certified (SFC), Scrum Master Certified (SMC), Scrum Developer Certified (SDC)
+Angela Valdez                                Certification in Basic C# Programming
+Antonio  Gonzalez Govea                      Lean Six Sigma Bronze
+Ariel Milton Quiroz Najar                    Lightbend Akka for Scala Professional – Level 2, Lightbend Scala Language Professional – Level 2, Scrum Master
+Arleth Vargas                                Microsoft MTA Software Development Fundamentals, Microsoft MTA Database Fundamentals
+Armando Israel Quiroz Gonzalez               Sun Certified Java Programmer, Sun Certified Web Component Developer
+Artis Plocins                                Certified SugarCRM Developer, CompTIA A+, CompTIA Network+
+Arturo  Benitez Jimenez                      Certified Java Programmer 6
+Ashley Shea                                  Certified ScrumMaster® (CSM®)
+Athziri  Rodriguez Morales                   ITIL V3 Foundation Certification
+Azucena Teresa Alvarez Otterburg             MTA (Networking Fundamentals)
+Blanca Jazmin Lopez Paredes                  Azure Fundamentals, Google IT Support Certification
+Brayam Fabian Ruiz Zapata                    AWS Certified Solutions Architect - Associate, Blockchain Professional Certificate
+Bryan  Quintero Pereyra                      C1 English language level certificated by ITEP, TOEFL (560 points)
+Carlos  Gonzalez Zarco                       OCMJEA 6, SCJP 6, SCWCD 5, SCDJWS 5, AWS CCP, Togaf 9 Foundation
+Carlos  Reynoso Alvarez                      Certified Kubernetes Administrator (CKA), Certified Node.js Services Developer, Docker Certified Associate
+Carlos Alberto Torres Perez                  Java SE 4 Developer Certification SCJP
+Carlos Alejandro Perez Ceron                 Microsoft Certified: Azure AI Fundamentals, Microsoft Certified: Azure Fundamentals, Google Cloud Computing, Certified Ethical Hacker (CEH), Fortinet NSE 1-3, Fortinet FortiGate 7.4 Operator
+Carlos Alfonso Gallegos Sandoval             Agile Project Management Certification
+Carlos Andres Ramirez Villa                  Design Sprint Certification
+Carlos Clemente Zazueta Gonzalez             Desarrolla sistemas web en ASP Net Core, SQL Server y VueJS
+Carlos Daniel Arteaga Iriarte                Microsoft Certified: Azure Fundamentals
+Carlos Eduardo Acevedo Garza                 ATA 2.0 (MIT)
+Carlos Fernando de Santiago Ramirez          AWS Certified Cloud Practitioner, AWS Certified Developer, AWS Certified Solutions Architect, AWS Certified Security Specialty, AWS Certified DevOps Professional
+Carlos Manuel Luna Condori                   AWS Certified Developer - Associate, HackerRank Certification - JavaScript Fundamentals, HackerRank Certification - REST API Intermediate, HackerRank Certification - React Fundamentals, HackerRank Certification - SQL Fundamentals
+Carlos Mario Moreno Velasquez                Programming in HTML5 with JavaScript and CSS3 Certification
+Christian Paez Negron                        AWS Cloud Technical Essentials, Deep Learning Specialization
+Christopher  Balli Gallegos                  ITIL Foundation, ITIL Service Operation
+Ciaran Colgan                                Certified Scrum Master, Pluralsight IQ Certified Expert - C#
+Citlalli  Del Villar Aguilar                 Scrum Master Accredited Certification
+Claire Okane                                 CIPD Level 3 Certificate in Human Resources Practice
+Claudia  Sanjuan Perez                       ITIL Certification - EXIN, Lean Practitioner
+Colin McMaster                               PMP (Project Management Professional), Scrum Master
+Concepcion del Rosario Aguilar Cortes        Java Sun Certification Programmer, Java EE 6 Web Component Developer, ISTQB Foundation Level Certification, Personal Software Process Programmer Certification
+Crispin Quizo Melendrez                      Certified Scrum Master
+Damian Desiderio Lopez Lira                  Microsoft Technology Associate, Software Development Fundamentals
+Daniel Agustin Perez Bueno                   ISTQB Certified
+Daniel Antonio Diaz Quiroz                   TensorFlow Developer Certificate
+Daniel Erick Sanchez Trujillo                FHIR Fundamentals
+Daniel Felipe Galindo Camacho                AWS Academy Graduate – AWS Academy Introduction to Cloud
+Daniel Fernando Imbacuan Lopez               ISTQB Certified Tester, Foundation, ISTQB Certified Tester, Agile
+Daniel Francisco Maya Zapata                 SAFe 4.0
+Daniela Angelica Ticona                      The Accredited Software Testing Fundamentals Certification (AICS® ASTFC)
+Daniela Maria Pierola Marquez                Scrum Master
+David Israel Garcia Alcazar                  DO081x: Fundamentals of Containers, Kubernetes, and Red Hat OpenShift, AWS Developer - Building on AWS, Oracle Certified Java Programmer 6, TSP Member
+Davin Gerber                                 How To Design for Accessibility: for UX Designers (WCAG 2.2)
+Diego Ariel Chavez Ojeda                     Scrum Master, Scrum Fundamentals, Kanban Foundation, ITIL 4, PMI Agile
+Diego Nicolas Martinez Becerra               Oracle Certification Java SE 6 Programmer
+Diego Yessid Jauregui Salvatierra            AWS Certified Solutions Architect - Associate, AWS Certified Cloud Practitioner, Certified Kubernetes Administrator (CKA), CCNA, SFPC - Scrum Foundation Professional Certificate, Sophos XDR Certified Admin, Kaspersky Lab Certified Professional
+Edgar  Uribe Gaspar                          Red Hat Certified System Administrator (RHCSA)
+Edgar Eduardo Chavez Miramontes              Oracle Certified Associate, Java SE 8 Programmer, Oracle Certified Associate, DB Analyst, Oracle Python Certified Entry Level Programmer, JavaScript Developer Certified Engineer, ISTQB Certified Advanced Professional Software Automation Tester, HP ASE - UFT (Quick Test Professional), HP ASE - LTUL (Performance Test/Load Runner), HP AIS - ALM (Quality Center) Certified Professional, Cypress V12 Certified Developer, Microsoft Azure Certified Engineer
+Edgar Uriel Saldana Hurtado                  AWS Cloud Practitioner
+Eduardo Jesus Morales Abrego                 Cisco CCNA
+Edwin Adan Pena Lopez                        A4Q Certification Foundation
+Einaras Garbasauskas                         Microsoft Azure Fundamentals
+Emilio  Perez Banuel de la Vega              CCNA, ITIL
+Emilio Gutierrez                             MCP
+Ernesto  Hernandez Aguayo                    Salesforce Certified Administrator
+Eunice  Nunez Figueroa                       SAFe
+Fabian  Sanchez Anaya                        SAFe (Scaled Agile Framework) User
+Fernando  Aguirre Montanez                   Xamarin Certified Mobile Professional, Xamarin Certified Mobile Developer
+Fernando Henry Peredo Rivas                  Scrum Master Certification
+Fernando Octavio Dominguez Carmona           MTA Software Development Fundamentals Certification
+Francisco Alejandro Perez Ramirez            Testim Specialist Tricentis
+Francisco Javier Vergara Mora                Scrum Master Professional Certificate, Kanban Foundation, ITIL V3 Foundation, Microsoft Certified Systems Administrator, Microsoft Certified Technology Specialist, Microsoft Certified IT Professional, Microsoft Certified Desktop Support Technician
+Francisco Manuel Rivera Uc                   AWS Certified Developer, Microsoft Certified Solutions Associate: Web Applications, Microsoft Specialist: Programming in HTML5 with JavaScript and CSS3, ITIL Foundation, Microsoft Certified Technology Specialist: SQL Server 2005
+Frantzdy  Pierre Simon                       Cisco Certified Network Associate (CCNA) Routing & Switching, Cisco Networking Academy - Introduction to IoT, Cisco Networking Academy - Cybersecurity Essentials
+Gabriel  Amezquita Garcia                    Professional Certificate in Data Science by IBM, Teaching Knowledge Test (TKT) Band 3
+Gabriel  Saldana Torres                      Google Ads Certification
+Gabriel Gonzalo Maranon Rodriguez            AWS Certified Solutions Architect – Associate, Microsoft Certified: Azure Solutions Architect Expert, Certified Kubernetes Administrator (CKA), Cisco Certified Network Associate (CCNA), CCNA Security, AZ-300 Microsoft Azure Architect Technologies, Microsoft Certified: Azure Fundamentals
+Gerardo  Garcia Herrera                      Oracle Java 7 Associate Programmer
+German  Zapien Dominguez                     Scrum Fundamentals
+Grecia Jorgelinda Machaca Yapura             Cisco Certified Network Associate (CCNA) 200-125
+Gustavo Adolfo Contreras Miranda             Scrum Master Accredited Certification – SCRUM Institute
+Gustavo David Melendez Sanchez               Sitecore Experience Solution 9 Certified Developer
+Hector Marcelo Hidalgo Quena                 AWS Certified Cloud Practitioner
+Hector Marcelo Mazzucotelli                  AWS Certified Developer – Associate, AWS Certified Cloud Practitioner
+Hector Oswaldo Herrera Miramontes            Salesforce Administrator, Salesforce Platform Developer I
+Hugo Daniel Alvarado Gallegos                Salesforce Certified Platform Developer 1, Salesforce Certified Business Analyst, Salesforce Certified Advanced Administrator, Salesforce Certified Pardot Specialist, Salesforce Certified Platform App Builder, Salesforce Certified Administrator, Salesforce Associate, Salesforce AI Associate, Salesforce AI Specialist
+Ingrid Guadalupe Rodriguez Leon              AWS Certified Cloud Practitioner, AWS Certified AI Practitioner, Databricks Certified Machine Learning Professional
+Irving Roberto Reyes Guerrero                Oracle Certified Professional Java SE 6 Programmer
+Isidoro Ricardo Gonzalez Leal                CompTIA Network+, ITIL v3 Foundation, MCSA Windows Server 2003, MCSD: Web Applications
+Ivan Alejandro Ocampo Salazar                Microsoft Certified Professional - Developing ASP.NET MVC Web Applications
+Ivan Armando Zepeda Garcia                   SQL Concepts for Data Engineers, Querying Data with Transact SQL
+Ivan Fernando Mujica Mamani                  OpenJS Node.js Application Developer, OpenJS Node.js Services Developer, TOEFL IBT, Microsoft SQL Server 2008 R2 Administrator
+Ivan Ricardo Castillo Fernandez              Cisco CCNA Routing and Switching, Huawei Pre-Position Competence Certification for Maintenance Service
+Jaime  Madrigal Rios                         AWS Certified Solutions Architect - Associate
+Jaime Daniel Cruz Diaz                       PSP
+Jaime Montoya Salinas                        Red Hat Certified Enterprise Virtualization Administrator
+Jake Lennox                                  MTA: Database Fundamentals
+Jake Sexton                                  ISTQB Certified Tester Foundation Level
+Javier Alberto Rodriguez Rodriguez           Scrum Master Accredited Certification™
+Javier Roberto Veloz Centeno                 Deep Learning Specialization, CIMAT-INAOE Deep Learning Certification
+Javier Ulises Sanchez Grande                 Azure DevOps Engineer Expert, Azure Developer Associate, Unity Certified Developer, Xamarin Developer
+Jeffry Stiven Guerrero Delgado               Azure Fundamentals, Google Cloud Skills, Technical Support Fundamentals
+Jesus Pardo Delgado                          CCNA (Cisco Certified Network Associate), CISO (Certified Information Security Officer), MTA Server Administrator Fundamentals, MTA Networking Fundamentals, MTA Security Fundamentals
+Jesus Rodrigo Acedo Vargas                   Microsoft Certified Solutions Developer: Web Applications, Microsoft Certified Technology Specialist, Microsoft Certified Professional Developer: Windows Developer 4
+Jhan Carlos Orozco Mercado                   Databricks Data Analyst Associate, AWS Solutions Architect – Associate
+Jhanina Meliza Romero Lazcano                ISTQB
+Jhoselin Luizaga Rodriguez                   Certified Software Testing Professional
+Jimmy Osvaldo Rojas Medrano                  Certified Leadership and Management
+Joaquin Atahualpa Olivera Mullin             Salesforce Certified Platform Developer 1
+Joel Vila Bringuez                           Scrum Product Owner, Scrum Master, Security Techniques in the Development Process
+Jonathan Emmanuel Garces Palos               Azure Fundamentals, Azure AI Fundamentals, Azure Data Fundamentals, Azure Developer
+Jorge Antonio Maldonado Nunez                Oracle Certified Associate Java Programmer
+Jorge Ernesto Flores Guerrero                Microsoft Azure Administrator AZ-104, Microsoft Azure Fundamentals AZ-900, Kubernetes Administrator, Kubernetes Application Developer
+Jorge Santiago Penayo Espinola               Oracle Database certification, EFSET English Certificate (C2 Proficient)
+Jose Alan Perea Hernandez                    Design Sprint Professional Certificate (SDPC), Google Project Management Certificate, Scrum Master Professional Certificate (SMPC), Scrum Foundation Professional Certificate (SFPC), Internal Auditor ISO 9001, Risk Management Certificate
+Jose Alberto Oscoy Gonzalez                  Google IT Support Certificate
+Jose Alfredo Vargas Santiago                 CS169.1x: Software as a Service, CS169.2x: Engineering Software as a Service, Louv1.01x: Paradigms of Computer Programming, Project101x: Introduction to Project Management, Python Essentials by CISCO
+Jose Angel Aspuru Mijares                    ISTQB Foundation Level
+Jose Angel Hernandez Martinez                IT Infrastructure Certification
+Jose Antonio Aldrete Macias                  Testim Fundamentals Certification
+Jose Braulio Hernandez Galvan                Scrum Master Accredited Certification
+Jose David Yances Rojas                      Certified Java Professional, Pentest Engineer
+Jose de Jesus Marquez Renteria               CCNA 1: Introduction to Networks, CCNA 2: Routing and Switching, CCNA 3: Scaling Networks
+Jose Eduardo Dimas Torres                    AWS Certified Solutions Architect - Associate, GCP Associate Cloud Engineer
+Jose Eduardo Rodriguez Rodriguez             AWS Certified Cloud Practitioner
+Jose Felix Alba Solis                        Oracle Certified Professional, Java SE 6
+Jose Gerardo Cardenas Solis                  Programming in C# Specialist Certification by Microsoft
+Josh Perdue                                  Microsoft Certified Database Administrator, Microsoft Certified Trainer, CompTIA Certified Technical Trainer
+Josue Yael Aguirre Munoz                     Infosys Certified Software Programmer – Web, Infosys Certified Selenium Basic Automation Tester
+Juan Carlos Garibay Ruiz                     PMP
+Juan David Caballero Florez                  AWS Certified Cloud Practitioner, Associate Cloud Engineer, SAP BTP: config, build, develop
+Juan David Davila Mejia                      ISTQB
+Juan David Estrada                           Salesforce Certified, Siebel Certified, PMP Certified
+Juan David Martinez Gualdron                 Oracle Cloud Infrastructure (OCI) DevOps Professional, Oracle Cloud Infrastructure (OCI) Observability Professional, Oracle Cloud Infrastructure (OCI) Generative AI Professional, Oracle Cloud Infrastructure (OCI) Foundations Associate, Oracle Cloud Infrastructure (OCI) AI Foundations Associate
+Juan David Olarte Serna                      Angular Certification, .NET Advance Application Developer
+Juan David Tuta Botero                       AWS Certified Cloud Practitioner
+Juan Fernando Misas Marin                    Ruby On Rails Full-Stack Labs Certification
+Juan Manuel Roa Mejia                        Scrum Foundations Professional Certificate (SFPC)
+Juan Pablo Amonzabel Zegarra                 Angular Level 2 Certification, Angular Level 1 Certification
+Juan Ramon Ponce Mauries                     Outsystems Traditional Web Developer, Outsystems Reactive Developer
+Judas Armando Echeverria Badilla             AWS Certified Solutions Architect - Associate
+Julio Alex Cesar Rocabado Vargas             Software Quality Assurance Foundation, Scrum Foundations Professional Certificate (SFPC)
+Justin Abdul Salcedo Morales                 DeVry's Programming Essentials Certificate
+Kelly Johana Valdes Casiani                  Scrum Foundations Professional Certificate (SFPC)
+Kevin Daniel Villagomez Llorenty             Microsoft Certified Azure Solutions Architect Expert, Microsoft Certified DevOps Engineer Expert, Microsoft Certified Azure Administrator Associate
+Kris Hauhe                                   Certified Scrum Product Owner, Lean Six Sigma Yellow Belt
+Leonardo Julio Rios Aliaga                   AWS Certified Cloud Practitioner
+Lorenzo Antonio Infante Sanchez              Microsoft Certified Technology Specialist (MCTS): .Net Framework 4, Web Applications
+Lucas Solis Silvano                          EF SET C2 Proficiency
+Lucy Rani                                    ISTQB, Certificate for FDA Guidelines
+Luis Alberto Molina Orozco                   CENEVAL
+Luis Alfredo Porras Paez                     Certified Scrum Master
+Luis Eduardo Velandia Torres                 AWS Certified Cloud Practitioner
+Luis Enrique Cortes Velasco                  Scrum Master Accredited Certification
+Luis Fernando Anda Collazo                   Mabl Skill and Fundamentals
+Luis Fernando Gomez Valdivia                 Microsoft Certified: Azure Fundamentals
+Luis Gerardo Morales Paez                    NSE1 Network Security Associate, NSE2 Network Security Associate, NSE3 Network Security Associate, EC-Council Network Defense Essentials, ISC2 Incident Response, BC and DR, ISC2 Incident Response and Recovery, Microsoft Certified: Azure Fundamentals
+Luis Gerardo Ramirez Cabrera                 Certified SAFe 5 Practitioner
+Luis Gerardo Zuniga Becerra                  Scrum Fundamentals Certified
+Luis Manuel Cogollo Silva                    Certified Ethical Hacker (CEH), Scrum Fundamentals Certified
+Luis Olaf Lopez Arias                        SQL Server 2008 MCTS, Oracle Certified Java Programmer
+Manuel Alejandro Gutierrez Lemus             IBM Academic Associate: DB2 Database and Application Fundamentals
+Manuel Facundo Cardozo Ramirez               Microsoft Certified: Azure Fundamentals, EFSET English Certificate (C2 Proficient)
+Manuel Jose Escalante Eguis                  Onbase Certified Installer, Onbase Certified Workflow Engineer, Onbase Certified WorkView Engineer
+Marco Antonio Andrade Tirado                 IBM Data Science Professional Certificate
+Marco Antonio Martinez Munoz                 M101P MongoDB for Developers
+Marco Antonio Santos Maldonado               Oracle Certified Associate, MySQL 5, Oracle Certified Associate, Java SE 5/SE 6, Oracle Certified Associate, Solaris 10 Operating System, Microsoft Technology Associate: Networking Fundamentals
+Marco Medrano Garay                          Microsoft Technology Associate – Windows Development Fundamentals (C#), MB2-876: Extending Microsoft Dynamics CRM 2011, 2013
+Marcos Jahdiel Poot Xool                     Certification in Angular 5 Applications, Certification in CA application, ITIL
+Maria Alejandra Hoyos Agudelo                Data Literacy Green Belt – Cisco
+Mariana Alejandra Rendon Partido             ISTQB® Certified Tester, Foundation Level
+Marianne Soria Salazar                       CCNA Security, MTCNA, MTCTE, Heart Saver First Aid CPR AED
+Marisela  Orozco Ascencio                    Oracle Certified Associate Java Programmer SE 6
+Mauricio Dellagiovanna                       University Expert in Ethical Hacking
+Michael Ferneein Garzon Rodriguez            Snowflake Sales Professional Accreditation
+Midaysa Nathalie Palacios Gomez              OutSystems Associate: Reactive Developer, OutSystems Mobile Developer Specialist, OutSystems Traditional Web Developer, OutSystems ODC Developer, Scrum Foundation Professional Certificate
+Miguel Angel Almanza Hernandez               Cisco CLCOR 350-801
+Moises  Carrillo del Rio                     Certified Scrum Master, Cambridge Business English Certificate
+Monserrat  Hernandez Salas                   Scrum Product Owner Professional Certificate (SPOPC), Design Thinking Professional Certificate (DTPC)
+Nathan McAlinden                             AWS Certified Solutions Architect - Associate
+Neil Yezid Villarroel Molina                 PC: Scrum Foundation Professional Certificate, MCPS: Microsoft Certified Professional, MTA: Windows Server Administration Fundamentals, MTA: Security Fundamentals, MTA: Networking Fundamentals, CCNA: Cisco Certified Networking Associated
+Neyber Rojas Zapata                          Scrum Foundation Professional Certificate
+Nicola McNally                               ISTQB Certified Tester Foundation Level
+Noemi Ines Rangel Ramirez                    ISTQB Certified, Azure Fundamentals (AZ-900), Six Sigma White Belt, Scrum Fundamentals Certified, Postman API Fundamentals Student Expert
+Olimpia Colque Flores                        Certified in Software Testing by the Florida Institute of Education and Soft Academy
+Ollin Ixchel Leon Luna                       Certified Scrum Master
+Omar Baltazar Alonso Hernandez               AWS Certified Solutions Architect - Associate
+Omar Gerardo Rodriguez Aramburo              Scrum Master (2021)
+Oneciforo Rafael Pina Matos                  AZ-900 Microsoft Azure Fundamentals
+Oscar Alejandro Ledon Mu                     Scrum Master Accredited Certification™
+Oscar Alfredo Lira Duran                     Microsoft Technology Associate, Software Development Fundamentals
+Oscar Antonio Zamora Castellanos             Intermediate Scrum Master, Agile Team Facilitator, Scrum Master
+Oscar Leonardo Sanchez Acuña                 Cisco CCNA, AWS Cloud Practitioner, ITIL 4
+Oscar Omar Aguilar Mazariegos                ServiceNow Fundamentals
+Oscar Reynaldo Callisaya Limachi             AWS Certified Developer Associate
+Osvaldo  Santiago Estrada                    Xamarin Certified Mobile Developer, Xamarin Certified Mobile Professional, Oracle Certified Professional, Java SE 6 Programmer
+Pablo Antonio Laines Gurrola                 ISTQB Foundation Level, Scrum Fundamentals
+Pedro  Moriel Enriquez                       SCRUM Fundamentals Certified, IMB Agile Explorer, Cybersecurity Training and ISO-9001 NOM
+Philip Bisby                                 MuleSoft Certified Developer
+Rafael  Velazquez Alfaro                     Oracle Certified Professional: Java SE, Fortinet NSE 2
+Rafael Eduardo Torres Vargas                 Salesforce Certified Javascript Developer I, Salesforce Certified Platform Developer II, Salesforce Certified Platform Developer I, Salesforce Certified Platform App Builder, Salesforce Certified Administrator, Salesforce Associate Certified
+Rafael Rodrigo Lopez Raygoza                 Project Manager by Google
+Raul Alejandro Jalomo Ortiz                  CISSP, CISA, CRISC, ISO/IEC 27001 Lead Auditor
+Raymundo Hernandez Rocha                     Cisco Certified Network Associate (CCNA), Project Management Certification
+Rene Jezrael Lopez Cano                      MCSD Web Applications, Java SE 6 Programmer
+Ricardo  Garza Gerhard                       AWS Certified Developer – Associate
+Richard Bill Jacome Granados                 AZ-204 Azure Developer, 70-483 Programming in C#, ISO/IEC 27001:2013 Internal Auditor
+Roberto Carlos Gonzalez Garcia               TATA Knowledge Certifications - QA and Testing Methodology, TATA Knowledge Certifications - Digital: Mobile Computing Android Foundation, TATA Knowledge Certifications - Software Testing Skills, TATA Knowledge Certifications - Test Automation Foundation, TATA Knowledge Certifications - Agile Delivery Foundation
+Roberto Salgado Ramos                        EF SET English Certificate, 70-480: Programming in HTML5 with JavaScript and CSS3
+Rodrigo Axel Garcia Arambula                 Oracle Certification Java SE 6 Programmer
+Rodrigo Ballon                               AWS Certified Solutions Architect, Red Hat Certified Engineer, Red Hat Certified System Administrator, ITIL Foundation V3
+Rodrigo Huanca                               Certified Software Automation Testing Professional (AT), AWS Certified Cloud Practitioner (CLF-C02)
+Rodrigo Roman Munguia Gonzalez               Testim AI Certification
+Roger Ulaque Colque                          ISTQB Mobile Application Testing
+Roland Alex Alcala Cuba                      EF Set Certificate C1 Advanced English
+Romulo Boris Condori Sea                     Software Development Professional
+Rosa Isela Lopez Nieves                      Scrum Master Professional Certificate (SMPC)
+Ryan Molloy                                  ICAgile Fundamentals, ISTQB Foundation Level
+Samuel Mauricio Braganza Zorilla             EF SET English Certificate C2 Proficient
+Sander Giovan Castillo Calao                 Scrum Fundamentals Certified
+Sandra Liliana Mayorga Bayona                Professional Scrum Master
+Sebastian Rodriguez Marin                    AWS Certified Solutions Architect - Associate, AWS Certified Cloud Practitioner, Kanban Essentials Professional Certification - KEPC, OKR Certified Professional, Design Thinking Professional Certificate - DTPC, Scrum Developer Professional Certification - SDPC, Scrum Foundation Professional Certification - SFPC, Scrum Master Professional Certificate - SMPC, Scrum Product Owner Professional Certificate - SPOPC
+Sergio Andres Martinez Palacios              AWS Certified Cloud Practitioner
+Sergio Eduardo Vargas Lopez                  PCAP – Certified Associate in Python Programming
+Sergio Godoy                                 Cisco Certified Network Professional Collaboration (CCNP Collaboration), Cisco Certified Network Professional Routing and Switching (CCNP R&S), Cisco Certified Network Professional Voice (CCNP Voice), Cisco Certified Network Associate Routing and Switching (CCNA R&S), Cisco Certified Network Associate Voice (CCNA Voice), Juniper Networks Certified Associate Junos (JNCIA-Junos), Linux Essentials (LPI), Certified Associate in Python Programming (OpenEDG Python Institute)
+Shrikant Kewale                              Professional Scrum Master
+Sofia  Milanes Arechiga                      Scrum Master Accredited Certification™
+Soledad Teresa Nina Huanca                   Zephyr Scale Certification
+Stephanie Cruz Guzman                        Microsoft Certified Azure Developer Associate (AZ-204), Azure AZ-900 Prep. Cert.: Microsoft Azure Fundamentals
+Susana Iraiis Delgado Rodriguez              Tricentis Testim Fundamentals − Creating Automated Tests
+Tom Morrison                                 SAFe 4 Certified Agilist
+Ulises  Castaneda Lopez                      Oracle Certified Professional, Java SE 6 Programmer, ISTQB Certified Tester Foundation Level
+Victor Manuel Arango Ramiro                  Certified Professional Ethical Hacker
+Victor Manuel Rojas Rendon                   Java Programmer
+Vida Natalia Ariza Herrera                   Certificate in Tricentis Testim Fundamentals
+Waleska Alessandra Lopez Chacon              International Certification Perfil LAB
+Wilmar Giovanny Alfaro                       INTEC Certification, Computer Assembly and Maintenance Certification for Support Process, Linux Certification: Operation System, Virtual Commands and Utilities, Microsoft Excel 2007 Certification, Certification in the Development of Virtual Applications with Simultaneous Process Management and Use of Menus in Java, Application Certification with Graphical Interface, Events Management Classes and Objects in Java
+Yair Sinuhe Gomez Valencia                   Network Fundamentals Certification by Microsoft Technology Associate
+Yefferson Alexander Salcedo Mendievelso      ISTQB Certified Tester, Foundation Level
+Yonny Rafael  Vizcaya Jimenez                AWS Certified Solutions Architect, Certified Kubernetes Administrator (CKA), Docker Certified Associate
+Yuliana Vanessa Lopez Becerra                ISTQB Foundation Level Certification
+--------------------------------------------------------------------------------------------------------------
+
+Total: 263 employees with certifications
+
+======================================================================
+CERTIFICATION FREQUENCY
+======================================================================
+  AWS Certified Cloud Practitioner                        12
+  Scrum Master                                            8
+  AWS Certified Solutions Architect - Associate           8
+  Scrum Fundamentals Certified                            7
+  Certified Scrum Master                                  6
+  Microsoft Certified: Azure Fundamentals                 6
+  Certified Kubernetes Administrator (CKA)                4
+  AWS Certified Developer – Associate                     3
+  Azure Fundamentals                                      3
+  AWS Certified Solutions Architect                       3
+  Scrum Master Accredited Certification                   3
+  Scrum Fundamentals                                      3
+  Salesforce Certified Administrator                      3
+  ISTQB Certified Tester Foundation Level                 3
+  Scrum Master Accredited Certification™                  3
+  ISTQB                                                   3
+  ISTQB Foundation Level                                  3
+  Scrum Foundations Professional Certificate (SFPC)       3
+  Salesforce Certified Platform Developer I               2
+  Salesforce Certified Platform Developer II              2
+  ISTQB Certified Tester, Foundation Level                2
+  Scrum Master Certification                              2
+  AWS Certified Solutions Architect – Associate           2
+  Certified Scrum Product Owner                           2
+  CompTIA Network+                                        2
+  Docker Certified Associate                              2
+  Certified Ethical Hacker (CEH)                          2
+  AWS Certified Developer                                 2
+  Deep Learning Specialization                            2
+  ITIL Foundation                                         2
+  ISTQB Foundation Level Certification                    2
+  Microsoft Technology Associate, Software Development Fundamentals 2
+  ISTQB Certified                                         2
+  Kanban Foundation                                       2
+  ITIL 4                                                  2
+  Oracle Certification Java SE 6 Programmer               2
+  CCNA                                                    2
+  AWS Cloud Practitioner                                  2
+  Cisco CCNA                                              2
+  ITIL                                                    2
+  Xamarin Certified Mobile Professional                   2
+  Xamarin Certified Mobile Developer                      2
+  Microsoft Certified Technology Specialist               2
+  Cisco Certified Network Associate (CCNA)                2
+  CCNA Security                                           2
+  Salesforce Certified Platform Developer 1               2
+  Salesforce Certified Platform App Builder               2
+  EFSET English Certificate (C2 Proficient)               2
+  Scrum Master Professional Certificate (SMPC)            2
+  Scrum Foundation Professional Certificate               2
+  Oracle Certified Professional, Java SE 6 Programmer     2
+  Professional Scrum Master                               2
+  Microsoft Programming in HTML5 with JavaScript and CSS3 1
+  Google Associate Android Developer                      1
+  Certified Software Automation Testing Professional      1
+  Java EE 5 Web Component Developer Certification         1
+  Java SE 6 Programmer Certification                      1
+  Six Sigma Green Belt Certification                      1
+  ISTQB Certified Tester                                  1
+  TOEFL ITP                                               1
+  CAPM Certification                                      1
+  Scrum Master I                                          1
+  Selenium Certification                                  1
+  Salesforce Certified Development Professional           1
+  AWS Certified DevOps Engineer – Professional            1
+  AWS Certified Solutions Architect – Professional        1
+  AWS Certified SysOps Administrator – Associate          1
+  Microsoft Azure AZ-900                                  1
+  Microsoft Azure AZ-204                                  1
+  Microsoft Azure AZ-400                                  1
+  Scrum Developer Certified                               1
+  Scrum Master Certified                                  1
+  Java 7 Professional Certification                       1
+  Microsoft Office Specialist                             1
+  Microsoft Certified Professional                        1
+  Palo Alto Networks Certified Cybersecurity Entry-level Technician 1
+  Cisco Certified CCNA                                    1
+  Python Institute PCAP: Programming Essentials in Python 1
+  Cisco Certified CCNA Security                           1
+  Salesforce Certified JavaScript Developer I             1
+  Salesforce Certified B2C Commerce Developer             1
+  MCSD .Net 2.0                                           1
+  CCNA Cisco Certified Network Associate                  1
+  Certified Meraki Networking Associate                   1
+  Software Quality Assurance Jalasoft Certification       1
+  Scrum Foundations Professional Certificate              1
+  MCSA: Web Applications                                  1
+  MCPS: Certified Professional                            1
+  Microsoft Certified: HTML5 with JavaScript and CSS3     1
+  Cybersecurity Essentials                                1
+  UX/UI Designer Certification - EBAC – British School of Creative Arts 1
+  Certified Scrum Product Owner (CSPO)                    1
+  Project Management Professional (PMP)                   1
+  Certified Scrum Master (CSM)                            1
+  Project Management Officer (PMO)                        1
+  ITIL Foundation v3.0                                    1
+  Sun Certified Java 6 Programmer                         1
+  Cisco IT Essentials: PC Hardware and Software           1
+  CCNA Switching & Routing: Introduction to Networks      1
+  TOEFL (ITP)                                             1
+  Scrum Fundamentals Certified (SFC)                      1
+  Scrum Master Certified (SMC)                            1
+  Scrum Developer Certified (SDC)                         1
+  Certification in Basic C# Programming                   1
+  Lean Six Sigma Bronze                                   1
+  Lightbend Akka for Scala Professional – Level 2         1
+  Lightbend Scala Language Professional – Level 2         1
+  Microsoft MTA Software Development Fundamentals         1
+  Microsoft MTA Database Fundamentals                     1
+  Sun Certified Java Programmer                           1
+  Sun Certified Web Component Developer                   1
+  Certified SugarCRM Developer                            1
+  CompTIA A+                                              1
+  Certified Java Programmer 6                             1
+  Certified ScrumMaster® (CSM®)                           1
+  ITIL V3 Foundation Certification                        1
+  MTA (Networking Fundamentals)                           1
+  Google IT Support Certification                         1
+  Blockchain Professional Certificate                     1
+  C1 English language level certificated by ITEP          1
+  TOEFL (560 points)                                      1
+  OCMJEA 6                                                1
+  SCJP 6                                                  1
+  SCWCD 5                                                 1
+  SCDJWS 5                                                1
+  AWS CCP                                                 1
+  Togaf 9 Foundation                                      1
+  Certified Node.js Services Developer                    1
+  Java SE 4 Developer Certification SCJP                  1
+  Microsoft Certified: Azure AI Fundamentals              1
+  Google Cloud Computing                                  1
+  Fortinet NSE 1-3                                        1
+  Fortinet FortiGate 7.4 Operator                         1
+  Agile Project Management Certification                  1
+  Design Sprint Certification                             1
+  Desarrolla sistemas web en ASP Net Core, SQL Server y VueJS 1
+  ATA 2.0 (MIT)                                           1
+  AWS Certified Security Specialty                        1
+  AWS Certified DevOps Professional                       1
+  AWS Certified Developer - Associate                     1
+  HackerRank Certification - JavaScript Fundamentals      1
+  HackerRank Certification - REST API Intermediate        1
+  HackerRank Certification - React Fundamentals           1
+  HackerRank Certification - SQL Fundamentals             1
+  Programming in HTML5 with JavaScript and CSS3 Certification 1
+  AWS Cloud Technical Essentials                          1
+  ITIL Service Operation                                  1
+  Pluralsight IQ Certified Expert - C#                    1
+  CIPD Level 3 Certificate in Human Resources Practice    1
+  ITIL Certification - EXIN                               1
+  Lean Practitioner                                       1
+  PMP (Project Management Professional)                   1
+  Java Sun Certification Programmer                       1
+  Java EE 6 Web Component Developer                       1
+  Personal Software Process Programmer Certification      1
+  TensorFlow Developer Certificate                        1
+  FHIR Fundamentals                                       1
+  AWS Academy Graduate – AWS Academy Introduction to Cloud 1
+  ISTQB Certified Tester, Foundation                      1
+  ISTQB Certified Tester, Agile                           1
+  SAFe 4.0                                                1
+  The Accredited Software Testing Fundamentals Certification (AICS® ASTFC) 1
+  DO081x: Fundamentals of Containers, Kubernetes, and Red Hat OpenShift 1
+  AWS Developer - Building on AWS                         1
+  Oracle Certified Java Programmer 6                      1
+  TSP Member                                              1
+  How To Design for Accessibility: for UX Designers (WCAG 2.2) 1
+  PMI Agile                                               1
+  SFPC - Scrum Foundation Professional Certificate        1
+  Sophos XDR Certified Admin                              1
+  Kaspersky Lab Certified Professional                    1
+  Red Hat Certified System Administrator (RHCSA)          1
+  Oracle Certified Associate, Java SE 8 Programmer        1
+  Oracle Certified Associate, DB Analyst                  1
+  Oracle Python Certified Entry Level Programmer          1
+  JavaScript Developer Certified Engineer                 1
+  ISTQB Certified Advanced Professional Software Automation Tester 1
+  HP ASE - UFT (Quick Test Professional)                  1
+  HP ASE - LTUL (Performance Test/Load Runner)            1
+  HP AIS - ALM (Quality Center) Certified Professional    1
+  Cypress V12 Certified Developer                         1
+  Microsoft Azure Certified Engineer                      1
+  A4Q Certification Foundation                            1
+  Microsoft Azure Fundamentals                            1
+  MCP                                                     1
+  SAFe                                                    1
+  SAFe (Scaled Agile Framework) User                      1
+  MTA Software Development Fundamentals Certification     1
+  Testim Specialist Tricentis                             1
+  Scrum Master Professional Certificate                   1
+  ITIL V3 Foundation                                      1
+  Microsoft Certified Systems Administrator               1
+  Microsoft Certified IT Professional                     1
+  Microsoft Certified Desktop Support Technician          1
+  Microsoft Certified Solutions Associate: Web Applications 1
+  Microsoft Specialist: Programming in HTML5 with JavaScript and CSS3 1
+  Microsoft Certified Technology Specialist: SQL Server 2005 1
+  Cisco Certified Network Associate (CCNA) Routing & Switching 1
+  Cisco Networking Academy - Introduction to IoT          1
+  Cisco Networking Academy - Cybersecurity Essentials     1
+  Professional Certificate in Data Science by IBM         1
+  Teaching Knowledge Test (TKT) Band 3                    1
+  Google Ads Certification                                1
+  Microsoft Certified: Azure Solutions Architect Expert   1
+  AZ-300 Microsoft Azure Architect Technologies           1
+  Oracle Java 7 Associate Programmer                      1
+  Cisco Certified Network Associate (CCNA) 200-125        1
+  Scrum Master Accredited Certification – SCRUM Institute 1
+  Sitecore Experience Solution 9 Certified Developer      1
+  Salesforce Administrator                                1
+  Salesforce Platform Developer I                         1
+  Salesforce Certified Business Analyst                   1
+  Salesforce Certified Advanced Administrator             1
+  Salesforce Certified Pardot Specialist                  1
+  Salesforce Associate                                    1
+  Salesforce AI Associate                                 1
+  Salesforce AI Specialist                                1
+  AWS Certified AI Practitioner                           1
+  Databricks Certified Machine Learning Professional      1
+  Oracle Certified Professional Java SE 6 Programmer      1
+  ITIL v3 Foundation                                      1
+  MCSA Windows Server 2003                                1
+  MCSD: Web Applications                                  1
+  Microsoft Certified Professional - Developing ASP.NET MVC Web Applications 1
+  SQL Concepts for Data Engineers                         1
+  Querying Data with Transact SQL                         1
+  OpenJS Node.js Application Developer                    1
+  OpenJS Node.js Services Developer                       1
+  TOEFL IBT                                               1
+  Microsoft SQL Server 2008 R2 Administrator              1
+  Cisco CCNA Routing and Switching                        1
+  Huawei Pre-Position Competence Certification for Maintenance Service 1
+  PSP                                                     1
+  Red Hat Certified Enterprise Virtualization Administrator 1
+  MTA: Database Fundamentals                              1
+  CIMAT-INAOE Deep Learning Certification                 1
+  Azure DevOps Engineer Expert                            1
+  Azure Developer Associate                               1
+  Unity Certified Developer                               1
+  Xamarin Developer                                       1
+  Google Cloud Skills                                     1
+  Technical Support Fundamentals                          1
+  CCNA (Cisco Certified Network Associate)                1
+  CISO (Certified Information Security Officer)           1
+  MTA Server Administrator Fundamentals                   1
+  MTA Networking Fundamentals                             1
+  MTA Security Fundamentals                               1
+  Microsoft Certified Solutions Developer: Web Applications 1
+  Microsoft Certified Professional Developer: Windows Developer 4 1
+  Databricks Data Analyst Associate                       1
+  AWS Solutions Architect – Associate                     1
+  Certified Software Testing Professional                 1
+  Certified Leadership and Management                     1
+  Scrum Product Owner                                     1
+  Security Techniques in the Development Process          1
+  Azure AI Fundamentals                                   1
+  Azure Data Fundamentals                                 1
+  Azure Developer                                         1
+  Oracle Certified Associate Java Programmer              1
+  Microsoft Azure Administrator AZ-104                    1
+  Microsoft Azure Fundamentals AZ-900                     1
+  Kubernetes Administrator                                1
+  Kubernetes Application Developer                        1
+  Oracle Database certification                           1
+  Design Sprint Professional Certificate (SDPC)           1
+  Google Project Management Certificate                   1
+  Scrum Foundation Professional Certificate (SFPC)        1
+  Internal Auditor ISO 9001                               1
+  Risk Management Certificate                             1
+  Google IT Support Certificate                           1
+  CS169.1x: Software as a Service                         1
+  CS169.2x: Engineering Software as a Service             1
+  Louv1.01x: Paradigms of Computer Programming            1
+  Project101x: Introduction to Project Management         1
+  Python Essentials by CISCO                              1
+  IT Infrastructure Certification                         1
+  Testim Fundamentals Certification                       1
+  Certified Java Professional                             1
+  Pentest Engineer                                        1
+  CCNA 1: Introduction to Networks                        1
+  CCNA 2: Routing and Switching                           1
+  CCNA 3: Scaling Networks                                1
+  GCP Associate Cloud Engineer                            1
+  Oracle Certified Professional, Java SE 6                1
+  Programming in C# Specialist Certification by Microsoft 1
+  Microsoft Certified Database Administrator              1
+  Microsoft Certified Trainer                             1
+  CompTIA Certified Technical Trainer                     1
+  Infosys Certified Software Programmer – Web             1
+  Infosys Certified Selenium Basic Automation Tester      1
+  PMP                                                     1
+  Associate Cloud Engineer                                1
+  SAP BTP: config, build, develop                         1
+  Salesforce Certified                                    1
+  Siebel Certified                                        1
+  PMP Certified                                           1
+  Oracle Cloud Infrastructure (OCI) DevOps Professional   1
+  Oracle Cloud Infrastructure (OCI) Observability Professional 1
+  Oracle Cloud Infrastructure (OCI) Generative AI Professional 1
+  Oracle Cloud Infrastructure (OCI) Foundations Associate 1
+  Oracle Cloud Infrastructure (OCI) AI Foundations Associate 1
+  Angular Certification                                   1
+  .NET Advance Application Developer                      1
+  Ruby On Rails Full-Stack Labs Certification             1
+  Angular Level 2 Certification                           1
+  Angular Level 1 Certification                           1
+  Outsystems Traditional Web Developer                    1
+  Outsystems Reactive Developer                           1
+  Software Quality Assurance Foundation                   1
+  DeVry's Programming Essentials Certificate              1
+  Microsoft Certified Azure Solutions Architect Expert    1
+  Microsoft Certified DevOps Engineer Expert              1
+  Microsoft Certified Azure Administrator Associate       1
+  Lean Six Sigma Yellow Belt                              1
+  Microsoft Certified Technology Specialist (MCTS): .Net Framework 4, Web Applications 1
+  EF SET C2 Proficiency                                   1
+  Certificate for FDA Guidelines                          1
+  CENEVAL                                                 1
+  Mabl Skill and Fundamentals                             1
+  NSE1 Network Security Associate                         1
+  NSE2 Network Security Associate                         1
+  NSE3 Network Security Associate                         1
+  EC-Council Network Defense Essentials                   1
+  ISC2 Incident Response, BC and DR                       1
+  ISC2 Incident Response and Recovery                     1
+  Certified SAFe 5 Practitioner                           1
+  SQL Server 2008 MCTS                                    1
+  Oracle Certified Java Programmer                        1
+  IBM Academic Associate: DB2 Database and Application Fundamentals 1
+  Onbase Certified Installer                              1
+  Onbase Certified Workflow Engineer                      1
+  Onbase Certified WorkView Engineer                      1
+  IBM Data Science Professional Certificate               1
+  M101P MongoDB for Developers                            1
+  Oracle Certified Associate, MySQL 5                     1
+  Oracle Certified Associate, Java SE 5/SE 6              1
+  Oracle Certified Associate, Solaris 10 Operating System 1
+  Microsoft Technology Associate: Networking Fundamentals 1
+  Microsoft Technology Associate – Windows Development Fundamentals (C#) 1
+  MB2-876: Extending Microsoft Dynamics CRM 2011, 2013    1
+  Certification in Angular 5 Applications                 1
+  Certification in CA application                         1
+  Data Literacy Green Belt – Cisco                        1
+  ISTQB® Certified Tester, Foundation Level               1
+  MTCNA                                                   1
+  MTCTE                                                   1
+  Heart Saver First Aid CPR AED                           1
+  Oracle Certified Associate Java Programmer SE 6         1
+  University Expert in Ethical Hacking                    1
+  Snowflake Sales Professional Accreditation              1
+  OutSystems Associate: Reactive Developer                1
+  OutSystems Mobile Developer Specialist                  1
+  OutSystems Traditional Web Developer                    1
+  OutSystems ODC Developer                                1
+  Cisco CLCOR 350-801                                     1
+  Cambridge Business English Certificate                  1
+  Scrum Product Owner Professional Certificate (SPOPC)    1
+  Design Thinking Professional Certificate (DTPC)         1
+  PC: Scrum Foundation Professional Certificate           1
+  MCPS: Microsoft Certified Professional                  1
+  MTA: Windows Server Administration Fundamentals         1
+  MTA: Security Fundamentals                              1
+  MTA: Networking Fundamentals                            1
+  CCNA: Cisco Certified Networking Associated             1
+  Azure Fundamentals (AZ-900)                             1
+  Six Sigma White Belt                                    1
+  Postman API Fundamentals Student Expert                 1
+  Certified in Software Testing by the Florida Institute of Education and Soft Academy 1
+  Scrum Master (2021)                                     1
+  AZ-900 Microsoft Azure Fundamentals                     1
+  Intermediate Scrum Master                               1
+  Agile Team Facilitator                                  1
+  ServiceNow Fundamentals                                 1
+  AWS Certified Developer Associate                       1
+  SCRUM Fundamentals Certified                            1
+  IMB Agile Explorer                                      1
+  Cybersecurity Training and ISO-9001 NOM                 1
+  MuleSoft Certified Developer                            1
+  Oracle Certified Professional: Java SE                  1
+  Fortinet NSE 2                                          1
+  Salesforce Certified Javascript Developer I             1
+  Salesforce Associate Certified                          1
+  Project Manager by Google                               1
+  CISSP                                                   1
+  CISA                                                    1
+  CRISC                                                   1
+  ISO/IEC 27001 Lead Auditor                              1
+  Project Management Certification                        1
+  MCSD Web Applications                                   1
+  Java SE 6 Programmer                                    1
+  AZ-204 Azure Developer                                  1
+  70-483 Programming in C#                                1
+  ISO/IEC 27001:2013 Internal Auditor                     1
+  TATA Knowledge Certifications - QA and Testing Methodology 1
+  TATA Knowledge Certifications - Digital: Mobile Computing Android Foundation 1
+  TATA Knowledge Certifications - Software Testing Skills 1
+  TATA Knowledge Certifications - Test Automation Foundation 1
+  TATA Knowledge Certifications - Agile Delivery Foundation 1
+  EF SET English Certificate                              1
+  70-480: Programming in HTML5 with JavaScript and CSS3   1
+  Red Hat Certified Engineer                              1
+  Red Hat Certified System Administrator                  1
+  ITIL Foundation V3                                      1
+  Certified Software Automation Testing Professional (AT) 1
+  AWS Certified Cloud Practitioner (CLF-C02)              1
+  Testim AI Certification                                 1
+  ISTQB Mobile Application Testing                        1
+  EF Set Certificate C1 Advanced English                  1
+  Software Development Professional                       1
+  ICAgile Fundamentals                                    1
+  EF SET English Certificate C2 Proficient                1
+  Kanban Essentials Professional Certification - KEPC     1
+  OKR Certified Professional                              1
+  Design Thinking Professional Certificate - DTPC         1
+  Scrum Developer Professional Certification - SDPC       1
+  Scrum Foundation Professional Certification - SFPC      1
+  Scrum Master Professional Certificate - SMPC            1
+  Scrum Product Owner Professional Certificate - SPOPC    1
+  PCAP – Certified Associate in Python Programming        1
+  Cisco Certified Network Professional Collaboration (CCNP Collaboration) 1
+  Cisco Certified Network Professional Routing and Switching (CCNP R&S) 1
+  Cisco Certified Network Professional Voice (CCNP Voice) 1
+  Cisco Certified Network Associate Routing and Switching (CCNA R&S) 1
+  Cisco Certified Network Associate Voice (CCNA Voice)    1
+  Juniper Networks Certified Associate Junos (JNCIA-Junos) 1
+  Linux Essentials (LPI)                                  1
+  Certified Associate in Python Programming (OpenEDG Python Institute) 1
+  Zephyr Scale Certification                              1
+  Microsoft Certified Azure Developer Associate (AZ-204)  1
+  Azure AZ-900 Prep. Cert.: Microsoft Azure Fundamentals  1
+  Tricentis Testim Fundamentals − Creating Automated Tests 1
+  SAFe 4 Certified Agilist                                1
+  Certified Professional Ethical Hacker                   1
+  Java Programmer                                         1
+  Certificate in Tricentis Testim Fundamentals            1
+  International Certification Perfil LAB                  1
+  INTEC Certification                                     1
+  Computer Assembly and Maintenance Certification for Support Process 1
+  Linux Certification: Operation System, Virtual Commands and Utilities 1
+  Microsoft Excel 2007 Certification                      1
+  Certification in the Development of Virtual Applications with Simultaneous Process Management and Use of Menus in Java 1
+  Application Certification with Graphical Interface, Events Management Classes and Objects in Java 1
+  Network Fundamentals Certification by Microsoft Technology Associate 1

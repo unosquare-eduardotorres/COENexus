@@ -1,0 +1,100 @@
+import { Link } from 'react-router-dom';
+
+interface AppCardProps {
+  name: string;
+  codename: string;
+  tagline: string;
+  description: React.ReactNode;
+  href: string;
+  icon: React.ReactNode;
+  accentColor: string;
+  status: 'active' | 'experimental' | 'coming-soon';
+}
+
+function StatusBadge({ status }: { status: 'active' | 'experimental' | 'coming-soon' }) {
+  if (status === 'active') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        Active
+      </span>
+    );
+  }
+
+  if (status === 'experimental') {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+        Experimental
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-500/10 px-2.5 py-0.5 text-xs font-medium text-gray-400">
+      Coming Soon
+    </span>
+  );
+}
+
+function CardContent({ name, codename, tagline, description, icon, accentColor, status }: AppCardProps) {
+  return (
+    <div className="relative flex flex-col h-full">
+      <div
+        className="absolute -left-8 -top-8 h-32 w-32 rounded-full blur-3xl opacity-20"
+        style={{ background: accentColor }}
+      />
+
+      <div className="relative flex justify-end mb-3 min-h-[24px]">
+        <StatusBadge status={status} />
+      </div>
+
+      <div className="relative flex justify-center mb-4">
+        <div
+          className="flex h-20 w-20 items-center justify-center rounded-xl"
+          style={{ backgroundColor: `${accentColor}26` }}
+        >
+          <div style={{ color: accentColor }}>{icon}</div>
+        </div>
+      </div>
+
+      <div className="relative space-y-1.5 flex-1">
+        <h3 className="text-lg font-semibold text-primary">{name}</h3>
+        <p className="text-xs font-mono tracking-wider text-muted uppercase">{codename}</p>
+        {tagline && <p className="text-sm italic text-secondary">{tagline}</p>}
+        <p className="text-sm text-muted pt-1">{description}</p>
+      </div>
+
+      {(status === 'active' || status === 'experimental') && (
+        <div className="relative mt-auto pt-4 flex items-center gap-1.5 text-sm font-medium group-hover:gap-2.5 transition-all duration-300" style={{ color: accentColor }}>
+          Launch
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" />
+            <path d="m12 5 7 7-7 7" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AppCard(props: AppCardProps) {
+  if (props.status === 'active' || props.status === 'experimental') {
+    return (
+      <Link to={props.href} className="glass-card-hover p-6 block group relative overflow-hidden h-full">
+        <CardContent {...props} />
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled
+      aria-disabled="true"
+      className="glass-card p-6 relative overflow-hidden opacity-60 cursor-not-allowed appearance-none bg-transparent border-none text-left w-full h-full"
+    >
+      <CardContent {...props} />
+    </button>
+  );
+}

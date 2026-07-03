@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Mexico_City"
+
+    # Keep PR noise manageable
+    open-pull-requests-limit: 10
+
+    # Group minor+patch bumps into a single PR
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+    # Label PRs for easy filtering
+    labels:
+      - "dependencies"
+
+    # Packages we KNOW are blocked — don't open PRs until conditions change
+    ignore:
+      # Blocked by @electron-forge/plugin-fuses 8 stable (currently alpha)
+      - dependency-name: "@electron/fuses"
+        versions: [">=2.0.0"]
+
+      # Blocked by electron-vite 6 stable (currently beta) → needs Vite 8
+      - dependency-name: "@vitejs/plugin-react"
+        versions: [">=6.0.0"]
+
+      # Tailwind 4 is an architectural rewrite — dedicated sprint, not a Dependabot PR
+      - dependency-name: "tailwindcss"
+        versions: [">=4.0.0"]
+
+      # Goes with Tailwind 4 migration
+      - dependency-name: "tailwind-merge"
+        versions: [">=3.0.0"]
